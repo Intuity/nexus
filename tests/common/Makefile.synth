@@ -1,0 +1,97 @@
+# ==============================================================================
+# Common Setup
+# ==============================================================================
+MAKE_DIRS +=
+QUIET     ?= yes
+PRECMD    ?= $(if $(filter yes,$(QUIET)),@,)
+
+# Setup default rule
+.PHONY: all
+all: synth
+
+# ==============================================================================
+# Input Variables
+# ==============================================================================
+DESIGN_TOP   ?=
+RTL_SRC_DIRS ?= .
+RTL_SRC_EXTS ?= .v .sv
+RTL_SRCS     += $(foreach x,$(RTL_SRC_EXTS),$(foreach d,$(RTL_SRC_DIRS),$(wildcard $(d)/*$(x))))
+
+ifeq ($(DESIGN_TOP),)
+  $(info ERROR: No DESIGN_TOP specified)
+  $(error 1)
+endif
+ifeq ($(RTL_SRCS),)
+  $(info ERROR: No RTL_SRCS were located)
+  $(error 1)
+endif
+
+# ==============================================================================
+# Output Variables
+# ==============================================================================
+WORK_DIR  ?= work
+MAKE_DIRS += $(WORK_DIR)
+
+LOG_FILE ?= $(WORK_DIR)/log
+
+OUTPUT_JSON ?= $(DESIGN_TOP).json
+
+# ==============================================================================
+# Generate Synthesis Script
+# ==============================================================================
+SYN_SCRIPT ?= $(WORK_DIR)/yosys.do
+
+$(SYN_SCRIPT): | $(WORK_DIR)
+	@echo "# Creating synthesis script $(notdir $@)"
+ifneq ($(QUIET),yes)
+	$(PRECMD)echo "echo on;" >> $@
+endif
+	$(PRECMD)echo "log --> Setting up include directories;" >> $@
+	$(PRECMD)for d in $(abspath $(RTL_SRC_DIRS)); do \
+	    echo "read -incdir $$d;" >> $@; \
+	done
+	$(PRECMD)echo "log --> Reading in RTL files;" >> $@
+	$(PRECMD)for f in $(abspath $(RTL_SRCS)); do \
+	    echo "read -sv $$f;" >> $@; \
+	done
+	$(PRECMD)echo "log --> Building hierarchy from $(DESIGN_TOP);" >> $@
+	$(PRECMD)echo "hierarchy -top $(DESIGN_TOP);" >> $@
+	$(PRECMD)echo "log --> Translate processes to netlist;" >> $@
+	$(PRECMD)echo "proc;" >> $@
+	$(PRECMD)echo "log --> Extract and optimise FSMs;" >> $@
+	$(PRECMD)echo "fsm;" >> $@
+	$(PRECMD)echo "log --> Perform simple optimisations (round 1);" >> $@
+	$(PRECMD)echo "opt;" >> $@
+	$(PRECMD)echo "log --> Translate memories to basic cells;" >> $@
+	$(PRECMD)echo "memory;" >> $@
+	$(PRECMD)echo "log --> Perform simple optimisations (round 2);" >> $@
+	$(PRECMD)echo "opt;" >> $@
+	$(PRECMD)echo "log --> Writing out design to JSON $(OUTPUT_JSON);" >> $@
+	$(PRECMD)echo "write_json -aig $(OUTPUT_JSON);" >> $@
+
+# ==============================================================================
+# Synthesis Step
+# ==============================================================================
+SYN_ARGS += -Q
+SYN_ARGS += -l $(abspath $(LOG_FILE))
+SYN_ARGS += -s $(abspath $(SYN_SCRIPT))
+
+.PHONY: synth
+synth: $(SYN_SCRIPT) | $(WORK_DIR)
+	@echo "# Starting synthesis with script $(notdir $(SYN_SCRIPT))"
+	$(PRECMD)cd $(WORK_DIR) && yosys $(SYN_ARGS)
+
+# ==============================================================================
+# Make Directories
+# ==============================================================================
+$(MAKE_DIRS):
+	@echo "# Creating directory $(notdir $@)"
+	$(PRECMD)mkdir -p $@
+
+# ==============================================================================
+# Helper Rules
+# ==============================================================================
+.PHONY:
+clean:
+	@echo "# Removing working directories"
+	$(PRECMD)rm -rf $(MAKE_DIRS)
