@@ -24,6 +24,7 @@ def main(
     # Verbosity controls
     quiet, debug,
 ):
+    """ Architectural model of the Nexus accelerator """
     # Setup verbosity
     if   quiet: Base.set_verbosity(Verbosity.WARN )
     elif debug: Base.set_verbosity(Verbosity.DEBUG)
