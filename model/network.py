@@ -1,17 +1,26 @@
 import simpy
 
-class Pipe:
+from .base import Base
+
+class Pipe(Base):
     """ Pipe with a delay """
 
-    def __init__(self, env, delay, capacity):
+    def __init__(self, env, network, pipe_id, delay, capacity):
         """ Initialise Pipe instance.
 
         Args:
             env     : SimPy environment
+            network : Parent Network instance
             delay   : Propagation delay for the pipe
             capacity: Per-pipe capacity
         """
-        self.env        = env
+        assert isinstance(network,  Network)
+        assert isinstance(pipe_id,  int)
+        assert isinstance(delay,    int)
+        assert isinstance(capacity, int)
+        super().__init__(env, f"Net {network.id} Pipe {pipe_id}")
+        self.pipe_id    = pipe_id
+        self.network    = Network
         self.delay      = delay
         self.capacity   = capacity
         self.in_store   = simpy.Store(env, capacity=capacity)
@@ -50,11 +59,13 @@ class Pipe:
         # Increment number of pushes
         self.num_push += 1
         # Push to the inbound store
+        self.debug(f"Message {msg.id} pushed")
         yield self.in_store.put((self.env.now, msg))
 
     def pop(self):
         # Pop the next entry
         entry, msg = yield self.out_store.get()
+        self.debug(f"Message {msg.id} popped")
         # Increment number of items popped
         self.num_pop += 1
         # If empty, record active time
@@ -74,8 +85,10 @@ class Pipe:
             # Deliver to the outbound store
             self.out_store.put((entry, msg))
 
-class Network:
+class Network(Base):
     """ Multi-in-multi-out network. """
+
+    NEXT_ID = 0
 
     def __init__(self, env, delay, capacity):
         """ Initialise Network instance.
@@ -85,12 +98,21 @@ class Network:
             delay   : Propagation delay on each pipe
             capacity: Per-pipe capacity
         """
-        self.env       = env
+        assert isinstance(delay,    int)
+        assert isinstance(capacity, int)
+        self.id        = Network.issue_id()
+        super().__init__(env, f"Network {self.id:2d}")
         self.delay     = delay
         self.capacity  = capacity
         self.in_flight = []
         self.pipes     = []
         self.catchall  = None
+
+    @classmethod
+    def issue_id(cls):
+        the_id       = cls.NEXT_ID
+        cls.NEXT_ID += 1
+        return the_id
 
     @property
     def idle(self): return sum([x.idle for x in self.pipes])
@@ -114,7 +136,7 @@ class Network:
 
     def add_target(self, catchall=False, capacity=None):
         if capacity == None: capacity = self.capacity
-        self.pipes.append(Pipe(self.env, 1, capacity))
+        self.pipes.append(Pipe(self.env, self, len(self.pipes), 1, capacity))
         if catchall: self.catchall = self.pipes[-1]
         return self.pipes[-1]
 

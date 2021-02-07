@@ -1,10 +1,11 @@
 import simpy
 
+from .base import Base
 from .element import Element
 from .network import Network, Pipe
 from .message import Message
 
-class Receiver:
+class Receiver(Base):
     """ Receiver for messages exiting the network """
 
     def __init__(self, env, inbound):
@@ -14,9 +15,8 @@ class Receiver:
             env    : SimPy environment
             inbound: The inbound port to receive data through
         """
-        assert isinstance(env,     simpy.Environment)
         assert isinstance(inbound, Pipe)
-        self.env      = env
+        super().__init__(env, "Receiver")
         self.inbound  = inbound
         self.received = []
         self.action   = self.env.process(self.run())
@@ -29,9 +29,9 @@ class Receiver:
             # Collect the message
             self.received.append((self.env.now, msg))
             # Log message received
-            print(f"[RX {msg.id:04d}] Data 0x{msg.data:08X} @ {self.env.now}")
-            # for time, step in msg.chain:
-            #     if isinstance(step, Element):
-            #         print(f" - {step.row:4d}, {step.col:4d} @ {time:4d}")
-            #     else:
-            #         print(f" - {type(step).__name__} @ {time:4d}")
+            self.info(f"Message {msg.id:04d} - 0x{msg.data:08X}")
+            for time, step in msg.chain:
+                if isinstance(step, Element):
+                    self.debug(f" - {step.row:4d}, {step.col:4d} @ {time:4d}")
+                else:
+                    self.debug(f" - {type(step).__name__} @ {time:4d}")

@@ -1,7 +1,8 @@
+from .base import Base
 from .element import Element
 from .network import Network
 
-class Mesh:
+class Mesh(Base):
     """ A mesh constructed of nodes and networks """
 
     # Positions in array for busy and idle counters
@@ -19,7 +20,9 @@ class Mesh:
             rows   : Number of rows in the mesh
             columns: Number of columns in the mesh
         """
-        self.env     = env
+        assert isinstance(rows,    int)
+        assert isinstance(columns, int)
+        super().__init__(env, "Mesh")
         self.rows    = rows
         self.columns = columns
         # Start with an initial network - this is the entrypoint

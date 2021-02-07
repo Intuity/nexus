@@ -2,10 +2,11 @@ from random import choice, randint
 
 import simpy
 
+from .base import Base
 from .network import Network, Pipe
 from .message import Message
 
-class Element:
+class Element(Base):
     """ A single compute element in the network """
 
     def __init__(self, env, row, col, inbound, outbound):
@@ -18,10 +19,11 @@ class Element:
             inbound: Inbound pipe from network for receiving data
             outbound : Outbound pipe to network for transmitting data
         """
-        assert isinstance(env,      simpy.Environment)
-        assert isinstance(inbound,  Pipe)
+        assert isinstance(row,      int    )
+        assert isinstance(col,      int    )
+        assert isinstance(inbound,  Pipe   )
         assert isinstance(outbound, Network)
-        self.env      = env
+        super().__init__(env, f"Element {row:02d}, {col:02d}")
         self.row      = row
         self.col      = col
         self.inbound  = inbound
@@ -43,14 +45,19 @@ class Element:
             msg        = yield self.env.process(self.inbound.pop())
             start      = self.env.now
             self.idle += start - last_tx
+            # Log message capture
+            self.debug(f"Received message {msg.id}")
             # Sanity check
             assert isinstance(msg, Message)
             # Append this node to the chain
             msg.append_to_chain(self)
             # Delay for a cycle
             yield self.env.timeout(1)
-            # self.outbound.transmit(choice(range(self.outbound.num_targets)), msg)
-            yield self.env.process(self.outbound.transmit(self.col, msg))
+            self.debug(f"Sending message {msg.id}")
+            yield self.env.process(self.outbound.transmit(
+                choice(range(self.outbound.num_targets)), msg
+            ))
+            # yield self.env.process(self.outbound.transmit(self.col, msg))
             last_tx      = self.env.now
             self.active += last_tx - start
 

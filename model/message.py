@@ -1,4 +1,6 @@
-class Message:
+from .base import Base
+
+class Message(Base):
     """ Base class for a message """
 
     NEXT_ID = 0
@@ -11,11 +13,10 @@ class Message:
             data     : Data to carry
             initiator: Where the message was sent from
         """
-        self.env     = env
-        self.data    = data
-        self.id      = Message.issue_id()
-        self.chain   = [(self.env.now, initiator)]
-        self.created = self.env.now
+        self.id    = Message.issue_id()
+        super().__init__(env, f"Message {self.id:05d}")
+        self.data  = data
+        self.chain = [(self.env.now, initiator)]
 
     @classmethod
     def issue_id(cls):

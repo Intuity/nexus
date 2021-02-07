@@ -1,12 +1,15 @@
 import simpy
 
+from .base import Base, Verbosity
 from .mesh import Mesh
 from .transmitter import Transitter, TxMode
 from .receiver import Receiver
 
+Base.set_verbosity(Verbosity.INFO)
+
 env  = simpy.Environment()
-mesh = Mesh(env, 10, 10)
-tx   = Transitter(env, mesh.ingress, max_send=10000, bursts=(8, 10), mode=TxMode.UNIQUE)
+mesh = Mesh(env, 2, 2)
+tx   = Transitter(env, mesh.ingress, max_send=1000, bursts=(8, 10), mode=TxMode.UNIQUE)
 rx   = Receiver(env, mesh.egress)
 env.run()
 
