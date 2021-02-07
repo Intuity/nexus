@@ -130,3 +130,7 @@ dmypy.json
 
 # macOS
 .DS_Store
+
+# Synthesis environments
+tests/*/work
+
