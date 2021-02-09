@@ -14,22 +14,20 @@
 
 from .signal import Signal
 
-class Constant(Signal):
-    """ Represents a constant value """
+class Bit(Signal):
+    """ Represents a single bit """
 
-    def __init__(self, value, width):
-        """ Initialise the Constant instance.
+    def __init__(self, id):
+        """ Initialise the Bit instance.
 
         Args:
-            value: The value of the constant (as an integer)
-            width: Width of the constant
+            id: Bit ID from Yosys
         """
-        assert isinstance(value, int)
-        super().__init__(f"{value:0{width}b}", width, [])
-        self.value   = value
+        super().__init__(f"bit_{id}", 1, [self])
+        self.id      = id
         self.signals = []
 
     def link(self, signal):
-        """ Link the constant to a signal """
+        """ Link the bit to a signal """
         assert isinstance(signal, Signal)
         self.signals.append(signal)

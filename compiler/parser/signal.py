@@ -23,12 +23,23 @@ class Signal(Base):
         Args:
             name : Name of the signal
             width: Width of the signal
-            bits : List of bit IDs that this signal carries
+            bits : List of Bits or Constants attached to this signal
         """
         super().__init__(name)
         assert isinstance(width, int ) and width > 0
         assert isinstance(bits,  list) and len(bits) >= 0
+        from .bit import Bit
         from .constant import Constant
-        assert len([x for x in bits if type(x) not in (int, Constant)]) == 0
-        self.width      = width
-        self.bits       = bits
+        assert len([x for x in bits if type(x) not in (Bit, Constant)]) == 0
+        self.width     = width
+        self.bits      = bits[:]
+
+    def map(self, bit):
+        """ Map a bit to the index within the signal.
+
+        Args:
+            bit: Instance of Bit
+
+        Returns: Index within bit list
+        """
+        return self.bits.index(bit)

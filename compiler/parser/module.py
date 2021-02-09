@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from itertools import groupby
 import logging
+from operator import itemgetter
 
 log = logging.getLogger("parser.module")
 
 from .base import Base
+from .bit import Bit
 from .cell import Cell
 from .constant import Constant
 from .net import Net
 from .port import Port, PortDirection
+from .select import Select
+from .signal import Signal
 
 class Module(Base):
     """ Representation of a Module from Yosys JSON """
@@ -71,6 +76,7 @@ class Module(Base):
         self.inouts     = []
         self.nets       = []
         self.cells      = []
+        self.bits       = {}
         # Kick off the parse
         self.parse()
 
@@ -81,7 +87,8 @@ class Module(Base):
         return self.__repr__()
 
     def __repr__(self):
-        desc = [f"module {self.name} #("]
+        desc = [f"// Module Declaration"]
+        desc.append(f"module {self.name} #(")
         for idx, (key, val) in enumerate(self.parameters.items()):
             desc.append(
                 "    " + (", " if idx > 0 else "  ") +
@@ -101,10 +108,121 @@ class Module(Base):
             )
         desc.append("")
         for cell in self.cells:
+            desc.append(f"// Type: {cell.type}, Model: {cell.model}")
             desc.append(str(cell))
             desc.append("")
         desc.append("endmodule")
+        desc.append("")
+        desc.append("// Connectivity")
+        for key, bit in self.bits.items():
+            desc.append(
+                f"// - {bit.id:3d} - signals: " +
+                ", ".join([(
+                    (x.parent.safe_name + "." + x.safe_name)
+                    if isinstance(x, Port) else
+                    x.safe_name
+                ) for x in bit.signals])
+            )
         return "\n".join(desc)
+
+    def link_bit(self, key, signal):
+        """
+        Link any type of signal to either a Constant or Bit
+
+        Args:
+            key   : String to create a Constant, or Int to create a bit
+            signal: Link a signal to the
+
+        Returns: Bit or Constant depending on input
+        """
+        if isinstance(key, str):
+            const = Constant(int(key, 2), 1)
+            const.link(signal)
+            return const
+        elif not isinstance(key, int):
+            raise Exception("Bit key must be string or integer")
+        elif key not in self.bits:
+            self.bits[key] = Bit(key)
+        self.bits[key].link(signal)
+        return self.bits[key]
+
+    def get_bit_driver(self, bit):
+        """ Work out the driver of a bit.
+
+        Args:
+            bit: Either an instance of Bit or a bit ID
+
+        Returns: The signal instance driving the bit
+        """
+        # Convert bit ID to a Bit instance
+        if not isinstance(bit, Bit): bit = self.bits[bit]
+        # Identify all drivers in list
+        drivers = []
+        for sig in bit.signals:
+            if not isinstance(sig, Port): continue
+            if (
+                (sig.parent == self and sig.direction == PortDirection.INPUT ) or
+                (sig.parent != self and sig.direction == PortDirection.OUTPUT)
+            ):
+                drivers.append(sig)
+        # Check for multi-drive
+        if len(drivers) > 1:
+            raise Exception(f"Bit {bit.id} appears to be multi-driven")
+        # Check for no drive
+        elif len(drivers) == 0:
+            raise Exception(f"Bit {bit.id} appears to be undriven")
+        # Return the driver
+        return drivers[0]
+
+    def get_bit_targets(self, bit):
+        """ Get all of the targets for a bit.
+
+        Args:
+            bit: Either an instance of Bit or a bit ID
+
+        Returns: The signal instances driven by the bit.
+        """
+        # Convert bit ID to a Bit instance
+        if not isinstance(bit, Bit): bit = self.bits[bit]
+        # Identify all drivers in list
+        targets = []
+        for sig in bit.signals:
+            if (
+                (isinstance(sig, Port) and (
+                    (sig.parent == self and sig.direction == PortDirection.INPUT ) or
+                    (sig.parent != self and sig.direction == PortDirection.OUTPUT)
+                )) or isinstance(sig, Net)
+            ):
+                targets.append(sig)
+        # Check for no targets
+        if len(targets) == 0:
+            raise Exception(f"Bit {bit.id} appears to drive nothing")
+        # Return the targets
+        return targets
+
+    def get_signal(self, bit_ids):
+        """ Concatenate a signal together given a list of bits.
+
+        Args:
+            bit_ids: List of bit IDs
+        """
+        # First lookup all bits
+        signals = []
+        for bit_id in bit_ids:
+            if isinstance(bit_id, str):
+                signals.append((bit_id, Constant(int(bit_id, 2), 1), 0))
+            else:
+                bit = self.get_bit(bit_id)
+                signals.append((
+                    bit_id, bit.driver.signal, bit.driver.signal.map(bit)
+                ))
+        # Group into contiguous groups by the driving signal
+        groups = { k: list(g) for k, g in groupby(signals, lambda x: x[1]) }
+        # Assemble selections
+        selects = []
+        for port, components in groups.items():
+            selects.append(Select(port, *[x[2] for x in components]))
+        return selects
 
     def parse(self):
         """ Parse the raw model data into a structured representation """
@@ -119,24 +237,23 @@ class Module(Base):
         # Read in the ports
         raw_ports = self.raw.get(Module.PORTS, {})
         for key, data in raw_ports.items():
-            dirx = data[Module.PORT_DIRECTION]
-            bits = data[Module.PORT_BITS]
+            dirx      = PortDirection[data[Module.PORT_DIRECTION].upper()]
+            port      = Port(key, dirx, self, len(data[Module.PORT_BITS]), [])
+            port.bits = [self.link_bit(x, port) for x in data[Module.PORT_BITS]]
             {
-                Module.PORT_INPUT : self.inputs,
-                Module.PORT_OUTPUT: self.outputs,
-                Module.PORT_INOUT : self.inouts,
-            }[dirx].append(
-                Port(key, PortDirection[dirx.upper()], len(bits), bits)
-            )
+                PortDirection.INPUT : self.inputs,
+                PortDirection.OUTPUT: self.outputs,
+                PortDirection.INOUT : self.inouts,
+            }[dirx].append(port)
         # Read in the nets
         raw_nets = self.raw.get(Module.NETS, {})
         for key, data in raw_nets.items():
-            hide_name  = data[Module.NET_HIDE_NAME]
+            hide_name  = (True if data[Module.NET_HIDE_NAME] else False)
             bits       = data[Module.NET_BITS]
             attributes = data[Module.NET_ATTRIBUTES]
-            self.nets.append(Net(
-                key, len(bits), bits, (True if hide_name else False),
-            ))
+            net        = Net(key, len(bits), [], hide=hide_name)
+            net.bits   = [self.link_bit(x, net) for x in bits]
+            self.nets.append(net)
             for a_key, a_val in attributes.items():
                 self.nets[-1].set_attribute(a_key, a_val)
         # Read in cells
@@ -149,20 +266,15 @@ class Module(Base):
             attributes  = data[Module.CELL_ATTRIBUTES]
             port_dirx   = data[Module.CELL_PORT_DIRECTIONS]
             connections = data[Module.CELL_CONNECTIONS]
-            self.cells.append(
-                Cell(key, c_type, model, (True if hide_name else False))
-            )
+            self.cells.append(Cell(
+                key, c_type, model, self, (True if hide_name else False)
+            ))
             for p_key, p_val in parameters.items():
                 self.cells[-1].add_parameter(p_key, int(p_val, 2))
             for a_key, a_val in attributes.items():
                 self.cells[-1].set_attribute(a_key, a_val)
             for p_key, p_dirx in port_dirx.items():
-                p_conns = connections[p_key]
-                bits    = []
-                for bit in p_conns:
-                    bits.append(
-                        Constant(int(bit, 2), 1) if isinstance(bit, str) else bit
-                    )
-                self.cells[-1].add_port(
-                    p_key, PortDirection[p_dirx.upper()], len(bits), bits
-                )
+                p_dirx    = PortDirection[p_dirx.upper()]
+                p_conns   = connections[p_key]
+                port      = self.cells[-1].add_port(p_key, p_dirx, len(bits), [])
+                port.bits = [self.link_bit(x, port) for x in p_conns]

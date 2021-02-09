@@ -28,7 +28,7 @@ class Base:
     @property
     def safe_name(self):
         return self.name.translate(str.maketrans({
-            "[" : "_", "]" : "_", ":" : "_", "\\": "_",
+            "[" : "_", "]" : "_", ":" : "_", "\\": "_", "/": "_",
         }))
 
     def set_attribute(self, key, value):

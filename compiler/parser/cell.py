@@ -13,28 +13,34 @@
 # limitations under the License.
 
 from .base import Base
+from .constant import Constant
+from .net import Net
 from .port import Port, PortDirection
 
 class Cell(Base):
     """ Represents a cell primitive in the design """
 
-    def __init__(self, name, type, model, hide=False):
+    def __init__(self, name, type, model, parent, hide=False):
         """ Initialise the Cell instance.
 
         Args:
-            name : Name of the cell
-            type : Type of the cell
-            model: Model of the cell
-            hide : Whether the name of the cell should be shown
+            name  : Name of the cell
+            type  : Type of the cell
+            model : Model of the cell
+            parent: Parent Module instance
+            hide  : Whether the name of the cell should be shown
         """
         super().__init__(name)
         # Check and store attributes
+        from .module import Module
         assert isinstance(type,  str)
         assert isinstance(model, str) or model == None
+        assert isinstance(parent, Module)
         assert isinstance(hide,  bool)
-        self.type  = type
-        self.model = model
-        self.hide  = hide
+        self.type   = type
+        self.model  = model
+        self.parent = parent
+        self.hide   = hide
         # Create stores
         self.parameters = {}
         self.inputs     = []
@@ -55,9 +61,19 @@ class Cell(Base):
             )
         desc.append(") (")
         for idx, port in enumerate(self.ports):
-            desc.append(
-                "    " + (", " if idx > 0 else "  ") +  f".{port.safe_name}(...)"
+            port_str = (
+                "    " + (", ." if idx > 0 else "  .") + port.safe_name + "({ "
             )
+            for idx, bit in enumerate(port.bits):
+                if idx > 0: port_str += ", "
+                nets = [x for x in bit.signals if isinstance(x, Net)]
+                if port.is_input and isinstance(bit, Constant):
+                    port_str += f"1'b{bit.value}"
+                elif port.is_input or port.is_output:
+                    port_str += f"{nets[0].safe_name}[{nets[0].map(bit)}]"
+                else:
+                    port_str += "???"
+            desc.append(port_str + " })")
         desc.append(");")
         return "\n".join(desc)
 
@@ -80,8 +96,10 @@ class Cell(Base):
             width: Width of the port
             bits : Bit IDs that connect to the port
         """
+        port = Port(name, direction, self, width, bits)
         {
             PortDirection.INPUT : self.inputs,
             PortDirection.OUTPUT: self.outputs,
             PortDirection.INOUT : self.inouts,
-        }[direction].append(Port(name, direction, width, bits))
+        }[direction].append(port)
+        return port

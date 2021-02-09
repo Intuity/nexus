@@ -24,17 +24,49 @@ class PortDirection(IntEnum):
 class Port(Signal):
     """ Representation of a port on a module """
 
-    def __init__(self, name, direction, width, bits):
+    def __init__(self, name, direction, parent, width, bits):
         """ Initialise the Port instance.
 
         Args:
             name     : Name of the port
             direction: Direction of the port
+            parent   : The parent cell or module
             width    : Width of the signal
             bits     : List of bit IDs that this signal carries
         """
         super().__init__(name, width, bits)
         assert direction in PortDirection
+        from .cell import Cell
+        from .module import Module
+        assert type(parent) in (Cell, Module)
         self.direction = direction
-        self.inbound   = []
-        self.outbound  = []
+        self.parent    = parent
+
+    @property
+    def is_input(self): return self.direction == PortDirection.INPUT
+    @property
+    def is_output(self): return self.direction == PortDirection.OUTPUT
+    @property
+    def is_inout(self): return self.direction == PortDirection.INOUT
+
+    @property
+    def drivers(self):
+        from .cell import Cell
+        from .constant import Constant
+        from .module import Module
+        mod = self.parent if isinstance(self.parent, Module) else self.parent.parent
+        return [
+            (x if isinstance(x, Constant) else mod.get_bit_driver(x))
+            for x in self.bits
+        ]
+
+    @property
+    def targets(self):
+        from .cell import Cell
+        from .constant import Constant
+        from .module import Module
+        mod = self.parent if isinstance(self.parent, Module) else self.parent.parent
+        return [
+            (x if isinstance(x, Constant) else mod.get_bit_targets(x))
+            for x in self.bits
+        ]
