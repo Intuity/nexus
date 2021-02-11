@@ -29,6 +29,7 @@ def main(input):
     parser = Parser(input)
     parser.parse()
     print(parser.modules[0])
+    print(parser.models[0])
 
 if __name__ == "__main__":
     main()

@@ -225,7 +225,7 @@ class Module(Base):
         return selects
 
     def parse(self):
-        """ Parse the raw model data into a structured representation """
+        """ Parse the raw module data into a structured representation """
         # Capture attributes
         raw_attrs = self.raw.get(Module.ATTRIBUTES, {})
         for key, val in raw_attrs.items():
