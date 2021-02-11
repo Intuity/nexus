@@ -130,3 +130,7 @@ class Model:
                 self.nodes.append(ConstantOne(idx, build_port_tuples(n_args)))
             elif n_type == Model.NODE_False:
                 self.nodes.append(ConstantZero(idx, build_port_tuples(n_args)))
+            else:
+                raise Exception(
+                    f"Unrecognised node '{n_type}' in model AIG description"
+                )
