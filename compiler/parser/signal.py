@@ -13,33 +13,24 @@
 # limitations under the License.
 
 from .base import Base
+from .bit import Bit
 
 class Signal(Base):
     """ Representation of a signal within the design """
 
-    def __init__(self, name, width, bits):
+    def __init__(self, name, width):
         """ Initialise the Signal instance.
 
         Args:
             name : Name of the signal
             width: Width of the signal
-            bits : List of Bits or Constants attached to this signal
         """
         super().__init__(name)
-        assert isinstance(width, int ) and width > 0
-        assert isinstance(bits,  list) and len(bits) >= 0
-        from .bit import Bit
-        from .constant import Constant
-        assert len([x for x in bits if type(x) not in (Bit, Constant)]) == 0
-        self.width     = width
-        self.bits      = bits[:]
+        assert isinstance(width, int) and width > 0
+        self.bits = [Bit(x, self) for x in range(width)]
 
-    def map(self, bit):
-        """ Map a bit to the index within the signal.
+    @property
+    def width(self): return len(self.bits)
 
-        Args:
-            bit: Instance of Bit
-
-        Returns: Index within bit list
-        """
-        return self.bits.index(bit)
+    def __getitem__(self, key):
+        return self.bits[key]

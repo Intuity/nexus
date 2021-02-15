@@ -12,24 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .signal import Signal
+class Constant:
+    """ Represents a constant bit value """
 
-class Constant(Signal):
-    """ Represents a constant value """
-
-    def __init__(self, value, width):
+    def __init__(self, value):
         """ Initialise the Constant instance.
 
         Args:
-            value: The value of the constant (as an integer)
-            width: Width of the constant
+            value: Value of the constant (either 0 or 1)
         """
-        assert isinstance(value, int)
-        super().__init__(f"{value:0{width}b}", width, [])
-        self.value   = value
-        self.signals = []
-
-    def link(self, signal):
-        """ Link the constant to a signal """
-        assert isinstance(signal, Signal)
-        self.signals.append(signal)
+        assert isinstance(value, int) and value in (0, 1)
+        self.value = value

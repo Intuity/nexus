@@ -71,17 +71,18 @@ class Module(Base):
         self.raw  = raw
         # Attributes
         self.parameters = {}
-        self.inputs     = []
-        self.outputs    = []
-        self.inouts     = []
+        self.ports      = []
         self.nets       = []
         self.cells      = []
-        self.bits       = {}
         # Kick off the parse
         self.parse()
 
     @property
-    def ports(self): return self.inputs + self.outputs + self.inouts
+    def inputs(self): return (x for x in self.ports if x.is_input)
+    @property
+    def outputs(self): return (x for x in self.ports if x.is_output)
+    @property
+    def inouts(self): return (x for x in self.ports if x.is_inout)
 
     def __str__(self):
         return self.__repr__()
@@ -113,92 +114,7 @@ class Module(Base):
             desc.append("")
         desc.append("endmodule")
         desc.append("")
-        desc.append("// Connectivity")
-        for key, bit in self.bits.items():
-            desc.append(
-                f"// - {bit.id:3d} - signals: " +
-                ", ".join([(
-                    (x.parent.safe_name + "." + x.safe_name)
-                    if isinstance(x, Port) else
-                    x.safe_name
-                ) for x in bit.signals])
-            )
         return "\n".join(desc)
-
-    def link_bit(self, key, signal):
-        """
-        Link any type of signal to either a Constant or Bit
-
-        Args:
-            key   : String to create a Constant, or Int to create a bit
-            signal: Link a signal to the
-
-        Returns: Bit or Constant depending on input
-        """
-        if isinstance(key, str):
-            const = Constant(int(key, 2), 1)
-            const.link(signal)
-            return const
-        elif not isinstance(key, int):
-            raise Exception("Bit key must be string or integer")
-        elif key not in self.bits:
-            self.bits[key] = Bit(key)
-        self.bits[key].link(signal)
-        return self.bits[key]
-
-    def get_bit_driver(self, bit):
-        """ Work out the driver of a bit.
-
-        Args:
-            bit: Either an instance of Bit or a bit ID
-
-        Returns: The signal instance driving the bit
-        """
-        # Convert bit ID to a Bit instance
-        if not isinstance(bit, Bit): bit = self.bits[bit]
-        # Identify all drivers in list
-        drivers = []
-        for sig in bit.signals:
-            if not isinstance(sig, Port): continue
-            if (
-                (sig.parent == self and sig.direction == PortDirection.INPUT ) or
-                (sig.parent != self and sig.direction == PortDirection.OUTPUT)
-            ):
-                drivers.append(sig)
-        # Check for multi-drive
-        if len(drivers) > 1:
-            raise Exception(f"Bit {bit.id} appears to be multi-driven")
-        # Check for no drive
-        elif len(drivers) == 0:
-            raise Exception(f"Bit {bit.id} appears to be undriven")
-        # Return the driver
-        return drivers[0]
-
-    def get_bit_targets(self, bit):
-        """ Get all of the targets for a bit.
-
-        Args:
-            bit: Either an instance of Bit or a bit ID
-
-        Returns: The signal instances driven by the bit.
-        """
-        # Convert bit ID to a Bit instance
-        if not isinstance(bit, Bit): bit = self.bits[bit]
-        # Identify all drivers in list
-        targets = []
-        for sig in bit.signals:
-            if (
-                (isinstance(sig, Port) and (
-                    (sig.parent == self and sig.direction == PortDirection.INPUT ) or
-                    (sig.parent != self and sig.direction == PortDirection.OUTPUT)
-                )) or isinstance(sig, Net)
-            ):
-                targets.append(sig)
-        # Check for no targets
-        if len(targets) == 0:
-            raise Exception(f"Bit {bit.id} appears to drive nothing")
-        # Return the targets
-        return targets
 
     def get_signal(self, bit_ids):
         """ Concatenate a signal together given a list of bits.
@@ -234,28 +150,44 @@ class Module(Base):
         raw_params = self.raw.get(Module.PARAM_DEF_VALS, {})
         for key, val in raw_params.items():
             self.parameters[key] = int(val, 2)
+        # Create a bit lookup to track drivers and targets
+        bit_lookup = {}
+        def add_driver(bit_id, bit):
+            assert isinstance(bit_id, int) and isinstance(bit, Bit)
+            if not bit_id in bit_lookup: bit_lookup[bit_id] = ([], [])
+            bit_lookup[bit_id][0].append(bit)
+            # Link any known targets to this driver
+            for tgt in bit_lookup[bit_id][1]:
+                tgt.driver = bit
+                bit.add_target(tgt)
+        def add_target(bit_id, bit):
+            assert isinstance(bit_id, int) and isinstance(bit, Bit)
+            if not bit_id in bit_lookup: bit_lookup[bit_id] = ([], [])
+            bit_lookup[bit_id][1].append(bit)
+            # Link any known drivers to this target
+            for drv in bit_lookup[bit_id][0]:
+                drv.add_target(bit)
+                bit.driver = drv
         # Read in the ports
         raw_ports = self.raw.get(Module.PORTS, {})
         for key, data in raw_ports.items():
-            dirx      = PortDirection[data[Module.PORT_DIRECTION].upper()]
-            port      = Port(key, dirx, self, len(data[Module.PORT_BITS]), [])
-            port.bits = [self.link_bit(x, port) for x in data[Module.PORT_BITS]]
-            {
-                PortDirection.INPUT : self.inputs,
-                PortDirection.OUTPUT: self.outputs,
-                PortDirection.INOUT : self.inouts,
-            }[dirx].append(port)
+            dirx = PortDirection[data[Module.PORT_DIRECTION].upper()]
+            port = Port(key, dirx, self, len(data[Module.PORT_BITS]))
+            self.ports.append(port)
+            for bit_id, bit in zip(data[Module.PORT_BITS], port.bits):
+                if   port.is_input : add_driver(bit_id, bit)
+                elif port.is_output: add_target(bit_id, bit)
         # Read in the nets
         raw_nets = self.raw.get(Module.NETS, {})
         for key, data in raw_nets.items():
             hide_name  = (True if data[Module.NET_HIDE_NAME] else False)
-            bits       = data[Module.NET_BITS]
             attributes = data[Module.NET_ATTRIBUTES]
-            net        = Net(key, len(bits), [], hide=hide_name)
-            net.bits   = [self.link_bit(x, net) for x in bits]
-            self.nets.append(net)
+            net        = Net(key, len(data[Module.NET_BITS]), hide=hide_name)
             for a_key, a_val in attributes.items():
-                self.nets[-1].set_attribute(a_key, a_val)
+                net.set_attribute(a_key, a_val)
+            for bit_id, bit in zip(data[Module.NET_BITS], net.bits):
+                add_target(bit_id, bit)
+            self.nets.append(net)
         # Read in cells
         raw_cells = self.raw.get(Module.CELLS, {})
         for key, data in raw_cells.items():
@@ -274,7 +206,32 @@ class Module(Base):
             for a_key, a_val in attributes.items():
                 self.cells[-1].set_attribute(a_key, a_val)
             for p_key, p_dirx in port_dirx.items():
-                p_dirx    = PortDirection[p_dirx.upper()]
-                p_conns   = connections[p_key]
-                port      = self.cells[-1].add_port(p_key, p_dirx, len(bits), [])
-                port.bits = [self.link_bit(x, port) for x in p_conns]
+                port = self.cells[-1].add_port(
+                    p_key, PortDirection[p_dirx.upper()], len(connections[p_key])
+                )
+                for bit_id, bit in zip(connections[p_key], port.bits):
+                    # If the value is a string - this is a constant
+                    if isinstance(bit_id, str):
+                        bit.driver = Constant(int(bit_id))
+                    # If the value is an integer - this is a bit ID
+                    else:
+                        if   port.is_input : add_target(bit_id, bit)
+                        elif port.is_output: add_driver(bit_id, bit)
+        # Detect bits without drivers or targets
+        dangling = 0
+        for bit_id, (drivers, targets) in bit_lookup.items():
+            if len(drivers) == 0 or len(targets) == 0:
+                dangling += 1
+                log.warn(
+                    f"Bit {bit_id} - has {len(drivers)} drivers and "
+                    f"{len(targets)} targets"
+                )
+                if len(drivers) > 0:
+                    log.warn("Drivers: " + ", ".join((
+                        f"{x.parent.parent.name}.{x.parent.name}" for x in drivers
+                    )))
+                if len(targets) > 0:
+                    log.warn("Targets: " + ", ".join((
+                        f"{x.parent.parent.name}.{x.parent.name}" for x in targets
+                    )))
+        if dangling > 0: raise Exception(f"Detected {dangling} dangling bits")

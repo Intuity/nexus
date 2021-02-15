@@ -67,11 +67,11 @@ class NAND(ModelNode):
 
 class ConstantOne(ModelNode):
     def __init__(self, index, outputs):
-        super().__init__(index, ModelOperations.TRUE, outputs)
+        super().__init__(index, ModelOperations.TRUE, [], outputs)
 
 class ConstantZero(ModelNode):
     def __init__(self, index, outputs):
-        super().__init__(index, ModelOperations.FALSE, outputs)
+        super().__init__(index, ModelOperations.FALSE, [], outputs)
 
 class Model:
     """ Representation of an AIG model from Yosys JSON """
@@ -128,7 +128,7 @@ class Model:
                 ))
             elif n_type == Model.NODE_TRUE:
                 self.nodes.append(ConstantOne(idx, build_port_tuples(n_args)))
-            elif n_type == Model.NODE_False:
+            elif n_type == Model.NODE_FALSE:
                 self.nodes.append(ConstantZero(idx, build_port_tuples(n_args)))
             else:
                 raise Exception(

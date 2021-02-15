@@ -17,16 +17,6 @@ import logging
 from pathlib import Path
 import re
 
-# If available, use Rich to colourise the output log
-try:
-    from rich.logging import RichHandler
-    logging.basicConfig(
-        level="NOTSET", format="%(message)s", datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True)]
-    )
-except ModuleNotFoundError:
-    pass
-
 log = logging.getLogger("parser")
 
 from .model import Model

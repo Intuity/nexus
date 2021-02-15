@@ -43,12 +43,14 @@ class Cell(Base):
         self.hide   = hide
         # Create stores
         self.parameters = {}
-        self.inputs     = []
-        self.outputs    = []
-        self.inouts     = []
+        self.ports      = []
 
     @property
-    def ports(self): return self.inputs + self.outputs + self.inouts
+    def inputs(self): return (x for x in self.ports if x.is_input)
+    @property
+    def outputs(self): return (x for x in self.ports if x.is_output)
+    @property
+    def inouts(self): return (x for x in self.ports if x.is_inout)
 
     def __str__(self):
         return self.__repr__()
@@ -66,11 +68,12 @@ class Cell(Base):
             )
             for idx, bit in enumerate(port.bits):
                 if idx > 0: port_str += ", "
-                nets = [x for x in bit.signals if isinstance(x, Net)]
-                if port.is_input and isinstance(bit, Constant):
-                    port_str += f"1'b{bit.value}"
-                elif port.is_input or port.is_output:
-                    port_str += f"{nets[0].safe_name}[{nets[0].map(bit)}]"
+                if port.is_input and isinstance(bit.driver, Constant):
+                    port_str += f"1'b{bit.driver.value}"
+                elif port.is_input:
+                    port_str += f"{bit.driver.parent.safe_name}[{bit.driver.index}]"
+                elif port.is_output:
+                    port_str += f"{bit.targets[0].parent.safe_name}[{bit.targets[0].index}]"
                 else:
                     port_str += "???"
             desc.append(port_str + " })")
@@ -88,18 +91,13 @@ class Cell(Base):
         assert isinstance(value, int)
         self.parameters[key] = value
 
-    def add_port(self, name, direction, width, bits):
+    def add_port(self, name, direction, width):
         """ Add a port to the cell.
 
         Args:
             name : Name of the port
             width: Width of the port
-            bits : Bit IDs that connect to the port
         """
-        port = Port(name, direction, self, width, bits)
-        {
-            PortDirection.INPUT : self.inputs,
-            PortDirection.OUTPUT: self.outputs,
-            PortDirection.INOUT : self.inouts,
-        }[direction].append(port)
+        port = Port(name, direction, self, width)
+        self.ports.append(port)
         return port

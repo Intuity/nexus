@@ -12,22 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .signal import Signal
+from .constant import Constant
 
-class Bit(Signal):
+class Bit:
     """ Represents a single bit """
 
-    def __init__(self, id):
+    def __init__(self, index, parent):
         """ Initialise the Bit instance.
 
         Args:
-            id: Bit ID from Yosys
+            index : Bit index within the parent vector
+            parent: Parent node
         """
-        super().__init__(f"bit_{id}", 1, [self])
-        self.id      = id
-        self.signals = []
+        self.index     = index
+        self.parent    = parent
+        self.__driver  = None
+        self.__targets = []
 
-    def link(self, signal):
-        """ Link the bit to a signal """
-        assert isinstance(signal, Signal)
-        self.signals.append(signal)
+    @property
+    def driver(self):
+        return self.__driver
+
+    @driver.setter
+    def driver(self, drvr):
+        assert type(drvr) in (Bit, Constant)
+        assert self.__driver == None
+        self.__driver = drvr
+
+    @property
+    def targets(self):
+        return self.__targets[:]
+
+    def add_target(self, tgt):
+        assert isinstance(tgt, Bit)
+        self.__targets.append(tgt)
