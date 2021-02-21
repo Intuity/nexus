@@ -14,10 +14,47 @@
 
 from enum import IntEnum
 
+from .gate import Gate
+
 class PortDirection(IntEnum):
     INPUT  = 0
     OUTPUT = 1
     INOUT  = 2
+
+class PortBit:
+    """ Represents a bit within a port """
+
+    def __init__(self, port, index):
+        """ Initialise the PortBit instance.
+
+        Args:
+            port : The parent port
+            index: Bit index within the port
+        """
+        assert isinstance(port, Port) or port == None
+        assert isinstance(index, int)
+        self.port      = port
+        self.index     = index
+        self.__driver  = None  # What drives this bit
+        self.__targets = []    # What is driven by this bit
+
+    @property
+    def driver(self):
+        return self.__driver
+
+    @driver.setter
+    def driver(self, drv):
+        if self.__driver: raise Exception("Driver has already been set")
+        assert isinstance(drv, PortBit) or isinstance(drv, Gate)
+        self.__driver = drv
+
+    @property
+    def targets(self):
+        return self.__targets[:]
+
+    def add_target(self, tgt):
+        assert isinstance(tgt, PortBit) or isinstance(tgt, Gate)
+        self.__targets.append(tgt)
 
 class Port:
     """ Represents a port on a module or operation """
@@ -36,9 +73,7 @@ class Port:
         assert isinstance(width, int) and width > 0
         self.name      = name
         self.direction = direction
-        self.width     = width
-        self.inbound   = None # Signal or concatenation driving this port
-        self.outbound  = []   # All signals or slices driven by this port
+        self.bits      = [PortBit(self, x) for x in range(width)]
         self.parent    = parent
 
     @property
@@ -47,3 +82,20 @@ class Port:
     def is_output(self): return (self.direction == PortDirection.OUTPUT)
     @property
     def is_inout(self): return (self.direction == PortDirection.INOUT)
+
+    @property
+    def width(self): return len(self.bits)
+
+    @property
+    def drivers(self):
+        return set([x.driver for x in self.bits])
+
+    @property
+    def targets(self):
+        return set([
+            (y.port if isinstance(y, PortBit) else y)
+            for x in self.bits for y in x.targets
+        ])
+
+    def __getitem__(self, key):
+        return self.bits[key]

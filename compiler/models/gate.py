@@ -42,30 +42,43 @@ class Gate:
         self.outputs = outputs[:]
 
 class INVERT(Gate):
-    def __init__(self, input, output):
-        super().__init__(OpAction.INVERT, [input], [output])
+    def __init__(self, input=None, output=None):
+        inputs  = [input ] if input  else []
+        outputs = [output] if output else []
+        super().__init__(Operation.INVERT, inputs, outputs)
 
 class AND(Gate):
     def __init__(self, inputs, output):
-        super().__init__(OpAction.AND, inputs, [output])
+        if not inputs: inputs = []
+        outputs = [output] if output else []
+        super().__init__(Operation.AND, inputs, outputs)
 
 class NAND(Gate):
     def __init__(self, inputs, output):
-        super().__init__(OpAction.AND, inputs, [output])
+        if not inputs: inputs = []
+        outputs = [output] if output else []
+        super().__init__(Operation.NAND, inputs, outputs)
 
 class OR(Gate):
-    def __init__(self, inputs, output):
-        super().__init__(OpAction.OR, inputs, [output])
+    def __init__(self, inputs, output=None):
+        if not inputs: inputs = []
+        outputs = [output] if output else []
+        super().__init__(Operation.OR, inputs, outputs)
 
 class NOR(Gate):
     def __init__(self, inputs, output):
-        super().__init__(OpAction.NOR, inputs, [output])
+        if not inputs: inputs = []
+        outputs = [output] if output else []
+        super().__init__(Operation.NOR, inputs, outputs)
 
 class XOR(Gate):
     def __init__(self, inputs, output):
-        super().__init__(OpAction.XOR, inputs, [output])
+        if not inputs: inputs = []
+        outputs = [output] if output else []
+        super().__init__(Operation.XOR, inputs, outputs)
 
 class XNOR(Gate):
     def __init__(self, inputs, output):
-        super().__init__(OpAction.XNOR, inputs, [output])
-
+        if not inputs: inputs = []
+        outputs = [output] if output else []
+        super().__init__(Operation.XNOR, inputs, outputs)

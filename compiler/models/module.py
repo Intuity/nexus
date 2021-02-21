@@ -17,15 +17,19 @@ from .port import Port, PortDirection
 class Module:
     """ Represents a module in the hierarchy """
 
-    def __init__(self, name):
+    def __init__(self, name, type):
         """ Initialise the Module instance.
 
         Args:
             name: Name of the module
+            type: Type of the module
         """
         assert isinstance(name, str)
-        self.name  = name
-        self.ports = []
+        assert isinstance(type, str)
+        self.name     = name
+        self.type     = type
+        self.ports    = {}
+        self.children = []
 
     @property
     def inputs(self): return (x for x in self.ports if x.is_input)
@@ -44,8 +48,10 @@ class Module:
 
         Returns: New port instance
         """
+        if name in self.ports:
+            raise Exception(f"Already have port for name '{name}'")
         port = Port(name, direction, width, self)
-        self.ports.append(port)
+        self.ports[name] = port
         return port
 
     def add_input(self, name, width):
@@ -80,3 +86,12 @@ class Module:
         Returns: New port instance
         """
         return self.add_port(name, PortDirection.INOUT, width)
+
+    def add_child(self, instance):
+        """ Add another Module instance as a child.
+
+        Args:
+            instance: Module instance
+        """
+        assert isinstance(instance, Module)
+        self.children.append(instance)
