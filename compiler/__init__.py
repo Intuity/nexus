@@ -11,3 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import logging
+
+# If available, use Rich to colourise the output log
+try:
+    from rich.logging import RichHandler
+    logging.basicConfig(
+        level="NOTSET", format="%(message)s", datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True)]
+    )
+except ModuleNotFoundError:
+    pass
