@@ -29,14 +29,28 @@ class Module:
         self.name     = name
         self.type     = type
         self.ports    = {}
-        self.children = []
+        self.children = {}
 
     @property
-    def inputs(self): return (x for x in self.ports if x.is_input)
+    def inputs(self): return (x for x in self.ports.values() if x.is_input)
     @property
-    def outputs(self): return (x for x in self.ports if x.is_output)
+    def outputs(self): return (x for x in self.ports.values() if x.is_output)
     @property
-    def inouts(self): return (x for x in self.ports if x.is_inout)
+    def inouts(self): return (x for x in self.ports.values() if x.is_inout)
+
+    def add_raw_port(self, port):
+        """ Add a new Port instance to the module.
+
+        Args:
+            port: Instance of Port to attach
+        """
+        assert isinstance(port, Port)
+        if port.name in self.ports:
+            raise Exception(f"Already have a port called '{port.name}'")
+        # Link this module to the port
+        port.parent = self
+        # Attach the port to the module
+        self.ports[port.name] = port
 
     def add_port(self, name, direction, width):
         """ Add a new port to the module.
@@ -48,10 +62,8 @@ class Module:
 
         Returns: New port instance
         """
-        if name in self.ports:
-            raise Exception(f"Already have port for name '{name}'")
         port = Port(name, direction, width, self)
-        self.ports[name] = port
+        self.add_raw_port(port)
         return port
 
     def add_input(self, name, width):
@@ -94,4 +106,5 @@ class Module:
             instance: Module instance
         """
         assert isinstance(instance, Module)
-        self.children.append(instance)
+        assert instance.name not in self.children
+        self.children[instance.name] = instance

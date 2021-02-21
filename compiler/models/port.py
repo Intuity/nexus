@@ -59,7 +59,7 @@ class PortBit:
 class Port:
     """ Represents a port on a module or operation """
 
-    def __init__(self, name, direction, width, parent):
+    def __init__(self, name, direction, width, parent=None):
         """ Initialise the Port instance.
 
         Args:

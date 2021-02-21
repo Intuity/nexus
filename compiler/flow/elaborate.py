@@ -21,33 +21,32 @@ from ..parser.module import Module as YModule
 from ..parser import model as yosys_model
 from ..parser.bit import Bit as YBit
 from ..parser.model import Model as YModel
+from ..parser.port import Port as YPort
 
 # Import compiler models
 from ..models.constant import Constant as NexusConstant
 from ..models import gate as nexus_gate
+from ..models.flop import Flop as NexusFlop
 from ..models.module import Module as NexusModule
 from ..models.port import Port as NexusPort
 from ..models.port import PortBit as NexusPortBit
 from ..models.port import PortDirection as NexusPortDirection
 
-def _build_op_chain(parent, cell, model):
+def _build_cell_model(cell, model):
     """ Build up a chain of operations from an AIG (AND-INVERTER Graphs).
 
     Args:
-        parent: Parent module
-        cell  : Cell of this model
-        model : The AIG model
+        cell : Cell of this model
+        model: The AIG model
 
     Returns: The operation chain
     """
+    # Build a module to represent the cell
+    mod = NexusModule(cell.name, cell.type)
     # Build ports to match the cell description
-    cell_ports = {}
     for key, y_port in cell.ports.items():
-        cell_ports[key] = NexusPort(
-            name     =y_port.name,
-            direction=NexusPortDirection(y_port.direction),
-            width    =y_port.width,
-            parent   =None,
+        mod.add_port(
+            y_port.name, NexusPortDirection(y_port.direction), y_port.width,
         )
     # Build up the signal chains
     points = []
@@ -55,10 +54,10 @@ def _build_op_chain(parent, cell, model):
         inputs = []
         for item in node.inputs:
             if isinstance(item, tuple):
-                inputs.append(cell_ports[item[0]][item[1]])
+                inputs.append(mod.ports[item[0]][item[1]])
             else:
                 inputs += points[item]
-        outputs = [cell_ports[x][y] for x, y in node.outputs]
+        outputs = [mod.ports[x][y] for x, y in node.outputs]
         gate    = None
         if isinstance(node, yosys_model.Port):
             pass
@@ -92,7 +91,8 @@ def _build_op_chain(parent, cell, model):
                 out_bit.driver = in_bit
         # Store the point
         points.append([gate] if gate else inputs)
-    import pdb; pdb.set_trace()
+    # Return the cell module
+    return mod
 
 def _build_module(src, ymodules, ymodels, instance=None):
     """
@@ -134,21 +134,60 @@ def _build_module(src, ymodules, ymodels, instance=None):
             if cell.model not in ymodels:
                 raise Exception(f"Failed to resolve cell model '{cell.model}'")
             # Get the I/O for the operation
-            _build_op_chain(nmod, cell, ymodels[cell.model])
+            nmod.add_child(_build_cell_model(cell, ymodels[cell.model]))
         # Nested modules
         elif cell.type in ymodules:
             log.info(f" - Cell {cell.name} - Type: {cell.type}")
             nmod.add_child(_build_module(
                 ymodules[cell.type], ymodules, ymodels, instance=cell.name,
             ))
-        # Cell primitives
-        elif cell.type in ["$adff"]:
+        # Flop primitive
+        elif cell.type == "$adff":
             log.info(f" - Cell {cell.name} is a primitive '{cell.type}'")
+            nmod.add_child(NexusFlop(
+                cell.name,
+                NexusPort("ARST", NexusPortDirection.INPUT,  1),
+                NexusPort("CLK",  NexusPortDirection.INPUT,  1),
+                NexusPort("D",    NexusPortDirection.INPUT,  cell.ports["D"].width),
+                NexusPort("Q",    NexusPortDirection.OUTPUT, cell.ports["Q"].width),
+            ))
         # Unknown
         else:
             raise Exception(
                 f"Unknown type for cell '{cell.name}' of type '{cell.type}'"
             )
+    # Build out connectivity from boundary input ports
+    for port in src.inputs:
+        drv_port = nmod.ports[port.name]
+        for bit in port.bits:
+            drv_bit = drv_port[bit.index]
+            for target in bit.targets:
+                if not isinstance(target.parent, YPort): continue
+                tgt_mod  = (
+                    nmod if (target.parent.parent == src) else
+                    nmod.children[target.parent.parent.name]
+                )
+                tgt_port = tgt_mod.ports[target.parent.name]
+                tgt_bit  = tgt_port[target.index]
+                tgt_bit.driver = drv_bit
+                drv_bit.add_target(tgt_bit)
+    # Build out connectivity from child output ports
+    for child in src.cells:
+        drv_child = nmod.children[child.name]
+        for port in child.outputs:
+            drv_port = drv_child.ports[port.name]
+            for bit in port.bits:
+                drv_bit = drv_port[bit.index]
+                for target in bit.targets:
+                    if not isinstance(target.parent, YPort): continue
+                    tgt_mod  = (
+                        nmod if (target.parent.parent == src) else
+                        nmod.children[target.parent.parent.name]
+                    )
+                    tgt_port = tgt_mod.ports[target.parent.name]
+                    tgt_bit  = tgt_port[target.index]
+                    tgt_bit.driver = drv_bit
+                    drv_bit.add_target(tgt_bit)
     # Return the constructed module
     return nmod
 
