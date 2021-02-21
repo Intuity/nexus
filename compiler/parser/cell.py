@@ -43,14 +43,14 @@ class Cell(Base):
         self.hide   = hide
         # Create stores
         self.parameters = {}
-        self.ports      = []
+        self.ports      = {}
 
     @property
-    def inputs(self): return (x for x in self.ports if x.is_input)
+    def inputs(self): return (x for x in self.ports.values() if x.is_input)
     @property
-    def outputs(self): return (x for x in self.ports if x.is_output)
+    def outputs(self): return (x for x in self.ports.values() if x.is_output)
     @property
-    def inouts(self): return (x for x in self.ports if x.is_inout)
+    def inouts(self): return (x for x in self.ports.values() if x.is_inout)
 
     def __str__(self):
         return self.__repr__()
@@ -62,7 +62,7 @@ class Cell(Base):
                 "    " + (", " if idx > 0 else "  ") + f".{key}('d{val})"
             )
         desc.append(") (")
-        for idx, port in enumerate(self.ports):
+        for idx, port in enumerate(self.ports.values()):
             port_str = (
                 "    " + (", ." if idx > 0 else "  .") + port.safe_name + "({ "
             )
@@ -98,6 +98,7 @@ class Cell(Base):
             name : Name of the port
             width: Width of the port
         """
+        assert name not in self.ports
         port = Port(name, direction, self, width)
-        self.ports.append(port)
+        self.ports[name] = port
         return port
