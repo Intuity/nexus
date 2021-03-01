@@ -18,6 +18,7 @@ import click
 
 from .parser import Parser
 from .flow.elaborate import elaborate
+from .flow.flatten import flatten
 
 log = logging.getLogger("compiler")
 
@@ -65,6 +66,9 @@ def main(
         modules=parser.modules,
         models =parser.models,
     )
+
+    # Flatten the module
+    flat = flatten(model.copy())
 
     import pdb; pdb.set_trace()
 

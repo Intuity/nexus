@@ -20,6 +20,7 @@ log = logging.getLogger("elaborate")
 from ..parser.module import Module as YModule
 from ..parser import model as yosys_model
 from ..parser.bit import Bit as YBit
+from ..parser.constant import Constant as YConstant
 from ..parser.model import Model as YModel
 from ..parser.port import Port as YPort
 
@@ -66,10 +67,10 @@ def _build_cell_model(cell, model):
             gate = nexus_gate.INVERT(inputs[0], None)
         elif isinstance(node, yosys_model.AND):
             assert len(inputs) == 2
-            gate = nexus_gate.AND(inputs, [])
+            gate = nexus_gate.AND(inputs, outputs[0] if outputs else None)
         elif isinstance(node, yosys_model.NAND):
             assert len(inputs) == 2
-            gate = nexus_gate.NAND(inputs, [])
+            gate = nexus_gate.NAND(inputs, outputs[0] if outputs else None)
         elif isinstance(node, yosys_model.ConstantOne):
             inputs = [NexusConstant(1)]
         elif isinstance(node, yosys_model.ConstantZero):
@@ -85,12 +86,15 @@ def _build_cell_model(cell, model):
                     raise Exception(f"Unknown input type {bit}")
             for bit in outputs:
                 bit.driver = gate
-        # If 'gate' not populate, but 'outputs' are - then connect in -> out
+        # If 'gate' not populated, but 'outputs' are - then connect in -> out
         else:
             for in_bit, out_bit in zip(inputs, outputs):
                 out_bit.driver = in_bit
         # Store the point
         points.append([gate] if gate else inputs)
+        # Attach the gate to the module
+        if gate:
+            mod.add_child(gate)
     # Return the cell module
     return mod
 
@@ -171,23 +175,29 @@ def _build_module(src, ymodules, ymodels, instance=None):
                 tgt_bit  = tgt_port[target.index]
                 tgt_bit.driver = drv_bit
                 drv_bit.add_target(tgt_bit)
-    # Build out connectivity from child output ports
+    # Build out connectivity from child ports
     for child in src.cells:
         drv_child = nmod.children[child.name]
-        for port in child.outputs:
+        for port in child.ports.values():
             drv_port = drv_child.ports[port.name]
             for bit in port.bits:
                 drv_bit = drv_port[bit.index]
-                for target in bit.targets:
-                    if not isinstance(target.parent, YPort): continue
-                    tgt_mod  = (
-                        nmod if (target.parent.parent == src) else
-                        nmod.children[target.parent.parent.name]
-                    )
-                    tgt_port = tgt_mod.ports[target.parent.name]
-                    tgt_bit  = tgt_port[target.index]
-                    tgt_bit.driver = drv_bit
-                    drv_bit.add_target(tgt_bit)
+                if port.is_input:
+                    if not isinstance(bit.driver, YConstant): continue
+                    n_const = NexusConstant(bit.driver.value)
+                    drv_bit.driver = n_const
+                    n_const.add_target(drv_bit)
+                elif port.is_output:
+                    for target in bit.targets:
+                        if not isinstance(target.parent, YPort): continue
+                        tgt_mod  = (
+                            nmod if (target.parent.parent == src) else
+                            nmod.children[target.parent.parent.name]
+                        )
+                        tgt_port = tgt_mod.ports[target.parent.name]
+                        tgt_bit  = tgt_port[target.index]
+                        tgt_bit.driver = drv_bit
+                        drv_bit.add_target(tgt_bit)
     # Return the constructed module
     return nmod
 

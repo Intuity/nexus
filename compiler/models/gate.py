@@ -26,6 +26,8 @@ class Operation(IntEnum):
 class Gate:
     """ Represents a gate in the design """
 
+    IDS = {}
+
     def __init__(self, op, inputs, outputs):
         """ Initialise the Operation instance.
 
@@ -37,9 +39,46 @@ class Gate:
         assert op in Operation
         assert isinstance(inputs, list)
         assert isinstance(outputs, list)
+        self.id      = Gate.issue_id(op)
+        self.name    = f"{Operation(op).name.upper()}{self.id:03d}"
         self.op      = op
         self.inputs  = inputs[:]
         self.outputs = outputs[:]
+
+    @classmethod
+    def issue_id(cls, op):
+        """ Issue a unique gate ID for a particular operation.
+
+        Args:
+            op: Operation gate performs (from Operation)
+
+        Returns: Integer ID for this gate
+        """
+        # Sanity check
+        assert op in Operation
+        # Ensure counter exists
+        if Operation(op).name not in Gate.IDS: Gate.IDS[Operation(op).name] = 0
+        # Issue the next available ID
+        issued = Gate.IDS[Operation(op).name]
+        Gate.IDS[Operation(op).name] += 1
+        return issued
+
+    def copy(self):
+        """
+        Create a copy of this gate with the same name and ID. Note that I/O is
+        not copied as connectivity is constructed externally.
+
+        Returns: Instance of Gate (or inherited type), populated as a copy """
+        # Create base copy
+        if type(self) == Gate:
+            new = type(self)(self.op, [], [])
+        elif issubclass(type(self), Gate):
+            new = type(self)(None, None)
+        # Copy over ID and name
+        new.id   = self.id
+        new.name = self.name
+        # Return the copy
+        return new
 
 class INVERT(Gate):
     def __init__(self, input=None, output=None):

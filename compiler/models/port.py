@@ -48,6 +48,10 @@ class PortBit:
         assert isinstance(drv, PortBit) or isinstance(drv, Gate)
         self.__driver = drv
 
+    def clear_driver(self):
+        """ Clear the held driver """
+        self.__driver = None
+
     @property
     def targets(self):
         return self.__targets[:]
@@ -55,6 +59,10 @@ class PortBit:
     def add_target(self, tgt):
         assert isinstance(tgt, PortBit) or isinstance(tgt, Gate)
         self.__targets.append(tgt)
+
+    def clear_targets(self):
+        """ Clear any held targets """
+        self.__targets = []
 
 class Port:
     """ Represents a port on a module or operation """
@@ -75,6 +83,12 @@ class Port:
         self.direction = direction
         self.bits      = [PortBit(self, x) for x in range(width)]
         self.parent    = parent
+
+    def __repr__(self):
+        return (
+            f"<Port (0x{id(self):X}) N: {self.name}, W: {self.width}, D: "
+            f"{self.direction}, P: {type(self.parent).__name__}::{self.parent.name}>"
+        )
 
     @property
     def is_input(self): return (self.direction == PortDirection.INPUT)

@@ -18,7 +18,10 @@ from .port import Port
 class Flop(Module):
     """ Represents a flop in the design """
 
-    def __init__(self, name, clock, reset, input, output, output_inv=None):
+    def __init__(
+        self, name, clock=None, reset=None, input=None, output=None,
+        output_inv=None
+    ):
         """ Initialise the Flop instance.
 
         Args:
@@ -30,10 +33,10 @@ class Flop(Module):
             output_inv: Inverted output from the flop (QN)
         """
         super().__init__(name, "flop")
-        assert isinstance(clock,      Port)
-        assert isinstance(reset,      Port)
-        assert isinstance(input,      Port)
-        assert isinstance(output,     Port)
+        assert isinstance(clock,      Port) or clock      == None
+        assert isinstance(reset,      Port) or reset      == None
+        assert isinstance(input,      Port) or input      == None
+        assert isinstance(output,     Port) or output     == None
         assert isinstance(output_inv, Port) or output_inv == None
         self.clock      = clock
         self.reset      = reset
@@ -45,3 +48,10 @@ class Flop(Module):
         if self.input     : self.add_raw_port(self.input)
         if self.output    : self.add_raw_port(self.output)
         if self.output_inv: self.add_raw_port(self.output_inv)
+
+    def base_copy(self):
+        """ Copy the base Flop container.
+
+        Returns: Instance of Flop
+        """
+        return Flop(self.name)
