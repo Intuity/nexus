@@ -55,3 +55,19 @@ class Flop(Module):
         Returns: Instance of Flop
         """
         return Flop(self.name)
+
+    def copy(self):
+        """ Create a copy of this Flop.
+
+        Returns: Instance of Flop, populated as a copy
+        """
+        # Use Module base class to form the copy
+        new = super().copy()
+        # Re-associate each of the port aliases
+        new.clock      = new.ports[self.clock.name     ] if self.clock      else None
+        new.reset      = new.ports[self.reset.name     ] if self.reset      else None
+        new.input      = new.ports[self.input.name     ] if self.input      else None
+        new.output     = new.ports[self.output.name    ] if self.output     else None
+        new.output_inv = new.ports[self.output_inv.name] if self.output_inv else None
+        # Return the copy
+        return new
