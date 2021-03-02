@@ -150,8 +150,8 @@ def _build_module(src, ymodules, ymodels, instance=None):
             log.info(f" - Cell {cell.name} is a primitive '{cell.type}'")
             nmod.add_child(NexusFlop(
                 cell.name,
-                NexusPort("ARST", NexusPortDirection.INPUT,  1),
                 NexusPort("CLK",  NexusPortDirection.INPUT,  1),
+                NexusPort("ARST", NexusPortDirection.INPUT,  1),
                 NexusPort("D",    NexusPortDirection.INPUT,  cell.ports["D"].width),
                 NexusPort("Q",    NexusPortDirection.OUTPUT, cell.ports["Q"].width),
             ))
