@@ -20,6 +20,8 @@ from .parser import Parser
 from .flow.elaborate import elaborate
 from .flow.flatten import flatten
 from .flow.group import group_logic
+from .flow.plot import plot_group
+from .flow.simplify import simplify_group
 
 log = logging.getLogger("compiler")
 
@@ -69,10 +71,23 @@ def main(
     )
 
     # Flatten the module
+    log.info("Flattening hierarchy")
     flat = flatten(model.copy())
 
     # Form flop-logic-flop groups
-    groups = group_logic(flat)
+    log.info("Grouping logic")
+    groups         = group_logic(flat)
+    grp_gate_count = [len(x[2]) for x in groups]
+
+    # Simplify logic in groups, optimising out constants
+    log.info(f"Simplifying {len(groups)} groups")
+    simplified = [simplify_group(*x) for x in groups]
+
+    # Plot pre and post simplify
+    log.info(f"Plotting {len(groups)} groups")
+    for idx, (pre, post) in enumerate(zip(grp_gate_count, simplified)):
+        log.info(f" - {idx} - #ORIG: {pre}, #SMPL: {len(post[2])}")
+        plot_group(*post, f"groups/post_{idx}.png")
 
     import pdb; pdb.set_trace()
 
