@@ -15,7 +15,7 @@
 from ..models.flop import Flop
 from ..models.gate import Gate, INVERT, AND, NAND, OR, NOR, XOR, XNOR
 from ..models.module import Module
-from ..models.port import PortBit
+from ..models.port import PortBit, Port, PortDirection
 
 def chase_to_source(bit):
     """ Chase driver of a bit back to its source.
@@ -76,8 +76,9 @@ def flatten(module, depth=0):
         del module.children[c_key]
     # Pickup the promoted modules
     for grandchild in promoted: module.add_child(grandchild)
-    # Clean-up boundary ports with references to flattened modules
+    # At the top-level, perform some tidying operations
     if depth == 0:
+        # Clean-up boundary ports with references to flattened modules
         for port in module.inputs:
             for bit in port.bits:
                 to_keep = [
@@ -88,5 +89,64 @@ def flatten(module, depth=0):
                 ]
                 bit.clear_targets()
                 for tgt in to_keep: bit.add_target(tgt)
+        # Shatter multi-bit flops
+        mb_flops = [
+            x for x in module.children.values()
+            if isinstance(x, Flop) and x.input.width > 1
+        ]
+        for flop in mb_flops:
+            in_bits  = flop.input.bits
+            out_bits = flop.output.bits if flop.output else ([None]*len(in_bits))
+            inv_bits = flop.output_inv.bits if flop.output_inv else ([None]*len(in_bits))
+            for idx, (in_bit, out_bit, inv_bit) in enumerate(zip(in_bits, out_bits, inv_bits)):
+                bit_flop = Flop(
+                    f"{flop.name}_{idx}",
+                    clock     =Port(flop.clock.name,      PortDirection.INPUT,  1),
+                    reset     =Port(flop.reset.name,      PortDirection.INPUT,  1) if flop.reset      else None,
+                    input     =Port(flop.input.name,      PortDirection.INPUT,  1),
+                    output    =Port(flop.output.name,     PortDirection.OUTPUT, 1) if flop.output     else None,
+                    output_inv=Port(flop.output_inv.name, PortDirection.OUTPUT, 1) if flop.output_inv else None,
+                )
+                module.children[bit_flop.name] = bit_flop
+                # Link clock
+                bit_flop.clock[0].driver = flop.clock[0].driver
+                bit_flop.clock[0].driver.add_target(bit_flop.clock[0])
+                # Optionally link reset
+                if bit_flop.reset:
+                    bit_flop.reset[0].driver = flop.reset[0].driver
+                    bit_flop.reset[0].driver.add_target(bit_flop.reset[0])
+                # Link input
+                bit_flop.input[0].driver = in_bit.driver
+                if isinstance(bit_flop.input[0].driver, Gate):
+                    bit_flop.input[0].driver.outputs.append(bit_flop.input[0])
+                else:
+                    bit_flop.input[0].driver.add_target(bit_flop.input[0])
+                # Optionally link output
+                if bit_flop.output:
+                    for tgt in out_bit.targets:
+                        bit_flop.output[0].add_target(tgt)
+                        if isinstance(tgt, Gate):
+                            tgt.inputs[tgt.inputs.index(out_bit)] = bit_flop.output[0]
+                        else:
+                            tgt.clear_driver()
+                            tgt.driver = bit_flop.output[0]
+                # Optionally link inverted output
+                if bit_flop.output_inv:
+                    for tgt in inv_bit.targets:
+                        bit_flop.output_inv[0].add_target(tgt)
+                        if isinstance(tgt, Gate):
+                            tgt.inputs[tgt.inputs.index(out_bit)] = bit_flop.output[0]
+                        else:
+                            tgt.clear_driver()
+                            tgt.driver = bit_flop.output_inv[0]
+        # Remove shattered flops and unlink input drivers (outputs already unlinked)
+        for flop in mb_flops:
+            del module.children[flop.name]
+            flop.clock[0].driver.remove_target(flop.clock[0])
+            if flop.reset: flop.reset[0].driver.remove_target(flop.reset[0])
+            if isinstance(flop.input[0].driver, Gate):
+                flop.input[0].driver.outputs.remove(flop.input[0])
+            else:
+                flop.input[0].driver.remove_target(flop.input[0])
     # Return the flattened module
     return module
