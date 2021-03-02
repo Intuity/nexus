@@ -17,6 +17,8 @@ from .port import PortBit
 class Constant(PortBit):
     """ Represents a constant value """
 
+    CONST_ID = 0
+
     def __init__(self, value):
         """ Initialise the Constant instance.
 
@@ -26,4 +28,14 @@ class Constant(PortBit):
         super().__init__(None, 0)
         assert isinstance(value, int)
         assert value in (0, 1)
+        self.id    = Constant.issue_id()
         self.value = value
+
+    @property
+    def name(self): return f"CONST_{self.id}"
+
+    @classmethod
+    def issue_id(cls):
+        issued = Constant.CONST_ID
+        Constant.CONST_ID += 1
+        return issued
