@@ -60,6 +60,11 @@ class PortBit:
         assert isinstance(tgt, PortBit) or isinstance(tgt, Gate)
         self.__targets.append(tgt)
 
+    def remove_target(self, tgt):
+        assert isinstance(tgt, PortBit) or isinstance(tgt, Gate)
+        assert tgt in self.__targets
+        self.__targets.remove(tgt)
+
     def clear_targets(self):
         """ Clear any held targets """
         self.__targets = []
