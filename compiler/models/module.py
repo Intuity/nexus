@@ -37,6 +37,10 @@ class Module:
         self.children = {}
 
     @property
+    def hier_name(self):
+        return (self.parent.hier_name + "." if self.parent else "") + self.name
+
+    @property
     def inputs(self): return (x for x in self.ports.values() if x.is_input)
     @property
     def outputs(self): return (x for x in self.ports.values() if x.is_output)
@@ -142,6 +146,7 @@ class Module:
                     n_child.inputs.append(Constant(bit.value))
                     n_child.inputs[-1].add_target(n_child)
             elif isinstance(child, Module):
+                n_child.parent = new
                 for port in child.inputs:
                     for bit in port.bits:
                         if not isinstance(bit.driver, Constant): continue
