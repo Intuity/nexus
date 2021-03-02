@@ -19,6 +19,7 @@ import click
 from .parser import Parser
 from .flow.elaborate import elaborate
 from .flow.flatten import flatten
+from .flow.group import group_logic
 
 log = logging.getLogger("compiler")
 
@@ -69,6 +70,9 @@ def main(
 
     # Flatten the module
     flat = flatten(model.copy())
+
+    # Form flop-logic-flop groups
+    groups = group_logic(flat)
 
     import pdb; pdb.set_trace()
 
