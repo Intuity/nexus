@@ -17,53 +17,55 @@ from ..models.flop import Flop
 from ..models.gate import Gate
 from ..models.module import Module
 
-def chase_gate(top, gate):
+def chase_gate(top, gate, depth=0):
     """ Chase backwards from a gate, collecting a logic cloud.
 
     Args:
-        top : Top-level module
-        gate: The Gate instance to start from
+        top  : Top-level module
+        gate : The Gate instance to start from
+        depth: Number of layers away from the flop input
 
     Returns: Tuple of gates in the logic cloud, and the inputs
     """
     logic, inputs = [], []
-    logic.append(gate)
+    logic.append((gate, depth))
     for in_bit in gate.inputs:
         if isinstance(in_bit, Gate):
-            c_logic, c_inputs = chase_gate(top, in_bit)
+            c_logic, c_inputs = chase_gate(top, in_bit, depth=(depth+1))
         else:
-            c_logic, c_inputs = chase_bit(top, in_bit)
+            c_logic, c_inputs = chase_bit(top, in_bit, depth=(depth+1))
         logic  += c_logic
         inputs += c_inputs
     return logic, inputs
 
-def chase_bit(top, bit):
+def chase_bit(top, bit, depth=0):
     """ Chase backwards from a port bit, collecting a logic cloud.
 
     Args:
-        top: Top-level module
-        bit: The PortBit instance to start from
+        top  : Top-level module
+        bit  : The PortBit instance to start from
+        depth: Number of layers away from the flop input
 
     Returns: Tuple of gates in the logic cloud, and the inputs
     """
     logic, inputs = [], []
     # Identify gates
     if bit.driver and isinstance(bit.driver, Gate):
-        c_logic, c_inputs = chase_gate(top, bit.driver)
+        c_logic, c_inputs = chase_gate(top, bit.driver, depth=(depth+1))
         logic  += c_logic
         inputs += c_inputs
-    # Identify constants
-    elif isinstance(bit, Constant):
-        inputs.append(bit)
-    # Identify primary inputs
-    elif not bit.driver and bit.port.parent == top:
-        inputs.append(bit)
-    # Identify flop outputs
-    elif not bit.driver and isinstance(bit.port.parent, Flop):
-        inputs.append(bit)
+    # Identify logic cloud inputs
+    elif (
+        # Constants
+        isinstance(bit, Constant) or
+        # Primary inputs
+        (not bit.driver and bit.port.parent == top) or
+        # Flop outputs
+        (not bit.driver and isinstance(bit.port.parent, Flop))
+    ):
+        inputs.append((bit, depth))
     # Unknown
     else:
-        import pdb; pdb.set_trace()
         raise Exception(f"Unknown bit driver: {bit.driver}")
     return logic, inputs
 
