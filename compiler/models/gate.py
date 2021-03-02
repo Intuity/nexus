@@ -23,6 +23,17 @@ class Operation(IntEnum):
     XOR    = 5
     XNOR   = 6
 
+    @classmethod
+    def symbol(cls, op):
+        if   op == Operation.INVERT: return "!"
+        elif op == Operation.AND   : return "&"
+        elif op == Operation.NAND  : return "!&"
+        elif op == Operation.OR    : return "|"
+        elif op == Operation.NOR   : return "!|"
+        elif op == Operation.XOR   : return "^"
+        elif op == Operation.XNOR  : return "!^"
+        else: return None
+
 class Gate:
     """ Represents a gate in the design """
 
@@ -62,6 +73,10 @@ class Gate:
         issued = Gate.IDS[Operation(op).name]
         Gate.IDS[Operation(op).name] += 1
         return issued
+
+    @property
+    def symbol(self):
+        return Operation.symbol(self.op)
 
     def copy(self):
         """
