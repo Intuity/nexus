@@ -39,6 +39,10 @@ class PortBit:
         self.__targets = []    # What is driven by this bit
 
     @property
+    def name(self):
+        return f"{self.port.hier_name}[{self.index}]"
+
+    @property
     def driver(self):
         return self.__driver
 
@@ -94,6 +98,10 @@ class Port:
             f"<Port (0x{id(self):X}) N: {self.name}, W: {self.width}, D: "
             f"{self.direction}, P: {type(self.parent).__name__}::{self.parent.name}>"
         )
+
+    @property
+    def hier_name(self):
+        return self.parent.hier_name + "." + self.name
 
     @property
     def is_input(self): return (self.direction == PortDirection.INPUT)
