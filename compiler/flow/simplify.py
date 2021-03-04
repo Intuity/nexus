@@ -73,6 +73,7 @@ def simplify_group(flop, inputs, logic):
     smpl = chase(flop.input[0].driver).simplify()
     # Re-construct gates
     gate_map = {
+        "~" : gate.INVERT,
         "&" : gate.AND,
         "|" : gate.OR,
         "~&": gate.NAND,
@@ -83,37 +84,43 @@ def simplify_group(flop, inputs, logic):
     def reconstruct(node, depth=0):
         gate_type = None
         node_ips  = []
-        # Map gate type (compressing inversion), and pickup inputs
+        # Build and connect a gate
+        def build(gate_type, node_ips):
+            # Construct the gate
+            inst = gate_type(node_ips[0] if gate_type == gate.INVERT else node_ips, None)
+            cloud.append((inst, depth))
+            # Connect up the outputs of the inputs
+            for bit in node_ips:
+                if isinstance(bit, gate.Gate):
+                    bit.outputs.append(inst)
+                else:
+                    bit.add_target(inst)
+            # Return constructed gate
+            return inst
+        # Map expression inputs back to port bits
         if isinstance(node, boolean.Symbol):
             all_ips.append(bit := sym2bit[node.obj])
             return bit
-        elif node.operator == "~":
-            if isinstance(node.args[0], boolean.Symbol):
-                cloud.append((inv := gate.INVERT(
-                    reconstruct(node.args[0], depth+1)
-                ), depth))
-                return inv
-            else:
-                gate_type = gate_map["~"+node.args[0].operator]
-                node_ips  = [reconstruct(x, depth+1) for x in node.args[0].args]
-        else:
+        # Break apart multi-input gates into 2-input gates (associative law)
+        elif node.operator in ("&", "|") and len(node.args) > 2:
             gate_type = gate_map[node.operator]
-            node_ips  = [reconstruct(x, depth+1) for x in node.args]
-        # Construct the gate
-        inst = gate_type(node_ips[0] if gate_type == gate.INVERT else node_ips, None)
-        cloud.append((inst, depth))
-        # Connect up the outputs of the inputs
-        for bit in node_ips:
-            if isinstance(bit, gate.Gate):
-                bit.outputs.append(inst)
-            else:
-                bit.add_target(inst)
-        # Return the reconstructed gate
-        return inst
+            last      = build(gate_type, [reconstruct(x, depth+1) for x in node.args[:2]])
+            for arg in node.args[2:]:
+                last = build(gate_type, [last, reconstruct(arg, depth+1)])
+            return last
+        else:
+            return build(
+                gate_type=gate_map[node.operator],
+                node_ips =[reconstruct(x, depth+1) for x in node.args],
+            )
     result = reconstruct(smpl)
+    # Check if there has been an improvement?
+    if len(cloud) > len(logic): return flop, inputs, logic
     # Update the flop to be driven from the simplified logic
     flop.input[0].clear_driver()
     flop.input[0].driver = result
+    # Sort the logic cloud by descending depth
+    cloud = sorted(cloud, key=lambda x: x[1], reverse=True)
     # Return the updated group
     max_depth = max(x[1] for x in cloud)
     return flop, [(x, max_depth+1) for x in all_ips], cloud
