@@ -56,6 +56,13 @@ class Gate:
         self.inputs  = inputs[:]
         self.outputs = outputs[:]
 
+    def __repr__(self):
+        return (
+            type(self).__name__ + "(" + ",".join([str(x) for x in self.inputs])
+            + ")"
+        )
+    def __str__(self): return self.__repr__()
+
     @classmethod
     def issue_id(cls, op):
         """ Issue a unique gate ID for a particular operation.
