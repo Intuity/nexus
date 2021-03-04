@@ -37,6 +37,34 @@ class Instruction:
             (f" -> O[{self.output}]" if self.output != None else "")
         )
 
+    def encode(self, op_w=3, input_w=4, target_w=4, output_w=2):
+        """
+        Encode instruction into binary - the format from MSB to LSB will follow
+        the pattern.
+
+        ENC_INSTR = { OPERATION, INPUT[0], INPUT[1], TARGET, FLAG, OUTPUT }
+
+        The FLAG field indicates whether or not OUTPUT is present.
+        """
+        # First place the operation
+        data   = int(self.op) & ((1 << op_w) - 1)
+        # Place the first input
+        data <<= input_w
+        data  |= (self.inputs[0].index & ((1 << input_w) - 1)) if len(self.inputs) > 0 else 0
+        # Place the second input
+        data <<= input_w
+        data  |= (self.inputs[1].index & ((1 << input_w) - 1)) if len(self.inputs) > 1 else 0
+        # Place the target
+        data <<= target_w
+        data  |= self.target.index & ((1 << target_w) - 1)
+        # Place the output indicator
+        data <<= 1
+        data  |= 1 if self.output != None else 0
+        # Place the output
+        data <<= output_w
+        data  |= (self.output & ((1 << output_w) - 1)) if self.output != None else 0
+        return data
+
 class Register:
 
     def __init__(self, index, value=None, protect=False):
@@ -147,7 +175,7 @@ def compile(module, groups):
             for reg in registers: reg.step()
     # Form connections between outputs and inputs
     print("Connections:")
-    enc_conn = {}
+    connectivity = {}
     for idx, input in enumerate(primary):
         sources = [
             x for x in outputs if
@@ -157,12 +185,12 @@ def compile(module, groups):
         if len(sources) != 1:
             raise Exception(f"Failed to identify unique source for {input}")
         print(f"O[{sources[0][0]}] -> I[{idx}]")
-        if sources[0][2] not in enc_conn: enc_conn[sources[0][2]] = []
-        enc_conn[sources[0][2]].append(idx)
+        if sources[0][2] not in connectivity: connectivity[sources[0][2]] = []
+        connectivity[sources[0][2]].append(idx)
     print("")
     # Print instructions
     print("Instructions:")
-    enc_inst = []
+    instr_seq = []
     for idx, instr in enumerate(instructions):
         print(f" - {idx:03d}: {instr}")
         data = {
@@ -170,13 +198,19 @@ def compile(module, groups):
             "op"     : instr.op.name,
             "inputs" : [x.index for x in instr.inputs],
             "target" : instr.target.index,
+            "encoded": instr.encode(),
         }
         if instr.output != None: data["output"] = instr.output
-        enc_inst.append(data)
+        instr_seq.append(data)
     print("")
+    print("Writing out instruction details")
     with open("instr_seq.json", "w") as fh:
         json.dump({
-            "instructions": enc_inst,
-            "connections" : enc_conn,
+            "instructions": instr_seq,
+            "connections" : connectivity,
         }, fh, indent=4)
+    print("Writing out encoded instructions")
+    with open("instr.hex", "w") as fh:
+        for instr in instr_seq:
+            fh.write(f"{instr['encoded']:05X}\n")
     import pdb; pdb.set_trace()
