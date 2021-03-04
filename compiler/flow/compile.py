@@ -23,16 +23,18 @@ log = logging.getLogger("compiler.compile")
 
 class Instruction:
 
-    def __init__(self, op, inputs, output):
+    def __init__(self, op, inputs, target, output):
         self.op     = op
         self.inputs = inputs[:]
+        self.target = target
         self.output = output
 
     def __repr__(self):
         return (
             f"{self.op.name}(" +
-            ", ".join([f"R{x.index}" for x in self.inputs]) +
-            (f") -> {self.output}" if self.output != None else ")")
+            ", ".join([f"R[{x.index}]" for x in self.inputs]) +
+            f") -> R[{self.target.index}]" +
+            (f" -> O[{self.output}]" if self.output != None else "")
         )
 
 class Register:
@@ -134,7 +136,7 @@ def compile(module, groups):
             # If this is the end of the logic chain, construct an output
             output = len(outputs) if (term == logic[-1][0]) else None
             # Record the instruction
-            instructions.append(Instruction(term.op, reg_in, output))
+            instructions.append(Instruction(term.op, reg_in, target, output))
             # Update register state for the next operation
             target.set(term)
             # If this is the final stage, record the output
@@ -145,7 +147,7 @@ def compile(module, groups):
             for reg in registers: reg.step()
     # Form connections between outputs and inputs
     print("Connections:")
-    enc_conn = []
+    enc_conn = {}
     for idx, input in enumerate(primary):
         sources = [
             x for x in outputs if
@@ -155,8 +157,8 @@ def compile(module, groups):
         if len(sources) != 1:
             raise Exception(f"Failed to identify unique source for {input}")
         print(f"O[{sources[0][0]}] -> I[{idx}]")
-        enc_conn.append((sources[0][0], idx))
-    enc_conn.sort(key=lambda x: x[0])
+        if sources[0][2] not in enc_conn: enc_conn[sources[0][2]] = []
+        enc_conn[sources[0][2]].append(idx)
     print("")
     # Print instructions
     print("Instructions:")
@@ -167,6 +169,7 @@ def compile(module, groups):
             "comment": str(instr),
             "op"     : instr.op.name,
             "inputs" : [x.index for x in instr.inputs],
+            "target" : instr.target.index,
         }
         if instr.output != None: data["output"] = instr.output
         enc_inst.append(data)
