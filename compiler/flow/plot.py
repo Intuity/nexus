@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import logging
+import os
+
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 import networkx
@@ -46,8 +48,8 @@ def plot_group(flop, inputs, logic, path):
     max_input_depth = max([x[1] for x in inputs])
     max_depth       = max((max_gate_depth, max_input_depth))
     # Collect node colours and labels
-    colours = []
-    labels  = {}
+    node_colours = []
+    node_labels  = {}
     # Find the earliest (deepest) appearance for each input
     input_first = {}
     for input, depth in inputs:
@@ -56,14 +58,20 @@ def plot_group(flop, inputs, logic, path):
         elif input_first[input.name][1] < depth:
             input_first[input.name] = (input, depth)
     # Create primary input nodes
+    in_prefix = os.path.commonprefix(list(input_first.keys()))
+    in_suffix = os.path.commonprefix([x[::-1] for x in input_first.keys()])[::-1]
+    if in_prefix == in_suffix: in_suffix = ""
     for input, depth in input_first.values():
-        graph.add_node(input.name, layer=max_depth-depth)
         if isinstance(input, Constant):
-            colours.append("red")
-            labels[input.name] = "1" if input.value else "0"
+            graph.add_node(input.name, layer=max_depth-depth)
+            node_colours.append("red")
+            node_labels[input.name] = "1" if input.value else "0"
         elif isinstance(input, PortBit):
-            colours.append("#99ff66")
-            labels[input.name] = "I"
+            graph.add_node(input.name, layer=0) # layer=max_depth-depth)
+            node_colours.append("#99ff66")
+            short = input.name.replace(in_prefix, "").replace(in_suffix, "")
+            if short.strip() == "": short = str(input.index)
+            node_labels[input.name] = short
         else:
             raise Exception(f"Unknown input {input}")
     # Find the earliest (deepest) appearance for each gate
@@ -76,32 +84,46 @@ def plot_group(flop, inputs, logic, path):
     # Create gate nodes
     for gate, depth in gate_first.values():
         graph.add_node(gate.name, layer=max_depth-depth)
-        colours.append("#99ccff")
-        labels[gate.name] = gate.symbol
+        node_colours.append("#99ccff")
+        node_labels[gate.name] = gate.symbol
     # Add output node
     graph.add_node(flop.name, layer=max_depth+1)
-    colours.append("violet")
-    labels[flop.name] = "O"
-    # Construct edges
-    graph.add_edge(flop.input[0].driver.name, flop.name)
-    for gate, _ in logic:
-        for in_bit in gate.inputs:
-            graph.add_edge(in_bit.name, gate.name)
-    # Draw graph
+    node_colours.append("violet")
+    node_labels[flop.name] = flop.input.name
+    # Draw the basic graph
     plt.figure(figsize=(12, 8))
-    plt.margins(0)
+    plt.margins(0.05)
     plt.axis("off")
     axis = plt.gca()
-    axis.set_title(flop.hier_name)
-    networkx.draw(
-        graph,
-        networkx.multipartite_layout(graph, subset_key="layer", align="vertical"),
-        width=0.5,
-        node_color=colours,
-        node_size=200,
-        with_labels=True,
-        labels=labels,
+    if len(in_suffix) > 0:
+        axis.set_title(f"{in_prefix}X{in_suffix} -> {flop.input[0].name}")
+    else:
+        axis.set_title(f"{in_prefix} -> {flop.input[0].name}")
+    layout = networkx.multipartite_layout(graph, subset_key="layer", align="vertical")
+    networkx.draw_networkx_nodes(
+        graph, layout, node_color=node_colours, node_size=200, ax=axis,
+    )
+    networkx.draw_networkx_labels(graph, layout, labels=node_labels, ax=axis)
+    # Construct different edge classes
+    input_edges, gate_edges = [], []
+    for gate, _ in logic:
+        for in_bit in gate.inputs:
+            (gate_edges if isinstance(in_bit, Gate) else input_edges).append(
+                (in_bit.name, gate.name)
+            )
+    networkx.draw_networkx_edges(
+        graph, layout, edgelist=input_edges, width=0.5, edge_color="green",
         ax=axis,
     )
+    networkx.draw_networkx_edges(
+        graph, layout, edgelist=gate_edges, width=0.5, edge_color="blue",
+        ax=axis,
+    )
+    networkx.draw_networkx_edges(
+        graph, layout, edgelist=[(flop.input[0].driver.name, flop.name)], width=0.5,
+        edge_color=("blue" if isinstance(flop.input[0].driver, Gate) else "green"),
+        ax=axis,
+    )
+    # Write to file
     plt.savefig(path, bbox_inches="tight")
     plt.close()
