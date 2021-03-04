@@ -94,6 +94,9 @@ def group_logic(module):
             raise Exception(f"Flop {flop.name} is {flop.input.width} bits wide")
         # Chase back input to previous flops/primary inputs
         logic, inputs = chase_bit(module, flop.input[0])
+        # Sort logic by descending depth
+        logic = sorted(logic, key=lambda x: x[1], reverse=True)
+        # Store the group
         groups.append((flop, inputs, logic))
     # Return groupings
     return groups
