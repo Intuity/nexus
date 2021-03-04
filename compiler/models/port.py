@@ -42,6 +42,9 @@ class PortBit:
     def name(self):
         return f"{self.port.hier_name}[{self.index}]"
 
+    def __repr__(self): return self.name
+    def __str__(self): return self.name
+
     @property
     def driver(self):
         return self.__driver
