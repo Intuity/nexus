@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from pathlib import Path
 
 import click
 
@@ -22,19 +23,22 @@ from .flow.flatten import flatten
 from .flow.group import group_logic
 from .flow.plot import plot_group
 from .flow.simplify import simplify_group
+from .flow.prune import prune
+from .flow.compile import compile
 
 log = logging.getLogger("compiler")
 
 @click.command()
 # Debug options
-@click.option("--show-modules", default=False, count=True, help="Print out parsed modules")
-@click.option("--show-models",  default=False, count=True, help="Print out parsed models")
+@click.option("--show-modules", count=True,        help="Print out parsed modules")
+@click.option("--show-models",  count=True,        help="Print out parsed models")
+@click.option("--plot-groups",  type=click.Path(), help="Plot out flop-logic-flop groups")
 # Positional arguments
 @click.argument("input")
 @click.argument("top")
 def main(
     # Debug options
-    show_modules, show_models,
+    show_modules, show_models, plot_groups,
     # Positional arguments
     input, top,
 ):
@@ -84,10 +88,21 @@ def main(
     simplified = [simplify_group(*x) for x in groups]
 
     # Plot pre and post simplify
-    log.info(f"Plotting {len(groups)} groups")
-    for idx, (pre, post) in enumerate(zip(grp_gate_count, simplified)):
-        log.info(f" - {idx} - #ORIG: {pre}, #SMPL: {len(post[2])}")
-        plot_group(*post, f"groups/post_{idx}.png")
+    if plot_groups:
+        log.info(f"Plotting {len(groups)} groups")
+        plot_groups = Path(plot_groups)
+        plot_groups.mkdir(parents=True, exist_ok=True)
+        for idx, (pre, post) in enumerate(zip(grp_gate_count, simplified)):
+            log.info(f" - {idx} - #ORIG: {pre}, #SMPL: {len(post[2])}")
+            plot_group(*post, plot_groups / f"post_{idx}.png")
+
+    # Prune dead logic
+    log.info("Pruning dead logic")
+    prune(flat)
+
+    # Compile onto mesh
+    log.info("Compiling design onto mesh")
+    compile(flat, simplified)
 
     import pdb; pdb.set_trace()
 
