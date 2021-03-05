@@ -37,7 +37,7 @@ class Instruction:
             (f" -> O[{self.output}]" if self.output != None else "")
         )
 
-    def encode(self, op_w=3, input_w=4, target_w=4, output_w=2):
+    def encode(self, op_w=3, reg_w=4, output_w=2):
         """
         Encode instruction into binary - the format from MSB to LSB will follow
         the pattern.
@@ -49,14 +49,14 @@ class Instruction:
         # First place the operation
         data   = int(self.op) & ((1 << op_w) - 1)
         # Place the first input
-        data <<= input_w
-        data  |= (self.inputs[0].index & ((1 << input_w) - 1)) if len(self.inputs) > 0 else 0
+        data <<= reg_w
+        data  |= (self.inputs[0].index & ((1 << reg_w) - 1)) if len(self.inputs) > 0 else 0
         # Place the second input
-        data <<= input_w
-        data  |= (self.inputs[1].index & ((1 << input_w) - 1)) if len(self.inputs) > 1 else 0
+        data <<= reg_w
+        data  |= (self.inputs[1].index & ((1 << reg_w) - 1)) if len(self.inputs) > 1 else 0
         # Place the target
-        data <<= target_w
-        data  |= self.target.index & ((1 << target_w) - 1)
+        data <<= reg_w
+        data  |= self.target.index & ((1 << reg_w) - 1)
         # Place the output indicator
         data <<= 1
         data  |= 1 if self.output != None else 0
