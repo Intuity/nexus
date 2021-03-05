@@ -134,3 +134,8 @@ dmypy.json
 # Synthesis environments
 tests/*/work
 
+# Hardware design
+*.vcd
+*.log
+*.vvp
+
