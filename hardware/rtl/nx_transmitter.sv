@@ -34,10 +34,6 @@ module nx_transmitter #(
     , input  logic                         cmd_ready
 );
 
-localparam FULL_W     = TARGET_W + BUS_W + PAYLOAD_W; // { TGT, CMD, DATA }
-localparam FIFO_DEPTH = FULL_W / BUS_W;
-localparam DEPTH_W    = $clog2(FIFO_DEPTH);
-
 typedef enum bit [1:0] {
       TX_TARGET  // Sending target address
     , TX_COMMAND // Sending command
@@ -57,7 +53,7 @@ assign cmd_data  = m_cmd_data_q;
 assign cmd_last  = m_cmd_last_q;
 assign cmd_valid = m_cmd_valid_q;
 
-always_comb begin : c_feed_fifo
+always_comb begin : c_transmit
     integer i;
 
     `INIT_D(state);
@@ -70,27 +66,27 @@ always_comb begin : c_feed_fifo
 
     if (cmd_ready) begin
         case (m_state_d)
-            // TARGET: Push target address into transmit FIFO
+            // TARGET: Push target address onto bus
             TX_TARGET: begin
                 // Capture data
                 m_command_d = tx_command;
                 m_payload_d = tx_payload;
                 m_valids_d  = tx_valid;
-                // Setup push into FIFO
+                // Setup push onto bus
                 m_cmd_data_d  = tx_target;
                 m_cmd_last_d  = 1'b0;
                 m_cmd_valid_d = |m_valids_d;
                 // If target pushed, move to the next state
                 if (m_cmd_valid_d) m_state_d = TX_COMMAND;
             end
-            // COMMAND: Push command into FIFO
+            // COMMAND: Push command onto bus
             TX_COMMAND: begin
                 m_cmd_data_d  = { 1'b0, m_command_q };
                 m_cmd_last_d  = 1'b0;
                 m_cmd_valid_d = 1'b1;
                 m_state_d     = TX_PAYLOAD;
             end
-            // PAYLOAD: Push payload chunk-by-chunk into FIFO
+            // PAYLOAD: Push payload chunk-by-chunk onto bus
             TX_PAYLOAD: begin
                 m_cmd_valid_d = 1'b0;
                 for (i = 0; i < (PAYLOAD_W / BUS_W); i = (i + 1)) begin
@@ -112,7 +108,7 @@ always_comb begin : c_feed_fifo
     end
 end
 
-always_ff @(posedge clk, posedge rst) begin : s_feed_fifo
+always_ff @(posedge clk, posedge rst) begin : s_transmit
     if (rst) begin
         `RESET_Q(state,               TX_TARGET);
         `RESET_Q(command,         {BUS_W{1'b0}});
