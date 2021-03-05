@@ -15,9 +15,31 @@
 `ifndef __NX_COMMON_SVH__
 `define __NX_COMMON_SVH__
 
-`define DECLARE_DQ(X) m_``X``_d, m_``X``_q
-`define RESET_Q(X, Y) m_``X``_q <= (Y)
-`define FLOP_DQ(X) m_``X``_q <= m_``X``_d
+// DECLARE_DQ(X, C, R, I)
+// Declares a combinatorial-sequential logic pair, and sets up the sequential
+// logic portion.
+// Args:
+//  X: Name of the signal
+//  C: Clock signal driving sequential logic
+//  R: Reset signal driving sequential logic
+//  I: Initial value for the signal to take
+//
+`define DECLARE_DQ(X, C, R, I) \
+    m_``X``_d, m_``X``_q; \
+    always_ff @(posedge C, posedge R) begin : s_``X \
+        if (R) begin \
+            m_``X``_q <= (I); \
+        end else begin \
+            m_``X``_q <= m_``X``_d; \
+        end \
+    end
+
+// INIT_D(X)
+// Copy the sequential value back to the combinatorial value, ready for
+// computing the next state.
+// Args:
+//  X: Name of the signal
+//
 `define INIT_D(X) m_``X``_d = m_``X``_q
 
 `endif // __NX_COMMON_SVH__

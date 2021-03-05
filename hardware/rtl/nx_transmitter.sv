@@ -34,19 +34,21 @@ module nx_transmitter #(
     , input  logic                         cmd_ready
 );
 
+localparam VALID_W = PAYLOAD_W / BUS_W;
+
 typedef enum bit [1:0] {
       TX_TARGET  // Sending target address
     , TX_COMMAND // Sending command
     , TX_PAYLOAD // Sending payload
 } nx_tx_state_t;
 
-nx_tx_state_t             `DECLARE_DQ(state);
-logic [        BUS_W-1:0] `DECLARE_DQ(command);
-logic [    PAYLOAD_W-1:0] `DECLARE_DQ(payload);
-logic [(PAYLOAD_W/8)-1:0] `DECLARE_DQ(valids);
-logic [        BUS_W-1:0] `DECLARE_DQ(cmd_data);
-logic                     `DECLARE_DQ(cmd_last);
-logic                     `DECLARE_DQ(cmd_valid);
+nx_tx_state_t         `DECLARE_DQ(state,     clk, rst, TX_TARGET        )
+logic [    BUS_W-1:0] `DECLARE_DQ(command,   clk, rst, {BUS_W{1'b0}}    )
+logic [PAYLOAD_W-1:0] `DECLARE_DQ(payload,   clk, rst, {PAYLOAD_W{1'b0}})
+logic [  VALID_W-1:0] `DECLARE_DQ(valids,    clk, rst, {VALID_W{1'b0}}  )
+logic [    BUS_W-1:0] `DECLARE_DQ(cmd_data,  clk, rst, {BUS_W{1'b0}}    )
+logic                 `DECLARE_DQ(cmd_last,  clk, rst, 1'b0             )
+logic                 `DECLARE_DQ(cmd_valid, clk, rst, 1'b0             )
 
 assign tx_ready  = (m_state_q == TX_TARGET) && cmd_ready;
 assign cmd_data  = m_cmd_data_q;
@@ -105,26 +107,6 @@ always_comb begin : c_transmit
                 m_valids_d = {(PAYLOAD_W/BUS_W){1'b0}};
             end
         endcase
-    end
-end
-
-always_ff @(posedge clk, posedge rst) begin : s_transmit
-    if (rst) begin
-        `RESET_Q(state,               TX_TARGET);
-        `RESET_Q(command,         {BUS_W{1'b0}});
-        `RESET_Q(payload,     {PAYLOAD_W{1'b0}});
-        `RESET_Q(valids,  {(PAYLOAD_W/8){1'b0}});
-        `RESET_Q(cmd_data,        {BUS_W{1'b0}});
-        `RESET_Q(cmd_last,                 1'b0);
-        `RESET_Q(cmd_valid,                1'b0);
-    end else begin
-        `FLOP_DQ(state);
-        `FLOP_DQ(command);
-        `FLOP_DQ(payload);
-        `FLOP_DQ(valids);
-        `FLOP_DQ(cmd_data);
-        `FLOP_DQ(cmd_last);
-        `FLOP_DQ(cmd_valid);
     end
 end
 

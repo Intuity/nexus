@@ -72,12 +72,12 @@ typedef enum bit [OP_W-1:0] {
 // State variables
 // =============================================================================
 
-logic [  IO_W-1:0] `DECLARE_DQ(inputs);
-nx_core_state_t    `DECLARE_DQ(state);
-logic [ REG_W-1:0] `DECLARE_DQ(registers);
-logic [STEP_W-1:0] `DECLARE_DQ(step);
-logic [  IO_W-1:0] `DECLARE_DQ(outputs);
-logic [  IO_W-1:0] `DECLARE_DQ(updated);
+logic [  IO_W-1:0] `DECLARE_DQ(inputs,    clk, rst, {IO_W{1'b0}}  )
+nx_core_state_t    `DECLARE_DQ(state,     clk, rst, STATE_SETUP   )
+logic [ REG_W-1:0] `DECLARE_DQ(registers, clk, rst, {REG_W{1'b0}} )
+logic [STEP_W-1:0] `DECLARE_DQ(step,      clk, rst, {STEP_W{1'b0}})
+logic [  IO_W-1:0] `DECLARE_DQ(outputs,   clk, rst, {IO_W{1'b0}}  )
+logic [  IO_W-1:0] `DECLARE_DQ(updated,   clk, rst, {IO_W{1'b0}}  )
 
 // Expose state flags
 assign in_setup = (m_state_q == STATE_SETUP);
@@ -189,34 +189,6 @@ always_comb begin : c_execute
             else m_step_d = m_step_d + { {(STEP_W-1){1'b0}}, 1'b1 };
         end
     endcase
-end
-
-// =============================================================================
-// Sequential Logic
-// =============================================================================
-
-always_ff @(posedge clk, posedge rst) begin : s_load_input
-    if (rst) begin
-        `RESET_Q(inputs, {IO_W{1'b0}});
-    end else begin
-        `FLOP_DQ(inputs);
-    end
-end
-
-always_ff @(posedge clk, posedge rst) begin : s_execute
-    if (rst) begin
-        `RESET_Q(state,     STATE_SETUP);
-        `RESET_Q(registers, {REG_W{1'b0}});
-        `RESET_Q(step,      {STEP_W{1'b0}});
-        `RESET_Q(outputs,   {IO_W{1'b0}});
-        `RESET_Q(updated,   {IO_W{1'b0}});
-    end else begin
-        `FLOP_DQ(state);
-        `FLOP_DQ(registers);
-        `FLOP_DQ(step);
-        `FLOP_DQ(outputs);
-        `FLOP_DQ(updated);
-    end
 end
 
 endmodule
