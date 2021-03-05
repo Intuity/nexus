@@ -91,7 +91,7 @@ always_comb begin : c_transmit
             // PAYLOAD: Push payload chunk-by-chunk onto bus
             TX_PAYLOAD: begin
                 m_cmd_valid_d = 1'b0;
-                for (i = 0; i < (PAYLOAD_W / BUS_W); i = (i + 1)) begin
+                for (i = VALID_W-1; i >= 0; i = (i - 1)) begin
                     if (!m_cmd_valid_d && m_valids_d[i]) begin
                         m_valids_d[i] = 1'b0;
                         m_cmd_data_d  = (m_payload_q >> (i * BUS_W));

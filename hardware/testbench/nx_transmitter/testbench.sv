@@ -67,7 +67,7 @@ initial begin : i_gen_tx
         if (m_tx_valid) begin
             m_expected.push_back({ 1'b0, m_tx_target  });
             m_expected.push_back({ 1'b0, m_tx_command });
-            for (i = 0; i < 3; i = (i + 1)) begin
+            for (i = 2; i >= 0; i = (i - 1)) begin
                 if (m_tx_valid[i]) begin
                     exp = m_tx_payload >> (i * 8);
                     m_expected.push_back({
