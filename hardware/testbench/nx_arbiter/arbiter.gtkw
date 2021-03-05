@@ -1,0 +1,53 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Fri Mar  5 17:23:34 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_arbiter/sim.vcd"
+[dumpfile_mtime] "Fri Mar  5 17:22:42 2021"
+[dumpfile_size] 585969
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_arbiter/arbiter.gtkw"
+[timestart] 0
+[size] 1674 845
+[pos] 116 91
+*-20.021891 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[sst_width] 193
+[signals_width] 193
+[sst_expanded] 1
+[sst_vpaned_height] 253
+@28
+testbench.m_dut.clk
+testbench.m_dut.rst
+@200
+-
+@28
+testbench.m_dut.m_active
+testbench.m_dut.m_lock
+testbench.m_dut.m_source
+@200
+-
+@22
+testbench.m_dut.inbound_a_data[7:0]
+@28
+testbench.m_dut.inbound_a_last
+testbench.m_dut.inbound_a_ready
+testbench.m_dut.inbound_a_valid
+@200
+-
+@22
+testbench.m_dut.inbound_b_data[7:0]
+@28
+testbench.m_dut.inbound_b_last
+testbench.m_dut.inbound_b_ready
+testbench.m_dut.inbound_b_valid
+@200
+-
+@22
+testbench.m_dut.outbound_data[7:0]
+@29
+testbench.m_dut.outbound_last
+@28
+testbench.m_dut.outbound_ready
+testbench.m_dut.outbound_valid
+[pattern_trace] 1
+[pattern_trace] 0
