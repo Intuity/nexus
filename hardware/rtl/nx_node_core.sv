@@ -32,6 +32,7 @@ module nx_node_core #(
     , input  logic                     rst
     // External controls
     , input  logic                     tick
+    , input  logic                     stall
     // State outputs
     , output logic                     in_setup
     , output logic                     in_wait
@@ -46,8 +47,8 @@ module nx_node_core #(
     , input  logic [ $clog2(IO_W)-1:0] in_index
     , input  logic                     in_valid
     // Value output
-    , output logic          [IO_W-1:0] out_values
-    , output logic          [IO_W-1:0] out_valids
+    , output logic [         IO_W-1:0] out_values
+    , output logic [         IO_W-1:0] out_valids
 );
 
 localparam STEP_W = $clog2(SLOTS);
@@ -134,6 +135,9 @@ always_comb begin : c_execute
     `INIT_D(outputs);
     `INIT_D(updated);
 
+    // Always clear the output update flags (just need a 1 cycle pulse)
+    m_updated_d = {IO_W{1'b0}};
+
     case (m_state_d)
         // SETUP: Wait for the last instruction to be loaded, then transition to
         //        to WAIT phase
@@ -190,5 +194,15 @@ always_comb begin : c_execute
         end
     endcase
 end
+
+// Aliases for VCD tracing
+`ifndef SYNTHESIS
+generate
+    genvar idx;
+    for (idx = 0; idx < SLOTS; idx = (idx + 1)) begin : m_alias
+        logic [INST_W-1:0] m_instr_alias = m_instructions[idx];
+    end
+endgenerate
+`endif
 
 endmodule
