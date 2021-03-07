@@ -167,6 +167,7 @@ nx_transmitter #(
       .clk(clk)
     , .rst(rst)
     // Data to send
+    , .tx_target (m_tx_target )
     , .tx_command(m_tx_command)
     , .tx_payload(m_tx_payload)
     , .tx_valid  (m_tx_valid  )
