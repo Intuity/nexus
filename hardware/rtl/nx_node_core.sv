@@ -85,6 +85,10 @@ assign in_setup = (m_state_q == STATE_SETUP);
 assign in_wait  = (m_state_q == STATE_WAIT );
 assign in_run   = (m_state_q == STATE_RUN  );
 
+// Expose outputs
+assign out_values = m_outputs_q;
+assign out_valids = m_updated_q;
+
 // =============================================================================
 // Instruction store
 // =============================================================================
@@ -100,7 +104,7 @@ always_ff @(posedge clk, posedge rst) begin : s_load_instr
     if (rst) begin
         for (i = 0; i < SLOTS; i = (i + 1)) m_instructions[i] <= {INST_W{1'b0}};
     end else if (load_valid) begin
-        m_instructions[load_slot] <= {load_instr, 1'b1};
+        m_instructions[load_slot] <= {1'b1, load_instr};
     end
 end
 
@@ -125,7 +129,7 @@ always_comb begin : c_execute
     nx_core_op_t              operation;
     logic [$clog2(REG_W)-1:0] reg_in_a, reg_in_b, reg_out;
     logic                     gen_out;
-    logic [         IO_W-1:0] out_idx;
+    logic [ $clog2(IO_W)-1:0] out_idx;
     logic                     op_valid;
     logic                     value_a, value_b, result;
 
@@ -163,9 +167,14 @@ always_comb begin : c_execute
         STATE_RUN: begin
             // Decode the operation to perform
             {
-                operation, reg_in_a, reg_in_b, reg_out, gen_out, out_idx,
-                op_valid
+                op_valid, operation, reg_in_a, reg_in_b, reg_out, gen_out,
+                out_idx
             } = m_instructions[m_step_d];
+            $display(
+                "%0t - SLOT[%03d] 0x%05x -> Vld: %0b Op: %0h, RA: %0d, RB: %0d, RO: %0d, O: %0d (%0b)",
+                $time, m_step_d, m_instructions[m_step_d], op_valid, operation,
+                reg_in_a, reg_in_b, reg_out, out_idx, gen_out
+            );
             // If operation is valid, execute it
             if (op_valid) begin
                 value_a = m_registers_d[reg_in_a];
@@ -180,7 +189,11 @@ always_comb begin : c_execute
                     OP_XOR   : result =  (value_a ^ value_b);
                     OP_XNOR  : result = ~(value_a ^ value_b);
                 endcase
-                m_registers_q[reg_out] = result;
+                $display(
+                    "%0t - SLOT[%03d] VA: %0b, VB: %0b -> R: %0b (%0d)",
+                    $time, m_step_d, value_a, value_b, result, reg_out
+                );
+                m_registers_d[reg_out] = result;
                 // If output generation is marked, store and flag
                 if (gen_out) begin
                     m_outputs_d[out_idx] = result;
@@ -200,7 +213,8 @@ end
 generate
     genvar idx;
     for (idx = 0; idx < SLOTS; idx = (idx + 1)) begin : m_alias
-        logic [INST_W-1:0] m_instr_alias = m_instructions[idx];
+        logic [INST_W-1:0] m_instr_alias;
+        assign m_instr_alias = m_instructions[idx];
     end
 endgenerate
 `endif
