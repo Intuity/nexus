@@ -1,0 +1,167 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Sun Mar  7 22:41:42 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_core/sim.vcd"
+[dumpfile_mtime] "Sun Mar  7 22:40:44 2021"
+[dumpfile_size] 323392
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_core/core.gtkw"
+[timestart] 88000
+[size] 1539 839
+[pos] -1 -1
+*-17.420387 311000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[treeopen] testbench.m_dut.
+[sst_width] 193
+[signals_width] 261
+[sst_expanded] 1
+[sst_vpaned_height] 250
+@28
+testbench.m_dut.clk
+testbench.m_dut.rst
+@200
+-
+@28
+testbench.m_dut.tick
+testbench.m_dut.in_setup
+testbench.m_dut.in_run
+testbench.m_dut.in_wait
+@200
+-
+@800200
+-Commands
+@200
+-Inbound
+@22
+testbench.m_dut.rx_cmd_data[7:0]
+@28
+testbench.m_dut.rx_cmd_last
+testbench.m_dut.rx_cmd_ready
+testbench.m_dut.rx_cmd_valid
+@200
+-
+-Outbound
+@22
+testbench.m_dut.tx_cmd_data[7:0]
+@28
+testbench.m_dut.tx_cmd_last
+testbench.m_dut.tx_cmd_ready
+testbench.m_dut.tx_cmd_valid
+@200
+-
+@1000200
+-Commands
+@200
+-
+@800200
+-Control
+@200
+-Output Map
+@28
+testbench.m_dut.m_control.m_alias[0].m_output_map_alias[1:0]
+testbench.m_dut.m_control.m_alias[1].m_output_map_alias[1:0]
+testbench.m_dut.m_control.m_alias[2].m_output_map_alias[1:0]
+testbench.m_dut.m_control.m_alias[3].m_output_map_alias[1:0]
+@1000200
+-Control
+@200
+-
+@800200
+-Core
+@200
+-Instruction Load
+@24
+testbench.m_dut.m_core.load_slot[4:0]
+@22
+testbench.m_dut.m_core.load_instr[18:0]
+@28
+testbench.m_dut.m_core.load_last
+testbench.m_dut.m_core.load_valid
+@200
+-
+-Input Load
+@c00028
+testbench.m_dut.m_core.in_index[1:0]
+@28
+(0)testbench.m_dut.m_core.in_index[1:0]
+(1)testbench.m_dut.m_core.in_index[1:0]
+@1401200
+-group_end
+@28
+testbench.m_dut.m_core.in_value
+testbench.m_dut.m_core.in_valid
+@200
+-
+-Execute
+@800022
+testbench.m_dut.m_core.m_inputs_q[3:0]
+@28
+(0)testbench.m_dut.m_core.m_inputs_q[3:0]
+(3)testbench.m_dut.m_core.m_inputs_q[3:0]
+(1)testbench.m_dut.m_core.m_inputs_q[3:0]
+(2)testbench.m_dut.m_core.m_inputs_q[3:0]
+@1001200
+-group_end
+@c00022
+testbench.m_dut.m_core.m_registers_q[15:0]
+@28
+(0)testbench.m_dut.m_core.m_registers_q[15:0]
+(1)testbench.m_dut.m_core.m_registers_q[15:0]
+(2)testbench.m_dut.m_core.m_registers_q[15:0]
+(3)testbench.m_dut.m_core.m_registers_q[15:0]
+(4)testbench.m_dut.m_core.m_registers_q[15:0]
+(5)testbench.m_dut.m_core.m_registers_q[15:0]
+(6)testbench.m_dut.m_core.m_registers_q[15:0]
+(7)testbench.m_dut.m_core.m_registers_q[15:0]
+(8)testbench.m_dut.m_core.m_registers_q[15:0]
+(9)testbench.m_dut.m_core.m_registers_q[15:0]
+(10)testbench.m_dut.m_core.m_registers_q[15:0]
+(11)testbench.m_dut.m_core.m_registers_q[15:0]
+(12)testbench.m_dut.m_core.m_registers_q[15:0]
+(13)testbench.m_dut.m_core.m_registers_q[15:0]
+(14)testbench.m_dut.m_core.m_registers_q[15:0]
+(15)testbench.m_dut.m_core.m_registers_q[15:0]
+@1401200
+-group_end
+@24
+testbench.m_dut.m_core.m_step_q[4:0]
+@23
+testbench.m_dut.m_core.m_outputs_q[3:0]
+@22
+testbench.m_dut.m_core.m_updated_q[3:0]
+@200
+-
+-Output
+@22
+testbench.m_dut.m_core.out_values[3:0]
+testbench.m_dut.m_core.out_valids[3:0]
+@200
+-
+-Instructions
+@22
+testbench.m_dut.m_core.m_alias[0].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[1].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[2].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[3].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[4].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[5].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[6].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[7].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[8].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[9].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[10].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[11].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[12].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[13].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[14].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[15].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[16].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[17].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[18].m_instr_alias[18:0]
+testbench.m_dut.m_core.m_alias[19].m_instr_alias[18:0]
+@1000200
+-Core
+@200
+-
+[pattern_trace] 1
+[pattern_trace] 0
