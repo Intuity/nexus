@@ -199,7 +199,7 @@ nx_receiver #(
     , .rx_ready   (m_rx_ready   )
 );
 
-
+// VCD tracing
 initial begin : i_vcd
     string f_name;
     $timeformat(-9, 2, " ns", 20);
