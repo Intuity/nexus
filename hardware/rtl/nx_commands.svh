@@ -18,7 +18,8 @@
 typedef enum bit [2:0] {
     CMD_LOAD_INSTR, // 0: Load an instruction into a logic core
     CMD_LAST_INSTR, // 1: Last instruction to load into a logic core
-    CMD_BIT_VALUE   // 2: Transfer a bit value between logic cores and boundary I/O
+    CMD_BIT_VALUE,  // 2: Transfer a bit value between logic cores and boundary I/O
+    CMD_OUT_MAP     // 3: Setup mapping of output bit to input bit
 } nx_command_t;
 
 `endif // __NX_COMMANDS_SVH__
