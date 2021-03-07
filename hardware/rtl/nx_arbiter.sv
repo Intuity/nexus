@@ -43,7 +43,7 @@ assign m_source = (
     // When locked to a channel, only source data from that channel
     m_lock ? ((m_active                    ) ? 1'b1 : 1'b0)
     // When not locked, prefer to alternate channel unless other isn't busy
-           : ((m_active || ~inbound_b_valid) ? 1'b0 : 1'b1)
+           : (((m_active && inbound_a_valid) || ~inbound_b_valid) ? 1'b0 : 1'b1)
 );
 
 // Mux data, last, and valid onto outbound signals
@@ -60,7 +60,7 @@ always_ff @(posedge clk, posedge rst) begin : p_lock
     if (rst) begin
         m_active <= 1'b0;
         m_lock   <= 1'b0;
-    end else if (outbound_valid) begin
+    end else if (outbound_valid && outbound_ready) begin
         m_active <= m_source;
         m_lock   <= ~outbound_last;
     end
