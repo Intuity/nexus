@@ -40,6 +40,8 @@ logic [7:0] m_inbound_a_data;
 logic       m_inbound_a_last;
 logic       m_inbound_a_valid;
 logic       m_inbound_a_ready;
+logic [8:0] m_expected_a [$];
+logic       m_done_a;
 
 initial begin : i_gen_cmd_a
     integer i, sent;
@@ -47,11 +49,11 @@ initial begin : i_gen_cmd_a
     logic [ 7:0] target, command;
     logic [23:0] payload;
     logic [ 2:0] pld_valid;
-    logic [34:0] exp, cap;
     // Reset state
     m_inbound_a_data  = 8'd0;
     m_inbound_a_last  = 1'b0;
     m_inbound_a_valid = 1'b0;
+    m_done_a          = 1'b0;
     // Wait for reset to go high
     while (!rst) @(posedge clk);
     // Wait for reset to go low
@@ -70,15 +72,16 @@ initial begin : i_gen_cmd_a
                 "%0t: Transmit - T: %02h, C: %02h, P: %06h, V: %03b",
                 $time, target, command, payload, pld_valid
             );
-            // Transmit target
-            m_inbound_a_data  = target;
+            // Transmit target (always carry 1'b0 in MSB)
+            m_inbound_a_data  = { 1'b0, target[6:0] };
             m_inbound_a_last  = 1'b0;
             m_inbound_a_valid = 1'b1;
+            m_expected_a.push_back({ m_inbound_a_last, m_inbound_a_data });
             do begin @(posedge clk); end while (!m_inbound_a_ready);
             // Transmit command
             m_inbound_a_data  = command;
-            exp[31:24]  = command;
             m_inbound_a_valid = 1'b1;
+            m_expected_a.push_back({ m_inbound_a_last, m_inbound_a_data });
             do begin @(posedge clk); end while (!m_inbound_a_ready);
             // Transmit payload
             for (i = 3; i >= 0; i = (i - 1)) begin
@@ -87,6 +90,7 @@ initial begin : i_gen_cmd_a
                     m_inbound_a_data  = (payload >> (i * 8));
                     m_inbound_a_last  = ~(|pld_valid);
                     m_inbound_a_valid = 1'b1;
+                    m_expected_a.push_back({ m_inbound_a_last, m_inbound_a_data });
                     do begin @(posedge clk); end while (!m_inbound_a_ready);
                 end
             end
@@ -100,8 +104,8 @@ initial begin : i_gen_cmd_a
     m_inbound_a_valid = 3'd0;
     // Allow some time to drain
     repeat (30) @(posedge clk);
-    // Finish the simulation
-    $finish;
+    // Mark done
+    m_done_a = 1'b1;
 end
 
 // Inbound interface B
@@ -109,6 +113,8 @@ logic [7:0] m_inbound_b_data;
 logic       m_inbound_b_last;
 logic       m_inbound_b_valid;
 logic       m_inbound_b_ready;
+logic [8:0] m_expected_b [$];
+logic       m_done_b;
 
 initial begin : i_gen_cmd_b
     integer i, sent;
@@ -116,11 +122,11 @@ initial begin : i_gen_cmd_b
     logic [ 7:0] target, command;
     logic [23:0] payload;
     logic [ 2:0] pld_valid;
-    logic [34:0] exp, cap;
     // Reset state
     m_inbound_b_data  = 8'd0;
     m_inbound_b_last  = 1'b0;
     m_inbound_b_valid = 1'b0;
+    m_done_b          = 1'b0;
     // Wait for reset to go high
     while (!rst) @(posedge clk);
     // Wait for reset to go low
@@ -139,15 +145,16 @@ initial begin : i_gen_cmd_b
                 "%0t: Transmit - T: %02h, C: %02h, P: %06h, V: %03b",
                 $time, target, command, payload, pld_valid
             );
-            // Transmit target
-            m_inbound_b_data  = target;
+            // Transmit target (always carry 1'b1 in MSB)
+            m_inbound_b_data  = { 1'b1, target[6:0] };
             m_inbound_b_last  = 1'b0;
             m_inbound_b_valid = 1'b1;
+            m_expected_b.push_back({ m_inbound_b_last, m_inbound_b_data });
             do begin @(posedge clk); end while (!m_inbound_b_ready);
             // Transmit command
             m_inbound_b_data  = command;
-            exp[31:24]  = command;
             m_inbound_b_valid = 1'b1;
+            m_expected_b.push_back({ m_inbound_b_last, m_inbound_b_data });
             do begin @(posedge clk); end while (!m_inbound_b_ready);
             // Transmit payload
             for (i = 3; i >= 0; i = (i - 1)) begin
@@ -156,6 +163,7 @@ initial begin : i_gen_cmd_b
                     m_inbound_b_data  = (payload >> (i * 8));
                     m_inbound_b_last  = ~(|pld_valid);
                     m_inbound_b_valid = 1'b1;
+                    m_expected_b.push_back({ m_inbound_b_last, m_inbound_b_data });
                     do begin @(posedge clk); end while (!m_inbound_b_ready);
                 end
             end
@@ -169,17 +177,92 @@ initial begin : i_gen_cmd_b
     m_inbound_b_valid = 3'd0;
     // Allow some time to drain
     repeat (30) @(posedge clk);
-    // Finish the simulation
-    $finish;
+    // Mark done
+    m_done_b = 1'b1;
 end
 
 // Outbound interface
-logic [7:0] m_outbound_data;
-logic       m_outbound_last;
-logic       m_outbound_valid;
-logic       m_outbound_ready;
+logic [ 7:0] m_outbound_data;
+logic        m_outbound_last;
+logic        m_outbound_valid;
+logic        m_outbound_ready;
+logic [ 8:0] m_received [$];
+logic [31:0] m_rec_cycle;
 
-assign m_outbound_ready = 1'b1;
+initial begin : i_gen_ready
+    integer i, delay;
+    while (1'b1) begin
+        #0;
+        m_outbound_ready = $urandom & 1;
+        delay            = $urandom % 5;
+        repeat (delay+1) @(posedge clk);
+    end
+end
+
+always @(posedge clk) begin : p_receive
+    if (rst) begin
+        m_rec_cycle <= 32'd0;
+    end else if (m_outbound_valid && m_outbound_ready) begin
+        m_rec_cycle <= (m_rec_cycle + 32'd1);
+        m_received.push_back({ m_outbound_last, m_outbound_data });
+    end
+end
+
+// Check data emitted by arbiter
+initial begin : i_check_output
+    integer   i;
+    bit       lock, source;
+    bit       got_last, exp_last;
+    bit [7:0] got_data, exp_data;
+    // Wait for reset to go high
+    while (!rst) @(posedge clk);
+    // Wait for reset to go low
+    while (rst) @(posedge clk);
+    // Wait for both 'done' signals to gone high
+    $display("%0t: Waiting for transmit processes to complete", $time);
+    while (!m_done_a || !m_done_b) @(posedge clk);
+    // Wait a few cycles to drain
+    $display("%0t: Waiting for output to drain", $time);
+    repeat (30) @(posedge clk);
+    // Check output is sensible
+    $display("%0t: Checking arbitrated result", $time);
+    i      = 0;
+    source = 1'b0;
+    lock   = 1'b0;
+    while (m_received.size()) begin
+        { got_last, got_data } = m_received.pop_front();
+        // If not locked to a source, determine which transmitter sent it
+        if (!lock) begin
+            if (m_expected_a[0] == { got_last, got_data }) begin
+                source = 1'b0;
+                lock   = 1'b1;
+            end else if (m_expected_b[0] == { got_last, got_data }) begin
+                source = 1'b1;
+                lock   = 1'b1;
+            end else begin
+                $fatal(1, "Couldn't identify source of byte 0x%02h", got_data);
+            end
+        end
+        // When locked to a source, pick-up data and last
+        if (source == 1'b0) begin
+            { exp_last, exp_data } = m_expected_a.pop_front();
+        end else begin
+            { exp_last, exp_data } = m_expected_b.pop_front();
+        end
+        // Check data
+        $display("[%03d] Checking source %0d - 0x%02h == 0x%02h", i, source, exp_data, got_data);
+        if (exp_data != got_data) begin
+            $fatal(1, "Data mismatch %0d - 0x%02h != 0x%02h", source, exp_data, got_data);
+        end
+        if (exp_last != got_last) begin
+            $fatal(1, "Last mismatch %0d - 0x%02h != 0x%02h", source, exp_last, got_last);
+        end
+        // Clear lock if last flag presented
+        if (got_last) lock = 1'b0;
+        // Count cycles
+        i = (i + 1);
+    end
+end
 
 // Arbiter instance
 nx_arbiter #(
