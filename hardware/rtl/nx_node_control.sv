@@ -60,6 +60,9 @@ module nx_node_control #(
 
 localparam SLOT_W = $clog2(SLOTS);
 
+// TODO: Drive signals properly
+assign rx_ready = 1'b1;
+
 // Instruction load
 logic [INST_W-1:0] `DECLARE_DQ(instr_data,  clk, rst, {INST_W{1'b0}})
 logic [SLOT_W-1:0] `DECLARE_DQ(instr_slot,  clk, rst, {SLOT_W{1'b0}})
@@ -80,6 +83,10 @@ assign in_value = m_input_value_q;
 assign in_index = m_input_index_q;
 assign in_valid = m_input_valid_q;
 
+// Output->input mapping
+logic [$clog2(IO_W)-1:0] m_output_map_d [IO_W-1:0];
+logic [$clog2(IO_W)-1:0] m_output_map_q [IO_W-1:0];
+
 // Command transmit
 logic [ TARGET_W-1:0] `DECLARE_DQ(tx_target,  clk, rst,  {TARGET_W{1'b0}})
 logic [    CMD_W-1:0] `DECLARE_DQ(tx_command, clk, rst,     {CMD_W{1'b0}})
@@ -98,6 +105,7 @@ assign stall = (~tx_ready || tx_valid) & (out_valids != {IO_W{1'b0}});
 // Decode received commands and generate instruction/input load to core
 //
 always_comb begin : c_decode_rx
+    integer      i;
     nx_command_t command;
     logic [4:0]  index;
 
@@ -109,6 +117,8 @@ always_comb begin : c_decode_rx
     `INIT_D(input_value);
     `INIT_D(input_index);
     `INIT_D(input_valid);
+
+    for (i = 0; i < IO_W; i = (i + 1)) m_output_map_d[i] = m_output_map_q[i];
 
     // Always clear valid signals
     m_instr_valid_d = 1'b0;
@@ -131,6 +141,10 @@ always_comb begin : c_decode_rx
                 m_input_value_d = rx_payload[0];
                 m_input_index_d = index[$clog2(IO_W)-1:0];
                 m_input_valid_d = 1'b1;
+            end
+            CMD_OUT_MAP: begin
+                // Encoding: { INPUT_IDX, OUTPUT_IDX }
+                m_output_map_d[rx_payload[$clog2(IO_W)-1:0]] = rx_payload[(2*$clog2(IO_W))-1:$clog2(IO_W)];
             end
         endcase
     end
@@ -156,8 +170,12 @@ always_comb begin : c_encode_tx
         if (out_valids != {IO_W{1'b0}}) begin
             for (i = 0; i < IO_W; i = (i + 1)) begin
                 if (out_valids[i]) begin
-                    m_tx_target_d  = 0;                       // TODO: Use real target
-                    m_tx_command_d = { CMD_BIT_VALUE, 5'd0 }; // TODO: Use real bit position
+                    m_tx_target_d  = 8'd0; // TODO: Use real target
+                    m_tx_command_d = {
+                        CMD_BIT_VALUE,            // Base command
+                        {(5-$clog2(IO_W)){1'b0}}, // Padding
+                        m_output_map_q[i]         // Map output -> input bit
+                    };
                     m_tx_payload_d = { 7'd0, out_values[i] };
                     m_tx_valid_d   = 1'b1;
                 end
@@ -165,5 +183,28 @@ always_comb begin : c_encode_tx
         end
     end
 end
+
+// s_output_map
+// Handle D->Q transfer for output map
+//
+always_ff @(posedge clk, posedge rst) begin : s_output_map
+    integer i;
+    if (rst) begin
+        for (i = 0; i < IO_W; i = (i + 1)) m_output_map_q[i] <= {$clog2(IO_W){1'b0}};
+    end else begin
+        for (i = 0; i < IO_W; i = (i + 1)) m_output_map_q[i] <= m_output_map_d[i];
+    end
+end
+
+// Aliases for VCD tracing
+`ifndef SYNTHESIS
+generate
+    genvar idx;
+    for (idx = 0; idx < IO_W; idx = (idx + 1)) begin : m_alias
+        logic [$clog2(IO_W)-1:0] m_output_map_alias;
+        assign m_output_map_alias = m_output_map_q[idx];
+    end
+endgenerate
+`endif
 
 endmodule
