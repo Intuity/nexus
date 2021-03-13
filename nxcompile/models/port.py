@@ -24,6 +24,8 @@ class PortDirection(IntEnum):
 class PortBit:
     """ Represents a bit within a port """
 
+    ID = 0
+
     def __init__(self, port, index):
         """ Initialise the PortBit instance.
 
@@ -33,10 +35,17 @@ class PortBit:
         """
         assert isinstance(port, Port) or port == None
         assert isinstance(index, int)
+        self.id        = PortBit.issue_id()
         self.port      = port
         self.index     = index
         self.__driver  = None  # What drives this bit
         self.__targets = []    # What is driven by this bit
+
+    @classmethod
+    def issue_id(cls):
+        issued      = PortBit.ID
+        PortBit.ID += 1
+        return issued
 
     @property
     def name(self):
