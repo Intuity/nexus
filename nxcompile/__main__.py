@@ -24,7 +24,7 @@ from .flow.group import group_logic
 from .flow.plot import plot_group
 from .flow.simplify import simplify_group
 from .flow.prune import prune
-from .flow.compile import compile
+from .flow.compile_multi import compile
 
 log = logging.getLogger("compiler")
 
@@ -103,8 +103,6 @@ def main(
     # Compile onto mesh
     log.info("Compiling design onto mesh")
     compile(flat, simplified)
-
-    import pdb; pdb.set_trace()
 
 if __name__ == "__main__":
     main()
