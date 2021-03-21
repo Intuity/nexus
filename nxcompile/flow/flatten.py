@@ -29,82 +29,38 @@ def chase_to_source(bit):
         current = current.driver
     return current
 
-def flatten(module, depth=0):
-    """ Recursively flatten a hierarchical design into a monolithic block.
+def chase_to_targets(bit):
+    """ Chase a driven bit to its ultimate targets.
 
     Args:
-        module: The input Module instance
-        depth : How deep is the recursion
+        bit: The starting point
 
-    Returns: Flattened Module instance.
-    """
-    assert isinstance(module, Module)
-    # First flatten all child modules
-    promoted = []
-    for c_key, child in [x for x in module.children.items()]:
-        # Ignore gates and flops - these are handled later
-        if isinstance(child, Gate) or isinstance(child, Flop): continue
-        # Create a flat child
-        f_child = flatten(child, depth=(depth + 1))
-        # Reconnect signals on the boundary of the child
-        for port in f_child.ports.values():
-            for bit in port.bits:
-                source = chase_to_source(bit)
-                for target in bit.targets:
-                    # Adjust the target's driver
-                    if isinstance(target, Gate):
-                        target.inputs[target.inputs.index(bit)] = source
-                    elif isinstance(target, PortBit):
-                        target.parent = module
-                        target.clear_driver()
-                        target.driver = source
-                    else:
-                        raise Exception(f"Unrecognised target {target}")
-                    # Adjust the source's targets
-                    if isinstance(source, Gate):
-                        source.outputs.append(target)
-                    elif isinstance(source, PortBit):
-                        source.parent = module
-                        source.add_target(target)
-                    else:
-                        raise Exception(f"Unrecognised source {source}")
-        # Promote children up one level
-        for grandchild in f_child.children.values():
-            grandchild.name = f"{f_child.name}_{grandchild.name}"
-            promoted.append(grandchild)
-        # Remove the child
-        del module.children[c_key]
-    # Pickup the promoted modules
-    for grandchild in promoted: module.add_child(grandchild)
-    # At the top-level, perform some tidying operations
-    if depth == 0:
-        # Clean-up boundary ports with references to flattened modules
-        for port in module.inputs:
-            for bit in port.bits:
-                to_keep = [
-                    x for x in bit.targets
-                    if not isinstance(x, PortBit)
-                    or not type(x.port.parent) == Module
-                    or x.port.parent == module
-                ]
-                bit.clear_targets()
-                for tgt in to_keep: bit.add_target(tgt)
-        # Shatter multi-bit flops
-        mb_flops = [
-            x for x in module.children.values()
-            if isinstance(x, Flop) and x.input.width > 1
-        ]
-        for flop in mb_flops:
-            in_bits  = flop.input.bits
-            out_bits = flop.output.bits if flop.output else ([None]*len(in_bits))
-            inv_bits = flop.output_inv.bits if flop.output_inv else ([None]*len(in_bits))
-            for idx, (in_bit, out_bit, inv_bit) in enumerate(zip(in_bits, out_bits, inv_bits)):
+    Returns: List of ultimate targets """
+    if isinstance(bit, PortBit):
+        if bit.targets:
+            return sum([chase_to_targets(x) for x in bit.targets], [])
+        else:
+            return [bit]
+    else:
+        return [bit]
+
+def shatter_flops(module):
+    """ Shatter multi-bit flops of all children within this module """
+    to_remove = []
+    for flop in list(module.children.values()):
+        if isinstance(flop, Flop) and flop.input.width > 1:
+            to_remove.append(flop)
+            for bit_idx, (in_bit, out_bit, inv_bit) in enumerate(zip(
+                flop.input.bits,
+                flop.output.bits     if flop.output     else ([None] * len(flop.input.bits)),
+                flop.output_inv.bits if flop.output_inv else ([None] * len(flop.input.bits)),
+            )):
                 bit_flop = Flop(
-                    f"{flop.name}_{idx}",
+                    f"{flop.name}_{bit_idx}",
                     clock     =Port(flop.clock.name,      PortDirection.INPUT,  1),
-                    reset     =Port(flop.reset.name,      PortDirection.INPUT,  1) if flop.reset      else None,
+                    reset     =Port(flop.reset.name,      PortDirection.INPUT,  1) if flop.reset else None,
                     input     =Port(flop.input.name,      PortDirection.INPUT,  1),
-                    output    =Port(flop.output.name,     PortDirection.OUTPUT, 1) if flop.output     else None,
+                    output    =Port(flop.output.name,     PortDirection.OUTPUT, 1) if flop.output else None,
                     output_inv=Port(flop.output_inv.name, PortDirection.OUTPUT, 1) if flop.output_inv else None,
                 )
                 module.children[bit_flop.name] = bit_flop
@@ -139,14 +95,110 @@ def flatten(module, depth=0):
                         else:
                             tgt.clear_driver()
                             tgt.driver = bit_flop.output_inv[0]
-        # Remove shattered flops and unlink input drivers (outputs already unlinked)
-        for flop in mb_flops:
-            del module.children[flop.name]
+        elif isinstance(flop, Module):
+            shatter_flops(flop)
+    # Clear up shattered flops
+    for flop in to_remove:
+        del module.children[flop.name]
+        if flop.clock[0] in flop.clock[0].driver.targets:
             flop.clock[0].driver.remove_target(flop.clock[0])
-            if flop.reset: flop.reset[0].driver.remove_target(flop.reset[0])
-            if isinstance(flop.input[0].driver, Gate):
-                flop.input[0].driver.outputs.remove(flop.input[0])
-            else:
-                flop.input[0].driver.remove_target(flop.input[0])
+        if flop.reset and flop.reset[0] in flop.reset[0].driver.targets:
+            flop.reset[0].driver.remove_target(flop.reset[0])
+        if isinstance(flop.input[0].driver, Gate):
+            flop.input[0].driver.outputs.remove(flop.input[0])
+        else:
+            flop.input[0].driver.remove_target(flop.input[0])
+
+def flatten_connections(module):
+    """ Flatten connectivity of all children within this module """
+    for child in module.children.values():
+        if isinstance(child, Gate):
+            child.inputs  = [chase_to_source(x) for x in child.inputs]
+            child.outputs = sum([chase_to_targets(x) for x in child.outputs], [])
+        elif isinstance(child, Flop):
+            # Resolve clock
+            true_clock = chase_to_source(child.clock[0])
+            child.clock[0].clear_driver()
+            child.clock[0].driver = true_clock
+            true_clock.add_target(child.clock[0])
+            # Resolve reset
+            true_reset = chase_to_source(child.reset[0])
+            child.reset[0].clear_driver()
+            child.reset[0].driver = true_reset
+            true_reset.add_target(child.reset[0])
+            # Resolve inputs
+            for bit in child.input.bits:
+                true_source = chase_to_source(bit.driver)
+                bit.clear_driver()
+                bit.driver = true_source
+                if isinstance(true_source, Gate):
+                    true_source.outputs.append(bit)
+                else:
+                    true_source.add_target(bit)
+            # Resolve outputs
+            for bit in (child.output.bits if child.output else []):
+                true_targets = sum([chase_to_targets(x) for x in bit.targets], [])
+                bit.clear_targets()
+                for tgt in true_targets:
+                    bit.add_target(tgt)
+                    if isinstance(tgt, PortBit):
+                        tgt.clear_driver()
+                        tgt.driver = bit
+            # Resolve inverted outputs
+            for bit in (child.output_inv.bits if child.output_inv else []):
+                true_targets = sum([chase_to_targets(x) for x in bit.targets], [])
+                bit.clear_targets()
+                for tgt in true_targets:
+                    bit.add_target(tgt)
+                    if isinstance(tgt, PortBit):
+                        tgt.clear_driver()
+                        tgt.driver = bit
+        elif isinstance(child, Module):
+            flatten_connections(child)
+
+def flatten_hierarchy(module):
+    """ Flatten module hierarchy, promoting gates and flops """
+    # Run through all children
+    for child in list(module.children.values()):
+        if not isinstance(child, Flop) and not isinstance(child, Gate):
+            # Promote grandchildren
+            for subchild in flatten_hierarchy(child):
+                subchild.name = child.name + "_" + subchild.name
+                assert subchild.name not in module.children
+                module.children[subchild.name] = subchild
+            # Delete this node
+            del module.children[child.name]
+    # Return the list of nodes to promote
+    return [
+        x for x in module.children.values() if
+        isinstance(x, Gate) or isinstance(x, Flop)
+    ]
+
+def flatten(module):
+    """ Recursively flatten a hierarchical design into a monolithic block.
+
+    Args:
+        module: The input Module instance
+
+    Returns: Flattened Module instance.
+    """
+    assert isinstance(module, Module)
+    # Shatter multi-bit flops into many single bit flops
+    shatter_flops(module)
+    # Flatten connectivity of intermediate modules
+    flatten_connections(module)
+    # Flatten the hierarchy
+    flatten_hierarchy(module)
+    # Strip hierarchical connectivity from boundary I/O
+    for port in module.ports.values():
+        for bit in port.bits:
+            to_keep = [
+                x for x in bit.targets if
+                (not isinstance(x, PortBit)) or
+                (isinstance(x.port.parent, Flop)) or
+                (type(x.port.parent) == Module and x.port.parent == module)
+            ]
+            bit.clear_targets()
+            for tgt in to_keep: bit.add_target(tgt)
     # Return the flattened module
     return module
