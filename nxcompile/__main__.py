@@ -78,31 +78,9 @@ def main(
     log.info("Flattening hierarchy")
     flat = flatten(model.copy())
 
-    # Form flop-logic-flop groups
-    log.info("Grouping logic")
-    groups         = group_logic(flat)
-    grp_gate_count = [len(x[2]) for x in groups]
-
-    # Simplify logic in groups, optimising out constants
-    log.info(f"Simplifying {len(groups)} groups")
-    simplified = [simplify_group(*x) for x in groups]
-
-    # Plot pre and post simplify
-    if plot_groups:
-        log.info(f"Plotting {len(groups)} groups")
-        plot_groups = Path(plot_groups)
-        plot_groups.mkdir(parents=True, exist_ok=True)
-        for idx, (pre, post) in enumerate(zip(grp_gate_count, simplified)):
-            log.info(f" - {idx} - #ORIG: {pre}, #SMPL: {len(post[2])}")
-            plot_group(*post, plot_groups / f"post_{idx}.png")
-
-    # Prune dead logic
-    log.info("Pruning dead logic")
-    prune(flat)
-
     # Compile onto mesh
     log.info("Compiling design onto mesh")
-    compile(flat, simplified)
+    compile(flat)
 
 if __name__ == "__main__":
     main()

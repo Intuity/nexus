@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from statistics import mean
 
 from ..models.flop import Flop
 from ..models.gate import Gate, Operation
 from ..models.port import PortBit
+
+log = logging.getLogger("compiler.compile")
 
 class Input:
     """ Represents a boundary input or flop output within the logic """
@@ -45,9 +48,11 @@ class Wire:
     """ Combinatorial connectivity between two different nodes """
     ID = 0
     def __init__(self, keep=False):
-        self.id    = Wire.ID
-        self.keep  = keep
-        Wire.ID   += 1
+        self.id       = Wire.ID
+        self.keep     = keep
+        self.driver   = None
+        self.targets  = []
+        Wire.ID      += 1
     def __repr__(self): return f"<Wire {self.id}>"
 
 class Instruction:
@@ -82,7 +87,7 @@ class Instruction:
 class Node:
 
     def __init__(
-        self, row, column, inputs=4, outputs=4, slots=32, registers=16
+        self, row, column, inputs=8, outputs=8, slots=32, registers=8
     ):
         # Position within the mesh
         self.position = (row, column)
@@ -137,7 +142,7 @@ class Node:
 
     def remove_op(self, op):
         assert self.contains_op(op)
-        self.ops.remove(op)
+        self.__ops.remove(op)
         op.node = None
 
     def contains_op(self, op):
@@ -253,41 +258,42 @@ def signature(bit):
     else:
         raise Exception(f"Unsupported type {type(bit)}")
 
-def compile(module, groups):
-    # Sort groups from least to most complex
-    groups = sorted(groups, key=lambda x: len(x[2]), reverse=False)
+def compile(module):
     # Calculate signatures for all logic nodes
+    log.info("Calculating signatures for all logic nodes")
     signatures   = {}
     histogram    = {}
     dependencies = {}
-    for flop, _, _ in groups:
-        def chase(bit, depth=0):
-            bit_sig  = signature(bit)
-            sub_sigs = []
-            if isinstance(bit, Gate):
-                for in_bit in bit.inputs:
-                    sub_sigs += chase(in_bit, depth=(depth + 1))
-            # Work out just the immediate dependencies
-            base_depth = min([x[1] for x in sub_sigs]) if sub_sigs else 0
-            imm_deps   = [x for x, y in sub_sigs if y == base_depth]
-            signatures[bit_sig] = (bit, imm_deps)
-            # Track dependency usage
-            if bit_sig not in dependencies: dependencies[bit_sig] = []
-            for dep in imm_deps: dependencies[dep].append(bit_sig)
-            # Accumulate term usage histogram
-            if bit_sig not in histogram: histogram[bit_sig] = 0
-            histogram[bit_sig] += 1
-            return sub_sigs + [(bit_sig, depth)]
+    def chase(bit, depth=0):
+        bit_sig  = signature(bit)
+        sub_sigs = []
+        if isinstance(bit, Gate):
+            for in_bit in bit.inputs:
+                sub_sigs += chase(in_bit, depth=(depth + 1))
+        # Work out just the immediate dependencies
+        base_depth = min([x[1] for x in sub_sigs]) if sub_sigs else 0
+        imm_deps   = [x for x, y in sub_sigs if y == base_depth]
+        signatures[bit_sig] = (bit, imm_deps)
+        # Track dependency usage
+        if bit_sig not in dependencies: dependencies[bit_sig] = []
+        for dep in imm_deps: dependencies[dep].append(bit_sig)
+        # Accumulate term usage histogram
+        if bit_sig not in histogram: histogram[bit_sig] = 0
+        histogram[bit_sig] += 1
+        return sub_sigs + [(bit_sig, depth)]
+    for flop in (x for x in module.children.values() if isinstance(x, Flop)):
         chase(flop.input[0].driver)
-    print(f"Calculated {len(signatures.keys())} signatures")
-    print(f"Max histogram count {max(histogram.values())}")
-    print(f"Min histogram count {min(histogram.values())}")
-    print(f"Average histogram count {mean(histogram.values())}")
     # Sort signatures by most frequently used
     sorted_sigs = sorted(signatures.keys(), key=lambda x: histogram[x], reverse=True)
+    log.info(
+        f"Calculated {len(signatures.keys())} signatures, most usages is "
+        f"{histogram[sorted_sigs[0]]}, least usages is {histogram[sorted_sigs[-1]]}"
+        f", average term usage is {mean(histogram.values())}"
+    )
     # Create a mesh to track usage
-    mesh = Mesh(rows=12, columns=12)
+    mesh = Mesh(rows=6, columns=6)
     # Assemble operation chains
+    log.info("Starting to schedule operations into mesh")
     terms = {}
     for sig_idx, sig in enumerate(sorted_sigs):
         bit, sub_sigs = signatures[sig]
@@ -312,7 +318,8 @@ def compile(module, groups):
         ]
         targets = [Wire(keep=(len(drv_flops) != 0))]
         # Construct the operation
-        terms[sig] = (op := Instruction(sig, bit, sources, targets, None))
+        terms[sig]        = (op := Instruction(sig, bit, sources, targets, None))
+        targets[0].driver = op
         # Find the set of nodes that hold the sources
         src_ops   = [x for x in sources if isinstance(x, Instruction)]
         src_nodes = list(set([x.node for x in src_ops]))
@@ -349,8 +356,11 @@ def compile(module, groups):
             raise Exception(f"No node has capacity for term {sig}")
         # Move any supporting terms
         for item in to_move:
-            item.node.remove_op(item)
+            old_node = item.node
+            old_node.remove_op(item)
             node.add_op(item)
+            assert item not in old_node.ops
+            assert item in node.ops
         # Link terms together
         for src in src_ops:
             # Within the same node, link by register
@@ -370,6 +380,7 @@ def compile(module, groups):
                     raise Exception(f"No output wire exists from {src.sig}")
                 # Connect the source wire to the operation
                 op.sources.append(wires[0])
+                wires[0].targets.append(op)
         # Place the term into the node
         node.add_op(op)
         # Trim unused output wires from nodes
@@ -386,21 +397,53 @@ def compile(module, groups):
                 tgt_nodes = set([terms[x].node for x in dependencies[chk_op.sig]])
                 if len(tgt_nodes) != 1 or tgt_nodes.pop() != node: continue
                 # Trim output wires
-                print(f"Trimming wires from {chk_op.sig}")
                 for wire in chk_op.target_wires: chk_op.targets.remove(wire)
         # Trigger usage recounts on source nodes
         for src_node in set([x.node for x in src_ops]): src_node.recount()
-    # For every flop, work out where it is driven from
-    for flop, _, _ in groups:
-        found = None
-        for node in mesh.all_nodes:
-            for op in node.ops:
-                if str(op.op) == str(flop.input[0].driver):
-                    found = op
-                    break
-                if found: break
-            if found: break
-        print(f"Considering flop {flop.output[0]} -> {found}")
+    # Work out where every operation has been placed
+    gate_map = {}
+    for node in mesh.all_nodes:
+        for op_idx, op in enumerate(node.ops):
+            gate_map[op.op.id] = (node, op_idx)
+    # Build up a list of messages that need to be sent
+    comb_msg   = []
+    seq_msg    = []
+    io_out_msg = []
+    for node in mesh.all_nodes:
+        for op_idx, op in enumerate(node.ops):
+            for output in op.op.outputs:
+                if isinstance(output, Gate):
+                    tgt_node, tgt_op_idx = gate_map[output.id]
+                    # If within the same node, no message required
+                    if tgt_node == node: continue
+                    # Create a message
+                    comb_msg.append(((node, op_idx), (tgt_node, tgt_op_idx)))
+                elif isinstance(output, PortBit):
+                    if isinstance(output.port.parent, Flop):
+                        flop = output.port.parent
+                        for tgt in (flop.output[0].targets if flop.output else []):
+                            if isinstance(tgt, Gate):
+                                tgt_node, tgt_op_idx = gate_map[tgt.id]
+                                seq_msg.append(((node, op_idx), (tgt_node, tgt_op_idx)))
+                            else:
+                                io_out_msg.append(((node, op_idx), tgt))
+                        for tgt in (flop.output_inv[0].targets if flop.output_inv else []):
+                            if isinstance(tgt, Gate):
+                                tgt_node, tgt_op_idx = gate_map[tgt.id]
+                                seq_msg.append(((node, op_idx), (tgt_node, tgt_op_idx)))
+                            else:
+                                io_out_msg.append(((node, op_idx), tgt))
+                    else:
+                        import pdb; pdb.set_trace()
+    msg_counts = {}
+    for (node, op_idx), _ in (comb_msg + seq_msg + io_out_msg):
+        if node.position not in msg_counts: msg_counts[node.position] = 0
+        msg_counts[node.position] += 1
+    ord_pos = sorted(msg_counts.keys(), key=lambda x: msg_counts[x])
+    log.info(f"Total messages {len(comb_msg+seq_msg+io_out_msg)}")
+    log.info(f" - Max count: {msg_counts[ord_pos[-1]]} @ {ord_pos[-1]}")
+    log.info(f" - Min count: {msg_counts[ord_pos[0]]} @ {ord_pos[0]}")
+    log.info(f" - Avg count: {round(mean(msg_counts.values()))}")
     # Debugging information
     mesh.show_utilisation()
     mesh.show_utilisation("input")
