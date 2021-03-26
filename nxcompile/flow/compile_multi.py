@@ -15,6 +15,7 @@
 import logging
 from statistics import mean
 
+from ..models.constant import Constant
 from ..models.flop import Flop
 from ..models.gate import Gate, Operation
 from ..models.port import PortBit
@@ -29,8 +30,11 @@ class Input:
 
     def __repr__(self): return f"<Input {self.bit}>"
 
-    @property
-    def is_flop(self): return isinstance(self.bit.port.parent, Flop)
+class State:
+    def __init__(self, bit, source, targets):
+        self.bit     = bit
+        self.source  = source
+        self.targets = targets
 
 class Output:
     """ Represents a boundary output from the logic """
@@ -97,8 +101,8 @@ class Node:
         self.__num_slots     = slots
         self.__num_registers = registers
         # Keep track of how many of each type of resource is consumed
-        self.__used_inputs    = []
-        self.__used_outputs   = []
+        self.__used_inputs    = 0
+        self.__used_outputs   = 0
         self.__used_registers = []
         # Keep a list of all operations
         self.__ops = []
@@ -108,9 +112,9 @@ class Node:
         return self.__ops[:]
 
     @property
-    def input_usage(self): return (len(self.__used_inputs) / self.__num_inputs)
+    def input_usage(self): return (self.__used_inputs / self.__num_inputs)
     @property
-    def output_usage(self): return (len(self.__used_outputs) / self.__num_outputs)
+    def output_usage(self): return (self.__used_outputs / self.__num_outputs)
     @property
     def slot_usage(self): return (len(self.__ops) / self.__num_slots)
 
@@ -131,14 +135,29 @@ class Node:
         # Update counts for used inputs and used outputs
         self.recount()
 
+    def count_op_usage(self, *ops):
+        op_inputs, op_outputs = [], 0
+        for op in ops:
+            op_inputs += [
+                x for x in op.sources if isinstance(x, State) or
+                (isinstance(x, Instruction) and x.node != self)
+            ]
+            for tgt in op.targets:
+                if (
+                    isinstance(tgt, State) or
+                    (isinstance(tgt, Instruction) and tgt.node != self)
+                ):
+                    op_outputs += 1
+                    break
+        return len(set(op_inputs)), op_outputs
+
     def recount(self):
-        # Update counts for used inputs and used outputs
-        self.__used_inputs  = list(set(sum([x.inputs  for x in self.__ops], [])))
-        self.__used_outputs = list(set(sum([x.outputs for x in self.__ops], [])))
+        # Count how many inputs and outputs are required
+        self.__used_inputs, self.__used_outputs = self.count_op_usage(*self.ops)
         # Check that resources haven't been exceeded
-        assert len(self.__used_inputs)  <= self.__num_inputs
-        assert len(self.__used_outputs) <= self.__num_outputs
-        assert len(self.__ops)          <= self.__num_slots
+        assert self.__used_inputs  <= self.__num_inputs
+        assert self.__used_outputs <= self.__num_outputs
+        assert len(self.__ops)     <= self.__num_slots
 
     def remove_op(self, op):
         assert self.contains_op(op)
@@ -149,17 +168,18 @@ class Node:
         assert isinstance(op, Instruction)
         return op in self.__ops
 
-    def space_for_op(
-        self, *ops, use_reg=False, wires_in=0, wires_out=0,
-    ):
-        all_inputs  = set(self.__used_inputs  + sum([x.inputs  for x in ops], []))
-        all_outputs = set(self.__used_outputs + sum([x.outputs for x in ops], []))
-        new_ops     = set(list(ops) + list(self.__ops))
+    def space_for_op(self, *ops):
+        new_inputs, new_outputs = self.count_op_usage(*self.ops, *ops)
         return (
-            (len(all_inputs ) < (self.__num_inputs  - wires_in )) and
-            (len(all_outputs) < (self.__num_outputs - wires_out)) and
-            (len(new_ops    ) < self.__num_slots                )
+            (new_inputs                 < self.__num_inputs ) and
+            (new_outputs                < self.__num_outputs) and
+            ((len(ops) + len(self.ops)) < self.__num_slots  )
         )
+
+    def compile(self):
+        """ Compile operations allocated to this node into encoded values """
+        regs = [None] * self.__num_registers
+        # for op in self.ops:
 
 class Mesh:
 
@@ -226,6 +246,7 @@ class Mesh:
         print(f"{mode.capitalize()} Usage:")
         print("      " + " ".join([f"{x:^5d}" for x in range(len(self.nodes[0]))]))
         print("------" + "-".join(["-----" for x in range(len(self.nodes[0]))]))
+        values = []
         for r_idx, row in enumerate(self.nodes):
             row_str = ""
             for node in row:
@@ -235,8 +256,10 @@ class Mesh:
                 elif mode == "slot"  : u_val = node.slot_usage
                 else                 : u_val = node.usage
                 row_str += f"{u_val:01.03f} "
+                values.append(u_val)
             print(f"{r_idx:3d} | {row_str}")
         print("")
+        print(f"Max: {max(values)}, Min: {min(values)}, Mean: {mean(values)}")
 
 def signature(bit):
     # Build the signature
@@ -262,7 +285,6 @@ def compile(module):
     # Calculate signatures for all logic nodes
     log.info("Calculating signatures for all logic nodes")
     signatures   = {}
-    histogram    = {}
     dependencies = {}
     def chase(bit, depth=0):
         bit_sig  = signature(bit)
@@ -277,57 +299,66 @@ def compile(module):
         # Track dependency usage
         if bit_sig not in dependencies: dependencies[bit_sig] = []
         for dep in imm_deps: dependencies[dep].append(bit_sig)
-        # Accumulate term usage histogram
-        if bit_sig not in histogram: histogram[bit_sig] = 0
-        histogram[bit_sig] += 1
         return sub_sigs + [(bit_sig, depth)]
     for flop in (x for x in module.children.values() if isinstance(x, Flop)):
         chase(flop.input[0].driver)
-    # Sort signatures by most frequently used
-    sorted_sigs = sorted(signatures.keys(), key=lambda x: histogram[x], reverse=True)
-    log.info(
-        f"Calculated {len(signatures.keys())} signatures, most usages is "
-        f"{histogram[sorted_sigs[0]]}, least usages is {histogram[sorted_sigs[-1]]}"
-        f", average term usage is {mean(histogram.values())}"
-    )
-    # Create a mesh to track usage
-    mesh = Mesh(rows=6, columns=6)
-    # Assemble operation chains
-    log.info("Starting to schedule operations into mesh")
-    terms = {}
-    for sig_idx, sig in enumerate(sorted_sigs):
-        bit, sub_sigs = signatures[sig]
-        # For primary inputs, insert the term then skip the rest of the processing
-        if isinstance(bit, PortBit):
-            terms[sig] = Input(bit, [])
+    # Build all of the combinatorial operations
+    terms   = {}
+    bit_map = {}
+    for sig, (bit, _) in signatures.items():
+        if isinstance(bit, Constant):
+            bit_map[bit.id] = terms[sig] = bit
+        elif isinstance(bit, Gate):
+            bit_map[bit.id] = terms[sig] = Instruction(sig, bit, [], [], None)
+        elif isinstance(bit, PortBit) and isinstance(bit.port.parent, Flop):
             continue
-        # Construct sources to the operation
-        sources        = []
-        all_primary_ip = True
-        for sub_sig in sub_sigs:
-            # Skip indirect terms
-            if sub_sig in terms:
-                sources.append(sub_term := terms[sub_sig])
-                all_primary_ip &= isinstance(sub_term, Input)
-            else:
-                raise Exception(f"Can't find supporting term for '{sub_sig}'")
-        # Every term starts with an output wire, then these are pruned later
-        drv_flops = [
-            x.port.parent for x in bit.outputs if
-            isinstance(x, PortBit) and isinstance(x.port.parent, Flop)
-        ]
-        targets = [Wire(keep=(len(drv_flops) != 0))]
-        # Construct the operation
-        terms[sig]        = (op := Instruction(sig, bit, sources, targets, None))
-        targets[0].driver = op
+        elif isinstance(bit, PortBit) and bit.port.parent == module:
+            continue
+        else:
+            raise Exception(f"Unsupported signature type: {sig}")
+    # Build all of the flops
+    for flop in (x for x in module.children.values() if isinstance(x, Flop)):
+        bit_map[flop.input[0].id] = (state := State(flop.input[0], None, []))
+        if flop.output:
+            bit_map[flop.output[0].id]     = state
+            terms[f"I{flop.output[0].id}"] = state
+        if flop.output_inv:
+            bit_map[flop.output_inv[0].id]     = state
+            terms[f"I{flop.output_inv[0].id}"] = state
+    # Link sources & targets
+    for sig, (bit, sub_sigs) in signatures.items():
+        op = terms[sig]
+        for imm_dep in sub_sigs:
+            op.sources.append(terms[imm_dep])
+            terms[imm_dep].targets.append(op)
+        if isinstance(bit, Gate):
+            for tgt in bit.outputs:
+                if isinstance(tgt, PortBit) and isinstance(tgt.port.parent, Flop):
+                    bit_map[tgt.id].source = bit
+    # Create a mesh to track usage
+    mesh = Mesh(rows=7, columns=8)
+    # Place operations into the mesh, starting with the most used
+    log.info("Starting to schedule operations into mesh")
+    to_place = sorted(signatures.keys(), key=lambda x: dependencies[x], reverse=True)
+    while to_place:
+        # Pop the next term to place
+        sig = to_place.pop(0)
+        # Skip placing terms that are not instructions
+        if sig not in terms or not isinstance(terms[sig], Instruction): continue
+        # Pickup the operation
+        op = terms[sig]
         # Find the set of nodes that hold the sources
-        src_ops   = [x for x in sources if isinstance(x, Instruction)]
+        src_ops   = [x for x in op.sources if isinstance(x, Instruction)]
         src_nodes = list(set([x.node for x in src_ops]))
+        # If we're not ready to place, postpone
+        if None in src_nodes:
+            to_place.append(sig)
+            continue
         # Try to identify a suitable node
         node    = None
         to_move = []
-        # - If all terms are primary inputs, place where those terms are already used
-        if all_primary_ip:
+        # - If there are no instruction dependencies, place anywhere
+        if not src_ops:
             node = mesh.find_first_vacant(op)
         # - If inner terms exist, place in the same node or one in the next row
         else:
@@ -345,11 +376,10 @@ def compile(module):
             if not node:
                 last_row = max([x.position[0] for x in src_nodes])
                 node     = mesh.find_first_vacant(
-                    op, start_row=(last_row + 1), wires_in=len(src_ops),
+                    op, start_row=(last_row + 1)
                 )
             # If still no node found, place anywhere
-            if not node:
-                node = mesh.find_first_vacant(op, wires_in=len(src_ops))
+            if not node: node = mesh.find_first_vacant(op)
         # Check a node was found
         if not node:
             mesh.show_utilisation()
@@ -361,43 +391,8 @@ def compile(module):
             node.add_op(item)
             assert item not in old_node.ops
             assert item in node.ops
-        # Link terms together
-        for src in src_ops:
-            # Within the same node, link by register
-            if src.node == node:
-                reg = None
-                if (regs := src.target_registers):
-                    reg = regs[0]
-                else:
-                    reg = Register()
-                    src.targets.append(reg)
-                op.sources.append(reg)
-            # If in different nodes, link by wire
-            else:
-                wires = src.target_wires
-                # Output wire should not have been trimmed yet
-                if not wires:
-                    raise Exception(f"No output wire exists from {src.sig}")
-                # Connect the source wire to the operation
-                op.sources.append(wires[0])
-                wires[0].targets.append(op)
         # Place the term into the node
         node.add_op(op)
-        # Trim unused output wires from nodes
-        for node in mesh.all_nodes:
-            for chk_op in node.ops:
-                # If this operation has no outputs, skip
-                if not chk_op.target_wires: continue
-                # If there are any unplaced dependencies, don't trim yet
-                if [x for x in dependencies[chk_op.sig] if x not in terms]:
-                    continue
-                # Check if wire is marked with 'keep'
-                if [x for x in chk_op.target_wires if x.keep]: continue
-                # Check if target operations happen within one node
-                tgt_nodes = set([terms[x].node for x in dependencies[chk_op.sig]])
-                if len(tgt_nodes) != 1 or tgt_nodes.pop() != node: continue
-                # Trim output wires
-                for wire in chk_op.target_wires: chk_op.targets.remove(wire)
         # Trigger usage recounts on source nodes
         for src_node in set([x.node for x in src_ops]): src_node.recount()
     # Work out where every operation has been placed
@@ -434,7 +429,7 @@ def compile(module):
                             else:
                                 io_out_msg.append(((node, op_idx), tgt))
                     else:
-                        import pdb; pdb.set_trace()
+                        raise Exception("Combinatorial driving I/O not implemented yet")
     msg_counts = {}
     for (node, op_idx), _ in (comb_msg + seq_msg + io_out_msg):
         if node.position not in msg_counts: msg_counts[node.position] = 0
@@ -449,4 +444,10 @@ def compile(module):
     mesh.show_utilisation("input")
     mesh.show_utilisation("output")
     mesh.show_utilisation("slot")
+    # Compile operations in every node
+    compiled = {}
+    for node in mesh.all_nodes:
+        compiled[node.position] = node.compile()
+    # Debug
+    import pdb; pdb.set_trace()
 
