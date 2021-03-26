@@ -91,7 +91,7 @@ class Instruction:
 class Node:
 
     def __init__(
-        self, row, column, inputs=8, outputs=8, slots=32, registers=8
+        self, row, column, inputs=8, outputs=8, slots=12, registers=8
     ):
         # Position within the mesh
         self.position = (row, column)
@@ -135,13 +135,18 @@ class Node:
         # Update counts for used inputs and used outputs
         self.recount()
 
-    def count_op_usage(self, *ops):
-        op_inputs, op_outputs = [], 0
+    def count_op_input_usage(self, *ops):
+        op_inputs = []
         for op in ops:
             op_inputs += [
                 x for x in op.sources if isinstance(x, State) or
                 (isinstance(x, Instruction) and x.node != self)
             ]
+        return len(set(op_inputs))
+
+    def count_op_output_usage(self, *ops):
+        op_outputs = 0
+        for op in ops:
             for tgt in op.targets:
                 if (
                     isinstance(tgt, State) or
@@ -149,7 +154,14 @@ class Node:
                 ):
                     op_outputs += 1
                     break
-        return len(set(op_inputs)), op_outputs
+        return op_outputs
+
+    def count_op_usage(self, *ops):
+        op_inputs, op_outputs = 0, 0
+        for op in ops:
+            op_inputs  += self.count_op_input_usage(op)
+            op_outputs += self.count_op_output_usage(op)
+        return op_inputs, op_outputs
 
     def recount(self):
         # Count how many inputs and outputs are required
@@ -176,10 +188,87 @@ class Node:
             ((len(ops) + len(self.ops)) < self.__num_slots  )
         )
 
+    def encode(self, op, sources, tgt_reg, output):
+        sources += [(0, 0)] * (2 - len(sources)) if len(sources) < 2 else []
+        return (
+            ((int(op.op.op) & 0x7         ) << 12) | # [14:12] - OPCODE
+            ((sources[0][1] & 0x7         ) <<  9) | # [11: 9] - SOURCE A
+            ((1 if sources[0][0] else 0   ) <<  8) | # [ 8: 8] - INPUT/!REG A
+            ((sources[1][1] & 0x7         ) <<  5) | # [ 7: 5] - SOURCE B
+            ((1 if sources[1][0] else 0   ) <<  4) | # [ 4: 4] - INPUT/!REG B
+            ((tgt_reg & 0x7               ) <<  1) | # [ 3: 1] - TARGET
+            ((1 if (output != None) else 0) <<  0)   # [ 0: 0] - OUTPUT
+        )
+
+    def decode(self, op):
+        assert isinstance(op, int)
+        is_in_a = (op >>  8) & 0x1
+        is_in_b = (op >>  4) & 0x1
+        return {
+            "OPCODE"   : Operation((op >> 12) & 0x7).name,
+            "SOURCE A" : ("INPUT[" if is_in_a else "REG[") + str((op >>  9) & 0x7) + "]",
+            "SOURCE B" : ("INPUT[" if is_in_a else "REG[") + str((op >>  5) & 0x7) + "]",
+            "TGT REG"  : f"REG[{(op >>  1) & 0x7}]",
+            "OUTPUT"   : "YES" if ((op >> 0) & 0x1) else "NO",
+        }
+
     def compile(self):
         """ Compile operations allocated to this node into encoded values """
-        regs = [None] * self.__num_registers
-        # for op in self.ops:
+        regs    = [None] * self.__num_registers
+        inputs  = [None] * self.__num_inputs
+        outputs = [None] * self.__num_outputs
+        encoded = []
+        for op_idx, op in enumerate(self.ops):
+            # If no free registers, raise an exception
+            if None not in regs:
+                raise Exception(f"Run out of registers in node {self.position}")
+            # Does this operation need any external inputs?
+            op_sources = []
+            for src in op.sources:
+                # Is this source already placed?
+                if src in inputs:
+                    op_sources.append((True, inputs.index(src)))
+                    continue
+                # If this is a registered value, use it
+                if src in regs:
+                    op_sources.append((False, regs.index(src)))
+                    continue
+                # If this is a constant, ignore it
+                if isinstance(src, Constant): continue
+                # If this is an internal instruction, raise an error
+                if isinstance(src, Instruction) and src in self.ops:
+                    raise Exception(
+                        f"Failed to locate registered op in node {self.position}"
+                    )
+                # Otherwise, allocate the first free slot
+                if None not in inputs:
+                    raise Exception(f"Run out of inputs in node {self.position}")
+                use_input = inputs.index(None)
+                log.info(f"N: {self.position}, O: {op_idx} -> IN[{use_input}]")
+                inputs[use_input] = src
+                op_sources.append((True, inputs.index(src)))
+            # Use the first free register as temporary storage
+            use_reg = regs.index(None)
+            log.info(f"N: {self.position}, O: {op_idx} -> REG[{use_reg}]")
+            regs[use_reg] = op
+            # Does this operation generate any outputs?
+            use_output = None
+            if self.count_op_output_usage(op):
+                if None not in outputs:
+                    raise Exception(f"Run out of outputs in node {self.position}")
+                use_output = outputs.index(None)
+                log.info(f"N: {self.position}, O: {op_idx} -> OUT[{use_output}]")
+                outputs[use_output] = op
+            # Encode the instruction
+            encoded.append(self.encode(op, op_sources, use_reg, use_output))
+            # Check for any registers that have freed up
+            required = sum([x.sources for x in self.ops[op_idx+1:]], [])
+            for reg_idx, reg in enumerate(regs):
+                if reg and reg not in required:
+                    log.info(f"N: {self.position} releasing REG[{reg_idx}]")
+                    regs[reg_idx] = None
+        # Return the encoded instruction stream
+        return encoded
 
 class Mesh:
 
@@ -242,8 +331,9 @@ class Mesh:
         return viable
 
     def show_utilisation(self, mode="overall"):
-        print("")
+        print("=" * 80)
         print(f"{mode.capitalize()} Usage:")
+        print("")
         print("      " + " ".join([f"{x:^5d}" for x in range(len(self.nodes[0]))]))
         print("------" + "-".join(["-----" for x in range(len(self.nodes[0]))]))
         values = []
@@ -260,6 +350,7 @@ class Mesh:
             print(f"{r_idx:3d} | {row_str}")
         print("")
         print(f"Max: {max(values)}, Min: {min(values)}, Mean: {mean(values)}")
+        print("=" * 80)
 
 def signature(bit):
     # Build the signature
