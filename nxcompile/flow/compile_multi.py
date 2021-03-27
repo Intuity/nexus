@@ -107,9 +107,13 @@ class Node:
         # Keep a list of all operations
         self.__ops = []
 
-    @property
-    def ops(self):
-        return self.__ops[:]
+    def __repr__(self):
+        return (
+            f"<Node {self.position} - "
+            f"In: {self.__used_inputs}/{self.__num_inputs}, "
+            f"Out: {self.__used_outputs}/{self.__num_outputs}, "
+            f"Ops: {len(self.__ops)}/{self.__num_slots}>"
+        )
 
     @property
     def input_usage(self): return (self.__used_inputs / self.__num_inputs)
@@ -117,6 +121,8 @@ class Node:
     def output_usage(self): return (self.__used_outputs / self.__num_outputs)
     @property
     def slot_usage(self): return (len(self.__ops) / self.__num_slots)
+    @property
+    def ops(self): return self.__ops[:]
 
     @property
     def usage(self):
@@ -189,6 +195,7 @@ class Node:
         )
 
     def encode(self, op, sources, tgt_reg, output):
+        assert len(sources) <= 2
         sources += [(0, 0)] * (2 - len(sources)) if len(sources) < 2 else []
         return (
             ((int(op.op.op) & 0x7         ) << 12) | # [14:12] - OPCODE
@@ -212,8 +219,12 @@ class Node:
             "OUTPUT"   : "YES" if ((op >> 0) & 0x1) else "NO",
         }
 
-    def compile(self):
-        """ Compile operations allocated to this node into encoded values """
+    def compile_operations(self):
+        """ Compile operations allocated to this node into encoded values
+
+        Returns: Tuple of input allocation map, output allocation map, bytecode
+                 encoded operations
+        """
         regs    = [None] * self.__num_registers
         inputs  = [None] * self.__num_inputs
         outputs = [None] * self.__num_outputs
@@ -244,12 +255,12 @@ class Node:
                 if None not in inputs:
                     raise Exception(f"Run out of inputs in node {self.position}")
                 use_input = inputs.index(None)
-                log.info(f"N: {self.position}, O: {op_idx} -> IN[{use_input}]")
+                log.debug(f"N: {self.position}, O: {op_idx} -> IN[{use_input}]")
                 inputs[use_input] = src
                 op_sources.append((True, inputs.index(src)))
             # Use the first free register as temporary storage
             use_reg = regs.index(None)
-            log.info(f"N: {self.position}, O: {op_idx} -> REG[{use_reg}]")
+            log.debug(f"N: {self.position}, O: {op_idx} -> REG[{use_reg}]")
             regs[use_reg] = op
             # Does this operation generate any outputs?
             use_output = None
@@ -257,7 +268,7 @@ class Node:
                 if None not in outputs:
                     raise Exception(f"Run out of outputs in node {self.position}")
                 use_output = outputs.index(None)
-                log.info(f"N: {self.position}, O: {op_idx} -> OUT[{use_output}]")
+                log.debug(f"N: {self.position}, O: {op_idx} -> OUT[{use_output}]")
                 outputs[use_output] = op
             # Encode the instruction
             encoded.append(self.encode(op, op_sources, use_reg, use_output))
@@ -265,10 +276,48 @@ class Node:
             required = sum([x.sources for x in self.ops[op_idx+1:]], [])
             for reg_idx, reg in enumerate(regs):
                 if reg and reg not in required:
-                    log.info(f"N: {self.position} releasing REG[{reg_idx}]")
+                    log.debug(f"N: {self.position} releasing REG[{reg_idx}]")
                     regs[reg_idx] = None
-        # Return the encoded instruction stream
-        return encoded
+        # Return I/O mappings and the bytecode instruction stream
+        return inputs, outputs, encoded
+
+    def compile_messages(self, outputs):
+        """ Compile messages to be emitted by this node
+
+        Args:
+            outputs: List of instructions that are mapped to outputs, position
+                     determines order messages are emitted.
+
+        Returns: Dictionary of output bit to target operation assignment.
+        """
+        messages = {}
+        for idx_out, op in enumerate(outputs):
+            # Skip unassigned outputs
+            if op == None: continue
+            # Create a message list for this output
+            messages[idx_out] = []
+            # Find the list of nodes messages need to be sent to
+            for tgt in op.targets:
+                if isinstance(tgt, State):
+                    for flop_tgt in tgt.targets:
+                        messages[idx_out].append(flop_tgt.node)
+                elif isinstance(tgt, Instruction) and tgt.node != self:
+                    messages[idx_out].append(tgt.node)
+            # Ensure that the list is unique
+            messages[idx_out] = list(set(messages[idx_out]))
+        return messages
+
+    def compile(self):
+        """ Compile operations into bytecode and generate output messages.
+
+        Returns: Tuple of encoded operations, and messages to generate
+        """
+        # Compile operations, also generates I/O assignments
+        _, outputs, encoded = self.compile_operations()
+        # Compile messages, using output assignments as a baseline
+        messages = self.compile_messages(outputs)
+        # Return both operations and messages
+        return encoded, messages
 
 class Mesh:
 
@@ -349,7 +398,7 @@ class Mesh:
                 values.append(u_val)
             print(f"{r_idx:3d} | {row_str}")
         print("")
-        print(f"Max: {max(values)}, Min: {min(values)}, Mean: {mean(values)}")
+        print(f"Max: {max(values):.02f}, Min: {min(values):.02f}, Mean: {mean(values):.02f}")
         print("=" * 80)
 
 def signature(bit):
@@ -422,12 +471,15 @@ def compile(module):
         for imm_dep in sub_sigs:
             op.sources.append(terms[imm_dep])
             terms[imm_dep].targets.append(op)
+        # Does this node drive any flops?
         if isinstance(bit, Gate):
             for tgt in bit.outputs:
                 if isinstance(tgt, PortBit) and isinstance(tgt.port.parent, Flop):
+                    assert not bit_map[tgt.id] in op.targets
+                    op.targets.append(bit_map[tgt.id])
                     bit_map[tgt.id].source = bit
     # Create a mesh to track usage
-    mesh = Mesh(rows=7, columns=8)
+    mesh = Mesh(rows=10, columns=10)
     # Place operations into the mesh, starting with the most used
     log.info("Starting to schedule operations into mesh")
     to_place = sorted(signatures.keys(), key=lambda x: dependencies[x], reverse=True)
@@ -491,54 +543,22 @@ def compile(module):
     for node in mesh.all_nodes:
         for op_idx, op in enumerate(node.ops):
             gate_map[op.op.id] = (node, op_idx)
-    # Build up a list of messages that need to be sent
-    comb_msg   = []
-    seq_msg    = []
-    io_out_msg = []
-    for node in mesh.all_nodes:
-        for op_idx, op in enumerate(node.ops):
-            for output in op.op.outputs:
-                if isinstance(output, Gate):
-                    tgt_node, tgt_op_idx = gate_map[output.id]
-                    # If within the same node, no message required
-                    if tgt_node == node: continue
-                    # Create a message
-                    comb_msg.append(((node, op_idx), (tgt_node, tgt_op_idx)))
-                elif isinstance(output, PortBit):
-                    if isinstance(output.port.parent, Flop):
-                        flop = output.port.parent
-                        for tgt in (flop.output[0].targets if flop.output else []):
-                            if isinstance(tgt, Gate):
-                                tgt_node, tgt_op_idx = gate_map[tgt.id]
-                                seq_msg.append(((node, op_idx), (tgt_node, tgt_op_idx)))
-                            else:
-                                io_out_msg.append(((node, op_idx), tgt))
-                        for tgt in (flop.output_inv[0].targets if flop.output_inv else []):
-                            if isinstance(tgt, Gate):
-                                tgt_node, tgt_op_idx = gate_map[tgt.id]
-                                seq_msg.append(((node, op_idx), (tgt_node, tgt_op_idx)))
-                            else:
-                                io_out_msg.append(((node, op_idx), tgt))
-                    else:
-                        raise Exception("Combinatorial driving I/O not implemented yet")
-    msg_counts = {}
-    for (node, op_idx), _ in (comb_msg + seq_msg + io_out_msg):
-        if node.position not in msg_counts: msg_counts[node.position] = 0
-        msg_counts[node.position] += 1
-    ord_pos = sorted(msg_counts.keys(), key=lambda x: msg_counts[x])
-    log.info(f"Total messages {len(comb_msg+seq_msg+io_out_msg)}")
-    log.info(f" - Max count: {msg_counts[ord_pos[-1]]} @ {ord_pos[-1]}")
-    log.info(f" - Min count: {msg_counts[ord_pos[0]]} @ {ord_pos[0]}")
-    log.info(f" - Avg count: {round(mean(msg_counts.values()))}")
     # Debugging information
     mesh.show_utilisation()
     mesh.show_utilisation("input")
     mesh.show_utilisation("output")
     mesh.show_utilisation("slot")
     # Compile operations in every node
-    compiled = {}
+    compiled_ops  = {}
+    compiled_msgs = {}
     for node in mesh.all_nodes:
-        compiled[node.position] = node.compile()
+        compiled_ops[node.position], compiled_msgs[node.position] = node.compile()
+    # Accumulate message statistics
+    msg_counts = [sum([len(y) for y in x.values()]) for x in compiled_msgs.values()]
+    log.info(f"Total messages {sum(msg_counts)}")
+    log.info(f" - Max count: {max(msg_counts)}")
+    log.info(f" - Min count: {min(msg_counts)}")
+    log.info(f" - Avg count: {mean(msg_counts)}")
     # Debug
     import pdb; pdb.set_trace()
 
