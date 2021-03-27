@@ -140,9 +140,9 @@ def flatten_connections(module):
                 true_source = chase_to_source(bit.driver)
                 bit.clear_driver()
                 bit.driver = true_source
-                if isinstance(true_source, Gate):
+                if isinstance(true_source, Gate) and bit not in true_source.outputs:
                     true_source.outputs.append(bit)
-                else:
+                elif isinstance(true_source, PortBit) and bit not in true_source.targets:
                     true_source.add_target(bit)
             # Resolve outputs
             for bit in (child.output.bits if child.output else []):
