@@ -27,18 +27,20 @@ from .flow.prune import prune
 from .flow.compile_multi import compile
 
 log = logging.getLogger("compiler")
+log.setLevel(logging.INFO)
 
 @click.command()
 # Debug options
 @click.option("--show-modules", count=True,        help="Print out parsed modules")
 @click.option("--show-models",  count=True,        help="Print out parsed models")
 @click.option("--plot-groups",  type=click.Path(), help="Plot out flop-logic-flop groups")
+@click.option("--debug",        count=True,        help="Print debugging messages")
 # Positional arguments
 @click.argument("input")
 @click.argument("top")
 def main(
     # Debug options
-    show_modules, show_models, plot_groups,
+    show_modules, show_models, plot_groups, debug,
     # Positional arguments
     input, top,
 ):
@@ -49,6 +51,9 @@ def main(
         input: Path to the Yosys JSON export
         top  : The name of the top-level module in the design
     """
+    # Alter the logging verbosity
+    if debug: log.setLevel(logging.DEBUG)
+
     # Run the parse step on the Yosys JSON input
     log.info(f"Parsing Yosys JSON file: {input}")
     parser = Parser(input)
