@@ -307,17 +307,34 @@ class Node:
             messages[idx_out] = list(set(messages[idx_out]))
         return messages
 
-    def compile(self):
-        """ Compile operations into bytecode and generate output messages.
+    def compile_handling(self, inputs, lookup):
+        """ Compile handling of received messages to construct inputs.
 
-        Returns: Tuple of encoded operations, and messages to generate
+        Args:
+            inputs: List of ordered inputs, these can be either a State (where a
+                    value passes through a flop) or an Instruction (where value
+                    is handed combinatorially between nodes).
+            lookup: Dictionary of I/O and operation compilation results from all
+                    nodes, used to resolve output positioning.
         """
-        # Compile operations, also generates I/O assignments
-        _, outputs, encoded = self.compile_operations()
-        # Compile messages, using output assignments as a baseline
-        messages = self.compile_messages(outputs)
-        # Return both operations and messages
-        return encoded, messages
+        handling = {}
+        for idx_in, input in enumerate(inputs):
+            # Skip unassigned inputs
+            if input == None: continue
+            # Check input is either an Instruction (comb) or State (seq)
+            assert type(input) in (Instruction, State)
+            # Resolve source operation and node
+            flop_val = isinstance(input, State)
+            src_op   = input.source if flop_val else input
+            # TEMP: Ignore constants
+            if isinstance(src_op, Constant): continue
+            src_node = src_op.node
+            # Lookup positioning of the output
+            _, src_out, _ = lookup[src_node.position]
+            src_pos       = src_out.index(src_op)
+            # Construct the handling
+            handling[idx_in] = (src_node, src_pos)
+        return handling
 
 class Mesh:
 
@@ -447,8 +464,10 @@ def compile(module):
     bit_map = {}
     for sig, (bit, _) in signatures.items():
         if isinstance(bit, Constant):
+            assert bit.id not in bit_map
             bit_map[bit.id] = terms[sig] = bit
         elif isinstance(bit, Gate):
+            assert bit.id not in bit_map
             bit_map[bit.id] = terms[sig] = Instruction(sig, bit, [], [], None)
         elif isinstance(bit, PortBit) and isinstance(bit.port.parent, Flop):
             continue
@@ -458,11 +477,14 @@ def compile(module):
             raise Exception(f"Unsupported signature type: {sig}")
     # Build all of the flops
     for flop in (x for x in module.children.values() if isinstance(x, Flop)):
+        assert flop.input[0].id not in bit_map
         bit_map[flop.input[0].id] = (state := State(flop.input[0], None, []))
         if flop.output:
+            assert flop.output[0].id not in bit_map
             bit_map[flop.output[0].id]     = state
             terms[f"I{flop.output[0].id}"] = state
         if flop.output_inv:
+            assert flop.output_inv[0].id not in bit_map
             bit_map[flop.output_inv[0].id]     = state
             terms[f"I{flop.output_inv[0].id}"] = state
     # Link sources & targets
@@ -477,7 +499,7 @@ def compile(module):
                 if isinstance(tgt, PortBit) and isinstance(tgt.port.parent, Flop):
                     assert not bit_map[tgt.id] in op.targets
                     op.targets.append(bit_map[tgt.id])
-                    bit_map[tgt.id].source = bit
+                    bit_map[tgt.id].source = bit_map[bit.id]
     # Create a mesh to track usage
     mesh = Mesh(rows=10, columns=10)
     # Place operations into the mesh, starting with the most used
@@ -548,17 +570,25 @@ def compile(module):
     mesh.show_utilisation("input")
     mesh.show_utilisation("output")
     mesh.show_utilisation("slot")
-    # Compile operations in every node
+    # Compile operations for every node
     compiled_ops  = {}
+    for node in mesh.all_nodes:
+        compiled_ops[node.position] = node.compile_operations()
+    # Compile outbound messages for every node
     compiled_msgs = {}
     for node in mesh.all_nodes:
-        compiled_ops[node.position], compiled_msgs[node.position] = node.compile()
+        _, outputs, _ = compiled_ops[node.position]
+        compiled_msgs[node.position] = node.compile_messages(outputs)
     # Accumulate message statistics
     msg_counts = [sum([len(y) for y in x.values()]) for x in compiled_msgs.values()]
     log.info(f"Total messages {sum(msg_counts)}")
     log.info(f" - Max count: {max(msg_counts)}")
     log.info(f" - Min count: {min(msg_counts)}")
     log.info(f" - Avg count: {mean(msg_counts)}")
+    # Compile input handling for every node
+    compiled_hndl = {}
+    for node in mesh.all_nodes:
+        inputs, _, _ = compiled_ops[node.position]
+        compiled_hndl[node.position] = node.compile_handling(inputs, compiled_ops)
     # Debug
     import pdb; pdb.set_trace()
-
