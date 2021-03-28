@@ -82,7 +82,7 @@ def group_logic(module):
     # Check that a module has been provided
     assert isinstance(module, Module)
     # Check whether the module has been flattened
-    if [x for x in module.children if type(x) == Module]:
+    if [x for x in module.children.values() if type(x) == Module]:
         raise Exception(f"Module {module.name} has not been flattened")
     # Identify all flops in the design
     all_flops = [x for x in module.children.values() if isinstance(x, Flop)]

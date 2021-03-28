@@ -32,7 +32,7 @@ class Constant(PortBit):
         self.value = value
 
     @property
-    def name(self): return f"CONST_{self.id}"
+    def name(self): return f"{self.id}:{self.value}"
 
     @classmethod
     def issue_id(cls):

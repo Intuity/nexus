@@ -169,7 +169,7 @@ def _build_module(src, ymodules, ymodels, instance=None):
                 if not isinstance(target.parent, YPort): continue
                 tgt_mod  = (
                     nmod if (target.parent.parent == src) else
-                    nmod.children[target.parent.parent.name]
+                    nmod.get_child(target.parent.parent.name)
                 )
                 tgt_port = tgt_mod.ports[target.parent.name]
                 tgt_bit  = tgt_port[target.index]
@@ -177,7 +177,7 @@ def _build_module(src, ymodules, ymodels, instance=None):
                 drv_bit.add_target(tgt_bit)
     # Build out connectivity from child ports
     for child in src.cells:
-        drv_child = nmod.children[child.name]
+        drv_child = nmod.get_child(child.name)
         for port in child.ports.values():
             drv_port = drv_child.ports[port.name]
             for bit in port.bits:
@@ -192,7 +192,7 @@ def _build_module(src, ymodules, ymodels, instance=None):
                         if not isinstance(target.parent, YPort): continue
                         tgt_mod  = (
                             nmod if (target.parent.parent == src) else
-                            nmod.children[target.parent.parent.name]
+                            nmod.get_child(target.parent.parent.name)
                         )
                         tgt_port = tgt_mod.ports[target.parent.name]
                         tgt_bit  = tgt_port[target.index]

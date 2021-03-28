@@ -23,18 +23,12 @@ from ..models.port import PortBit
 log = logging.getLogger("compiler.compile")
 
 class Input:
-    """ Represents a boundary input or flop output within the logic """
+    """ Represents a boundary input to the logic """
     def __init__(self, bit, targets):
         self.bit     = bit
         self.targets = targets
 
     def __repr__(self): return f"<Input {self.bit}>"
-
-class State:
-    def __init__(self, bit, source, targets):
-        self.bit     = bit
-        self.source  = source
-        self.targets = targets
 
 class Output:
     """ Represents a boundary output from the logic """
@@ -43,6 +37,12 @@ class Output:
         self.source = source
 
     def __repr__(self): return f"<Output {self.bit}>"
+
+class State:
+    def __init__(self, bit, source, targets):
+        self.bit     = bit
+        self.source  = source
+        self.targets = targets
 
 class Register:
     """ Temporary registering of a result between instructions within a node """
@@ -61,8 +61,7 @@ class Wire:
 
 class Instruction:
 
-    def __init__(self, sig, op, sources, targets, node):
-        self.sig     = sig
+    def __init__(self, op, sources, targets, node):
         self.op      = op
         self.sources = sources
         self.targets = targets
@@ -300,7 +299,13 @@ class Node:
             for tgt in op.targets:
                 if isinstance(tgt, State):
                     for flop_tgt in tgt.targets:
-                        messages[idx_out].append(flop_tgt.node)
+                        if isinstance(flop_tgt, Output):
+                            # TEMP: Not yet handling outputs
+                            continue
+                        elif isinstance(flop_tgt, Instruction):
+                            messages[idx_out].append(flop_tgt.node)
+                        else:
+                            raise Exception(f"Unsupported type: {flop_tgt}")
                 elif isinstance(tgt, Instruction) and tgt.node != self:
                     messages[idx_out].append(tgt.node)
             # Ensure that the list is unique
@@ -328,6 +333,8 @@ class Node:
             src_op   = input.source if flop_val else input
             # TEMP: Ignore constants
             if isinstance(src_op, Constant): continue
+            if src_op == None:
+                import pdb; pdb.set_trace()
             src_node = src_op.node
             # Lookup positioning of the output
             _, src_out, _ = lookup[src_node.position]
@@ -439,85 +446,70 @@ def signature(bit):
         raise Exception(f"Unsupported type {type(bit)}")
 
 def compile(module):
-    # Calculate signatures for all logic nodes
-    log.info("Calculating signatures for all logic nodes")
-    signatures   = {}
-    dependencies = {}
-    def chase(bit, depth=0):
-        bit_sig  = signature(bit)
-        sub_sigs = []
-        if isinstance(bit, Gate):
-            for in_bit in bit.inputs:
-                sub_sigs += chase(in_bit, depth=(depth + 1))
-        # Work out just the immediate dependencies
-        base_depth = min([x[1] for x in sub_sigs]) if sub_sigs else 0
-        imm_deps   = [x for x, y in sub_sigs if y == base_depth]
-        signatures[bit_sig] = (bit, imm_deps)
-        # Track dependency usage
-        if bit_sig not in dependencies: dependencies[bit_sig] = []
-        for dep in imm_deps: dependencies[dep].append(bit_sig)
-        return sub_sigs + [(bit_sig, depth)]
-    for flop in (x for x in module.children.values() if isinstance(x, Flop)):
-        chase(flop.input[0].driver)
-    # Build all of the combinatorial operations
+    # Convert gates to instructions, flops to state objects
     terms   = {}
     bit_map = {}
-    for sig, (bit, _) in signatures.items():
-        if isinstance(bit, Constant):
-            assert bit.id not in bit_map
-            bit_map[bit.id] = terms[sig] = bit
-        elif isinstance(bit, Gate):
-            assert bit.id not in bit_map
-            bit_map[bit.id] = terms[sig] = Instruction(sig, bit, [], [], None)
-        elif isinstance(bit, PortBit) and isinstance(bit.port.parent, Flop):
-            continue
-        elif isinstance(bit, PortBit) and bit.port.parent == module:
-            continue
+    for item in module.children.values():
+        if isinstance(item, Gate):
+            assert item.id not in bit_map
+            if str(item) in terms:
+                import pdb; pdb.set_trace()
+            bit_map[item.id] = terms[str(item)] = Instruction(item, [], [], None)
+        elif isinstance(item, Flop):
+            assert item.input[0].id not in bit_map
+            bit_map[item.input[0].id] = (state := State(item.input[0], None, []))
+            if item.output:
+                assert item.output[0].id not in bit_map
+                bit_map[item.output[0].id]     = state
+            if item.output_inv:
+                assert item.output_inv[0].id not in bit_map
+                bit_map[item.output_inv[0].id]     = state
         else:
-            raise Exception(f"Unsupported signature type: {sig}")
-    # Build all of the flops
-    for flop in (x for x in module.children.values() if isinstance(x, Flop)):
-        assert flop.input[0].id not in bit_map
-        bit_map[flop.input[0].id] = (state := State(flop.input[0], None, []))
-        if flop.output:
-            assert flop.output[0].id not in bit_map
-            bit_map[flop.output[0].id]     = state
-            terms[f"I{flop.output[0].id}"] = state
-        if flop.output_inv:
-            assert flop.output_inv[0].id not in bit_map
-            bit_map[flop.output_inv[0].id]     = state
-            terms[f"I{flop.output_inv[0].id}"] = state
-    # Link sources & targets
-    for sig, (bit, sub_sigs) in signatures.items():
-        op = terms[sig]
-        for imm_dep in sub_sigs:
-            op.sources.append(terms[imm_dep])
-            terms[imm_dep].targets.append(op)
-        # Does this node drive any flops?
-        if isinstance(bit, Gate):
-            for tgt in bit.outputs:
-                if isinstance(tgt, PortBit) and isinstance(tgt.port.parent, Flop):
-                    assert not bit_map[tgt.id] in op.targets
-                    op.targets.append(bit_map[tgt.id])
-                    bit_map[tgt.id].source = bit_map[bit.id]
+            raise Exception(f"Unsupported child type: {sig}")
+    # Build boundary I/O
+    for port in module.ports.values():
+        assert port.is_input or port.is_output
+        for bit in port.bits:
+            bit_map[bit.id] = (Input if port.is_input else Output)(bit, [])
+    # Link instruction I/O
+    for op in (x for x in bit_map.values() if isinstance(x, Instruction)):
+        for input in op.op.inputs:
+            op.sources.append(bit_map[input.id])
+        for output in op.op.outputs:
+            op.targets.append(bit_map[output.id])
+    # Link state I/O
+    for state in (x for x in bit_map.values() if isinstance(x, State)):
+        state.source = bit_map[state.bit.driver.id]
+        if state.bit.port.parent.output:
+            for tgt in state.bit.port.parent.output[0].targets:
+                state.targets.append(bit_map[tgt.id])
+        if state.bit.port.parent.output_inv:
+            for tgt in state.bit.port.parent.output_inv[0].targets:
+                state.targets.append(bit_map[tgt.id])
+    # Link boundary I/O
+    for port in module.ports.values():
+        for bit in port.bits:
+            if port.is_input:
+                for tgt in bit.targets:
+                    if tgt.id not in bit_map: continue
+                    bit_map[bit.id].targets.append(bit_map[tgt.id])
+            elif port.is_output:
+                bit_map[bit.id].source = bit_map[bit.driver.id]
     # Create a mesh to track usage
-    mesh = Mesh(rows=10, columns=10)
+    mesh = Mesh(rows=4, columns=4)
     # Place operations into the mesh, starting with the most used
     log.info("Starting to schedule operations into mesh")
-    to_place = sorted(signatures.keys(), key=lambda x: dependencies[x], reverse=True)
+    to_place = list(terms.values())
     while to_place:
         # Pop the next term to place
-        sig = to_place.pop(0)
-        # Skip placing terms that are not instructions
-        if sig not in terms or not isinstance(terms[sig], Instruction): continue
-        # Pickup the operation
-        op = terms[sig]
+        op = to_place.pop(0)
+        assert isinstance(op, Instruction)
         # Find the set of nodes that hold the sources
         src_ops   = [x for x in op.sources if isinstance(x, Instruction)]
         src_nodes = list(set([x.node for x in src_ops]))
         # If we're not ready to place, postpone
         if None in src_nodes:
-            to_place.append(sig)
+            to_place.append(op)
             continue
         # Try to identify a suitable node
         node    = None
@@ -548,7 +540,7 @@ def compile(module):
         # Check a node was found
         if not node:
             mesh.show_utilisation()
-            raise Exception(f"No node has capacity for term {sig}")
+            raise Exception(f"No node has capacity for term {op.op}")
         # Move any supporting terms
         for item in to_move:
             old_node = item.node

@@ -63,8 +63,7 @@ def shatter_flops(module):
                     output    =Port(flop.output.name,     PortDirection.OUTPUT, 1) if flop.output else None,
                     output_inv=Port(flop.output_inv.name, PortDirection.OUTPUT, 1) if flop.output_inv else None,
                 )
-                module.children[bit_flop.name] = bit_flop
-                bit_flop.parent                = module
+                module.add_child(bit_flop)
                 # Link clock
                 bit_flop.clock[0].driver = flop.clock[0].driver
                 bit_flop.clock[0].driver.add_target(bit_flop.clock[0])
@@ -100,7 +99,7 @@ def shatter_flops(module):
             shatter_flops(flop)
     # Clear up shattered flops
     for flop in to_remove:
-        del module.children[flop.name]
+        module.remove_child(flop)
         if flop.clock[0] in flop.clock[0].driver.targets:
             flop.clock[0].driver.remove_target(flop.clock[0])
         if flop.reset and flop.reset[0] in flop.reset[0].driver.targets:
@@ -173,10 +172,9 @@ def flatten_hierarchy(module):
             # Promote grandchildren
             for subchild in flatten_hierarchy(child):
                 subchild.name = child.name + "_" + subchild.name
-                assert subchild.name not in module.children
-                module.children[subchild.name] = subchild
+                module.add_child(subchild)
             # Delete this node
-            del module.children[child.name]
+            module.remove_child(child)
     # Update all parent pointers
     for child in module.children.values():
         if isinstance(child, Module): child.parent = module
@@ -195,6 +193,8 @@ def flatten(module):
     Returns: Flattened Module instance.
     """
     assert isinstance(module, Module)
+    # Create working copy of the module
+    module = module.copy()
     # Shatter multi-bit flops into many single bit flops
     shatter_flops(module)
     # Flatten connectivity of intermediate modules

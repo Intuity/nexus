@@ -19,6 +19,8 @@ from .port import Port, PortBit, PortDirection
 class Module:
     """ Represents a module in the hierarchy """
 
+    ID = 0
+
     def __init__(self, name, type, parent=None):
         """ Initialise the Module instance.
 
@@ -30,11 +32,22 @@ class Module:
         assert isinstance(name, str)
         assert isinstance(type, str)
         assert isinstance(parent, Module) or parent == None
+        self.id       = Module.issue_id()
         self.name     = name
         self.type     = type
         self.parent   = parent
         self.ports    = {}
         self.children = {}
+
+    @classmethod
+    def issue_id(cls):
+        """ Issue a unique module ID.
+
+        Returns: Integer ID for this module
+        """
+        issued   = Module.ID
+        Module.ID += 1
+        return f"M{issued}"
 
     @property
     def hier_name(self):
@@ -112,12 +125,35 @@ class Module:
         """ Add another Module instance as a child.
 
         Args:
-            instance: Module instance
+            instance: Module or Gate instance
         """
         assert isinstance(instance, Module) or isinstance(instance, Gate)
-        assert instance.name not in self.children
-        instance.parent              = self
-        self.children[instance.name] = instance
+        assert instance.id not in self.children
+        instance.parent            = self
+        self.children[instance.id] = instance
+
+    def get_child(self, name, default=None):
+        """ Retrieve a child with a certain name.
+
+        Args:
+            name   : Name of the child
+            default: Default value to return if child not found
+
+        Returns: Located child or None if not found
+        """
+        found = [x for x in self.children.values() if x.name == name]
+        assert len(found) in (0, 1)
+        return found[0] if found else default
+
+    def remove_child(self, instance):
+        """ Remove a child from this module.
+
+        Args:
+            instance: Module or Gate instance
+        """
+        assert instance in self.children.values()
+        assert instance.id in self.children
+        del self.children[instance.id]
 
     def base_copy(self):
         """ Copy the base container
@@ -161,14 +197,14 @@ class Module:
                 n_bit = n_port[bit.index]
                 for target in bit.targets:
                     if isinstance(target, Gate):
-                        n_target = new.children[target.name]
+                        n_target = new.get_child(target.name)
                         n_bit.add_target(n_target)
                         n_target.inputs.append(n_bit)
                     elif isinstance(target, PortBit):
                         t_port   = target.port
                         t_parent = t_port.parent
                         # Find the matching target in the copy
-                        n_tgt_parent = new.children[t_parent.name]
+                        n_tgt_parent = new.get_child(t_parent.name)
                         n_tgt_port   = n_tgt_parent.ports[t_port.name]
                         n_tgt_bit    = n_tgt_port[target.index]
                         # Create the connection
@@ -178,17 +214,17 @@ class Module:
                         raise Exception(f"Unexpected target {target}")
         # Construct child output connectivity
         for key, child in self.children.items():
-            n_child = new.children[key]
+            n_child = new.get_child(child.name)
             if isinstance(child, Gate):
                 for target in child.outputs:
                     if isinstance(target, Gate):
-                        n_target = new.children[target.name]
+                        n_target = new.get_child(target.name)
                         n_child.outputs.append(n_target)
                         n_target.inputs.append(n_child)
                     elif isinstance(target, PortBit):
                         t_port       = target.port
                         t_parent     = t_port.parent
-                        n_tgt_parent = new.children.get(t_parent.name, new)
+                        n_tgt_parent = new.get_child(t_parent.name, new)
                         n_tgt_port   = n_tgt_parent.ports[t_port.name]
                         n_tgt_bit    = n_tgt_port[target.index]
                         n_child.outputs.append(n_tgt_bit)
@@ -202,13 +238,13 @@ class Module:
                         n_bit = n_port[bit.index]
                         for target in bit.targets:
                             if isinstance(target, Gate):
-                                n_target = new.children[target.name]
+                                n_target = new.get_child(target.name)
                                 n_bit.add_target(n_target)
                                 n_target.inputs.append(n_bit)
                             elif isinstance(target, PortBit):
                                 t_port       = target.port
                                 t_parent     = t_port.parent
-                                n_tgt_parent = new.children.get(t_parent.name, new)
+                                n_tgt_parent = new.get_child(t_parent.name, new)
                                 n_tgt_port   = n_tgt_parent.ports[t_port.name]
                                 n_tgt_bit    = n_tgt_port[target.index]
                                 n_bit.add_target(n_tgt_bit)

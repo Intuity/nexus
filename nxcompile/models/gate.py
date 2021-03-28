@@ -65,10 +65,7 @@ class Gate:
 
     @classmethod
     def issue_id(cls):
-        """ Issue a unique gate ID for a particular operation.
-
-        Args:
-            op: Operation gate performs (from Operation)
+        """ Issue a unique gate ID.
 
         Returns: Integer ID for this gate
         """

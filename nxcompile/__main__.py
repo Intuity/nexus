@@ -22,7 +22,7 @@ from .flow.elaborate import elaborate
 from .flow.flatten import flatten
 from .flow.group import group_logic
 from .flow.plot import plot_group
-from .flow.simplify import simplify_group
+from .flow.simplify import simplify
 from .flow.prune import prune
 from .flow.compile_multi import compile
 
@@ -81,11 +81,20 @@ def main(
 
     # Flatten the module
     log.info("Flattening hierarchy")
-    flat = flatten(model.copy())
+    flat = flatten(model)
+
+    from .models.gate import Gate
+    for gate in (x for x in flat.copy().children.values() if isinstance(x, Gate)):
+        if len(gate.outputs) == 0:
+            import pdb; pdb.set_trace()
+
+    # Simplify the module (propagate constants, etc)
+    log.info("Simplifying module")
+    smpl = simplify(flat)
 
     # Compile onto mesh
     log.info("Compiling design onto mesh")
-    compile(flat)
+    compile(smpl)
 
 if __name__ == "__main__":
     main()
