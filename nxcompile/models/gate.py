@@ -37,7 +37,7 @@ class Operation(IntEnum):
 class Gate:
     """ Represents a gate in the design """
 
-    IDS = {}
+    ID = 0
 
     def __init__(self, op, inputs, outputs):
         """ Initialise the Operation instance.
@@ -50,8 +50,8 @@ class Gate:
         assert op in Operation
         assert isinstance(inputs, list)
         assert isinstance(outputs, list)
-        self.id      = Gate.issue_id(op)
-        self.name    = f"{Operation(op).name.upper()}{self.id:03d}"
+        self.id      = Gate.issue_id()
+        self.name    = f"{Operation(op).name.upper()}{self.id}"
         self.op      = op
         self.inputs  = inputs[:]
         self.outputs = outputs[:]
@@ -64,7 +64,7 @@ class Gate:
     def __str__(self): return self.__repr__()
 
     @classmethod
-    def issue_id(cls, op):
+    def issue_id(cls):
         """ Issue a unique gate ID for a particular operation.
 
         Args:
@@ -72,14 +72,9 @@ class Gate:
 
         Returns: Integer ID for this gate
         """
-        # Sanity check
-        assert op in Operation
-        # Ensure counter exists
-        if Operation(op).name not in Gate.IDS: Gate.IDS[Operation(op).name] = 0
-        # Issue the next available ID
-        issued = Gate.IDS[Operation(op).name]
-        Gate.IDS[Operation(op).name] += 1
-        return issued
+        issued   = Gate.ID
+        Gate.ID += 1
+        return f"G{issued}"
 
     @property
     def symbol(self):

@@ -45,7 +45,7 @@ class PortBit:
     def issue_id(cls):
         issued      = PortBit.ID
         PortBit.ID += 1
-        return issued
+        return f"PB{issued}"
 
     @property
     def name(self):

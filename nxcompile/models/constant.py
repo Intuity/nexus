@@ -38,4 +38,4 @@ class Constant(PortBit):
     def issue_id(cls):
         issued = Constant.CONST_ID
         Constant.CONST_ID += 1
-        return issued
+        return f"C{issued}"
