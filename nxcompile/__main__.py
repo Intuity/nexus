@@ -20,11 +20,9 @@ import click
 from .parser import Parser
 from .flow.elaborate import elaborate
 from .flow.flatten import flatten
-from .flow.group import group_logic
 from .flow.plot import plot_group
 from .flow.simplify import simplify
-from .flow.prune import prune
-from .flow.compile_multi import compile
+from .flow.compile import compile
 
 log = logging.getLogger("compiler")
 log.setLevel(logging.INFO)
