@@ -25,20 +25,27 @@ class Verbosity(IntEnum):
 class Base:
     """ Base object for simulation """
 
+    ID        = {}
     VERBOSITY = Verbosity.INFO
 
-    def __init__(self, env, name):
+    def __init__(self, env):
         """ Initialise the Base object.
 
         Args:
-            env : SimPy Environment
-            name: Friendly name of the object
+            env: SimPy Environment
         """
-        assert isinstance(env,  simpy.Environment)
-        assert isinstance(name, str)
+        assert isinstance(env, simpy.Environment)
+        self.id      = Base.issue_id(self)
         self.env     = env
-        self.name    = name
+        self.name    = f"{type(self).__name__}[{self.id}]"
         self.created = self.env.now
+
+    @classmethod
+    def issue_id(cls, inst):
+        type_str = type(inst).__name__
+        if type_str not in Base.ID: Base.ID[type_str] = 0
+        Base.ID[type_str] = (issued := Base.ID[type_str]) + 1
+        return issued
 
     @classmethod
     def set_verbosity(cls, level):

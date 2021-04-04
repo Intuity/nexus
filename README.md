@@ -3,7 +3,7 @@
 Mesh based RTL simulation accelerator.
 
 ## Model
-The `nxsimulate` folder contains an architectural model of Nexus, which uses the [SimPy](http://simpy.readthedocs.io) discrete event simulation framework. This can model an arbitrary mesh configuration and run basic simulations.
+The `nxmodel` folder contains an architectural model of Nexus, which uses the [SimPy](http://simpy.readthedocs.io) discrete event simulation framework. This can model an arbitrary mesh configuration and run basic simulations.
 
 ## Compiler
 The `nxcompile` folder contains the flow for translating Yosys' JSON output into instructions which can run on a Nexus mesh.
