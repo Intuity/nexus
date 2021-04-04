@@ -20,7 +20,6 @@ import click
 from .parser import Parser
 from .flow.elaborate import elaborate
 from .flow.flatten import flatten
-from .flow.plot import plot_group
 from .flow.simplify import simplify
 from .flow.compile import compile
 
@@ -29,16 +28,15 @@ log.setLevel(logging.INFO)
 
 @click.command()
 # Debug options
-@click.option("--show-modules", count=True,        help="Print out parsed modules")
-@click.option("--show-models",  count=True,        help="Print out parsed models")
-@click.option("--plot-groups",  type=click.Path(), help="Plot out flop-logic-flop groups")
-@click.option("--debug",        count=True,        help="Print debugging messages")
+@click.option("--show-modules", count=True, help="Print out parsed modules")
+@click.option("--show-models",  count=True, help="Print out parsed models")
+@click.option("--debug",        count=True, help="Print debugging messages")
 # Positional arguments
 @click.argument("input")
 @click.argument("top")
 def main(
     # Debug options
-    show_modules, show_models, plot_groups, debug,
+    show_modules, show_models, debug,
     # Positional arguments
     input, top,
 ):
