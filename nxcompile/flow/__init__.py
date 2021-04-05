@@ -11,3 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from .compile import compile
+from .elaborate import elaborate
+from .export import export
+from .flatten import flatten
+from .simplify import simplify

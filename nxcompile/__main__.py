@@ -17,11 +17,8 @@ from pathlib import Path
 
 import click
 
+from .flow import compile, elaborate, export, flatten, simplify
 from .parser import Parser
-from .flow.elaborate import elaborate
-from .flow.flatten import flatten
-from .flow.simplify import simplify
-from .flow.compile import compile
 
 log = logging.getLogger("compiler")
 log.setLevel(logging.INFO)
@@ -32,20 +29,24 @@ log.setLevel(logging.INFO)
 @click.option("--show-models",  count=True, help="Print out parsed models")
 @click.option("--debug",        count=True, help="Print debugging messages")
 # Positional arguments
-@click.argument("input")
+@click.argument("input", type=click.Path(exists=True))
 @click.argument("top")
+@click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 def main(
     # Debug options
     show_modules, show_models, debug,
     # Positional arguments
-    input, top,
+    input, top, output,
 ):
     """ Compiles Yosys JSON export into a Nexus instruction schedule
 
     Arguments:
 
-        input: Path to the Yosys JSON export
-        top  : The name of the top-level module in the design
+        input : Path to the Yosys JSON export
+
+        top   : The name of the top-level module in the design
+
+        output: Output file for the compiled design, to use with model or RTL
     """
     # Alter the logging verbosity
     if debug: log.setLevel(logging.DEBUG)
@@ -79,18 +80,17 @@ def main(
     log.info("Flattening hierarchy")
     flat = flatten(model)
 
-    from .models.gate import Gate
-    for gate in (x for x in flat.copy().children.values() if isinstance(x, Gate)):
-        if len(gate.outputs) == 0:
-            import pdb; pdb.set_trace()
-
     # Simplify the module (propagate constants, etc)
     log.info("Simplifying module")
     smpl = simplify(flat)
 
     # Compile onto mesh
     log.info("Compiling design onto mesh")
-    compile(smpl)
+    c_instr, c_in_hndl, c_out_hndl = compile(smpl)
+
+    # Export to JSON
+    log.info(f"Exporting compiled design to {output}")
+    export(output, c_instr, c_in_hndl, c_out_hndl)
 
 if __name__ == "__main__":
     main()

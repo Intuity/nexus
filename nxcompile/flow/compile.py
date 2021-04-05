@@ -306,7 +306,7 @@ class Node:
             _, src_out, _ = lookup[src_node.position]
             src_pos       = src_out.index(src_op)
             # Construct the handling
-            handling[idx_in] = (src_node, src_pos)
+            handling[idx_in] = (src_node, src_pos, flop_val)
         return handling
 
 class Mesh:
@@ -548,5 +548,5 @@ def compile(module):
     for node in mesh.all_nodes:
         inputs, _, _ = compiled_ops[node.position]
         compiled_hndl[node.position] = node.compile_handling(inputs, compiled_ops)
-    # Debug
-    import pdb; pdb.set_trace()
+    # Return instruction sequences, input handling, output handling
+    return compiled_ops, compiled_hndl, compiled_msgs
