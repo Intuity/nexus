@@ -79,7 +79,7 @@ class Manager(Base):
         # Pickup the configuration section
         config   = model[Manager.DESIGN_CONFIG]
         cfg_rows = config[Manager.CONFIG_ROWS]
-        cfg_cols = config[Manager.CONFIG_COLS]
+        cfg_cols = config[Manager.CONFIG_COLUMNS]
         # Check that the mesh matches
         assert cfg_rows == self.mesh.rows
         assert cfg_cols == self.mesh.columns
@@ -99,17 +99,20 @@ class Manager(Base):
             for mapping in node_data[Manager.NODE_IN_MAP]:
                 self.queue.append(ConfigureInput(
                     self.env, n_row, n_col,
-                    mapping[IN_MAP_SRC_ROW], mapping[IN_MAP_SRC_COL],
-                    mapping[IN_MAP_SRC_POS], mapping[IN_MAP_TGT_POS],
-                    mapping[IN_MAP_STATE],
+                    mapping[Manager.IN_MAP_SRC_ROW], mapping[Manager.IN_MAP_SRC_COL],
+                    mapping[Manager.IN_MAP_SRC_POS], mapping[Manager.IN_MAP_TGT_POS],
+                    mapping[Manager.IN_MAP_STATE],
                 ))
             # Setup output mappings for the node
-            for mapping in node_data[MANAGER.NODE_OUT_MAP]:
+            for mapping in node_data[Manager.NODE_OUT_MAP]:
                 self.queue.append(ConfigureOutput(
-                    self.env, n_row, n_col, mapping[OUT_MAP_POS],
-                    mapping.get(OUT_MAP_TGT_A_ROW, 0), mapping.get(OUT_MAP_TGT_A_COL, 0),
-                    mapping.get(OUT_MAP_TGT_B_ROW, 0), mapping.get(OUT_MAP_TGT_B_COL, 0),
-                    mapping.get(OUT_MAP_BROADCAST, False), mapping.get(OUT_MAP_DECAY, 0),
+                    self.env, n_row, n_col, mapping[Manager.OUT_MAP_POS],
+                    mapping.get(Manager.OUT_MAP_TGT_A_ROW, 0),
+                    mapping.get(Manager.OUT_MAP_TGT_A_COL, 0),
+                    mapping.get(Manager.OUT_MAP_TGT_B_ROW, 0),
+                    mapping.get(Manager.OUT_MAP_TGT_B_COL, 0),
+                    mapping.get(Manager.OUT_MAP_BROADCAST, False),
+                    mapping.get(Manager.OUT_MAP_DECAY, 0),
                 ))
 
     def transmit(self):
