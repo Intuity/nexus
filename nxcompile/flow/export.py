@@ -21,6 +21,11 @@ DESIGN_NODES  = "nodes"
 # Mesh configuration
 CONFIG_ROWS    = "rows"
 CONFIG_COLUMNS = "columns"
+CONFIG_NODE    = "node"
+CFG_ND_INPUTS  = "inputs"
+CFG_ND_OUTPUTS = "outputs"
+CFG_ND_REGS    = "registers"
+CFG_ND_SLOTS   = "slots"
 # Per-node configuration
 NODE_ROW     = "row"
 NODE_COLUMN  = "column"
@@ -42,22 +47,39 @@ OUT_MAP_TGT_B_COL = "column_b"
 OUT_MAP_BROADCAST = "broadcast"
 OUT_MAP_DECAY     = "decay"
 
-def export(output, instructions, input_map, output_map):
+def export(
+    output,
+    mesh_rows, mesh_columns,
+    node_inputs, node_outputs, node_registers, node_slots,
+    instructions, input_map, output_map,
+):
     """
     Export the compiled design to a file for loading into the architectural
     model or the RTL design.
 
     Args:
-        output      : Path to the output file to write
-        instructions: Instruction sequences for every node
-        input_map   : Input handling for every node
-        output_map  : Output handling for every node
+        output        : Path to the output file to write
+        mesh_rows     : Number of rows in the mesh
+        mesh_columns  : Number of columns in the mesh
+        node_inputs   : Number of inputs per node
+        node_outputs  : Number of outputs per node
+        node_registers: Number of working registers per node
+        node_slots    : Number of instruction slots per node
+        instructions  : Instruction sequences for every node
+        input_map     : Input handling for every node
+        output_map    : Output handling for every node
     """
     # Assemble the model
     model = {
         DESIGN_CONFIG: {
-            CONFIG_ROWS   : max([r for r, _ in instructions.keys()]) + 1,
-            CONFIG_COLUMNS: max([c for _, c in instructions.keys()]) + 1,
+            CONFIG_ROWS   : mesh_rows,
+            CONFIG_COLUMNS: mesh_columns,
+            CONFIG_NODE   : {
+                CFG_ND_INPUTS : node_inputs,
+                CFG_ND_OUTPUTS: node_outputs,
+                CFG_ND_REGS   : node_registers,
+                CFG_ND_SLOTS  : node_slots,
+            },
         },
         DESIGN_NODES: [],
     }

@@ -54,10 +54,28 @@ class Instruction:
 
 
 class Node:
+    """
+    Represents a logic node within the mesh, keeps track of input, output, and
+    instruction slot usage. Also performs compilation of operations into encoded
+    values, generation of input handling and output handling.
+    """
 
     def __init__(
-        self, row, column, inputs=8, outputs=8, slots=12, registers=8
+        self, mesh, row, column, inputs=8, outputs=8, slots=12, registers=8
     ):
+        """ Initialise the Node.
+
+        Args:
+            mesh     : Pointer to the mesh
+            row      : Row position within the mesh
+            column   : Column position within the mesh
+            inputs   : Number of input positions
+            outputs  : Number of output positions
+            slots    : Maximum number of operations
+            registers: Number of working registers
+        """
+        # Keep a reference to the mesh
+        self.mesh = mesh
         # Position within the mesh
         self.position = (row, column)
         # Keep a record of available resources
@@ -266,8 +284,8 @@ class Node:
                 if isinstance(tgt, State):
                     for flop_tgt in tgt.targets:
                         if isinstance(flop_tgt, Output):
-                            # TEMP: Not yet handling outputs
-                            continue
+                            # Direct to the special output node
+                            messages[idx_out].append(self.mesh.output)
                         elif isinstance(flop_tgt, Instruction):
                             messages[idx_out].append(flop_tgt.node)
                         else:
@@ -297,10 +315,6 @@ class Node:
             # Resolve source operation and node
             flop_val = isinstance(input, State)
             src_op   = input.source if flop_val else input
-            # TEMP: Ignore constants
-            if isinstance(src_op, Constant): continue
-            if src_op == None:
-                import pdb; pdb.set_trace()
             src_node = src_op.node
             # Lookup positioning of the output
             _, src_out, _ = lookup[src_node.position]
@@ -310,9 +324,27 @@ class Node:
         return handling
 
 class Mesh:
+    """ Mesh of node models to suppport allocation and scheduling of operations """
 
-    def __init__(self, rows=4, columns=4):
-        self.nodes = [[Node(x, y) for y in range(columns)] for x in range(rows)]
+    def __init__(self, rows=4, columns=4, **params):
+        """ Initialise the Mesh.
+
+        Args:
+            rows   : Number of rows in the mesh
+            columns: Number of columns in the mesh
+            params : Other parameters
+        """
+        # Create the main mesh of nodes
+        self.nodes = [
+            [
+                Node(
+                    self, x, y,
+                    **{k.replace("node_", "", 1): v for k, v in params.items() if k.startswith("node_")}
+                ) for y in range(columns)
+            ] for x in range(rows)
+        ]
+        # Create a special reserved output node
+        self.output = Node(self, rows, 0)
 
     def __getitem__(self, key):
         if isinstance(key, tuple):
@@ -369,9 +401,14 @@ class Mesh:
             if viable: break
         return viable
 
-    def show_utilisation(self, mode="overall"):
+    def show_utilisation(self, metric="summary"):
+        """ Print out a utilisation table for different metrics.
+
+        Args:
+            metric: Which metric to tabulate (default: summary)
+        """
         print("=" * 80)
-        print(f"{mode.capitalize()} Usage:")
+        print(f"{metric.capitalize()} Usage:")
         print("")
         print("      " + " ".join([f"{x:^5d}" for x in range(len(self.nodes[0]))]))
         print("------" + "-".join(["-----" for x in range(len(self.nodes[0]))]))
@@ -380,10 +417,11 @@ class Mesh:
             row_str = ""
             for node in row:
                 u_val = 0
-                if   mode == "input" : u_val = node.input_usage
-                elif mode == "output": u_val = node.output_usage
-                elif mode == "slot"  : u_val = node.slot_usage
-                else                 : u_val = node.usage
+                if   metric == "input"  : u_val = node.input_usage
+                elif metric == "output" : u_val = node.output_usage
+                elif metric == "slot"   : u_val = node.slot_usage
+                elif metric == "summary": u_val = node.usage
+                else: raise Exception(f"Unknown metric {metric}")
                 row_str += f"{u_val:01.03f} "
                 values.append(u_val)
             print(f"{r_idx:3d} | {row_str}")
@@ -391,27 +429,30 @@ class Mesh:
         print(f"Max: {max(values):.02f}, Min: {min(values):.02f}, Mean: {mean(values):.02f}")
         print("=" * 80)
 
-def signature(bit):
-    # Build the signature
-    if isinstance(bit, Gate):
-        parts = []
-        for in_bit in bit.inputs:
-            parts.append(signature(in_bit))
-        sig = "(" + ",".join(parts) + ")"
-        if   bit.op == Operation.INVERT: sig = "N" + sig
-        elif bit.op == Operation.AND   : sig = "A" + sig
-        elif bit.op == Operation.NAND  : sig = "N(A" + sig + ")"
-        elif bit.op == Operation.OR    : sig = "O" + sig
-        elif bit.op == Operation.NOR   : sig = "N(O" + sig + ")"
-        elif bit.op == Operation.XOR   : sig = "X" + sig
-        elif bit.op == Operation.XNOR  : sig = "N(X" + sig + ")"
-        return sig
-    elif isinstance(bit, PortBit):
-        return f"I{bit.id}"
-    else:
-        raise Exception(f"Unsupported type {type(bit)}")
+def compile(
+    module,
+    rows=4, columns=4,
+    node_inputs=8, node_outputs=8, node_registers=8, node_slots=16,
+):
+    """
+    Manage the compilation process - converting the logical model of the design
+    into operations, messages, and handling configurations.
 
-def compile(module):
+    Args:
+        module        : The logic module to compile
+        rows          : Number of rows in the mesh (default: 4)
+        columns       : Number of columns in the mesh (default: 4)
+        node_inputs   : Number of inputs per node
+        node_outputs  : Number of outputs per node
+        node_registers: Number of registers per node
+        node_slots    : Number of instruction slots per node
+    """
+    # Create a mesh of the requested configuration
+    mesh = Mesh(
+        rows=rows, columns=columns,
+        node_inputs=node_inputs, node_outputs=node_outputs,
+        node_registers=node_registers, node_slots=node_slots,
+    )
     # Convert gates to instructions, flops to state objects
     terms   = {}
     bit_map = {}
@@ -461,8 +502,6 @@ def compile(module):
                     bit_map[bit.id].targets.append(bit_map[tgt.id])
             elif port.is_output:
                 bit_map[bit.id].source = bit_map[bit.driver.id]
-    # Create a mesh to track usage
-    mesh = Mesh(rows=4, columns=4)
     # Place operations into the mesh, starting with the most used
     log.info("Starting to schedule operations into mesh")
     to_place = list(terms.values())

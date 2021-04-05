@@ -24,6 +24,14 @@ log = logging.getLogger("compiler")
 log.setLevel(logging.INFO)
 
 @click.command()
+# Mesh configuration
+@click.option("-r", "--rows", type=int, default=4, help="Number of rows in the mesh")
+@click.option("-c", "--cols", type=int, default=4, help="Number of columns in the mesh")
+# Node configuration
+@click.option("--node-inputs",    type=int, default=8,  help="Inputs per node")
+@click.option("--node-outputs",   type=int, default=8,  help="Outputs per node")
+@click.option("--node-registers", type=int, default=8,  help="Working registers")
+@click.option("--node-slots",     type=int, default=16, help="Max instructions per node")
 # Debug options
 @click.option("--show-modules", count=True, help="Print out parsed modules")
 @click.option("--show-models",  count=True, help="Print out parsed models")
@@ -33,6 +41,10 @@ log.setLevel(logging.INFO)
 @click.argument("top")
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 def main(
+    # Mesh configuration
+    rows, cols,
+    # Node configuration
+    node_inputs, node_outputs, node_registers, node_slots,
     # Debug options
     show_modules, show_models, debug,
     # Positional arguments
@@ -90,7 +102,12 @@ def main(
 
     # Export to JSON
     log.info(f"Exporting compiled design to {output}")
-    export(output, c_instr, c_in_hndl, c_out_hndl)
+    export(
+        output,
+        rows, cols,
+        node_inputs, node_outputs, node_registers, node_slots,
+        c_instr, c_in_hndl, c_out_hndl,
+    )
 
 if __name__ == "__main__":
     main()
