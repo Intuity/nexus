@@ -14,6 +14,7 @@
 
 from .base import Base
 from .node import Node, Direction
+from .pipe import Pipe
 
 class Mesh(Base):
     """ A mesh constructed of nodes and networks """
@@ -45,18 +46,18 @@ class Mesh(Base):
                 #       skip linking nodes that have already been handled
                 to_east  = self.nodes[row][column+1] if column < (self.columns - 1) else None
                 to_south = self.nodes[row+1][column] if row    < (self.rows    - 1) else None
-                # Link the eastbound pipe
+                # Create and link the eastbound pipe
                 if to_east:
                     assert not to_east.inbound[Direction.WEST]
                     assert not node.inbound[Direction.EAST]
-                    to_east.inbound[Direction.WEST] = node.outbound[Direction.EAST]
-                    node.inbound[Direction.EAST]    = to_east.outbound[Direction.WEST]
-                # Link the southbound pipe
+                    to_east.inbound[Direction.WEST] = node.outbound[Direction.EAST]    = Pipe(self.env, 1, 1)
+                    node.inbound[Direction.EAST]    = to_east.outbound[Direction.WEST] = Pipe(self.env, 1, 1)
+                # Create and link the southbound pipe
                 if to_south:
                     assert not to_south.inbound[Direction.NORTH]
                     assert not node.inbound[Direction.SOUTH]
-                    to_south.inbound[Direction.NORTH] = node.outbound[Direction.SOUTH]
-                    node.inbound[Direction.SOUTH]     = to_south.outbound[Direction.NORTH]
+                    to_south.inbound[Direction.NORTH] = node.outbound[Direction.SOUTH]     = Pipe(self.env, 1, 1)
+                    node.inbound[Direction.SOUTH]     = to_south.outbound[Direction.NORTH] = Pipe(self.env, 1, 1)
 
     @property
     def rows(self): return len(self.nodes)

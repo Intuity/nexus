@@ -125,16 +125,17 @@ class Node(Base):
         assert isinstance(outputs,   int) and outputs   >= 1
         assert isinstance(registers, int) and registers >= 1
         assert isinstance(max_ops,   int) and max_ops   >= 1
-        self.__inputs    = [0] * inputs
-        self.__outputs   = [0] * outputs
-        self.__registers = [0] * registers
-        self.__ops       = [None] * max_ops
+        self.__inputs      = [0] * inputs
+        self.__next_inputs = [0] * inputs # For the next cycle
+        self.__outputs     = [0] * outputs
+        self.__registers   = [0] * registers
+        self.__ops         = [None] * max_ops
         # Setup phase
         self.__phase = Phase.SETUP
         # Create spaces for inbound pipes (4 -> one for each of N, E, S, W)
         self.inbound = [None] * 4
         # Create real outbound pipes
-        self.outbound = [Pipe(self.env, 1, 1) for _ in range(4)]
+        self.outbound = [None] * 4
         # The internal pipe allows for loopback from outputs -> inputs
         self.internal = Pipe(self.env, 1, 1)
         # Create an internal tick event
@@ -231,9 +232,11 @@ class Node(Base):
                     src_col == msg.src_col and
                     src_pos == msg.src_pos
                 ):
-                    self.__inputs[input_pos] = msg.src_val
+                    self.__next_inputs[input_pos] = msg.src_val
                     # If this is not a stateful input, restart instruction execution
-                    if not state: self.exec_loop.interrupt()
+                    if not state:
+                        self.__inputs[input_pos] = msg.src_val
+                        self.exec_loop.interrupt()
                     break
             else:
                 if not msg.broadcast:
@@ -258,27 +261,34 @@ class Node(Base):
             bc_dirs: Direction to broadcast a message in
         """
         def do_dispatch(msg):
-            # Collect tracking information on the message to debug routing
-            msg.tracking.append((self, msg))
             # Broadcast messages are sent on every outbound pipe
             if msg.broadcast:
                 self.debug(f"Broadcasting message")
                 for dirx in bc_dirs:
-                    yield self.env.process(self.outbound[int(dirx)].push(msg))
+                    # Check pipe has been connected
+                    if not self.outbound[int(dirx)]: continue
+                    # Copy message, decrease decay, track propagation
+                    cp_msg        = msg.copy()
+                    cp_msg.decay -= 1
+                    cp_msg.tracking.append((self, cp_msg))
+                    # Send message
+                    yield self.env.process(self.outbound[int(dirx)].push(cp_msg))
             # Non-broadcast messages are directed towards their target
             else:
+                # Collect tracking information on the message to debug routing
+                msg.tracking.append((self, msg))
                 # Determine the pipe to send through
                 pipe_dir = None
                 if   msg.tgt_row < self.row   : pipe = pipe_dir = Direction.NORTH
                 elif msg.tgt_row > self.row   : pipe = pipe_dir = Direction.SOUTH
                 elif msg.tgt_col > self.column: pipe = pipe_dir = Direction.EAST
                 elif msg.tgt_col < self.column: pipe = pipe_dir = Direction.WEST
+                # Check pipe has been connected
+                if not self.outbound[int(pipe_dir)]: return
                 # Queue up the message onto the pipe
                 if pipe_dir != None:
-                    self.debug(f"Dispatch on {pipe_dir.name} pipe")
                     yield self.env.process(self.outbound[int(pipe_dir)].push(msg))
                 else:
-                    self.debug(f"Dispatch on internal pipe")
                     yield self.env.process(self.internal.push(msg))
         return self.env.process(do_dispatch(msg))
 
@@ -288,22 +298,23 @@ class Node(Base):
         seen      = {}
         while True:
             # Wait for a message on any inbound pipe (round robin)
-            self.debug(f"Waiting for message")
             while True:
                 pipe = None
                 for idx in range(len(self.inbound)):
-                    test = self.inbound[(int(last_pipe) + idx) % len(self.inbound)]
+                    wrap_idx = (int(last_pipe) + idx) % len(self.inbound)
+                    test     = self.inbound[wrap_idx]
                     if not test or len(test.out_store.items) == 0: continue
                     pipe      = test
-                    last_pipe = Direction(idx)
+                    last_pipe = Direction(wrap_idx)
                 if pipe: break
                 yield self.env.timeout(1)
-            self.debug(f"Got message")
             # Grab the next message from the pipe
             self.debug(f"Received message from pipe {last_pipe.name}")
             msg = yield self.env.process(pipe.pop())
             # Check a message hasn't been seen twice
             if type(msg).__name__ not in seen: seen[type(msg).__name__] = []
+            # if msg.id in seen[type(msg).__name__]:
+            #     import pdb; pdb.set_trace()
             assert msg.id not in seen[type(msg).__name__], \
                 f"{self.position} Seen message {type(msg).__name__}[{msg.id}] more than once"
             seen[type(msg).__name__].append(msg.id)
@@ -311,12 +322,7 @@ class Node(Base):
             if msg.target == self.position or msg.broadcast:
                 self.digest(msg)
             # Does this message need to be passed on
-            if msg.target != self.position:
-                yield self.dispatch(msg)
-            elif msg.broadcast and msg.decay > 0:
-                # Copy the message and adjust the decay
-                cp_msg        = msg.copy()
-                cp_msg.decay -= 1
+            if msg.broadcast and msg.decay > 0:
                 # Decide which directions to broadcast (to avoid recirculating)
                 bc_dirs = {
                     Direction.NORTH: [Direction.SOUTH, Direction.EAST, Direction.WEST],
@@ -325,6 +331,8 @@ class Node(Base):
                     Direction.WEST : [Direction.EAST],
                 }[last_pipe]
                 yield self.dispatch(msg, bc_dirs=bc_dirs)
+            elif not msg.broadcast and msg.target != self.position:
+                yield self.dispatch(msg)
 
     def execute(self):
         """ Execute the instruction loop """
@@ -338,6 +346,9 @@ class Node(Base):
                     assert self.__phase in (Phase.SETUP, Phase.WAIT), \
                         f"[{self.position}] Phase is currently {self.__phase.name}"
                     self.debug(f"Got tick")
+                    # Copy input state
+                    for idx, val in enumerate(self.__next_inputs):
+                        self.__inputs[idx] = val
                 # Reset skip tick (after interrupt has set it)
                 skip_tick = False
                 # Switch to the RUN phase
@@ -355,7 +366,9 @@ class Node(Base):
                     # Perform the operation
                     self.__registers[op.target] = (result := Operation.evaluate(op.op, val_a, val_b))
                     # Generate an output if required
-                    if op.is_output:
+                    if op.is_output and self.__outputs[output_idx] != result:
+                        # Capture updated value to avoid unnecessary retrigger
+                        self.__outputs[output_idx] = result
                         # Check output mapping exists
                         assert output_idx in self.__output_map, \
                             f"Missing output {output_idx} from {self.position}"

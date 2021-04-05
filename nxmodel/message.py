@@ -44,7 +44,9 @@ class Message(Base):
     def target(self): return self.tgt_row, self.tgt_col
 
     def copy(self):
-        return copy.copy(self)
+        copied          = copy.copy(self)
+        copied.tracking = self.tracking[:]
+        return copied
 
 class LoadInstruction(Message):
     """ Load an instruction into a core """
