@@ -62,3 +62,11 @@ class Mesh(Base):
     def rows(self): return len(self.nodes)
     @property
     def columns(self): return len(self.nodes[0])
+
+    def __getitem__(self, key):
+        if isinstance(key, tuple):
+            node = self.nodes
+            for item in key: node = node[item]
+            return node
+        else:
+            return self.nodes[key]

@@ -40,11 +40,10 @@ class Operation(IntEnum):
 
     @classmethod
     def evaluate(self, op, *inputs):
+        assert len(inputs) in (1, 2)
         if op == Operation.INVERT:
-            assert len(inputs) == 1
             return not inputs[0]
         else:
-            assert len(inputs) == 2
             if   op == Operation.AND : return     (inputs[0] and inputs[1])
             elif op == Operation.NAND: return not (inputs[0] and inputs[1])
             elif op == Operation.OR  : return     (inputs[0] or inputs[1])
@@ -204,9 +203,9 @@ class Node(Base):
         elif msg_type == ConfigureOutput:
             assert msg.out_pos >= 0 and msg.out_pos < len(self.__outputs)
             self.__output_map[msg.out_pos] = (
-                self.msg_as_bc, self.bc_decay,
-                self.msg_a_row, self.msg_a_col,
-                self.msg_b_row, self.msg_b_col,
+                msg.msg_as_bc, msg.bc_decay,
+                msg.msg_a_row, msg.msg_a_col,
+                msg.msg_b_row, msg.msg_b_col,
             )
         # Handle updated signal state
         elif msg_type == SignalState:
@@ -277,7 +276,7 @@ class Node(Base):
             self.debug(f"Node {self.position} - got message")
             # Grab the next message from the pipe
             self.debug(f"[{self.position}] Received message from pipe {last_pipe.name}")
-            msg = pipe.pop()
+            msg = yield self.env.process(pipe.pop())
             # Is the message addressed to this node?
             if msg.target == self.position or msg.broadcast:
                 self.digest(msg)
@@ -318,6 +317,8 @@ class Node(Base):
                 for op in self.__ops:
                     # If this operation is empty, break out
                     if op == None: break
+                    # Debug log
+                    self.debug(f"Node {self.position} executing {op}")
                     # Pickup each source value
                     val_a = self.__inputs[op.source_a] if op.is_input_a else self.__registers[op.source_a]
                     val_b = self.__inputs[op.source_b] if op.is_input_b else self.__registers[op.source_b]
@@ -325,23 +326,24 @@ class Node(Base):
                     self.__registers[op.target] = (result := Operation.evaluate(op.op, val_a, val_b))
                     # Generate an output if required
                     if op.is_output:
-                        assert output_idx in self.__output_map
+                        assert output_idx in self.__output_map, \
+                            f"Missing output {output_idx} from {self.position}"
                         (
                             do_bc, bc_decay, tgt_a_row, tgt_a_col, tgt_b_row,
                             tgt_b_col,
                         ) = self.__output_map[output_idx]
                         if do_bc and bc_decay > 0:
-                            yield dispatch(SignalState(
+                            yield self.dispatch(SignalState(
                                 self.env, 0, 0, True, bc_decay,
                                 self.row, self.column, output_idx, result,
                             ))
                         elif not do_bc:
-                            yield dispatch(SignalState(
+                            yield self.dispatch(SignalState(
                                 self.env, tgt_a_row, tgt_a_col, False, 0,
                                 self.row, self.column, output_idx, result,
                             ))
                             if (tgt_b_row, tgt_b_col) != (tgt_a_row, tgt_a_col):
-                                yield dispatch(SignalState(
+                                yield self.dispatch(SignalState(
                                     self.env, tgt_b_row, tgt_b_col, False, 0,
                                     self.row, self.column, output_dix, result,
                                 ))

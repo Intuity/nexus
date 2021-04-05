@@ -18,6 +18,7 @@ import simpy
 from .base import Base, Verbosity
 from .manager import Manager
 from .mesh import Mesh
+from .node import Direction
 
 @click.command()
 # Mesh configuration
@@ -31,13 +32,14 @@ from .mesh import Mesh
 # Verbosity controls
 @click.option("--quiet", count=True, help="Only show warning & error messages")
 @click.option("--debug", count=True, help="Enable debug messages")
+@click.option("--log",   type=click.Path(file_okay=True, dir_okay=False), help="Output log path")
 # Simulation setup
 @click.argument("design", type=click.File("r"))
 def main(
     # Mesh configuration
     rows, cols, node_inputs, node_outputs, node_registers, node_slots,
     # Verbosity controls
-    quiet, debug,
+    quiet, debug, log,
     # Simulation setup
     design,
 ):
@@ -47,12 +49,15 @@ def main(
 
         DESIGN: Path to the compiled design to load and execute.
     """
-    # Setup verbosity
-    if   quiet: Base.set_verbosity(Verbosity.WARN )
-    elif debug: Base.set_verbosity(Verbosity.DEBUG)
-    else      : Base.set_verbosity(Verbosity.INFO )
     # Create a simulation environment
     env = simpy.Environment()
+    # Setup verbosity
+    Base.setup_log(env, {
+        (True,  True ): "INFO",
+        (True,  False): "WARN",
+        (False, True ): "DEBUG",
+        (False, False): "INFO",
+    }[quiet, debug], log)
     # Create a mesh
     mesh = Mesh(env, rows, cols, nd_prms={
         "inputs"   : node_inputs,
@@ -62,6 +67,7 @@ def main(
     })
     # Create a manager
     manager = Manager(env, mesh)
+    mesh[0, 0].inbound[Direction.NORTH] = manager.outbound
     manager.load(design)
     # Run the simulation
     env.run()

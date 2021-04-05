@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from enum import IntEnum
+import logging
 
 import simpy
 
@@ -27,6 +28,7 @@ class Base:
 
     ID        = {}
     VERBOSITY = Verbosity.INFO
+    LOG       = None
 
     def __init__(self, env):
         """ Initialise the Base object.
@@ -48,17 +50,25 @@ class Base:
         return issued
 
     @classmethod
-    def set_verbosity(cls, level):
-        assert level in Verbosity
-        cls.VERBOSITY = level
-
-    # Verbosity filtered logging function
-    def __log(self, verb, msg):
-        if verb <= Base.VERBOSITY:
-            print(f"{self.env.now:08d} [{self.name}] {msg}")
+    def setup_log(cls, env, verbosity, log_path):
+        assert isinstance(env, simpy.Environment)
+        class LogFilter(logging.Filter):
+            def filter(self, record):
+                record.sim_time = env.now
+                return True
+        Base.LOG  = logging.getLogger("nxmodel")
+        stream    = logging.StreamHandler()
+        formatter = logging.Formatter("%(sim_time)08i nxmodel : %(message)s")
+        stream.setFormatter(formatter)
+        Base.LOG.addFilter(LogFilter())
+        Base.LOG.setLevel(verbosity)
+        Base.LOG.addHandler(stream)
+        if log_path:
+            Base.LOG.addHandler(fh := logging.FileHandler(log_path, "w"))
+            fh.setFormatter(formatter)
 
     # Logging aliases
-    def error(self, msg): return self.__log(Verbosity.ERROR, msg)
-    def warn (self, msg): return self.__log(Verbosity.WARN,  msg)
-    def info (self, msg): return self.__log(Verbosity.INFO,  msg)
-    def debug(self, msg): return self.__log(Verbosity.DEBUG, msg)
+    def error(self, msg): return Base.LOG.error(msg)
+    def warn (self, msg): return Base.LOG.warning(msg)
+    def info (self, msg): return Base.LOG.info(msg)
+    def debug(self, msg): return Base.LOG.debug(msg)
