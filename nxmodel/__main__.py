@@ -15,7 +15,8 @@
 import click
 import simpy
 
-from .base import Base, Verbosity
+from .base import Base
+from .capture import Capture
 from .manager import Manager
 from .mesh import Mesh
 from .node import Direction
@@ -37,7 +38,9 @@ from .node import Direction
 @click.argument("design", type=click.File("r"))
 def main(
     # Mesh configuration
-    rows, cols, node_inputs, node_outputs, node_registers, node_slots,
+    rows, cols,
+    # Node configuration
+    node_inputs, node_outputs, node_registers, node_slots,
     # Verbosity controls
     quiet, debug, log,
     # Simulation setup
@@ -69,6 +72,10 @@ def main(
     manager = Manager(env, mesh)
     mesh[0, 0].inbound[Direction.NORTH] = manager.outbound
     manager.load(design)
+    # Create a capture node
+    capture = Capture(env, cols)
+    for col, node in enumerate(mesh.nodes[rows-1]):
+        capture.inbound[col] = node.outbound[Direction.SOUTH]
     # Run the simulation
     env.run()
 

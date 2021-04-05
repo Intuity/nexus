@@ -38,6 +38,7 @@ class Message(Base):
         self.tgt_col   = tgt_col
         self.broadcast = broadcast
         self.decay     = decay
+        self.tracking  = []
 
     @property
     def target(self): return self.tgt_row, self.tgt_col
@@ -142,6 +143,9 @@ class SignalState(Message):
         self.src_col = src_col
         self.src_pos = src_pos
         self.src_val = src_val
+
+    @property
+    def source(self): return self.src_row, self.src_col
 
     def __repr__(self):
         return (

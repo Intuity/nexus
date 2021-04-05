@@ -51,13 +51,17 @@ class Pipe(Base):
 
     @property
     def idle(self):
+        return (len(self.in_store.items) == 0) and (len(self.out_store.items) == 0)
+
+    @property
+    def cycles_idle(self):
         if self.num_push == self.num_pop:
             return self.__idle + (self.env.now - self.last_pop)
         else:
             return self.__idle
 
     @property
-    def active(self):
+    def cycles_active(self):
         if self.num_push == self.num_pop:
             return self.__active
         else:
@@ -75,13 +79,11 @@ class Pipe(Base):
         # Increment number of pushes
         self.num_push += 1
         # Push to the inbound store
-        self.debug(f"Message {msg.id} pushed")
         yield self.in_store.put((self.env.now, msg))
 
     def pop(self):
         # Pop the next entry
         entry, msg = yield self.out_store.get()
-        self.debug(f"Message {msg.id} popped")
         # Increment number of items popped
         self.num_pop += 1
         # If empty, record active time

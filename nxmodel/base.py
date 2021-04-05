@@ -12,23 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import IntEnum
 import logging
 
 import simpy
 
-class Verbosity(IntEnum):
-    ERROR = 0
-    WARN  = 1
-    INFO  = 2
-    DEBUG = 3
-
 class Base:
     """ Base object for simulation """
 
-    ID        = {}
-    VERBOSITY = Verbosity.INFO
-    LOG       = None
+    ID  = {}
+    LOG = None
 
     def __init__(self, env):
         """ Initialise the Base object.

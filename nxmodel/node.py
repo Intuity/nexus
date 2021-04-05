@@ -166,6 +166,12 @@ class Node(Base):
         # Otherwise, the node is idle
         return True
 
+    # Logging aliases
+    def error(self, msg): return super().error(f"[{self.row}, {self.column}] {msg}")
+    def warn (self, msg): return super().warn(f"[{self.row}, {self.column}] {msg}")
+    def info (self, msg): return super().info(f"[{self.row}, {self.column}] {msg}")
+    def debug(self, msg): return super().debug(f"[{self.row}, {self.column}] {msg}")
+
     def reset(self):
         """ Reset the state of the logic node """
         self.__inputs    = [0] * len(self.__inputs)
@@ -192,16 +198,26 @@ class Node(Base):
         # Load an instruction into a specified slot
         if msg_type == LoadInstruction:
             assert msg.slot >= 0 and msg.slot < len(self.__ops)
+            self.debug(f"Loading instruction slot {msg.slot}: {msg.instr}")
             self.__ops[msg.slot] = msg.instr
         # Configure input mapping to the node
         elif msg_type == ConfigureInput:
             assert msg.tgt_pos >= 0 and msg.tgt_pos < len(self.__inputs)
+            self.debug(
+                f"Mapping input {msg.tgt_pos} - R: {msg.src_row}, C: {msg.src_col}"
+                f" - O[{msg.src_pos}], S: {msg.state}"
+            )
             self.__input_map[msg.tgt_pos] = (
                 msg.src_row, msg.src_col, msg.src_pos, msg.state
             )
         # Configure output mapping from the node
         elif msg_type == ConfigureOutput:
             assert msg.out_pos >= 0 and msg.out_pos < len(self.__outputs)
+            self.debug(
+                f"Mapping output {msg.out_pos} - B: {msg.msg_as_bc}, D: "
+                f"{msg.bc_decay}, A: {msg.msg_a_row} {msg.msg_a_col}, B: "
+                f"{msg.msg_b_row} {msg.msg_b_col}"
+            )
             self.__output_map[msg.out_pos] = (
                 msg.msg_as_bc, msg.bc_decay,
                 msg.msg_a_row, msg.msg_a_col,
@@ -217,13 +233,18 @@ class Node(Base):
                 ):
                     self.__inputs[input_pos] = msg.src_val
                     # If this is not a stateful input, restart instruction execution
-                    if not state: self.execute.interrupt()
+                    if not state: self.exec_loop.interrupt()
                     break
             else:
-                raise Exception(f"Failed to handle SignalState: {msg}")
+                if not msg.broadcast:
+                    raise Exception(
+                        f"[{self.position}] Failed to handle SignalState: {msg}"
+                    )
         # Unknown message type
         else:
-            raise Exception(f"Unknown message type {msg_type.__name__}")
+            raise Exception(
+                f"[{self.position}] Unknown message type {msg_type.__name__}"
+            )
 
     def dispatch(
         self,
@@ -237,11 +258,14 @@ class Node(Base):
             bc_dirs: Direction to broadcast a message in
         """
         def do_dispatch(msg):
+            # Collect tracking information on the message to debug routing
+            msg.tracking.append((self, msg))
+            # Broadcast messages are sent on every outbound pipe
             if msg.broadcast:
-                # Queue up the message onto every pipe
-                self.debug(f"[{self.position}] Broadcasting message")
+                self.debug(f"Broadcasting message")
                 for dirx in bc_dirs:
                     yield self.env.process(self.outbound[int(dirx)].push(msg))
+            # Non-broadcast messages are directed towards their target
             else:
                 # Determine the pipe to send through
                 pipe_dir = None
@@ -251,19 +275,20 @@ class Node(Base):
                 elif msg.tgt_col < self.column: pipe = pipe_dir = Direction.WEST
                 # Queue up the message onto the pipe
                 if pipe_dir != None:
-                    self.debug(f"[{self.position}] Dispatch on {pipe_dir.name} pipe")
+                    self.debug(f"Dispatch on {pipe_dir.name} pipe")
                     yield self.env.process(self.outbound[int(pipe_dir)].push(msg))
                 else:
-                    self.debug(f"[{self.position}] Dispatch on internal pipe")
+                    self.debug(f"Dispatch on internal pipe")
                     yield self.env.process(self.internal.push(msg))
         return self.env.process(do_dispatch(msg))
 
     def handle_messages(self):
         """ Pickup messages from one of the inbound pipes """
         last_pipe = Direction.NORTH
+        seen      = {}
         while True:
             # Wait for a message on any inbound pipe (round robin)
-            self.debug(f"Node {self.position} - waiting for message")
+            self.debug(f"Waiting for message")
             while True:
                 pipe = None
                 for idx in range(len(self.inbound)):
@@ -273,10 +298,15 @@ class Node(Base):
                     last_pipe = Direction(idx)
                 if pipe: break
                 yield self.env.timeout(1)
-            self.debug(f"Node {self.position} - got message")
+            self.debug(f"Got message")
             # Grab the next message from the pipe
-            self.debug(f"[{self.position}] Received message from pipe {last_pipe.name}")
+            self.debug(f"Received message from pipe {last_pipe.name}")
             msg = yield self.env.process(pipe.pop())
+            # Check a message hasn't been seen twice
+            if type(msg).__name__ not in seen: seen[type(msg).__name__] = []
+            assert msg.id not in seen[type(msg).__name__], \
+                f"{self.position} Seen message {type(msg).__name__}[{msg.id}] more than once"
+            seen[type(msg).__name__].append(msg.id)
             # Is the message addressed to this node?
             if msg.target == self.position or msg.broadcast:
                 self.digest(msg)
@@ -303,11 +333,11 @@ class Node(Base):
             try:
                 # Wait for a simulated clock tick
                 if not skip_tick:
-                    self.debug(f"Node {self.position} - waiting for tick")
+                    self.debug(f"Waiting for tick")
                     yield self.__tick_event
                     assert self.__phase in (Phase.SETUP, Phase.WAIT), \
                         f"[{self.position}] Phase is currently {self.__phase.name}"
-                    self.debug(f"Node {self.position} - got tick")
+                    self.debug(f"Got tick")
                 # Reset skip tick (after interrupt has set it)
                 skip_tick = False
                 # Switch to the RUN phase
@@ -318,7 +348,7 @@ class Node(Base):
                     # If this operation is empty, break out
                     if op == None: break
                     # Debug log
-                    self.debug(f"Node {self.position} executing {op}")
+                    self.debug(f"Executing {op}")
                     # Pickup each source value
                     val_a = self.__inputs[op.source_a] if op.is_input_a else self.__registers[op.source_a]
                     val_b = self.__inputs[op.source_b] if op.is_input_b else self.__registers[op.source_b]
@@ -326,17 +356,21 @@ class Node(Base):
                     self.__registers[op.target] = (result := Operation.evaluate(op.op, val_a, val_b))
                     # Generate an output if required
                     if op.is_output:
+                        # Check output mapping exists
                         assert output_idx in self.__output_map, \
                             f"Missing output {output_idx} from {self.position}"
+                        # Split out map components
                         (
                             do_bc, bc_decay, tgt_a_row, tgt_a_col, tgt_b_row,
                             tgt_b_col,
                         ) = self.__output_map[output_idx]
+                        # Handle broadcast messages
                         if do_bc and bc_decay > 0:
                             yield self.dispatch(SignalState(
                                 self.env, 0, 0, True, bc_decay,
                                 self.row, self.column, output_idx, result,
                             ))
+                        # Handle targeted messages
                         elif not do_bc:
                             yield self.dispatch(SignalState(
                                 self.env, tgt_a_row, tgt_a_col, False, 0,
@@ -345,8 +379,10 @@ class Node(Base):
                             if (tgt_b_row, tgt_b_col) != (tgt_a_row, tgt_a_col):
                                 yield self.dispatch(SignalState(
                                     self.env, tgt_b_row, tgt_b_col, False, 0,
-                                    self.row, self.column, output_dix, result,
+                                    self.row, self.column, output_idx, result,
                                 ))
+                        # Increment to the next output
+                        output_idx += 1
                     # Wait one cycle
                     yield self.env.timeout(1)
                 # Return to WAIT phase

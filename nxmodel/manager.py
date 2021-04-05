@@ -33,6 +33,11 @@ class Manager(Base):
     # Mesh configuration
     CONFIG_ROWS    = "rows"
     CONFIG_COLUMNS = "columns"
+    CONFIG_NODE    = "node"
+    CFG_ND_INPUTS  = "inputs"
+    CFG_ND_OUTPUTS = "outputs"
+    CFG_ND_REGS    = "registers"
+    CFG_ND_SLOTS   = "slots"
     # Per-node configuration
     NODE_ROW     = "row"
     NODE_COLUMN  = "column"
@@ -105,14 +110,17 @@ class Manager(Base):
                 ))
             # Setup output mappings for the node
             for mapping in node_data[Manager.NODE_OUT_MAP]:
+                self.debug(f"Queueing ({len(self.queue)}) output config for {n_row}, {n_col}")
                 self.queue.append(ConfigureOutput(
                     self.env, n_row, n_col, mapping[Manager.OUT_MAP_POS],
-                    mapping.get(Manager.OUT_MAP_TGT_A_ROW, 0),
-                    mapping.get(Manager.OUT_MAP_TGT_A_COL, 0),
-                    mapping.get(Manager.OUT_MAP_TGT_B_ROW, 0),
-                    mapping.get(Manager.OUT_MAP_TGT_B_COL, 0),
+                    (tgt_a_row := mapping.get(Manager.OUT_MAP_TGT_A_ROW, 0)),
+                    (tgt_a_col := mapping.get(Manager.OUT_MAP_TGT_A_COL, 0)),
+                    # NOTE: If B outputs don't exist, match A values, this will
+                    #       suppress a second message being emitted
+                    mapping.get(Manager.OUT_MAP_TGT_B_ROW, tgt_a_row),
+                    mapping.get(Manager.OUT_MAP_TGT_B_COL, tgt_a_col),
                     mapping.get(Manager.OUT_MAP_BROADCAST, False),
-                    mapping.get(Manager.OUT_MAP_DECAY, 0),
+                    mapping.get(Manager.OUT_MAP_DECAY,     0),
                 ))
 
     def transmit(self):
