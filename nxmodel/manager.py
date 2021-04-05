@@ -28,17 +28,17 @@ class Manager(Base):
     """
 
     # Main sections
-    DESIGN_CONFIG  = "configuration"
-    DESIGN_NODES   = "nodes"
+    DESIGN_CONFIG = "configuration"
+    DESIGN_NODES  = "nodes"
     # Mesh configuration
     CONFIG_ROWS    = "rows"
     CONFIG_COLUMNS = "columns"
     # Per-node configuration
-    NODE_ROW       = "row"
-    NODE_COLUMN    = "column"
-    NODE_INSTRS    = "instructions"
-    NODE_IN_MAP    = "input_map"
-    NODE_OUT_MAP   = "output_map"
+    NODE_ROW     = "row"
+    NODE_COLUMN  = "column"
+    NODE_INSTRS  = "instructions"
+    NODE_IN_MAP  = "input_map"
+    NODE_OUT_MAP = "output_map"
     # Node input mapping
     IN_MAP_SRC_ROW = "source_row"
     IN_MAP_SRC_COL = "source_column"
@@ -96,19 +96,20 @@ class Manager(Base):
                     self.env, n_row, n_col, slot, instr
                 ))
             # Setup input mappings for the node
-            for in_idx, mapping in enumerate(node_data[Manager.NODE_IN_MAP]):
+            for mapping in node_data[Manager.NODE_IN_MAP]:
                 self.queue.append(ConfigureInput(
                     self.env, n_row, n_col,
                     mapping[IN_MAP_SRC_ROW], mapping[IN_MAP_SRC_COL],
-                    mapping[IN_MAP_SRC_POS], mapping[IN_MAP_STATE],
+                    mapping[IN_MAP_SRC_POS], mapping[IN_MAP_TGT_POS],
+                    mapping[IN_MAP_STATE],
                 ))
             # Setup output mappings for the node
             for mapping in node_data[MANAGER.NODE_OUT_MAP]:
                 self.queue.append(ConfigureOutput(
                     self.env, n_row, n_col, mapping[OUT_MAP_POS],
-                    mapping[OUT_MAP_TGT_A_ROW], mapping[OUT_MAP_TGT_A_COL],
-                    mapping[OUT_MAP_TGT_B_ROW], mapping[OUT_MAP_TGT_B_COL],
-                    mapping[OUT_MAP_BROADCAST], mapping[OUT_MAP_DECAY],
+                    mapping.get(OUT_MAP_TGT_A_ROW, 0), mapping.get(OUT_MAP_TGT_A_COL, 0),
+                    mapping.get(OUT_MAP_TGT_B_ROW, 0), mapping.get(OUT_MAP_TGT_B_COL, 0),
+                    mapping.get(OUT_MAP_BROADCAST, False), mapping.get(OUT_MAP_DECAY, 0),
                 ))
 
     def transmit(self):
