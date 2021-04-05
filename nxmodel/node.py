@@ -119,7 +119,6 @@ class Node(Base):
         assert isinstance(row, int) and row >= 0
         assert isinstance(col, int) and col >= 0
         self.position = row, col
-        self.debug(f"Creating node {self.position}")
         # Check and store parameters
         assert isinstance(inputs,    int) and inputs    >= 1
         assert isinstance(outputs,   int) and outputs   >= 1
@@ -263,7 +262,6 @@ class Node(Base):
         def do_dispatch(msg):
             # Broadcast messages are sent on every outbound pipe
             if msg.broadcast:
-                self.debug(f"Broadcasting message")
                 for dirx in bc_dirs:
                     # Check pipe has been connected
                     if not self.outbound[int(dirx)]: continue
@@ -309,7 +307,6 @@ class Node(Base):
                 if pipe: break
                 yield self.env.timeout(1)
             # Grab the next message from the pipe
-            self.debug(f"Received message from pipe {last_pipe.name}")
             msg = yield self.env.process(pipe.pop())
             # Check a message hasn't been seen twice
             if type(msg).__name__ not in seen: seen[type(msg).__name__] = []
@@ -341,11 +338,9 @@ class Node(Base):
             try:
                 # Wait for a simulated clock tick
                 if not skip_tick:
-                    self.debug(f"Waiting for tick")
                     yield self.__tick_event
                     assert self.__phase in (Phase.SETUP, Phase.WAIT), \
                         f"[{self.position}] Phase is currently {self.__phase.name}"
-                    self.debug(f"Got tick")
                     # Copy input state
                     for idx, val in enumerate(self.__next_inputs):
                         self.__inputs[idx] = val
@@ -355,11 +350,11 @@ class Node(Base):
                 self.__phase = Phase.RUN
                 # Start executing instructions
                 output_idx = 0
-                for op in self.__ops:
+                for op_idx, op in enumerate(self.__ops):
                     # If this operation is empty, break out
                     if op == None: break
                     # Debug log
-                    self.debug(f"Executing {op}")
+                    self.debug(f"Executing op {op_idx}: {op}")
                     # Pickup each source value
                     val_a = self.__inputs[op.source_a] if op.is_input_a else self.__registers[op.source_a]
                     val_b = self.__inputs[op.source_b] if op.is_input_b else self.__registers[op.source_b]
@@ -401,5 +396,4 @@ class Node(Base):
                 # Return to WAIT phase
                 self.__phase = Phase.WAIT
             except simpy.Interrupt:
-                self.debug("Execution interrupted - restarting")
                 skip_tick = True
