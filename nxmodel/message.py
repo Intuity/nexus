@@ -45,7 +45,7 @@ class Message(Base):
     def copy(self):
         return copy.copy(self)
 
-class LoadInstruction(Base):
+class LoadInstruction(Message):
     """ Load an instruction into a core """
 
     def __init__(self, env, tgt_row, tgt_col, slot, instr):
@@ -62,7 +62,7 @@ class LoadInstruction(Base):
         self.slot  = slot
         self.instr = instr
 
-class ConfigureInput(Base):
+class ConfigureInput(Message):
     """ Configure an input mapping """
 
     def __init__(
@@ -87,7 +87,7 @@ class ConfigureInput(Base):
         self.tgt_pos = tgt_pos
         self.state   = state
 
-class ConfigureOutput(Base):
+class ConfigureOutput(Message):
     """ Configure output messaging """
 
     def __init__(
@@ -117,7 +117,7 @@ class ConfigureOutput(Base):
         self.msg_as_bc = msg_as_bc
         self.bc_decay  = bc_decay
 
-class SignalState(Base):
+class SignalState(Message):
     """ Carries a signal value change between nodes """
 
     def __init__(
