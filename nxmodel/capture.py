@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import simpy
+from vcd import VCDWriter
 
 from .base import Base
 from .pipe import Pipe
@@ -29,9 +30,39 @@ class Capture(Base):
             columns: Number of columns in the mesh (number of inbound pipes)
         """
         super().__init__(env)
-        self.inbound  = [None] * columns
-        self.rx_loop  = self.env.process(self.capture())
-        self.received = []
+        self.inbound   = [None] * columns
+        self.rx_loop   = self.env.process(self.capture())
+        self.received  = []
+        self.snapshots = []
+
+    def write_to_vcd(self, vcd_path):
+        """ Write all captured snapshots to a VCD file.
+
+        Args:
+            vcd_path: The path to the VCD file to write
+        """
+        def key_name(key): return ", ".join([str(x) for x in key])
+        with open(vcd_path, "w") as fh:
+            with VCDWriter(fh, timescale="1 ns", date="today") as vcd:
+                # Register all signals
+                cycle   = vcd.register_var("tb", "cycle", "integer", size=32)
+                signals = {}
+                for key in set(sum([list(x.keys()) for _, x in self.snapshots], [])):
+                    signals[key] = vcd.register_var(
+                        "tb.dut", key_name(key), "integer", size=1
+                    )
+                # Convert all snapshots into VCD entries
+                for time, (_, snapshot) in enumerate(self.snapshots):
+                    vcd.change(cycle, time, time)
+                    for key, value in snapshot:
+                        vcd.change(signals[key], time, value)
+
+    def tick(self):
+        snapshot = {}
+        while self.received:
+            item = self.received.pop(0)
+            snapshot[item.src_row, item.src_col, item.src_pos] = item.src_val
+        self.snapshots.append((self.env.now, snapshot))
 
     def capture(self):
         """ Indefinite capture loop - observes signal state messages """

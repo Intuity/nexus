@@ -22,9 +22,12 @@ from .mesh import Mesh
 from .node import Direction
 
 @click.command()
+# Simulation options
+@click.option("--cycles", type=int, default=100,           help="How many cycles to run for")
+@click.option("--vcd",    type=click.Path(dir_okay=False), help="Path for recorded VCD")
 # Mesh configuration
-@click.option("-r", "--rows", type=int, default=8,  help="Rows in the mesh")
-@click.option("-c", "--cols", type=int, default=8,  help="Columns in the mesh")
+@click.option("-r", "--rows", type=int, default=8, help="Rows in the mesh")
+@click.option("-c", "--cols", type=int, default=8, help="Columns in the mesh")
 # Node configuration
 @click.option("--node-inputs",    type=int, default=8,  help="Inputs per node")
 @click.option("--node-outputs",   type=int, default=8,  help="Outputs per node")
@@ -37,6 +40,8 @@ from .node import Direction
 # Simulation setup
 @click.argument("design", type=click.File("r"))
 def main(
+    # Simulation options
+    cycles, vcd,
     # Mesh configuration
     rows, cols,
     # Node configuration
@@ -69,15 +74,18 @@ def main(
         "max_ops"  : node_slots,
     })
     # Create a manager
-    manager = Manager(env, mesh)
+    manager = Manager(env, mesh, cycles=cycles)
     mesh[0, 0].inbound[Direction.NORTH] = manager.outbound
     manager.load(design)
     # Create a capture node
     capture = Capture(env, cols)
     for col, node in enumerate(mesh.nodes[rows-1]):
         capture.inbound[col] = node.outbound[Direction.SOUTH]
+    manager.add_observer(capture.tick)
     # Run the simulation
-    env.run()
+    env.run(until=manager.complete)
+    # Optionally write out VCD
+    if vcd: capture.write_to_vcd(vcd)
 
 if __name__ == "__main__":
     main(prog_name="nxmodel")

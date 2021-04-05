@@ -59,19 +59,31 @@ class Manager(Base):
     OUT_MAP_BROADCAST = "broadcast"
     OUT_MAP_DECAY     = "decay"
 
-    def __init__(self, env, mesh):
+    def __init__(self, env, mesh, cycles):
         """ Initialise the Manager.
 
         Args:
-            env : SimPy environment
-            mesh: The Nexus mesh model
+            env   : SimPy environment
+            mesh  : The Nexus mesh model
+            cycles: How many cycles to run for
         """
         super().__init__(env)
         self.mesh     = mesh
+        self.cycles   = cycles
         self.outbound = Pipe(self.env, 1, 1)
         self.queue    = []
+        self.observer = []
         self.tx_loop  = self.env.process(self.transmit())
         self.gen_tick = self.env.process(self.tick())
+        self.complete = self.env.event()
+
+    def add_observer(self, cb):
+        """ Add a callback to an observer to be notified of a tick event.
+
+        Args:
+            cb: Callback function
+        """
+        self.observer.append(cb)
 
     def load(self, design):
         """ Load a design into the mesh.
@@ -137,8 +149,8 @@ class Manager(Base):
 
     def tick(self):
         """ Generate ticks """
-        tick_count = 0
-        while True:
+        cycle = 0
+        while cycle < self.cycles:
             # Wait a cycle
             yield self.env.timeout(1)
             # If the queue is busy, don't generate a tick yet
@@ -151,9 +163,16 @@ class Manager(Base):
                     if not idle: break
                 if not idle: break
             if not idle: continue
-            # Generate the tick
-            tick_count += 1
-            self.info(f"Generating tick {tick_count}")
+            # Count number of cycles
+            # NOTE: As cycles can be blocked by busy queues or busy nodes, the
+            #       increment of cycle must be postponed.
+            cycle += 1
+            self.info(f"Generating tick {cycle}")
+            # First notify any observers
+            for observer in self.observer: observer()
+            # Now notify all nodes in the mesh
             for row in self.mesh.nodes:
                 for node in row:
                     node.tick()
+        # Stop the simulation
+        self.complete.succeed()
