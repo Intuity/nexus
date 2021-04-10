@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+from timeit import default_timer as timer
 
 import simpy
 
@@ -147,22 +148,30 @@ class Manager(Base):
             msg = self.queue.pop(0)
             yield self.env.process(self.outbound.push(msg))
 
+    def idle(self):
+        """ Determine if mesh is completely idle.
+
+        Returns: True if idle, False if busy
+        """
+        idle = True
+        for row in self.mesh.nodes:
+            for node in row:
+                idle &= node.idle
+                if not idle: break
+            if not idle: break
+        return idle
+
     def tick(self):
         """ Generate ticks """
         cycle = 0
+        start = timer()
         while cycle < self.cycles:
             # Wait a cycle
             yield self.env.timeout(1)
             # If the queue is busy, don't generate a tick yet
             if self.queue: continue
             # Check all nodes in the mesh are idle
-            idle = True
-            for row in self.mesh.nodes:
-                for node in row:
-                    idle &= node.idle
-                    if not idle: break
-                if not idle: break
-            if not idle: continue
+            if not self.idle(): continue
             # Count number of cycles
             # NOTE: As cycles can be blocked by busy queues or busy nodes, the
             #       increment of cycle must be postponed.
@@ -174,5 +183,21 @@ class Manager(Base):
             for row in self.mesh.nodes:
                 for node in row:
                     node.tick()
+        # Wait for mesh to go idle
+        yield self.env.timeout(1)
+        while not self.idle(): yield self.env.timeout(1)
+        # Print statistics
+        clock_ticks = self.env.now
+        real_time   = timer() - start
+        print("# " + "=" * 78)
+        print("# Simulation Statistics")
+        print("# " + "=" * 78)
+        print("#")
+        print(f"# Simulated Cycles   : {self.cycles}")
+        print(f"# Elapsed Clock Ticks: {clock_ticks}")
+        print(f"# Elapsed Real Time  : {real_time:0.02f} seconds")
+        print(f"# Cycles/second      : {self.cycles/real_time:0.02f}")
+        print("#")
+        print("# " + "=" * 78)
         # Stop the simulation
         self.complete.succeed()
