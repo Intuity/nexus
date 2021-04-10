@@ -98,7 +98,7 @@ def main(
 
     # Compile onto mesh
     log.info("Compiling design onto mesh")
-    c_instr, c_in_hndl, c_out_hndl = compile(smpl)
+    c_instr, c_in_hndl, c_out_hndl, c_state_map, c_output_map = compile(smpl)
 
     # Export to JSON
     log.info(f"Exporting compiled design to {output}")
@@ -106,7 +106,7 @@ def main(
         output,
         rows, cols,
         node_inputs, node_outputs, node_registers, node_slots,
-        c_instr, c_in_hndl, c_out_hndl,
+        c_instr, c_in_hndl, c_out_hndl, c_state_map, c_output_map,
     )
 
 if __name__ == "__main__":

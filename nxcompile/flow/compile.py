@@ -285,13 +285,13 @@ class Node:
                     for flop_tgt in tgt.targets:
                         if isinstance(flop_tgt, Output):
                             # Direct to the special output node
-                            messages[idx_out].append(self.mesh.output)
+                            messages[idx_out].append((flop_tgt, self.mesh.output))
                         elif isinstance(flop_tgt, Instruction):
-                            messages[idx_out].append(flop_tgt.node)
+                            messages[idx_out].append((flop_tgt, flop_tgt.node))
                         else:
                             raise Exception(f"Unsupported type: {flop_tgt}")
                 elif isinstance(tgt, Instruction) and tgt.node != self:
-                    messages[idx_out].append(tgt.node)
+                    messages[idx_out].append((tgt, tgt.node))
             # Ensure that the list is unique
             messages[idx_out] = list(set(messages[idx_out]))
         return messages
@@ -429,6 +429,42 @@ class Mesh:
         print(f"Max: {max(values):.02f}, Min: {min(values):.02f}, Mean: {mean(values):.02f}")
         print("=" * 80)
 
+    def report_state(self, compiled_ops):
+        """ Produce a report on where state (flops) have been located.
+
+        Args:
+            compiled_ops: Dictionary of compiled operations for the whole mesh
+
+        Returns: Keys are mesh position of the input, value is the flop
+        """
+        mapping = {}
+        for node in self.all_nodes:
+            inputs, _, _ = compiled_ops[node.position]
+            for index, source in enumerate(inputs):
+                if not source or not isinstance(source, State): continue
+                mapping[
+                    node.position[0], node.position[1], index
+                ] = source.bit.port.parent
+        return mapping
+
+    def report_outputs(self, compiled_msgs):
+        """ Produce a report on where outputs are generated.
+
+        Args:
+            compiled_msgs: Dictionary of compiled messages for the whole mesh
+
+        Returns: Keys are the mesh position of the output, value is the output
+        """
+        mapping = {}
+        for node in self.all_nodes:
+            for index, messages in compiled_msgs[node.position].items():
+                for target, tgt_node in messages:
+                    if tgt_node != self.output: continue
+                    mapping[
+                        node.position[0], node.position[1], index
+                    ] = target.bit
+        return mapping
+
 def compile(
     module,
     rows=4, columns=4,
@@ -459,8 +495,6 @@ def compile(
     for item in module.children.values():
         if isinstance(item, Gate):
             assert item.id not in bit_map
-            if str(item) in terms:
-                import pdb; pdb.set_trace()
             bit_map[item.id] = terms[str(item)] = Instruction(item, [], [], None)
         elif isinstance(item, Flop):
             assert item.input[0].id not in bit_map
@@ -588,4 +622,8 @@ def compile(
         inputs, _, _ = compiled_ops[node.position]
         compiled_hndl[node.position] = node.compile_handling(inputs, compiled_ops)
     # Return instruction sequences, input handling, output handling
-    return compiled_ops, compiled_hndl, compiled_msgs
+    return (
+        compiled_ops, compiled_hndl, compiled_msgs,
+        mesh.report_state(compiled_ops),
+        mesh.report_outputs(compiled_msgs),
+    )
