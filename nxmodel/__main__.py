@@ -20,6 +20,7 @@ from .capture import Capture
 from .manager import Manager
 from .mesh import Mesh
 from .node import Direction
+from .pipe import Pipe
 
 @click.command()
 # Simulation options
@@ -37,6 +38,8 @@ from .node import Direction
 @click.option("--quiet", count=True, help="Only show warning & error messages")
 @click.option("--debug", count=True, help="Enable debug messages")
 @click.option("--log",   type=click.Path(file_okay=True, dir_okay=False), help="Output log path")
+# Debug controls
+@click.option("--break-on-idle", count=True, help="Enter debug when mesh is idle")
 # Simulation setup
 @click.argument("design", type=click.File("r"))
 def main(
@@ -48,6 +51,8 @@ def main(
     node_inputs, node_outputs, node_registers, node_slots,
     # Verbosity controls
     quiet, debug, log,
+    # Debug controls
+    break_on_idle,
     # Simulation setup
     design,
 ):
@@ -74,13 +79,13 @@ def main(
         "max_ops"  : node_slots,
     })
     # Create a manager
-    manager = Manager(env, mesh, cycles=cycles)
+    manager = Manager(env, mesh, cycles=cycles, break_on_idle=break_on_idle)
     mesh[0, 0].inbound[Direction.NORTH] = manager.outbound
     manager.load(design)
     # Create a capture node
     capture = Capture(env, cols)
     for col, node in enumerate(mesh.nodes[rows-1]):
-        capture.inbound[col] = node.outbound[Direction.SOUTH]
+        capture.inbound[col] = node.outbound[Direction.SOUTH] = Pipe(env, 1, 1)
     manager.add_observer(capture.tick)
     # Run the simulation
     env.run(until=manager.complete)

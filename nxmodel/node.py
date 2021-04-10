@@ -310,8 +310,6 @@ class Node(Base):
             msg = yield self.env.process(pipe.pop())
             # Check a message hasn't been seen twice
             if type(msg).__name__ not in seen: seen[type(msg).__name__] = []
-            # if msg.id in seen[type(msg).__name__]:
-            #     import pdb; pdb.set_trace()
             assert msg.id not in seen[type(msg).__name__], \
                 f"{self.position} Seen message {type(msg).__name__}[{msg.id}] more than once"
             seen[type(msg).__name__].append(msg.id)

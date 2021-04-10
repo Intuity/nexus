@@ -29,8 +29,9 @@ class Manager(Base):
     """
 
     # Main sections
-    DESIGN_CONFIG = "configuration"
-    DESIGN_NODES  = "nodes"
+    DESIGN_CONFIG  = "configuration"
+    DESIGN_NODES   = "nodes"
+    DESIGN_REPORTS = "reports"
     # Mesh configuration
     CONFIG_ROWS    = "rows"
     CONFIG_COLUMNS = "columns"
@@ -40,37 +41,44 @@ class Manager(Base):
     CFG_ND_REGS    = "registers"
     CFG_ND_SLOTS   = "slots"
     # Per-node configuration
-    NODE_ROW     = "row"
-    NODE_COLUMN  = "column"
-    NODE_INSTRS  = "instructions"
-    NODE_IN_MAP  = "input_map"
-    NODE_OUT_MAP = "output_map"
-    # Node input mapping
-    IN_MAP_SRC_ROW = "source_row"
-    IN_MAP_SRC_COL = "source_column"
-    IN_MAP_SRC_POS = "source_bit"
-    IN_MAP_TGT_POS = "target_bit"
-    IN_MAP_STATE   = "is_state"
-    # Node output mapping
-    OUT_MAP_POS       = "position"
-    OUT_MAP_TGT_A_ROW = "row_a"
-    OUT_MAP_TGT_A_COL = "column_a"
-    OUT_MAP_TGT_B_ROW = "row_b"
-    OUT_MAP_TGT_B_COL = "column_b"
-    OUT_MAP_BROADCAST = "broadcast"
-    OUT_MAP_DECAY     = "decay"
+    NODE_ROW      = "row"
+    NODE_COLUMN   = "column"
+    NODE_INSTRS   = "instructions"
+    NODE_IN_HNDL  = "in_handling"
+    NODE_OUT_HNDL = "out_handling"
+    # Node input handling
+    IN_HNDL_SRC_ROW = "source_row"
+    IN_HNDL_SRC_COL = "source_column"
+    IN_HNDL_SRC_POS = "source_bit"
+    IN_HNDL_TGT_POS = "target_bit"
+    IN_HNDL_STATE   = "is_state"
+    # Node output handling
+    OUT_HNDL_POS       = "position"
+    OUT_HNDL_TGT_A_ROW = "row_a"
+    OUT_HNDL_TGT_A_COL = "column_a"
+    OUT_HNDL_TGT_B_ROW = "row_b"
+    OUT_HNDL_TGT_B_COL = "column_b"
+    OUT_HNDL_BROADCAST = "broadcast"
+    OUT_HNDL_DECAY     = "decay"
+    # Design reports
+    DSG_REP_STATE   = "state"
+    DSG_REP_OUTPUTS = "outputs"
 
-    def __init__(self, env, mesh, cycles):
+    def __init__(self, env, mesh, cycles, break_on_idle):
         """ Initialise the Manager.
 
         Args:
-            env   : SimPy environment
-            mesh  : The Nexus mesh model
-            cycles: How many cycles to run for
+            env          : SimPy environment
+            mesh         : The Nexus mesh model
+            cycles       : How many cycles to run for
+            break_on_idle: Launch a PDB session every time the mesh is idle
         """
         super().__init__(env)
-        self.mesh     = mesh
-        self.cycles   = cycles
+        # Capture variables
+        self.mesh          = mesh
+        self.cycles        = cycles
+        self.break_on_idle = break_on_idle
+        # Create interface and state
         self.outbound = Pipe(self.env, 1, 1)
         self.queue    = []
         self.observer = []
@@ -114,26 +122,26 @@ class Manager(Base):
                     self.env, n_row, n_col, slot, instr
                 ))
             # Setup input mappings for the node
-            for mapping in node_data[Manager.NODE_IN_MAP]:
+            for mapping in node_data[Manager.NODE_IN_HNDL]:
                 self.queue.append(ConfigureInput(
                     self.env, n_row, n_col,
-                    mapping[Manager.IN_MAP_SRC_ROW], mapping[Manager.IN_MAP_SRC_COL],
-                    mapping[Manager.IN_MAP_SRC_POS], mapping[Manager.IN_MAP_TGT_POS],
-                    mapping[Manager.IN_MAP_STATE],
+                    mapping[Manager.IN_HNDL_SRC_ROW], mapping[Manager.IN_HNDL_SRC_COL],
+                    mapping[Manager.IN_HNDL_SRC_POS], mapping[Manager.IN_HNDL_TGT_POS],
+                    mapping[Manager.IN_HNDL_STATE],
                 ))
             # Setup output mappings for the node
-            for mapping in node_data[Manager.NODE_OUT_MAP]:
+            for mapping in node_data[Manager.NODE_OUT_HNDL]:
                 self.debug(f"Queueing ({len(self.queue)}) output config for {n_row}, {n_col}")
                 self.queue.append(ConfigureOutput(
-                    self.env, n_row, n_col, mapping[Manager.OUT_MAP_POS],
-                    (tgt_a_row := mapping.get(Manager.OUT_MAP_TGT_A_ROW, 0)),
-                    (tgt_a_col := mapping.get(Manager.OUT_MAP_TGT_A_COL, 0)),
+                    self.env, n_row, n_col, mapping[Manager.OUT_HNDL_POS],
+                    (tgt_a_row := mapping.get(Manager.OUT_HNDL_TGT_A_ROW, 0)),
+                    (tgt_a_col := mapping.get(Manager.OUT_HNDL_TGT_A_COL, 0)),
                     # NOTE: If B outputs don't exist, match A values, this will
                     #       suppress a second message being emitted
-                    mapping.get(Manager.OUT_MAP_TGT_B_ROW, tgt_a_row),
-                    mapping.get(Manager.OUT_MAP_TGT_B_COL, tgt_a_col),
-                    mapping.get(Manager.OUT_MAP_BROADCAST, False),
-                    mapping.get(Manager.OUT_MAP_DECAY,     0),
+                    mapping.get(Manager.OUT_HNDL_TGT_B_ROW, tgt_a_row),
+                    mapping.get(Manager.OUT_HNDL_TGT_B_COL, tgt_a_col),
+                    mapping.get(Manager.OUT_HNDL_BROADCAST, False),
+                    mapping.get(Manager.OUT_HNDL_DECAY,     0),
                 ))
 
     def transmit(self):
@@ -172,6 +180,9 @@ class Manager(Base):
             if self.queue: continue
             # Check all nodes in the mesh are idle
             if not self.idle(): continue
+            # If requested, break for debug
+            if self.break_on_idle:
+                import pdb; pdb.set_trace()
             # Count number of cycles
             # NOTE: As cycles can be blocked by busy queues or busy nodes, the
             #       increment of cycle must be postponed.
@@ -189,6 +200,7 @@ class Manager(Base):
         # Print statistics
         clock_ticks = self.env.now
         real_time   = timer() - start
+        print("")
         print("# " + "=" * 78)
         print("# Simulation Statistics")
         print("# " + "=" * 78)
@@ -199,5 +211,6 @@ class Manager(Base):
         print(f"# Cycles/second      : {self.cycles/real_time:0.02f}")
         print("#")
         print("# " + "=" * 78)
+        print("")
         # Stop the simulation
         self.complete.succeed()

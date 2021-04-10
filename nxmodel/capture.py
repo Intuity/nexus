@@ -34,6 +34,7 @@ class Capture(Base):
         self.rx_loop   = self.env.process(self.capture())
         self.received  = []
         self.snapshots = []
+        self.ticks     = 0
 
     def write_to_vcd(self, vcd_path):
         """ Write all captured snapshots to a VCD file.
@@ -41,7 +42,7 @@ class Capture(Base):
         Args:
             vcd_path: The path to the VCD file to write
         """
-        def key_name(key): return ", ".join([str(x) for x in key])
+        def key_name(key): return "sig_" + "_".join([str(x) for x in key])
         with open(vcd_path, "w") as fh:
             with VCDWriter(fh, timescale="1 ns", date="today") as vcd:
                 # Register all signals
@@ -51,17 +52,24 @@ class Capture(Base):
                     signals[key] = vcd.register_var(
                         "tb.dut", key_name(key), "integer", size=1
                     )
+                # Write an initial state for all signals
+                for sig in signals.values(): vcd.change(sig, 0, 0)
                 # Convert all snapshots into VCD entries
                 for time, (_, snapshot) in enumerate(self.snapshots):
                     vcd.change(cycle, time, time)
-                    for key, value in snapshot:
+                    for key, value in snapshot.items():
                         vcd.change(signals[key], time, value)
 
     def tick(self):
+        # Increment tick counter
+        self.ticks += 1
+        # Summarise final output states from this tick
         snapshot = {}
         while self.received:
             item = self.received.pop(0)
             snapshot[item.src_row, item.src_col, item.src_pos] = item.src_val
+        # Log and store snapshot
+        self.info(f"Captured {len(snapshot)} outputs from tick {self.ticks-1}")
         self.snapshots.append((self.env.now, snapshot))
 
     def capture(self):
@@ -70,9 +78,9 @@ class Capture(Base):
             # Allow a cycle to elapse
             yield self.env.timeout(1)
             # Check all pipes
-            for pipe in self.inbound:
+            for idx, pipe in enumerate(self.inbound):
                 # Skip unattached pipes
-                if not pipe: continue
+                if pipe == None: continue
                 # Skip empty pipes
                 if pipe.idle: continue
                 # Pop the next entry
