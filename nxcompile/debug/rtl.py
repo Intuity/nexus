@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ..models.constant import Constant
 from ..models.gate import Gate, Operation
 from ..models.flop import Flop
 from ..models.port import PortBit
@@ -84,6 +85,8 @@ def export_rtl(module, path):
             }[child.op] + " ") if idx > 0 else ""
             if isinstance(input, Gate):
                 line += f"{join_op}{input.op.name}_{input.id}"
+            elif isinstance(input, Constant):
+                line += f"{join_op}{input.value}"
             elif isinstance(input, PortBit):
                 line += f"{join_op}{safe_name(input)}"
             else:
@@ -99,6 +102,19 @@ def export_rtl(module, path):
         for output in child.outputs:
             if isinstance(output, Gate): continue
             data.append(f"assign {safe_name(output)} = {child.op.name}_{child.id};")
+    data.append("")
+
+    # Link outputs
+    data.append("// Linking outputs")
+    for output in (x for x in module.ports.values() if x.is_output):
+        data.append(f"assign {output.name} = {'{'}")
+        for idx, bit in enumerate(sorted(output.bits, key=lambda x: x.index, reverse=True)):
+            data.append("    " + (", " if idx > 0 else "  ") + (
+                safe_name(bit.driver)
+                if isinstance(bit.driver, PortBit) else
+                f"{bit.driver.op.name}_{bit.driver.id}"
+            ))
+        data.append("};")
 
     # End the module
     data += ["", "endmodule", ""]

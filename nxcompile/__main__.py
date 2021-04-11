@@ -38,6 +38,7 @@ log.setLevel(logging.INFO)
 @click.option("--show-models",   count=True,        help="Print out parsed models")
 @click.option("--debug",         count=True,        help="Print debugging messages")
 @click.option("--export-simple", type=click.Path(), help="Export the simplified model to Verilog")
+@click.option("--export-flat",   type=click.Path(), help="Export the flattened model to Verilog")
 # Positional arguments
 @click.argument("input", type=click.Path(exists=True))
 @click.argument("top")
@@ -48,7 +49,7 @@ def main(
     # Node configuration
     node_inputs, node_outputs, node_registers, node_slots,
     # Debug options
-    show_modules, show_models, debug, export_simple,
+    show_modules, show_models, debug, export_simple, export_flat,
     # Positional arguments
     input, top, output,
 ):
@@ -93,6 +94,11 @@ def main(
     # Flatten the module
     log.info("Flattening hierarchy")
     flat = flatten(model)
+
+    # Optionally write out the flattened model
+    if export_flat:
+        log.info(f"Writing out flattened model to {export_flat}")
+        export_rtl(flat, export_flat)
 
     # Simplify the module (propagate constants, etc)
     log.info("Simplifying module")
