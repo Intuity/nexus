@@ -84,7 +84,7 @@ def simplify(module):
             # Based on the operation, simplify the gate
             # - INVERT gate - propagate signal value
             if isinstance(gate, INVERT):
-                new_const = Constant(0 if gate.inputs[0] else 1)
+                new_const = Constant(0 if in_consts[0] else 1)
                 for out in gate.outputs:
                     new_const.add_target(out)
                     if isinstance(out, Gate):
