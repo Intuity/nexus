@@ -17,6 +17,7 @@ from pathlib import Path
 
 import click
 
+from .debug import export_rtl
 from .flow import compile, elaborate, export, flatten, simplify
 from .parser import Parser
 
@@ -33,9 +34,10 @@ log.setLevel(logging.INFO)
 @click.option("--node-registers", type=int, default=8,  help="Working registers")
 @click.option("--node-slots",     type=int, default=16, help="Max instructions per node")
 # Debug options
-@click.option("--show-modules", count=True, help="Print out parsed modules")
-@click.option("--show-models",  count=True, help="Print out parsed models")
-@click.option("--debug",        count=True, help="Print debugging messages")
+@click.option("--show-modules",  count=True,        help="Print out parsed modules")
+@click.option("--show-models",   count=True,        help="Print out parsed models")
+@click.option("--debug",         count=True,        help="Print debugging messages")
+@click.option("--export-simple", type=click.Path(), help="Export the simplified model to Verilog")
 # Positional arguments
 @click.argument("input", type=click.Path(exists=True))
 @click.argument("top")
@@ -46,7 +48,7 @@ def main(
     # Node configuration
     node_inputs, node_outputs, node_registers, node_slots,
     # Debug options
-    show_modules, show_models, debug,
+    show_modules, show_models, debug, export_simple,
     # Positional arguments
     input, top, output,
 ):
@@ -95,6 +97,11 @@ def main(
     # Simplify the module (propagate constants, etc)
     log.info("Simplifying module")
     smpl = simplify(flat)
+
+    # Optionally write out the simplified model
+    if export_simple:
+        log.info(f"Writing out simplified model to {export_simple}")
+        export_rtl(smpl, export_simple)
 
     # Compile onto mesh
     log.info("Compiling design onto mesh")

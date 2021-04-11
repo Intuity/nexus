@@ -71,7 +71,7 @@ class Gate:
         """
         issued   = Gate.ID
         Gate.ID += 1
-        return f"G{issued}"
+        return f"G{issued:03d}"
 
     @property
     def symbol(self):
