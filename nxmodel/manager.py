@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import re
 from timeit import default_timer as timer
 
 import simpy
@@ -143,6 +144,11 @@ class Manager(Base):
                     mapping.get(Manager.OUT_HNDL_BROADCAST, False),
                     mapping.get(Manager.OUT_HNDL_DECAY,     0),
                 ))
+        # Set input names
+        rgx_pos = re.compile(r"^R([0-9]+)C([0-9]+)I([0-9]+)")
+        for entry, name in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_STATE].items():
+            row, col, idx = [int(x) for x in rgx_pos.match(entry).groups()]
+            self.mesh[row, col].input_names[idx] = name
 
     def transmit(self):
         """ Transmit any queued messages """

@@ -145,6 +145,8 @@ class Node(Base):
         # Input mappings
         self.__input_map  = {}
         self.__output_map = {}
+        # Naming
+        self.input_names = {}
 
     @property
     def row(self): return self.position[0]
@@ -231,6 +233,15 @@ class Node(Base):
                     src_col == msg.src_col and
                     src_pos == msg.src_pos
                 ):
+                    # Assert that the value has actually changed
+                    assert self.__next_inputs[input_pos] != msg.src_val
+                    # Log change
+                    in_name = self.input_names.get(input_pos, "N/A")
+                    self.info(
+                        f"{self.position} I[{input_pos}] ({in_name}) -> "
+                        f"{msg.src_val} (from {msg.source})"
+                    )
+                    # Always update the next tick's state
                     self.__next_inputs[input_pos] = msg.src_val
                     # If this is not a stateful input, restart instruction execution
                     if not state:
