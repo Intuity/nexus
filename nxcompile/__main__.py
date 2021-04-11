@@ -111,7 +111,11 @@ def main(
 
     # Compile onto mesh
     log.info("Compiling design onto mesh")
-    c_instr, c_in_hndl, c_out_hndl, c_state_map, c_output_map = compile(smpl)
+    c_instr, c_in_hndl, c_out_hndl, c_state_map, c_output_map = compile(
+        smpl, rows=rows, columns=cols,
+        node_inputs=node_inputs, node_outputs=node_outputs,
+        node_registers=node_registers, node_slots=node_slots,
+    )
 
     # Export to JSON
     log.info(f"Exporting compiled design to {output}")
