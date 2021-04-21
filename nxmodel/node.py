@@ -124,11 +124,11 @@ class Node(Base):
         assert isinstance(outputs,   int) and outputs   >= 1
         assert isinstance(registers, int) and registers >= 1
         assert isinstance(max_ops,   int) and max_ops   >= 1
-        self.__inputs      = [0] * inputs
-        self.__next_inputs = [0] * inputs # For the next cycle
-        self.__outputs     = [0] * outputs
-        self.__registers   = [0] * registers
-        self.__ops         = [None] * max_ops
+        self.__inputs      = [False] * inputs
+        self.__next_inputs = [False] * inputs # For the next cycle
+        self.__outputs     = [False] * outputs
+        self.__registers   = [False] * registers
+        self.__ops         = [None ] * max_ops
         # Setup phase
         self.__phase = Phase.SETUP
         # Create spaces for inbound pipes (4 -> one for each of N, E, S, W)
@@ -176,10 +176,10 @@ class Node(Base):
 
     def reset(self):
         """ Reset the state of the logic node """
-        self.__inputs    = [0] * len(self.__inputs)
-        self.__outputs   = [0] * len(self.__outputs)
-        self.__registers = [0] * len(self.__registers)
-        self.__ops       = [None] * len(self.__ops)
+        self.__inputs    = [False] * len(self.__inputs)
+        self.__outputs   = [False] * len(self.__outputs)
+        self.__registers = [False] * len(self.__registers)
+        self.__ops       = [None ] * len(self.__ops)
         self.__phase     = Phase.SETUP
 
     def tick(self):
@@ -233,8 +233,16 @@ class Node(Base):
                     src_col == msg.src_col and
                     src_pos == msg.src_pos
                 ):
-                    # Assert that the value has actually changed
-                    assert self.__next_inputs[input_pos] != msg.src_val
+                    # Log if signal value hasn't changed (suboptimal)
+                    # NOTE: Because the instruction loop can be restarted at any
+                    #       time, the interrupt may disrupt the sending of
+                    #       messages. This can mean that a state change is lost
+                    #       leading to a later message where the value appears
+                    #       to be repeated. Over the course of a whole tick this
+                    #       is still safe, and the correct value will propagate
+                    #       but repeated values may occur.
+                    did_change = (self.__next_inputs[input_pos] != msg.src_val)
+                    if not did_change: self.debug("No change in signal value")
                     # Log change
                     in_name = self.input_names.get(input_pos, "N/A")
                     self.info(
@@ -243,8 +251,8 @@ class Node(Base):
                     )
                     # Always update the next tick's state
                     self.__next_inputs[input_pos] = msg.src_val
-                    # If this is not a stateful input, restart instruction execution
-                    if not state:
+                    # If this is not a stateful input, request restart
+                    if did_change and not state:
                         self.__inputs[input_pos] = msg.src_val
                         self.exec_loop.interrupt()
                     break
@@ -342,37 +350,45 @@ class Node(Base):
 
     def execute(self):
         """ Execute the instruction loop """
-        skip_tick = False
+        prev_inputs = []
+        restart     = False
         while True:
             try:
                 # Wait for a simulated clock tick
-                if not skip_tick:
+                if not restart:
                     yield self.__tick_event
                     assert self.__phase in (Phase.SETUP, Phase.WAIT), \
                         f"[{self.position}] Phase is currently {self.__phase.name}"
                     # Copy input state
                     for idx, val in enumerate(self.__next_inputs):
                         self.__inputs[idx] = val
-                # Reset skip tick (after interrupt has set it)
-                skip_tick = False
                 # Switch to the RUN phase
                 self.__phase = Phase.RUN
+                # Clear the execution restart flag
+                if restart: self.debug("Restarting instruction execution")
+                restart = False
+                # Log the difference in input
+                if self.position == (2, 1):
+                    self.info(
+                        "Current: " + "".join([("1" if x else "0") for x in self.__inputs]) +
+                        ", last: "  + "".join([("1" if x else "0") for x in prev_inputs])
+                    )
+                prev_inputs = self.__inputs[:]
                 # Start executing instructions
                 output_idx = 0
                 for op_idx, op in enumerate(self.__ops):
                     # If this operation is empty, break out
                     if op == None: break
-                    # Debug log
-                    self.debug(f"Executing op {op_idx}: {op}")
                     # Pickup each source value
                     val_a = self.__inputs[op.source_a] if op.is_input_a else self.__registers[op.source_a]
                     val_b = self.__inputs[op.source_b] if op.is_input_b else self.__registers[op.source_b]
                     # Perform the operation
                     self.__registers[op.target] = (result := Operation.evaluate(op.op, val_a, val_b))
+                    # Debug log
+                    self.debug(f"Executing op {op_idx}: {op} - A: {val_a}, B: {val_b}, R: {result}")
                     # Generate an output if required
                     if op.is_output and self.__outputs[output_idx] != result:
-                        # Capture updated value to avoid unnecessary retrigger
-                        self.__outputs[output_idx] = result
+                        self.info("GENERATING OUTPUT")
                         # Check output mapping exists
                         assert output_idx in self.__output_map, \
                             f"Missing output {output_idx} from {self.position}"
@@ -398,11 +414,14 @@ class Node(Base):
                                     self.env, tgt_b_row, tgt_b_col, False, 0,
                                     self.row, self.column, output_idx, result,
                                 ))
-                        # Increment to the next output
-                        output_idx += 1
+                        # Capture updated value to avoid unnecessary retrigger
+                        self.__outputs[output_idx] = result
+                    # Always increment regardless of whether a message was sent
+                    if op.is_output: output_idx += 1
                     # Wait one cycle
                     yield self.env.timeout(1)
+            except simpy.Interrupt:
+                restart = True
+            else:
                 # Return to WAIT phase
                 self.__phase = Phase.WAIT
-            except simpy.Interrupt:
-                skip_tick = True
