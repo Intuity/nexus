@@ -149,6 +149,7 @@ class Manager(Base):
         for entry, name in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_STATE].items():
             row, col, idx = [int(x) for x in rgx_pos.match(entry).groups()]
             self.mesh[row, col].input_names[idx] = name
+        return model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS]
 
     def transmit(self):
         """ Transmit any queued messages """

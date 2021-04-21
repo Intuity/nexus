@@ -22,12 +22,13 @@ from .message import SignalState
 class Capture(Base):
     """ Captures signal state outputs from the mesh """
 
-    def __init__(self, env, columns):
+    def __init__(self, env, columns, lookup):
         """ Initialise the Capture instance.
 
         Args:
             env    : SimPy environment
             columns: Number of columns in the mesh (number of inbound pipes)
+            lookup : Dictionary to lookup output port names
         """
         super().__init__(env)
         self.inbound   = [None] * columns
@@ -35,6 +36,7 @@ class Capture(Base):
         self.received  = []
         self.snapshots = []
         self.ticks     = 0
+        self.lookup    = lookup
 
     def write_to_vcd(self, vcd_path):
         """ Write all captured snapshots to a VCD file.
@@ -42,15 +44,19 @@ class Capture(Base):
         Args:
             vcd_path: The path to the VCD file to write
         """
-        def key_name(key): return "sig_" + "_".join([str(x) for x in key])
+        def sig_name(row, col, pos):
+            key = f"R{row}C{col}I{pos}"
+            return self.lookup.get(key, key).replace("[", "_").replace("]", "_").replace(".", "_")
         with open(vcd_path, "w") as fh:
             with VCDWriter(fh, timescale="1 ns", date="today") as vcd:
                 # Register all signals
                 cycle   = vcd.register_var("tb", "cycle", "integer", size=32)
                 signals = {}
-                for key in set(sum([list(x.keys()) for _, x in self.snapshots], [])):
-                    signals[key] = vcd.register_var(
-                        "tb.dut", key_name(key), "integer", size=1
+                for row, col, pos in set(sum([
+                    list(x.keys()) for _, x in self.snapshots
+                ], [])):
+                    signals[row, col, pos] = vcd.register_var(
+                        "tb.dut", sig_name(row, col, pos), "integer", size=1
                     )
                 # Write an initial state for all signals
                 for sig in signals.values(): vcd.change(sig, 0, 0)

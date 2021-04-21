@@ -81,9 +81,9 @@ def main(
     # Create a manager
     manager = Manager(env, mesh, cycles=cycles, break_on_idle=break_on_idle)
     mesh[0, 0].inbound[Direction.NORTH] = manager.outbound
-    manager.load(design)
+    out_lkp = manager.load(design)
     # Create a capture node
-    capture = Capture(env, cols)
+    capture = Capture(env, cols, out_lkp)
     for col, node in enumerate(mesh.nodes[rows-1]):
         capture.inbound[col] = node.outbound[Direction.SOUTH] = Pipe(env, 1, 1)
     manager.add_observer(capture.tick)
