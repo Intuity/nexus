@@ -89,9 +89,11 @@ def simplify(module):
                     new_const.add_target(out)
                     if isinstance(out, Gate):
                         out.inputs[out.inputs.index(gate)] = new_const
+                        assert gate not in out.inputs
                     elif isinstance(out, PortBit):
                         out.clear_driver()
                         out.driver = new_const
+                        assert out.driver != gate
                     else:
                         raise Exception(f"Unsupported output: {out}")
                 # Strip this gate from the hierarchy
@@ -105,7 +107,7 @@ def simplify(module):
                         assert gate not in input.targets
                     else:
                         raise Exception(f"Unsupported input: {input}")
-            # - AND gate - propagate constant, or unmodified value
+            # - AND gate - propagate constant or unmodified value
             elif isinstance(gate, AND):
                 # If a 0 is present or no input signals, tie output value
                 if (0 in in_consts) or (len(in_signal) == 0):
@@ -114,9 +116,11 @@ def simplify(module):
                         new_const.add_target(out)
                         if isinstance(out, Gate):
                             out.inputs[out.inputs.index(gate)] = new_const
+                            assert gate not in out.inputs
                         elif isinstance(out, PortBit):
                             out.clear_driver()
                             out.driver = new_const
+                            assert out.driver != gate
                         else:
                             raise Exception(f"Unsupported output: {out}")
                 # Otherwise, pass input through unmodified
@@ -131,9 +135,11 @@ def simplify(module):
                         # Reconnect the downstream target directly to the source
                         if isinstance(out, Gate):
                             out.inputs[out.inputs.index(gate)] = in_signal[0]
+                            assert gate not in out.inputs
                         elif isinstance(out, PortBit):
                             out.clear_driver()
                             out.driver = in_signal[0]
+                            assert out.driver != gate
                         else:
                             raise Exception(f"Unsupported output: {out}")
                 # Strip this gate from the hierarchy
@@ -147,7 +153,7 @@ def simplify(module):
                         assert gate not in input.targets
                     else:
                         raise Exception(f"Unsupported input: {input}")
-            # - NAND gate - propagate constant, or inverted value
+            # - NAND gate - propagate constant or inverted value
             elif isinstance(gate, NAND):
                 # If 0 present -> tie output high, if both inputs = 1 -> tie low
                 if (0 in in_consts) or (len(in_signal) == 0 and (0 not in in_consts)):
@@ -155,14 +161,17 @@ def simplify(module):
                     if in_signal:
                         if isinstance(in_signal[0], Gate):
                             in_signal[0].outputs.remove(gate)
+                            assert gate not in in_signal[0].outputs
                         elif isinstance(in_signal[0], PortBit):
                             in_signal[0].remove_target(gate)
+                            assert gate not in in_signal[0].targets
                     # Drive targets from the constant
                     new_const = Constant(1 if (0 in in_consts) else 0)
                     for out in gate.outputs:
                         new_const.add_target(out)
                         if isinstance(out, Gate):
                             out.inputs[out.inputs.index(gate)] = new_const
+                            assert gate not in out.inputs
                         elif isinstance(out, PortBit):
                             out.clear_driver()
                             out.driver = new_const
@@ -173,8 +182,10 @@ def simplify(module):
                     # Drop the target from the existing connection
                     if isinstance(in_signal[0], Gate):
                         in_signal[0].outputs.remove(gate)
+                        assert gate not in in_signal[0].outputs
                     elif isinstance(in_signal[0], PortBit):
                         in_signal[0].remove_target(gate)
+                        assert gate not in in_signal[0].targets
                     # Check if the required inverter doesn't already exist?
                     new_inv = INVERT(in_signal[0])
                     found   = [x for x in module.children.values() if str(x) == str(new_inv)]
@@ -191,9 +202,11 @@ def simplify(module):
                         new_inv.outputs.append(out)
                         if isinstance(out, Gate):
                             out.inputs[out.inputs.index(gate)] = new_inv
+                            assert gate not in out.inputs
                         elif isinstance(out, PortBit):
                             out.clear_driver()
                             out.driver = new_inv
+                            assert gate != out.driver
                         else:
                             raise Exception(f"Unsupported output: {out}")
                 # Strip this gate from the hierarchy
@@ -262,5 +275,42 @@ def simplify(module):
             module.remove_child(flop)
         # Log progress made
         log.info(f"Simplification pass {iteration} - made {num_smpl} simplifications")
+
+    # As a final step - merge any duplicated gates
+    # NOTE: These might have been inferred by simplifying other logic
+    existing  = {}
+    to_remove = []
+    for gate in (x for x in module.children.values() if isinstance(x, Gate)):
+        # If this is the first occurrence, register and continue
+        if str(gate) not in existing:
+            existing[str(gate)] = gate
+            continue
+        # Merge outputs to the existing gate
+        merge_to = existing[str(gate)]
+        log.debug(f"Duplicate gate {gate} - merging {gate.id} into {merge_to.id}")
+        # Detach inputs
+        for input in gate.inputs:
+            if isinstance(input, Gate):
+                input.outputs.remove(gate)
+                assert gate not in input.outputs
+            elif isinstance(input, PortBit):
+                input.remove_target(gate)
+                assert gate not in input.targets
+        # Relink outputs
+        for output in gate.outputs:
+            merge_to.outputs.append(output)
+            if isinstance(output, Gate):
+                output.inputs[output.inputs.index(gate)] = merge_to
+                assert gate not in output.inputs
+            elif isinstance(output, PortBit):
+                output.clear_driver()
+                output.driver = merge_to
+                assert gate != output.driver
+        # Mark this child for removal (don't modify collection while iterating)
+        to_remove.append(gate)
+
+    # Remove any merged gates
+    for gate in to_remove: module.remove_child(gate)
+
     # Return the simplified module
     return module
