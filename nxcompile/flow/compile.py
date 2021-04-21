@@ -495,6 +495,7 @@ def compile(
     for item in module.children.values():
         if isinstance(item, Gate):
             assert item.id not in bit_map
+            assert str(item) not in terms
             bit_map[item.id] = terms[str(item)] = Instruction(item, [], [], None)
         elif isinstance(item, Flop):
             assert item.input[0].id not in bit_map
@@ -538,8 +539,23 @@ def compile(
                 bit_map[bit.id].source = bit_map[bit.driver.id]
     # Place operations into the mesh, starting with the most used
     log.info("Starting to schedule operations into mesh")
-    to_place = list(terms.values())
+    to_place    = list(terms.values())
+    stall_count = 0
     while to_place:
+        # Detect placement deadlock and abort
+        if stall_count > len(to_place):
+            perc = (1 - (len(to_place) / len(terms.values()))) * 100
+            log.info("Unplaced operations:")
+            for idx, op in enumerate(to_place):
+                src_ops = [x for x in op.sources if isinstance(x, Instruction)]
+                log.info(
+                    f"[{idx:03d}] {type(op.op).__name__}_{op.op.id} requires " +
+                    ", ".join([f"{type(x.op).__name__}_{x.op.id}" for x in src_ops])
+                )
+            raise Exception(
+                f"Deadlock detected with {len(to_place)} operations left unplaced "
+                f"from a total of {len(terms.values())} ({perc:.01f}% complete)"
+            )
         # Pop the next term to place
         op = to_place.pop(0)
         assert isinstance(op, Instruction)
@@ -549,7 +565,10 @@ def compile(
         # If we're not ready to place, postpone
         if None in src_nodes:
             to_place.append(op)
+            stall_count += 1
             continue
+        # Reset the stall count to zero if a placement is successful
+        stall_count = 0
         # Try to identify a suitable node
         node    = None
         to_move = []
