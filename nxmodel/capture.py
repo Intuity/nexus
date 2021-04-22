@@ -22,15 +22,17 @@ from .message import SignalState
 class Capture(Base):
     """ Captures signal state outputs from the mesh """
 
-    def __init__(self, env, columns, lookup):
+    def __init__(self, env, mesh, columns, lookup):
         """ Initialise the Capture instance.
 
         Args:
             env    : SimPy environment
+            mesh   : Pointer to the mesh
             columns: Number of columns in the mesh (number of inbound pipes)
             lookup : Dictionary to lookup output port names
         """
         super().__init__(env)
+        self.mesh      = mesh
         self.inbound   = [None] * columns
         self.rx_loop   = self.env.process(self.capture())
         self.received  = []
@@ -49,22 +51,37 @@ class Capture(Base):
             return self.lookup.get(key, key).replace("[", "_").replace("]", "_").replace(".", "_")
         with open(vcd_path, "w") as fh:
             with VCDWriter(fh, timescale="1 ns", date="today") as vcd:
-                # Register all signals
-                cycle   = vcd.register_var("tb", "cycle", "integer", size=32)
+                # Record the cycle
+                cycle = vcd.register_var("tb", "cycle", "integer", size=32)
+                # Register all outputs
                 signals = {}
                 for row, col, pos in set(sum([
-                    list(x.keys()) for _, x in self.snapshots
+                    list(x.keys()) for _, x, _ in self.snapshots
                 ], [])):
                     signals[row, col, pos] = vcd.register_var(
                         "tb.dut", sig_name(row, col, pos), "integer", size=1
                     )
+                # Register all node inputs
+                nodes = {}
+                for node in self.mesh.all_nodes:
+                    row, col = node.position
+                    for idx in range(len(node.input_state)):
+                        nodes[row, col, idx] = vcd.register_var(
+                            f"tb.dut.mesh.row_{row}.col_{col}",
+                            f"input_{idx}", "integer", size=1,
+                        )
                 # Write an initial state for all signals
                 for sig in signals.values(): vcd.change(sig, 0, 0)
                 # Convert all snapshots into VCD entries
-                for time, (_, snapshot) in enumerate(self.snapshots):
+                for time, (_, snapshot, node_state) in enumerate(self.snapshots):
                     vcd.change(cycle, time, time)
+                    # Record output signals
                     for key, value in snapshot.items():
                         vcd.change(signals[key], time, value)
+                    # Record node state
+                    for (row, col), state in node_state.items():
+                        for idx, value in enumerate(state):
+                            vcd.change(nodes[row, col, idx], time, value)
 
     def tick(self):
         # Increment tick counter
@@ -74,9 +91,13 @@ class Capture(Base):
         while self.received:
             item = self.received.pop(0)
             snapshot[item.src_row, item.src_col, item.src_pos] = item.src_val
+        # Snapshot all node inputs
+        node_inputs = {}
+        for node in self.mesh.all_nodes:
+            node_inputs[node.position] = node.input_state
         # Log and store snapshot
         self.info(f"Captured {len(snapshot)} outputs from tick {self.ticks-1}")
-        self.snapshots.append((self.env.now, snapshot))
+        self.snapshots.append((self.env.now, snapshot, node_inputs))
 
     def capture(self):
         """ Indefinite capture loop - observes signal state messages """

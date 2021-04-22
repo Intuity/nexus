@@ -152,6 +152,8 @@ class Node(Base):
     def row(self): return self.position[0]
     @property
     def column(self): return self.position[1]
+    @property
+    def input_state(self): return self.__inputs[:]
 
     @property
     def idle(self):
