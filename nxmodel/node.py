@@ -147,6 +147,9 @@ class Node(Base):
         self.__output_map = {}
         # Naming
         self.input_names = {}
+        # Flags
+        self.__digesting   = False
+        self.__dispatching = 0
 
     @property
     def row(self): return self.position[0]
@@ -167,6 +170,10 @@ class Node(Base):
             if pipe and not pipe.idle: return False
         # Check the internal pipe
         if not self.internal.idle: return False
+        # Check if digesting flag is set
+        if self.__digesting: return False
+        # Check if dispatching is non-zero
+        if self.__dispatching != 0: return False
         # Otherwise, the node is idle
         return True
 
@@ -186,6 +193,11 @@ class Node(Base):
 
     def tick(self):
         """ Trigger an internal event when an simulated clock ticks """
+        # Check all pipes are empty (safety)
+        for pipe in self.inbound : assert not pipe or pipe.idle
+        for pipe in self.outbound: assert not pipe or pipe.idle
+        assert self.internal.idle
+        # Unblock instruction execution
         self.__tick_event.succeed()
         self.__tick_event = self.env.event()
 
@@ -317,6 +329,13 @@ class Node(Base):
                     yield self.env.process(self.outbound[int(pipe_dir)].push(msg))
                 else:
                     yield self.env.process(self.internal.push(msg))
+            # Decrement the dispatching counter
+            yield self.env.timeout(1)
+            self.__dispatching -= 1
+            assert self.__dispatching >= 0
+        # Increment the dispatching counter
+        self.__dispatching += 1
+        # Trigger the simpy process
         return self.env.process(do_dispatch(msg))
 
     def handle_messages(self):
@@ -341,6 +360,8 @@ class Node(Base):
                     break
                 if pipe: break
                 yield self.env.timeout(1)
+            # Raise the digesting flag (keeps node from appearing idle)
+            self.__digesting = True
             # Grab the next message from the pipe
             msg = yield self.env.process(pipe.pop())
             # Check a message hasn't been seen twice
@@ -363,6 +384,8 @@ class Node(Base):
                 yield self.dispatch(msg, bc_dirs=bc_dirs, bc_intx=False)
             elif not msg.broadcast and msg.target != self.position:
                 yield self.dispatch(msg)
+            # Clear the digesting flag
+            self.__digesting = False
 
     def execute(self):
         """ Execute the instruction loop """
@@ -435,7 +458,16 @@ class Node(Base):
                     # Wait one cycle
                     yield self.env.timeout(1)
             except simpy.Interrupt:
+                # Request restart by setting flag
                 restart = True
+                # Possible to receive multiple interrupts in one cycle - let it
+                # stabilise
+                while True:
+                    try:
+                        yield self.env.timeout(1)
+                        break
+                    except simpy.Interrupt:
+                        pass
             else:
                 # Return to WAIT phase
                 self.__phase = Phase.WAIT
