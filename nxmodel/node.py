@@ -245,7 +245,7 @@ class Node(Base):
                     if not did_change: self.debug("No change in signal value")
                     # Log change
                     in_name = self.input_names.get(input_pos, "N/A")
-                    self.info(
+                    self.debug(
                         f"{self.position} I[{input_pos}] ({in_name}) -> "
                         f"{msg.src_val} (from {msg.source})"
                     )
@@ -271,16 +271,24 @@ class Node(Base):
         self,
         msg,
         bc_dirs=[Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST],
+        bc_intx=True,
     ):
         """ Dispatch a message through the correct pipe.
 
         Args:
             msg    : The message to send
             bc_dirs: Direction to broadcast a message in
+            bc_intx: Include the internal pipe in broadcast (default: True)
         """
         def do_dispatch(msg):
             # Broadcast messages are sent on every outbound pipe
             if msg.broadcast:
+                # Optionally send on the internal pipe (with no propagation)
+                if bc_intx:
+                    cp_msg       = msg.copy()
+                    cp_msg.decay = 0          # Do not propagate
+                    yield self.env.process(self.internal.push(cp_msg))
+                # Send on outbound pipes
                 for dirx in bc_dirs:
                     # Check pipe has been connected
                     if not self.outbound[int(dirx)]: continue
@@ -314,15 +322,21 @@ class Node(Base):
         last_pipe = Direction.NORTH
         seen      = {}
         while True:
-            # Wait for a message on any inbound pipe (round robin)
+            # Wait for a message on any pipe (round robin)
+            pipe = None
             while True:
-                pipe = None
+                # Check the internal pipe
+                if len(self.internal.out_store.items) != 0:
+                    pipe = self.internal
+                    break
+                # Check inbound pipes
                 for idx in range(len(self.inbound)):
                     wrap_idx = (int(last_pipe) + idx) % len(self.inbound)
                     test     = self.inbound[wrap_idx]
                     if not test or len(test.out_store.items) == 0: continue
                     pipe      = test
                     last_pipe = Direction(wrap_idx)
+                    break
                 if pipe: break
                 yield self.env.timeout(1)
             # Grab the next message from the pipe
@@ -344,13 +358,13 @@ class Node(Base):
                     Direction.EAST : [Direction.WEST],
                     Direction.WEST : [Direction.EAST],
                 }[last_pipe]
-                yield self.dispatch(msg, bc_dirs=bc_dirs)
+                yield self.dispatch(msg, bc_dirs=bc_dirs, bc_intx=False)
             elif not msg.broadcast and msg.target != self.position:
                 yield self.dispatch(msg)
 
     def execute(self):
         """ Execute the instruction loop """
-        prev_inputs = []
+        prev_inputs = [False] * len(self.__inputs)
         restart     = False
         while True:
             try:
@@ -368,11 +382,10 @@ class Node(Base):
                 if restart: self.debug("Restarting instruction execution")
                 restart = False
                 # Log the difference in input
-                if self.position == (2, 1):
-                    self.info(
-                        "Current: " + "".join([("1" if x else "0") for x in self.__inputs]) +
-                        ", last: "  + "".join([("1" if x else "0") for x in prev_inputs])
-                    )
+                self.debug(
+                    "Current: " + "".join([("1" if x else "0") for x in self.__inputs]) +
+                    ", last: "  + "".join([("1" if x else "0") for x in prev_inputs])
+                )
                 prev_inputs = self.__inputs[:]
                 # Start executing instructions
                 output_idx = 0
@@ -388,7 +401,6 @@ class Node(Base):
                     self.debug(f"Executing op {op_idx}: {op} - A: {val_a}, B: {val_b}, R: {result}")
                     # Generate an output if required
                     if op.is_output and self.__outputs[output_idx] != result:
-                        self.info("GENERATING OUTPUT")
                         # Check output mapping exists
                         assert output_idx in self.__output_map, \
                             f"Missing output {output_idx} from {self.position}"
