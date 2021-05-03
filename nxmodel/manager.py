@@ -108,8 +108,10 @@ class Manager(Base):
         cfg_rows = config[Manager.CONFIG_ROWS]
         cfg_cols = config[Manager.CONFIG_COLUMNS]
         # Check that the mesh matches
-        assert cfg_rows == self.mesh.rows
-        assert cfg_cols == self.mesh.columns
+        assert cfg_rows == self.mesh.rows, \
+            f"Serialised design requires {cfg_rows} rows"
+        assert cfg_cols == self.mesh.columns, \
+            f"Serialised design requires {cfg_cols} columns"
         # Start loading the compiled design into the mesh
         nodes = model[Manager.DESIGN_NODES]
         for node_data in nodes:
