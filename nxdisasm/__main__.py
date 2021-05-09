@@ -13,16 +13,24 @@
 # limitations under the License.
 
 import json
+from pathlib import Path
+import re
 
 import click
+from mako.lookup import TemplateLookup
 
 from nxmodel.manager import Manager
-from nxmodel.node import Instruction
+from nxmodel.node import Instruction, Operation
+
+def verilog_safe(val):
+    """ Reformat a name to be safe for Verilog """
+    return val.translate(val.maketrans(".[", "__", "]"))
 
 @click.command()
 @click.option("--listing", type=click.File("w"), help="Dump a text listing of instructions")
+@click.option("--verilog", type=click.File("w"), help="Dump a Verilog conversion of the design")
 @click.argument("design", type=click.File("r"))
-def main(listing, design):
+def main(listing, verilog, design):
     """ Disassemble a compiled design.
 
     Arguments:\n
@@ -34,26 +42,74 @@ def main(listing, design):
     config   = model[Manager.DESIGN_CONFIG]
     cfg_rows = config[Manager.CONFIG_ROWS]
     cfg_cols = config[Manager.CONFIG_COLUMNS]
+    cfg_node = config[Manager.CONFIG_NODE]
+    # Extract per node configuration
+    nc_inputs    = cfg_node[Manager.CFG_ND_INPUTS]
+    nc_outputs   = cfg_node[Manager.CFG_ND_OUTPUTS]
+    nc_registers = cfg_node[Manager.CFG_ND_REGS]
     # Load the instruction sequences for every node
     nodes = [
-        [[] for _c in range(cfg_cols)] for _c in range(cfg_rows)
+        [[] for _c in range(cfg_cols)] for _r in range(cfg_rows)
     ]
+    node_inputs = [
+        [{} for _c in range(cfg_cols)] for _r in range(cfg_cols)
+    ]
+    node_outputs = [
+        [{} for _c in range(cfg_cols)] for _r in range(cfg_cols)
+    ]
+    outputs = []
     for node_data in model[Manager.DESIGN_NODES]:
         n_row = node_data[Manager.NODE_ROW]
         n_col = node_data[Manager.NODE_COLUMN]
-        for raw in node_data[Manager.NODE_INSTRS]:
-            nodes[n_row][n_col].append(Instruction(raw))
+        # Load the instruction sequence
+        out_idx = 0
+        for instr_idx, raw in enumerate(node_data[Manager.NODE_INSTRS]):
+            instr = Instruction(raw)
+            nodes[n_row][n_col].append(instr)
+            if instr.is_output:
+                node_outputs[n_row][n_col][out_idx] = instr_idx
+                out_idx += 1
+        # Load the node inputs
+        for mapping in node_data[Manager.NODE_IN_HNDL]:
+            src_row, src_col, src_pos, tgt_pos, state = (
+                mapping[Manager.IN_HNDL_SRC_ROW], mapping[Manager.IN_HNDL_SRC_COL],
+                mapping[Manager.IN_HNDL_SRC_POS], mapping[Manager.IN_HNDL_TGT_POS],
+                mapping[Manager.IN_HNDL_STATE],
+            )
+            node_inputs[n_row][n_col][tgt_pos] = (src_row, src_col, src_pos, state)
+    rgx_out = re.compile(r"R([0-9]+)C([0-9]+)I([0-9]+)")
+    for key, name in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS].items():
+        row, col, idx = rgx_out.match(key).groups()
+        outputs.append((int(row), int(col), int(idx), name))
+    # Create a template lookup
+    tmpl_lkp = TemplateLookup(directories=[Path(__file__).parent / "templates"])
     # Dump a text-based listing of all instructions
     if listing:
-        for row, columns in enumerate(nodes):
-            for col, instrs in enumerate(columns):
-                listing.write("# " + ("=" * 78 + "\n"))
-                listing.write(f"# Row {row:03d}, Column {col:03d}\n")
-                listing.write("# " + ("=" * 78 + "\n"))
-                listing.write("\n")
-                for idx, instr in enumerate(instrs):
-                    listing.write(f"{idx:03d}: {instr}\n")
-                listing.write("\n")
+        listing.write(tmpl_lkp.get_template("disasm.txt").render(
+            nodes=nodes,
+        ))
+    # Dump a Verilog implementation of the instructions
+    if verilog:
+        verilog.write(tmpl_lkp.get_template("disasm.v").render(
+            # Node configurations
+            cfg_nd_ins =nc_inputs,
+            cfg_nd_outs=nc_outputs,
+            cfg_nd_regs=nc_registers,
+            # Instructions and mappings
+            nodes       =nodes,
+            node_inputs =node_inputs,
+            node_outputs=node_outputs,
+            outputs     =outputs,
+            # Helper functions
+            verilog_safe=verilog_safe,
+            # Constants
+            **Operation.__members__,
+            verilog_op_map={
+                Operation.AND: "&", Operation.NAND: "&",
+                Operation.OR : "|", Operation.NOR : "|",
+                Operation.XOR: "^", Operation.XNOR: "^",
+            },
+        ))
 
 if __name__ == "__main__":
     main(prog_name="nxdisasm")
