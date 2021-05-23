@@ -83,6 +83,7 @@ class Manager(Base):
         self.outbound = Pipe(self.env, 1, 1)
         self.queue    = []
         self.observer = []
+        self.loaded   = []
         self.tx_loop  = self.env.process(self.transmit())
         self.gen_tick = self.env.process(self.tick())
         self.complete = self.env.event()
@@ -112,6 +113,8 @@ class Manager(Base):
             f"Serialised design requires {cfg_rows} rows"
         assert cfg_cols == self.mesh.columns, \
             f"Serialised design requires {cfg_cols} columns"
+        # Track what should be loaded to each node
+        self.loaded = [[[] for _ in range(cfg_cols)] for _ in range(cfg_rows)]
         # Start loading the compiled design into the mesh
         nodes = model[Manager.DESIGN_NODES]
         for node_data in nodes:
@@ -124,6 +127,7 @@ class Manager(Base):
                 self.queue.append(LoadInstruction(
                     self.env, n_row, n_col, slot, instr
                 ))
+                self.loaded[n_row][n_col].append(instr)
             # Setup input mappings for the node
             for mapping in node_data[Manager.NODE_IN_HNDL]:
                 self.queue.append(ConfigureInput(
@@ -152,6 +156,21 @@ class Manager(Base):
             row, col, idx = [int(x) for x in rgx_pos.match(entry).groups()]
             self.mesh[row, col].input_names[idx] = name
         return model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS]
+
+    def check_loaded(self):
+        """ Check every loaded instruction """
+        self.info("Checking all instructions loaded correctly")
+        for row, columns in enumerate(self.loaded):
+            for col, instrs in enumerate(columns):
+                node_ops = self.mesh[row, col].ops
+                assert len(node_ops) == len(instrs), \
+                    f"{row:03d}.{col:03d} Different number of instructions G: " \
+                    f"{len(node_ops)} != E: {len(instrs)}"
+                for idx, (got, exp) in enumerate(zip(node_ops, instrs)):
+                    assert got == exp, \
+                        f"{row:03d}.{col:03d} Instruction {idx} differs G: " \
+                        f"{got} != E: {exp}"
+        self.info("All OK!")
 
     def transmit(self):
         """ Transmit any queued messages """
@@ -189,6 +208,8 @@ class Manager(Base):
             if self.queue: continue
             # Check all nodes in the mesh are idle
             if not self.idle(): continue
+            # If this is the first time idle, check the loaded instructions
+            if cycle == 0: self.check_loaded()
             # If requested, break for debug
             if self.break_on_idle:
                 import pdb; pdb.set_trace()

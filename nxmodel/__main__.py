@@ -33,7 +33,6 @@ from .pipe import Pipe
 @click.option("--node-inputs",    type=int, default=8,  help="Inputs per node")
 @click.option("--node-outputs",   type=int, default=8,  help="Outputs per node")
 @click.option("--node-registers", type=int, default=8,  help="Working registers")
-@click.option("--node-slots",     type=int, default=16, help="Max instructions per node")
 # Verbosity controls
 @click.option("--quiet", count=True, help="Only show warning & error messages")
 @click.option("--debug", count=True, help="Enable debug messages")
@@ -48,7 +47,7 @@ def main(
     # Mesh configuration
     rows, cols,
     # Node configuration
-    node_inputs, node_outputs, node_registers, node_slots,
+    node_inputs, node_outputs, node_registers,
     # Verbosity controls
     quiet, debug, log,
     # Debug controls
@@ -76,7 +75,6 @@ def main(
         "inputs"   : node_inputs,
         "outputs"  : node_outputs,
         "registers": node_registers,
-        "max_ops"  : node_slots,
     })
     # Create a manager
     manager = Manager(env, mesh, cycles=cycles, break_on_idle=break_on_idle)

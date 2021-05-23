@@ -28,6 +28,12 @@ class Direction(IntEnum):
     SOUTH = 2
     WEST  = 3
 
+class OutputState(IntEnum):
+    """ Output state """
+    LOW     = 0
+    HIGH    = 1
+    UNKNOWN = 2
+
 class Operation(IntEnum):
     """ Encoding of operations that each node can perform """
     INVERT = 0
@@ -101,7 +107,7 @@ class Instruction:
 class Node(Base):
     """ A single logic compute node in the mesh """
 
-    def __init__(self, env, row, col, inputs=8, outputs=8, registers=8, max_ops=16):
+    def __init__(self, env, row, col, inputs=8, outputs=8, registers=8):
         """ Initialise the node.
 
         Args:
@@ -111,7 +117,6 @@ class Node(Base):
             inputs   : Number of supported inputs (default: 8)
             outputs  : Number of supported outputs (default: 8)
             registers: Number of temporary value registers (default: 8)
-            max_ops  : Maximum number of instructions (default: 16)
         """
         # Initialise base class
         super().__init__(env)
@@ -123,12 +128,11 @@ class Node(Base):
         assert isinstance(inputs,    int) and inputs    >= 1
         assert isinstance(outputs,   int) and outputs   >= 1
         assert isinstance(registers, int) and registers >= 1
-        assert isinstance(max_ops,   int) and max_ops   >= 1
         self.__inputs      = [False] * inputs
         self.__next_inputs = [False] * inputs # For the next cycle
-        self.__outputs     = [False] * outputs
+        self.__outputs     = [OutputState.LOW] * outputs
         self.__registers   = [False] * registers
-        self.__ops         = [None ] * max_ops
+        self.__ops         = []
         # Setup phase
         self.__phase = Phase.SETUP
         # Create spaces for inbound pipes (4 -> one for each of N, E, S, W)
@@ -156,7 +160,11 @@ class Node(Base):
     @property
     def column(self): return self.position[1]
     @property
+    def ops(self): return self.__ops[:]
+    @property
     def input_state(self): return self.__inputs[:]
+    @property
+    def output_state(self): return self.__outputs[:]
 
     @property
     def idle(self):
@@ -186,9 +194,9 @@ class Node(Base):
     def reset(self):
         """ Reset the state of the logic node """
         self.__inputs    = [False] * len(self.__inputs)
-        self.__outputs   = [False] * len(self.__outputs)
+        self.__outputs   = [OutputState.LOW] * len(self.__outputs)
         self.__registers = [False] * len(self.__registers)
-        self.__ops       = [None ] * len(self.__ops)
+        self.__ops       = []
         self.__phase     = Phase.SETUP
 
     def tick(self):
@@ -213,9 +221,9 @@ class Node(Base):
         msg_type = type(msg)
         # Load an instruction into a specified slot
         if msg_type == LoadInstruction:
-            assert msg.slot >= 0 and msg.slot < len(self.__ops)
+            assert msg.slot == len(self.__ops), "Instruction received out of order"
             self.debug(f"Loading instruction slot {msg.slot}: {msg.instr}")
-            self.__ops[msg.slot] = msg.instr
+            self.__ops.append(msg.instr)
         # Configure input mapping to the node
         elif msg_type == ConfigureInput:
             assert msg.tgt_pos >= 0 and msg.tgt_pos < len(self.__inputs)
@@ -241,12 +249,16 @@ class Node(Base):
             )
         # Handle updated signal state
         elif msg_type == SignalState:
+            handled      = False
+            restart_exec = False
             for input_pos, (src_row, src_col, src_pos, state) in self.__input_map.items():
                 if (
                     src_row == msg.src_row and
                     src_col == msg.src_col and
                     src_pos == msg.src_pos
                 ):
+                    # Mark this input has been handled
+                    handled = True
                     # Log if signal value hasn't changed (suboptimal)
                     # NOTE: Because the instruction loop can be restarted at any
                     #       time, the interrupt may disrupt the sending of
@@ -268,13 +280,14 @@ class Node(Base):
                     # If this is not a stateful input, request restart
                     if did_change and not state:
                         self.__inputs[input_pos] = msg.src_val
-                        self.exec_loop.interrupt()
-                    break
-            else:
-                if not msg.broadcast:
-                    raise Exception(
-                        f"[{self.position}] Failed to handle SignalState: {msg}"
-                    )
+                        restart_exec             = True
+            # If message wasn't handled, it must have been badly addressed
+            if not msg.broadcast and not handled:
+                raise Exception(
+                    f"[{self.position}] Failed to handle SignalState: {msg}"
+                )
+            # If a non-stateful input was detected, restart execution
+            if restart_exec: self.exec_loop.interrupt()
         # Unknown message type
         else:
             raise Exception(
@@ -390,22 +403,18 @@ class Node(Base):
     def execute(self):
         """ Execute the instruction loop """
         prev_inputs = [False] * len(self.__inputs)
-        restart     = False
         while True:
             try:
                 # Wait for a simulated clock tick
-                if not restart:
+                if self.__phase != Phase.RUN:
                     yield self.__tick_event
                     assert self.__phase in (Phase.SETUP, Phase.WAIT), \
                         f"[{self.position}] Phase is currently {self.__phase.name}"
                     # Copy input state
                     for idx, val in enumerate(self.__next_inputs):
                         self.__inputs[idx] = val
-                # Switch to the RUN phase
-                self.__phase = Phase.RUN
-                # Clear the execution restart flag
-                if restart: self.debug("Restarting instruction execution")
-                restart = False
+                    # Switch to the RUN phase
+                    self.__phase = Phase.RUN
                 # Log the difference in input
                 self.debug(
                     "Current: " + "".join([("1" if x else "0") for x in self.__inputs]) +
@@ -424,8 +433,14 @@ class Node(Base):
                     self.__registers[op.target] = (result := Operation.evaluate(op.op, val_a, val_b))
                     # Debug log
                     self.debug(f"Executing op {op_idx}: {op} - A: {val_a}, B: {val_b}, R: {result}")
+                    # Map result to an output state
+                    out_state = OutputState.HIGH if result else OutputState.LOW
                     # Generate an output if required
-                    if op.is_output and self.__outputs[output_idx] != result:
+                    if op.is_output and self.__outputs[output_idx] != out_state:
+                        # Clear held output state
+                        # NOTE: This protects against interrupt arriving between
+                        #       dispatch and saving state
+                        self.__outputs[output_idx] = OutputState.UNKNOWN
                         # Check output mapping exists
                         assert output_idx in self.__output_map, \
                             f"Missing output {output_idx} from {self.position}"
@@ -451,15 +466,16 @@ class Node(Base):
                                     self.env, tgt_b_row, tgt_b_col, False, 0,
                                     self.row, self.column, output_idx, result,
                                 ))
-                        # Capture updated value to avoid unnecessary retrigger
-                        self.__outputs[output_idx] = result
+                        # Capture output value
+                        # NOTE: This reduces duplicate values being sent
+                        self.__outputs[output_idx] = out_state
                     # Always increment regardless of whether a message was sent
                     if op.is_output: output_idx += 1
                     # Wait one cycle
                     yield self.env.timeout(1)
             except simpy.Interrupt:
-                # Request restart by setting flag
-                restart = True
+                # Re-activate the run phase to re-run instruction execution
+                self.__phase = Phase.RUN
                 # Possible to receive multiple interrupts in one cycle - let it
                 # stabilise
                 while True:
