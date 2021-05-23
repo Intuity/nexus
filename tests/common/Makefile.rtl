@@ -1,0 +1,58 @@
+# Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Guard statement
+ifeq ($(__COMMON_RTL_DEFINED__),)
+__COMMON_RTL_DEFINED__ := 1
+
+# ==============================================================================
+# RTL for Design
+# ==============================================================================
+
+DESIGN_TOP   ?=
+RTL_SRC_DIRS += $(abspath ./rtl)
+RTL_SRC_EXTS ?= .v .sv
+RTL_SRCS     += $(foreach x,$(RTL_SRC_EXTS),$(foreach d,$(RTL_SRC_DIRS),$(wildcard $(d)/*$(x))))
+
+$(info RTL_SRCS=$(RTL_SRCS))
+
+ifeq ($(DESIGN_TOP),)
+  $(info ERROR: No DESIGN_TOP specified)
+  $(error 1)
+endif
+ifeq ($(RTL_SRCS),)
+  $(info ERROR: No RTL_SRCS were located)
+  $(error 1)
+endif
+
+# ==============================================================================
+# RTL for Testbench
+# ==============================================================================
+
+TB_TOP      ?= testbench
+TB_SRC_DIRS += $(abspath ./tb)
+TB_SRC_EXTS ?= .v .sv
+TB_SRCS     += $(foreach x,$(TB_SRC_EXTS),$(foreach d,$(TB_SRC_DIRS),$(wildcard $(d)/*$(x))))
+
+ifeq ($(TB_TOP),)
+  $(info ERROR: No TB_TOP specified)
+  $(error 1)
+endif
+ifeq ($(TB_SRCS),)
+  $(info ERROR: No TB_SRCS were located)
+  $(error 1)
+endif
+
+# End of guard statement
+endif # __COMMON_RTL_DEFINED__

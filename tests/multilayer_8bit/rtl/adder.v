@@ -25,7 +25,7 @@ module adder #(
 
 reg [WIDTH:0] m_result;
 
-assign {sum, overflow} = m_result;
+assign {overflow, sum} = m_result;
 
 always @(posedge clk, posedge rst) begin
     if (rst) begin

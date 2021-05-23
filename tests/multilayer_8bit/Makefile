@@ -16,4 +16,4 @@
 DESIGN_TOP ?= Top
 
 # Include standard rules
-include ../common/Makefile.synth
+include ../common/Makefile.entry

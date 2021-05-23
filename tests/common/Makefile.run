@@ -1,0 +1,52 @@
+# Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ==============================================================================
+# Output Variables
+# ==============================================================================
+
+SIM_WORK_DIR    ?= work
+SIM_COMPILE_LOG ?= $(SIM_WORK_DIR)/compile.log
+SIM_RUN_LOG     ?= $(SIM_WORK_DIR)/run.log
+SIM_EXECUTABLE  ?= $(SIM_WORK_DIR)/$(DESIGN_TOP).vvp
+SIM_TRACE       ?= no
+
+MAKE_DIRS += $(SIM_WORK_DIR)
+
+# ==============================================================================
+# Compilation Rule
+# ==============================================================================
+
+SIM_COMPILE_ARGS += -g2012
+SIM_COMPILE_ARGS += -s $(TB_TOP)
+SIM_COMPILE_ARGS += -o $(SIM_EXECUTABLE)
+
+$(SIM_EXECUTABLE): $(RTL_SRCS) $(TB_SRCS) | $(SIM_WORK_DIR)
+	@echo "# Compiling testbench"
+	$(PRECMD)iverilog $(SIM_COMPILE_ARGS) $(RTL_SRCS) $(TB_SRCS) | tee $(SIM_COMPILE_LOG) 2>&1
+
+# ==============================================================================
+# Run Rule
+# ==============================================================================
+
+SIM_RUN_ARGS +=
+
+ifeq ($(SIM_TRACE),yes)
+  SIM_RUN_ARGS += +VCD_FILE=$(DESIGN_TOP).vcd
+endif
+
+.PHONY: run
+run: $(SIM_EXECUTABLE)
+	@echo "# Running simulation using $(basename $<)"
+	$(PRECMD)vvp $< $(SIM_RUN_ARGS) | tee $(SIM_RUN_LOG) 2>&1

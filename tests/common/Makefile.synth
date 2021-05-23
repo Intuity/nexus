@@ -1,47 +1,33 @@
-# ==============================================================================
-# Common Setup
-# ==============================================================================
-MAKE_DIRS +=
-QUIET     ?= yes
-PRECMD    ?= $(if $(filter yes,$(QUIET)),@,)
-
-# Setup default rule
-.PHONY: all
-all: synth
-
-# ==============================================================================
-# Input Variables
-# ==============================================================================
-DESIGN_TOP   ?=
-RTL_SRC_DIRS ?= .
-RTL_SRC_EXTS ?= .v .sv
-RTL_SRCS     += $(foreach x,$(RTL_SRC_EXTS),$(foreach d,$(RTL_SRC_DIRS),$(wildcard $(d)/*$(x))))
-
-ifeq ($(DESIGN_TOP),)
-  $(info ERROR: No DESIGN_TOP specified)
-  $(error 1)
-endif
-ifeq ($(RTL_SRCS),)
-  $(info ERROR: No RTL_SRCS were located)
-  $(error 1)
-endif
+# Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # ==============================================================================
 # Output Variables
 # ==============================================================================
-WORK_DIR  ?= work
-MAKE_DIRS += $(WORK_DIR)
 
-LOG_FILE ?= $(WORK_DIR)/log
+SYN_WORK_DIR    ?= work
+SYN_SCRIPT_PATH ?= $(SYN_WORK_DIR)/yosys.do
+SYN_LOG_PATH    ?= $(SYN_WORK_DIR)/yosys.log
+SYN_OUTPUT_JSON ?= $(DESIGN_TOP).json
 
-OUTPUT_JSON ?= $(DESIGN_TOP).json
+MAKE_DIRS += $(SYN_WORK_DIR)
 
 # ==============================================================================
 # Generate Synthesis Script
 # ==============================================================================
-SYN_SCRIPT ?= $(WORK_DIR)/yosys.do
 
-$(SYN_SCRIPT): | $(WORK_DIR)
+$(SYN_SCRIPT_PATH): | $(SYN_WORK_DIR)
 	@echo "# Creating synthesis script $(notdir $@)"
 ifneq ($(QUIET),yes)
 	$(PRECMD)echo "echo on;" >> $@
@@ -66,32 +52,18 @@ endif
 	$(PRECMD)echo "memory;" >> $@
 	$(PRECMD)echo "log --> Perform simple optimisations (round 2);" >> $@
 	$(PRECMD)echo "opt;" >> $@
-	$(PRECMD)echo "log --> Writing out design to JSON $(OUTPUT_JSON);" >> $@
-	$(PRECMD)echo "write_json -aig $(OUTPUT_JSON);" >> $@
+	$(PRECMD)echo "log --> Writing out design to JSON $(SYN_OUTPUT_JSON);" >> $@
+	$(PRECMD)echo "write_json -aig $(SYN_OUTPUT_JSON);" >> $@
 
 # ==============================================================================
 # Synthesis Step
 # ==============================================================================
+
 SYN_ARGS += -Q
-SYN_ARGS += -l $(abspath $(LOG_FILE))
-SYN_ARGS += -s $(abspath $(SYN_SCRIPT))
+SYN_ARGS += -l $(abspath $(SYN_LOG_PATH))
+SYN_ARGS += -s $(abspath $(SYN_SCRIPT_PATH))
 
 .PHONY: synth
-synth: $(SYN_SCRIPT) | $(WORK_DIR)
-	@echo "# Starting synthesis with script $(notdir $(SYN_SCRIPT))"
-	$(PRECMD)cd $(WORK_DIR) && yosys $(SYN_ARGS)
-
-# ==============================================================================
-# Make Directories
-# ==============================================================================
-$(MAKE_DIRS):
-	@echo "# Creating directory $(notdir $@)"
-	$(PRECMD)mkdir -p $@
-
-# ==============================================================================
-# Helper Rules
-# ==============================================================================
-.PHONY:
-clean:
-	@echo "# Removing working directories"
-	$(PRECMD)rm -rf $(MAKE_DIRS)
+synth: $(SYN_SCRIPT_PATH) | $(SYN_WORK_DIR)
+	@echo "# Starting synthesis with script $(notdir $(SYN_SCRIPT_PATH))"
+	$(PRECMD)cd $(SYN_WORK_DIR) && yosys $(SYN_ARGS)
