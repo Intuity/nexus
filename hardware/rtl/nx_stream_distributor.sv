@@ -14,36 +14,36 @@
 
 `include "nx_common.svh"
 
-// nx_stream_distributer
+// nx_stream_distributor
 // Distributes to multiple outbound message streams
 //
-module nx_stream_distributer #(
+module nx_stream_distributor #(
     parameter STREAM_WIDTH = 32
 ) (
       input  logic                    clk_i
     , input  logic                    rst_i
     // Inbound message stream
-    , output logic [STREAM_WIDTH-1:0] dist_data_i
-    , output logic [             1:0] dist_dir_i
-    , output logic                    dist_valid_i
-    , input  logic                    dist_ready_o
+    , input  logic [STREAM_WIDTH-1:0] dist_data_i
+    , input  logic [             1:0] dist_dir_i
+    , input  logic                    dist_valid_i
+    , output logic                    dist_ready_o
     // Outbound distributed message streams
     // - North
-    , input  logic [STREAM_WIDTH-1:0] north_data_o
-    , input  logic                    north_valid_o
-    , output logic                    north_ready_i
+    , output logic [STREAM_WIDTH-1:0] north_data_o
+    , output logic                    north_valid_o
+    , input  logic                    north_ready_i
     // - East
-    , input  logic [STREAM_WIDTH-1:0] east_data_o
-    , input  logic                    east_valid_o
-    , output logic                    east_ready_i
+    , output logic [STREAM_WIDTH-1:0] east_data_o
+    , output logic                    east_valid_o
+    , input  logic                    east_ready_i
     // - South
-    , input  logic [STREAM_WIDTH-1:0] south_data_o
-    , input  logic                    south_valid_o
-    , output logic                    south_ready_i
+    , output logic [STREAM_WIDTH-1:0] south_data_o
+    , output logic                    south_valid_o
+    , input  logic                    south_ready_i
     // - West
-    , input  logic [STREAM_WIDTH-1:0] west_data_o
-    , input  logic                    west_valid_o
-    , output logic                    west_ready_i
+    , output logic [STREAM_WIDTH-1:0] west_data_o
+    , output logic                    west_valid_o
+    , input  logic                    west_ready_i
 );
 
 // Constants and enumerations
@@ -74,4 +74,4 @@ assign dist_ready_o = (
                              west_ready_i))
 );
 
-endmodule : nx_stream_distributer
+endmodule : nx_stream_distributor
