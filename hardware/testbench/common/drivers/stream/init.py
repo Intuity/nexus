@@ -46,7 +46,10 @@ class StreamInitiator(Driver):
         # Wait for reset to clear
         while self.reset == 1: await RisingEdge(self.clock)
         # Drive the transaction interface
-        self.intf.data  <= transaction
+        data, dirx = transaction, 0
+        if not isinstance(transaction, int): data, dirx = transaction
+        self.intf.data <= data
+        if hasattr(self.intf, "dir"): self.intf.dir <= dirx
         self.intf.valid <= 1
         while True:
             await RisingEdge(self.clock)
