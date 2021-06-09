@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from enum import IntEnum
+from random import randint
 
 import simpy
 
@@ -82,6 +83,14 @@ class Instruction:
         ) = Instruction.decode(self.raw)
 
     @classmethod
+    def randomise(cls):
+        while True:
+            try:
+                return Instruction(randint(0, (1 << 15) - 1))
+            except Exception:
+                continue
+
+    @classmethod
     def decode(cls, encoded):
         bv = BitVector(encoded, 15)
         return (
@@ -96,7 +105,7 @@ class Instruction:
 
     def __repr__(self):
         return (
-            f"{self.op.name}(" +
+            f"{self.op.name}[0x{self.op:02X}](" +
             ("I" if self.is_input_a else "R") + f"[{self.source_a}]" + "," +
             ("I" if self.is_input_b else "R") + f"[{self.source_b}]" + ")" +
             f" -> R[{self.target}]" + (" -> O" if self.is_output else "")
