@@ -1,0 +1,54 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Wed Jun  9 11:21:15 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_core/sim.vcd"
+[dumpfile_mtime] "Wed Jun  9 11:20:50 2021"
+[dumpfile_size] 206251
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_core/nx_node_core.gtkw"
+[timestart] 0
+[size] 1403 965
+[pos] -1 -1
+*-17.387499 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[treeopen] testbench.dut.
+[sst_width] 193
+[signals_width] 184
+[sst_expanded] 1
+[sst_vpaned_height] 295
+@28
+testbench.dut.clk_i
+testbench.dut.rst_i
+@200
+-
+@22
+testbench.dut.inputs_i[7:0]
+testbench.dut.outputs_o[7:0]
+@200
+-
+@22
+testbench.dut.instr_addr_o[8:0]
+@8024
+testbench.dut.instr_addr_o[8:0]
+@20001
+-
+@28
+testbench.dut.instr_rd_o
+@22
+testbench.dut.instr_data_i[35:0]
+@28
+testbench.dut.instr_stall_i
+@200
+-
+@28
+testbench.dut.trigger_i
+testbench.dut.idle_o
+@24
+testbench.dut.populated_i[8:0]
+@200
+-
+@28
+testbench.dut.exec_state_q
+testbench.dut.fetch_state_q
+[pattern_trace] 1
+[pattern_trace] 0
