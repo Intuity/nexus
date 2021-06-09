@@ -49,9 +49,10 @@ localparam REG_SRC_W    = $clog2(REGISTERS);
 localparam INPUT_SRC_W  = $clog2(REGISTERS);
 localparam SOURCE_WIDTH = (REG_SRC_W > INPUT_SRC_W) ? REG_SRC_W : INPUT_SRC_W;
 
-typedef enum logic {
+typedef enum logic [1:0] {
       IDLE
     , ACTIVE
+    , RESTART
 } core_state_t;
 
 typedef enum logic [OPCODE_WIDTH-1:0] {
@@ -66,8 +67,8 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 } core_op_t;
 
 // Internal state
-`DECLARE_DQ(1,            fetch_state, clk_i, rst_i, IDLE)
-`DECLARE_DQ(1,            exec_state,  clk_i, rst_i, IDLE)
+`DECLARE_DQ(2,            fetch_state, clk_i, rst_i, IDLE)
+`DECLARE_DQ(2,            exec_state,  clk_i, rst_i, IDLE)
 `DECLARE_DQ(INSTR_ADDR_W, pc,          clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
 `DECLARE_DQ(REGISTERS,    working,     clk_i, rst_i, {REGISTERS{1'b0}})
 `DECLARE_DQ(OUTPUTS,      outputs,     clk_i, rst_i, {OUTPUTS{1'b0}})
@@ -77,7 +78,7 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 assign outputs_o    = outputs_q;
 assign idle_o       = (fetch_state_q == IDLE && exec_state_q == IDLE);
 assign instr_addr_o = pc_q;
-assign instr_rd_o   = (fetch_state_q == ACTIVE);
+assign instr_rd_o   = (fetch_state_q != IDLE);
 
 // Fetch handling
 always_comb begin : p_fetch
@@ -86,12 +87,13 @@ always_comb begin : p_fetch
 
     // Start/restart execution on request
     if (trigger_i) begin
-        fetch_state = ACTIVE;
+        fetch_state = (fetch_state == ACTIVE) ? RESTART : ACTIVE;
         pc          = {INSTR_ADDR_W{1'b0}};
 
     // If active and not stalled, increment to the next PC
-    end else if (fetch_state == ACTIVE && !instr_stall_i) begin
-        pc = pc + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
+    end else if (fetch_state != IDLE && !instr_stall_i) begin
+        fetch_state = ACTIVE;
+        pc          = pc + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
 
     end
 
@@ -115,10 +117,14 @@ always_comb begin : p_execute
     `INIT_D(outputs);
     `INIT_D(output_idx);
 
-    // On a restart request, immediately abort execution
-    // TODO: There is a possible misbehaviour here if a fetch was stalled when
-    //       the restart trigger came in - need to protect against that!
-    if (trigger_i) exec_state = IDLE;
+    // On a restart request, abort execution and reset output index
+    if (exec_state == ACTIVE && trigger_i) begin
+        exec_state = RESTART;
+        output_idx = {OUTPUT_IDX_W{1'b0}};
+    // When fetch returns to ACTIVE, allow execution to resume
+    end else if (exec_state == RESTART && fetch_state_q == ACTIVE) begin
+        exec_state = ACTIVE;
+    end
 
     // If execute is active, and fetch not stalled, execute
     if (exec_state == ACTIVE && !instr_stall_i) begin
@@ -153,7 +159,7 @@ always_comb begin : p_execute
         // Generate an output if required
         if (gen_out) begin
             outputs[output_idx] = result;
-            output_idx          = { {(OUTPUT_IDX_W-1){1'b0}}, 1'b1 };
+            output_idx          = output_idx + { {(OUTPUT_IDX_W-1){1'b0}}, 1'b1 };
         end
     end
 
@@ -162,7 +168,9 @@ always_comb begin : p_execute
         output_idx = {OUTPUT_IDX_W{1'b0}};
 
     // Copy the fetch state to inform the next execute cycle
-    if (!instr_stall_i) exec_state = fetch_state_q;
+    if (!instr_stall_i && exec_state != RESTART) begin
+        exec_state = fetch_state_q;
+    end
 end
 
 endmodule : nx_node_core
