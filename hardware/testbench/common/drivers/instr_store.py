@@ -35,19 +35,21 @@ class InstrRequest:
 class InstrStore(Monitor):
     """ Testbench driven instruction store """
 
-    def __init__(self, entity, clock, reset, intf):
+    def __init__(self, entity, clock, reset, intf, resp_cb=None):
         """ Initialise the instruction store.
 
         Args:
-            entity: Pointer to the testbench/DUT
-            clock : Clock signal for the interface
-            reset : Reset signal for the interface
-            intf  : Interface
+            entity : Pointer to the testbench/DUT
+            clock  : Clock signal for the interface
+            reset  : Reset signal for the interface
+            intf   : Interface
+            resp_cb: Callback function to retrieve responses
         """
-        self.entity = entity
-        self.clock  = clock
-        self.reset  = reset
-        self.intf   = intf
+        self.entity  = entity
+        self.clock   = clock
+        self.reset   = reset
+        self.intf    = intf
+        self.resp_cb = resp_cb
         super().__init__()
 
     async def _monitor_recv(self):
@@ -68,13 +70,14 @@ class InstrStore(Monitor):
                 if choice((True, False)):
                     self.intf.stall <= 1
                     stalled = randint(1, 5)
-                    self.log.info(f"Stalling instruction interface for {stalled} cycles")
+                    self.log.debug(f"Stalling instruction interface for {stalled} cycles")
                     await ClockCycles(self.clock, stalled)
                     self.intf.stall <= 0
                 # Respond
                 width = max(self.intf.data._range)-min(self.intf.data._range)+1
-                data  = randint(0, (1 << width) - 1)
-                self.log.info(f"Responding with data 0x{data:010X}")
+                if self.resp_cb: data = self.resp_cb(self, address)
+                else           : data = randint(0, (1 << width) - 1)
+                self.log.debug(f"Responding with data 0x{data:010X}")
                 self.intf.data <= data
                 # Capture this request
                 self._recv(InstrRequest(address, stalled, data))
