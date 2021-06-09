@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Wed Jun  9 11:21:15 2021
+[*] Wed Jun  9 12:15:57 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_core/sim.vcd"
-[dumpfile_mtime] "Wed Jun  9 11:20:50 2021"
-[dumpfile_size] 206251
+[dumpfile_mtime] "Wed Jun  9 12:15:20 2021"
+[dumpfile_size] 27675
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_core/nx_node_core.gtkw"
 [timestart] 0
 [size] 1403 965
 [pos] -1 -1
-*-17.387499 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.468424 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.dut.
 [sst_width] 193
-[signals_width] 184
+[signals_width] 225
 [sst_expanded] 1
 [sst_vpaned_height] 295
 @28
@@ -23,14 +23,26 @@ testbench.dut.rst_i
 -
 @22
 testbench.dut.inputs_i[7:0]
+@c00022
 testbench.dut.outputs_o[7:0]
+@28
+(0)testbench.dut.outputs_o[7:0]
+(1)testbench.dut.outputs_o[7:0]
+(2)testbench.dut.outputs_o[7:0]
+(3)testbench.dut.outputs_o[7:0]
+(4)testbench.dut.outputs_o[7:0]
+(5)testbench.dut.outputs_o[7:0]
+(6)testbench.dut.outputs_o[7:0]
+(7)testbench.dut.outputs_o[7:0]
+@1401200
+-group_end
 @200
 -
 @22
 testbench.dut.instr_addr_o[8:0]
 @8024
 testbench.dut.instr_addr_o[8:0]
-@20001
+@20000
 -
 @28
 testbench.dut.instr_rd_o
@@ -47,8 +59,27 @@ testbench.dut.idle_o
 testbench.dut.populated_i[8:0]
 @200
 -
+@25
+testbench.dut.exec_state_q[1:0]
+@24
+testbench.dut.fetch_state_q[1:0]
+testbench.dut.output_idx_q[2:0]
+@200
+-
+@22
+testbench.dut.p_execute.opcode[2:0]
 @28
-testbench.dut.exec_state_q
-testbench.dut.fetch_state_q
+testbench.dut.p_execute.src_ip_a
+@24
+testbench.dut.p_execute.src_a[2:0]
+@28
+testbench.dut.p_execute.src_ip_b
+@24
+testbench.dut.p_execute.src_b[2:0]
+@28
+testbench.dut.p_execute.tgt_reg[2:0]
+testbench.dut.p_execute.val_a
+testbench.dut.p_execute.val_b
+testbench.dut.p_execute.gen_out
 [pattern_trace] 1
 [pattern_trace] 0
