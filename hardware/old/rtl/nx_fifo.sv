@@ -17,18 +17,18 @@ module nx_fifo #(
     , parameter WIDTH    =    32 // The width of each FIFO entry
     , parameter FULL_LVL = DEPTH // The level at which the full flag is raised
 ) (
-      input  logic clk
-    , input  logic rst
+      input  logic                     clk_i
+    , input  logic                     rst_i
     // Write interface
-    , input  logic [WIDTH-1:0] wr_data
-    , input  logic             wr_push
+    , input  logic [WIDTH-1:0]         wr_data_i
+    , input  logic                     wr_push_i
     // Read interface
-    , output logic [WIDTH-1:0] rd_data
-    , input  logic             rd_pop
+    , output logic [WIDTH-1:0]         rd_data_o
+    , input  logic                     rd_pop_i
     // Status
-    , output logic [$clog2(DEPTH)-1:0] level
-    , output logic                     empty
-    , output logic                     full
+    , output logic [$clog2(DEPTH)-1:0] level_o
+    , output logic                     empty_o
+    , output logic                     full_o
 );
 
 localparam PTR_W    = $clog2(DEPTH);
@@ -39,32 +39,32 @@ logic [WIDTH-1:0] m_data [DEPTH-1:0];
 logic [PTR_W-1:0] m_wr_ptr, m_rd_ptr;
 logic [PTR_W  :0] m_level;
 
-assign rd_data = m_data[m_rd_ptr];
-assign level   = m_level;
-assign empty   = (m_level ==        0);
-assign full    = (m_level == FULL_LVL);
+assign rd_data_o = m_data[m_rd_ptr];
+assign level_o   = m_level;
+assign empty_o   = (m_level ==        0);
+assign full_o    = (m_level == FULL_LVL);
 
 logic m_truly_full = (m_level == DEPTH);
 
-always @(posedge clk, posedge rst) begin : p_handle
-    if (rst) begin
+always @(posedge clk_i, posedge rst_i) begin : p_handle
+    if (rst_i) begin
         m_wr_ptr <= {PTR_W{1'b0}};
         m_rd_ptr <= {PTR_W{1'b0}};
         m_level  <= {(PTR_W+1){1'b0}};
     end else begin
         // Pop from FIFO if not empty
-        if (rd_pop && !empty) begin
+        if (rd_pop_i && !empty_o) begin
             m_rd_ptr <= (m_rd_ptr + PTR_STEP) % DEPTH;
         end
         // Push to FIFO if not full, or top entry just popped
-        if (wr_push && (!m_truly_full || rd_pop)) begin
-            m_data[m_wr_ptr] <= wr_data;
+        if (wr_push_i && (!m_truly_full || rd_pop_i)) begin
+            m_data[m_wr_ptr] <= wr_data_i;
             m_wr_ptr         <= (m_wr_ptr + PTR_STEP) % DEPTH;
         end
         // Update the level
-        if (wr_push && !rd_pop && !m_truly_full)
+        if (wr_push_i && !rd_pop_i && !m_truly_full)
             m_level <= (m_level + LVL_STEP);
-        else if (!wr_push && rd_pop && !empty)
+        else if (!wr_push_i && rd_pop_i && !empty)
             m_level <= (m_level - LVL_STEP);
     end
 end
