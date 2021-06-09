@@ -139,3 +139,9 @@ tests/*/work
 *.log
 *.vvp
 
+# CocoTB
+*.xml
+
+# VSCode
+.vscode
+
