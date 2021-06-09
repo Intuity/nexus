@@ -19,18 +19,19 @@
 // Declares a combinatorial-sequential logic pair, and sets up the sequential
 // logic portion.
 // Args:
+//  W: Width of the signal
 //  X: Name of the signal
 //  C: Clock signal driving sequential logic
 //  R: Reset signal driving sequential logic
 //  I: Initial value for the signal to take
 //
-`define DECLARE_DQ(X, C, R, I) \
-    m_``X``_d, m_``X``_q; \
+`define DECLARE_DQ(W, X, C, R, I) \
+    logic [W-1:0] ``X``, ``X``_q; \
     always_ff @(posedge C, posedge R) begin : s_``X \
         if (R) begin \
-            m_``X``_q <= (I); \
+            ``X``_q <= (I); \
         end else begin \
-            m_``X``_q <= m_``X``_d; \
+            ``X``_q <= ``X``; \
         end \
     end
 
@@ -40,6 +41,6 @@
 // Args:
 //  X: Name of the signal
 //
-`define INIT_D(X) m_``X``_d = m_``X``_q
+`define INIT_D(X) ``X`` = ``X``_q
 
 `endif // __NX_COMMON_SVH__

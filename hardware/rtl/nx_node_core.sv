@@ -12,211 +12,157 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`timescale 1ns/1ps
-
-/*
-Notes:
-  1. Form of instructions: { OPERATION, INPUT_A, INPUT_B, TARGET, FLAG, OUTPUT }
-*/
-
 `include "nx_common.svh"
 
+// nx_node_core
+// Evaluates instruction sequence against input values and internal register
+// state to produce outputs
+//
 module nx_node_core #(
-      parameter OP_W   =  4 // Operand encoding width
-    , parameter REG_W  = 16 // Internal register width
-    , parameter IO_W   =  4 // Primary inputs/outputs width
-    , parameter SLOTS  = 32 // How many instruction slots are available
-    , parameter INST_W = OP_W + (3 * $clog2(REG_W)) + 1 + $clog2(IO_W) // Calculate instruction width
+      parameter INPUTS       =   8 // Number of input signals
+    , parameter OUTPUTS      =   8 // Number of output signals
+    , parameter REGISTERS    =   8 // Number of internal registers
+    , parameter MAX_INSTRS   = 512 // Maximum instructions
+    , parameter INSTR_WIDTH  =  36 // Width of each instruction
+    , parameter OPCODE_WIDTH =   3 // Width of each opcode
 ) (
-      input  logic                     clk
-    , input  logic                     rst
-    // External controls
-    , input  logic                     tick
-    , input  logic                     stall
-    // State outputs
-    , output logic                     in_setup
-    , output logic                     in_wait
-    , output logic                     in_run
-    // Instruction load
-    , input  logic [       INST_W-1:0] load_instr
-    , input  logic [$clog2(SLOTS)-1:0] load_slot
-    , input  logic                     load_last
-    , input  logic                     load_valid
-    // Input load
-    , input  logic                     in_value
-    , input  logic [ $clog2(IO_W)-1:0] in_index
-    , input  logic                     in_valid
-    // Value output
-    , output logic [         IO_W-1:0] out_values
-    , output logic [         IO_W-1:0] out_valids
+      input  logic                          clk_i
+    , input  logic                          rst_i
+    // I/O from simulated logic
+    , input  logic [            INPUTS-1:0] inputs_i      // Input vector
+    , output logic [           OUTPUTS-1:0] outputs_o     // Output vector
+    // Execution controls
+    , input  logic [$clog2(MAX_INSTRS)-1:0] populated_i   // # of populated instructions
+    , input  logic                          trigger_i     // Trigger execution
+    , output logic                          idle_o        // Core idle flag
+    // Instruction fetch
+    , output logic [$clog2(MAX_INSTRS)-1:0] instr_addr_o  // Instruction fetch address
+    , output logic                          instr_rd_o    // Read enable
+    , input  logic [       INSTR_WIDTH-1:0] instr_data_i  // Instruction data
+    , input  logic                          instr_stall_i // Fetch stall
 );
 
-localparam STEP_W = $clog2(SLOTS);
+// Parameters
+localparam INSTR_ADDR_W = $clog2(MAX_INSTRS);
+localparam OUTPUT_IDX_W = $clog2(OUTPUTS);
+localparam REG_SRC_W    = $clog2(REGISTERS);
+localparam INPUT_SRC_W  = $clog2(REGISTERS);
+localparam SOURCE_WIDTH = (REG_SRC_W > INPUT_SRC_W) ? REG_SRC_W : INPUT_SRC_W;
 
-typedef enum bit [1:0] {
-    STATE_SETUP, // 0: Instructions are loaded in the setup phase
-    STATE_WAIT,  // 1: Waiting for trigger
-    STATE_RUN    // 2: Running instruction sequence
-} nx_core_state_t;
+typedef enum logic {
+      IDLE
+    , ACTIVE
+} core_state_t;
 
-typedef enum bit [OP_W-1:0] {
-    OP_INVERT,
-    OP_AND,
-    OP_NAND,
-    OP_OR,
-    OP_NOR,
-    OP_XOR,
-    OP_XNOR
-} nx_core_op_t;
+typedef enum logic [OPCODE_WIDTH-1:0] {
+      OP_INVERT // 0 - !A
+    , OP_AND    // 1 -   A & B
+    , OP_NAND   // 2 - !(A & B)
+    , OP_OR     // 3 -   A | B
+    , OP_NOR    // 4 - !(A | B)
+    , OP_XOR    // 5 -   A ^ B
+    , OP_XNOR   // 6 - !(A ^ B)
+    , OP_UNUSED // 7 - Unassigned
+} core_op_t;
 
-// =============================================================================
-// State variables
-// =============================================================================
+// Internal state
+`DECLARE_DQ(1,            fetch_state, clk_i, rst_i, IDLE)
+`DECLARE_DQ(1,            exec_state,  clk_i, rst_i, IDLE)
+`DECLARE_DQ(INSTR_ADDR_W, pc,          clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
+`DECLARE_DQ(REGISTERS,    working,     clk_i, rst_i, {REGISTERS{1'b0}})
+`DECLARE_DQ(OUTPUTS,      outputs,     clk_i, rst_i, {OUTPUTS{1'b0}})
+`DECLARE_DQ(OUTPUT_IDX_W, output_idx,  clk_i, rst_i, {OUTPUT_IDX_W{1'b0}})
 
-logic [  IO_W-1:0] `DECLARE_DQ(inputs,    clk, rst, {IO_W{1'b0}}  )
-nx_core_state_t    `DECLARE_DQ(state,     clk, rst, STATE_SETUP   )
-logic [ REG_W-1:0] `DECLARE_DQ(registers, clk, rst, {REG_W{1'b0}} )
-logic [STEP_W-1:0] `DECLARE_DQ(step,      clk, rst, {STEP_W{1'b0}})
-logic [  IO_W-1:0] `DECLARE_DQ(outputs,   clk, rst, {IO_W{1'b0}}  )
-logic [  IO_W-1:0] `DECLARE_DQ(updated,   clk, rst, {IO_W{1'b0}}  )
+// Construct outputs
+assign outputs_o    = outputs_q;
+assign idle_o       = (fetch_state_q == IDLE && exec_state_q == IDLE);
+assign instr_addr_o = pc_q;
+assign instr_rd_o   = (fetch_state_q == ACTIVE);
 
-// Expose state flags
-assign in_setup = (m_state_q == STATE_SETUP);
-assign in_wait  = (m_state_q == STATE_WAIT );
-assign in_run   = (m_state_q == STATE_RUN  );
+// Fetch handling
+always_comb begin : p_fetch
+    `INIT_D(fetch_state);
+    `INIT_D(pc);
 
-// Expose outputs
-assign out_values = m_outputs_q;
-assign out_valids = m_updated_q;
+    // Start/restart execution on request
+    if (trigger_i) begin
+        fetch_state = ACTIVE;
+        pc          = {INSTR_ADDR_W{1'b0}};
 
-// =============================================================================
-// Instruction store
-// =============================================================================
+    // If active and not stalled, increment to the next PC
+    end else if (fetch_state == ACTIVE && !instr_stall_i) begin
+        pc = pc + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
 
-// NOTE: 1-bit wider than INST_W as it carries a VALID flag where loaded
-logic [INST_W:0] m_instructions [SLOTS-1:0];
-
-// s_load_instr
-// Handle load of instructions into store
-//
-always_ff @(posedge clk, posedge rst) begin : s_load_instr
-    integer i;
-    if (rst) begin
-        for (i = 0; i < SLOTS; i = (i + 1)) m_instructions[i] <= {INST_W{1'b0}};
-    end else if (load_valid) begin
-        m_instructions[load_slot] <= {1'b1, load_instr};
     end
+
+    // If all instructions are consumed, returned to idle
+    if (pc == populated_i && !instr_stall_i) fetch_state = IDLE;
 end
 
-// =============================================================================
-// Combinatorial logic
-// =============================================================================
+// Execution handling
+always_comb begin : p_execute
+    // Working variables
+    core_op_t                opcode;
+    logic [SOURCE_WIDTH-1:0] src_a, src_b;
+    logic                    src_ip_a, src_ip_b;
+    logic [REG_SRC_W-1:0   ] tgt_reg;
+    logic                    gen_out;
+    logic                    val_a, val_b, result;
 
-// c_load_input
-// Handle update of input bits from wrapper layer
-//
-always_comb begin : c_load_input
-    `INIT_D(inputs);
-    if (in_valid) m_inputs_d[in_index] = in_value;
-end
-
-// c_execute
-// Execute boolean operation instructions and produce outputs
-//
-always_comb begin : c_execute
-    integer i;
-
-    nx_core_op_t              operation;
-    logic [$clog2(REG_W)-1:0] reg_in_a, reg_in_b, reg_out;
-    logic                     gen_out;
-    logic [ $clog2(IO_W)-1:0] out_idx;
-    logic                     op_valid;
-    logic                     value_a, value_b, result;
-
-    `INIT_D(state);
-    `INIT_D(registers);
-    `INIT_D(step);
+    // Initialise state
+    `INIT_D(exec_state);
+    `INIT_D(working);
     `INIT_D(outputs);
-    `INIT_D(updated);
+    `INIT_D(output_idx);
 
-    // Always clear the output update flags (just need a 1 cycle pulse)
-    m_updated_d = {IO_W{1'b0}};
+    // On a restart request, immediately abort execution
+    // TODO: There is a possible misbehaviour here if a fetch was stalled when
+    //       the restart trigger came in - need to protect against that!
+    if (trigger_i) exec_state = IDLE;
 
-    case (m_state_d)
-        // SETUP: Wait for the last instruction to be loaded, then transition to
-        //        to WAIT phase
-        STATE_SETUP: begin
-            if (load_valid && load_last) m_state_d = STATE_WAIT;
+    // If execute is active, and fetch not stalled, execute
+    if (exec_state == ACTIVE && !instr_stall_i) begin
+        // Decode the operation
+        {
+            opcode,          // Operation [14:12]
+            src_a, src_ip_a, // Source A + is A input/!register [11:8]
+            src_b, src_ip_b, // Source B + is B input/!register [ 7:4]
+            tgt_reg,         // Target register
+            gen_out          // Generates output flag
+        } = instr_data_i;
+
+        // Pickup the inputs
+        val_a = src_ip_a ? inputs_i[src_a] : working[src_a];
+        val_b = src_ip_b ? inputs_i[src_b] : working[src_b];
+
+        // Perform the operation
+        case (opcode)
+            OP_INVERT: result = ! val_a         ;
+            OP_AND   : result =   val_a & val_b ;
+            OP_NAND  : result = !(val_a & val_b);
+            OP_OR    : result =   val_a | val_b ;
+            OP_NOR   : result = !(val_a | val_b);
+            OP_XOR   : result =   val_a ^ val_b ;
+            OP_XNOR  : result = !(val_a ^ val_b);
+            default  : result = 1'b0;
+        endcase
+
+        // Store the result
+        working[tgt_reg] = result;
+
+        // Generate an output if required
+        if (gen_out) begin
+            outputs[output_idx] = result;
+            output_idx          = { {(OUTPUT_IDX_W-1){1'b0}}, 1'b1 };
         end
-        // WAIT: Wait for the 'tick' pulse which signifies the rising edge of
-        //       the simulated clock
-        STATE_WAIT: begin
-            if (tick) begin
-                // Copy inputs into registers as starting point
-                for (i = 0; i < IO_W; i = (i + 1)) begin
-                    m_registers_d[i] = m_inputs_q[i];
-                end
-                // Reset to first instruction, clear output update flags
-                m_step_d    = {STEP_W{1'b0}};
-                m_updated_d = {IO_W{1'b0}};
-                // Move to the RUN phase
-                m_state_d = STATE_RUN;
-            end
-        end
-        // RUN: Pickup the next instruction to execute
-        STATE_RUN: begin
-            // Decode the operation to perform
-            {
-                op_valid, operation, reg_in_a, reg_in_b, reg_out, gen_out,
-                out_idx
-            } = m_instructions[m_step_d];
-            $display(
-                "%0t - SLOT[%03d] 0x%05x -> Vld: %0b Op: %0h, RA: %0d, RB: %0d, RO: %0d, O: %0d (%0b)",
-                $time, m_step_d, m_instructions[m_step_d], op_valid, operation,
-                reg_in_a, reg_in_b, reg_out, out_idx, gen_out
-            );
-            // If operation is valid, execute it
-            if (op_valid) begin
-                value_a = m_registers_d[reg_in_a];
-                value_b = m_registers_d[reg_in_b];
-                result  = 1'b0;
-                case (operation)
-                    OP_INVERT: result = ~(value_a          );
-                    OP_AND   : result =  (value_a & value_b);
-                    OP_NAND  : result = ~(value_a & value_b);
-                    OP_OR    : result =  (value_a | value_b);
-                    OP_NOR   : result = ~(value_a | value_b);
-                    OP_XOR   : result =  (value_a ^ value_b);
-                    OP_XNOR  : result = ~(value_a ^ value_b);
-                endcase
-                $display(
-                    "%0t - SLOT[%03d] VA: %0b, VB: %0b -> R: %0b (%0d)",
-                    $time, m_step_d, value_a, value_b, result, reg_out
-                );
-                m_registers_d[reg_out] = result;
-                // If output generation is marked, store and flag
-                if (gen_out) begin
-                    m_outputs_d[out_idx] = result;
-                    m_updated_d[out_idx] = 1'b1;
-                end
-            end
-            // For last or invalid instructions, transition to WAIT state
-            if (m_step_d == SLOTS || !op_valid) m_state_d = STATE_WAIT;
-            // Otherwise, move to the next instruction
-            else m_step_d = m_step_d + { {(STEP_W-1){1'b0}}, 1'b1 };
-        end
-    endcase
+    end
+
+    // When transitioning to active, reset the outputs
+    if (exec_state == IDLE && fetch_state_q == ACTIVE)
+        output_idx = {OUTPUT_IDX_W{1'b0}};
+
+    // Copy the fetch state to inform the next execute cycle
+    if (!instr_stall_i) exec_state = fetch_state_q;
 end
 
-// Aliases for VCD tracing
-`ifndef SYNTHESIS
-generate
-    genvar idx;
-    for (idx = 0; idx < SLOTS; idx = (idx + 1)) begin : m_alias
-        logic [INST_W-1:0] m_instr_alias;
-        assign m_instr_alias = m_instructions[idx];
-    end
-endgenerate
-`endif
-
-endmodule
+endmodule : nx_node_core
