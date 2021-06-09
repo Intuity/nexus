@@ -1,0 +1,59 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Wed Jun  9 15:52:44 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_distributer/sim.vcd"
+[dumpfile_mtime] "Wed Jun  9 15:51:27 2021"
+[dumpfile_size] 269059
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_distributer/nx_stream_distributer.gtkw"
+[timestart] 0
+[size] 1666 1011
+[pos] -93 -412
+*-16.569851 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[sst_width] 193
+[signals_width] 208
+[sst_expanded] 1
+[sst_vpaned_height] 311
+@28
+testbench.dut.clk_i
+testbench.dut.rst_i
+@200
+-
+@22
+testbench.dut.dist_data_i[31:0]
+@28
+testbench.dut.dist_dir_i[1:0]
+testbench.dut.dist_valid_i
+testbench.dut.dist_ready_o
+@200
+-
+@22
+testbench.dut.north_data_o[31:0]
+@29
+testbench.dut.north_valid_o
+@28
+testbench.dut.north_ready_i
+@200
+-
+@22
+testbench.dut.east_data_o[31:0]
+@28
+testbench.dut.east_valid_o
+testbench.dut.east_ready_i
+@200
+-
+@22
+testbench.dut.south_data_o[31:0]
+@28
+testbench.dut.south_valid_o
+testbench.dut.south_ready_i
+@200
+-
+@22
+testbench.dut.west_data_o[31:0]
+@28
+testbench.dut.west_valid_o
+testbench.dut.west_ready_i
+[pattern_trace] 1
+[pattern_trace] 0
