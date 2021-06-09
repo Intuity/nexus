@@ -15,7 +15,7 @@
 `include "nx_common.svh"
 
 // nx_stream_arbiter
-// Arbitrates between different inbound message streams,
+// Arbitrates between multiple inbound message streams
 //
 module nx_stream_arbiter #(
     parameter STREAM_WIDTH = 32
@@ -59,7 +59,6 @@ typedef enum logic [1:0] {
 `DECLARE_DQ(1, locked, clk_i, rst_i, 1'b0)
 
 // Construct outputs
-// NOTE: This uses the combinatorial version of 'choice', not sequential!
 assign arb_data_o = (
      (choice_q == NORTH) ? north_data_i :
     ((choice_q == EAST ) ? east_data_i  :
