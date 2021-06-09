@@ -11,18 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from .io_common import BaseIO
-
-class InstrIO(BaseIO):
-    """ Bus carrying instruction fetch signals """
-
-    def __init__(self, dut, name, role):
-        """ Initialise InstrIO.
-
-        Args:
-            dut : Pointer to the DUT boundary
-            name: Name of the signal - acts as a prefix
-            role: Role of this signal on the DUT boundary
-        """
-        super().__init__(dut, name, role, ["addr", "rd"], ["data", "stall"])

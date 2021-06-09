@@ -45,6 +45,7 @@ class InstrStore(Monitor):
             intf   : Interface
             resp_cb: Callback function to retrieve responses
         """
+        self.name    = "InstrStore"
         self.entity  = entity
         self.clock   = clock
         self.reset   = reset

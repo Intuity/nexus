@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import cocotb
-from cocotb.triggers import RisingEdge
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
-from drivers.instr_io import InstrIO
-from drivers.instr_store import InstrStore
+from drivers.instr.io import InstrIO
+from drivers.instr.store import InstrStore
 
 class Testbench(TestbenchBase):
 
