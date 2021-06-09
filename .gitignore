@@ -141,6 +141,7 @@ tests/*/work
 
 # CocoTB
 *.xml
+sim_build
 
 # VSCode
 .vscode
