@@ -78,4 +78,4 @@ run: results.xml
 
 .PHONY: view
 view:
-	$(PREFIX)$(GTKWAVE) $(SIM_VCD) $(GTKW_CFG) &
+	$(PREFIX)$(GTKWAVE) $(SIM_VCD) $(wildcard $(GTKW_CFG)) &
