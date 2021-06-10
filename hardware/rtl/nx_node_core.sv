@@ -23,7 +23,7 @@ module nx_node_core #(
     , parameter OUTPUTS      =   8 // Number of output signals
     , parameter REGISTERS    =   8 // Number of internal registers
     , parameter MAX_INSTRS   = 512 // Maximum instructions
-    , parameter INSTR_WIDTH  =  36 // Width of each instruction
+    , parameter INSTR_WIDTH  =  15 // Width of each instruction
     , parameter OPCODE_WIDTH =   3 // Width of each opcode
 ) (
       input  logic                          clk_i
