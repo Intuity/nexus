@@ -19,10 +19,14 @@
 // marked with broadcast
 //
 module nx_msg_decoder #(
-      parameter STREAM_WIDTH   = 32
-    , parameter ADDR_ROW_WIDTH =  4
-    , parameter ADDR_COL_WIDTH =  4
-    , parameter COMMAND_WIDTH  =  2
+      parameter STREAM_WIDTH   = 32 // Width of the stream interface
+    , parameter ADDR_ROW_WIDTH =  4 // Message row address field width
+    , parameter ADDR_COL_WIDTH =  4 // Message column address field width
+    , parameter COMMAND_WIDTH  =  2 // Message command field width
+    , parameter INSTR_WIDTH    = 15 // Width of each instruction
+    , parameter INPUTS         =  8 // Number of inputs
+    , parameter OUTPUTS        =  8 // Number of outputs
+    , parameter MAX_IO         = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS)
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -39,27 +43,53 @@ module nx_msg_decoder #(
     , output logic [             1:0] bypass_dir_o
     , output logic                    bypass_valid_o
     , input  logic                    bypass_ready_i
+    // I/O mapping handling
+    , output logic [ $clog2(MAX_IO)-1:0] map_io_o         // Which slot to configure
+    , output logic                       map_input_o      // High - maps an input, low - maps an output
+    , output logic [ ADDR_ROW_WIDTH-1:0] map_remote_row_o // The destination/source node row
+    , output logic [ ADDR_COL_WIDTH-1:0] map_remote_col_o // The destination/source node column
+    , output logic [$clog2(OUTPUTS)-1:0] map_remote_idx_o // The destination/source node I/O index
+    , output logic                       map_slot_o       // Which slot to program (for multiple outputs)
+    , output logic                       map_broadcast_o  // Flag to send output as broadcast
+    , output logic                       map_seq_o        // Flag to set input as sequential
+    , output logic                       map_valid_o      // Mapping is valid
+    // Signal state update
+    , output logic [ ADDR_ROW_WIDTH-1:0] signal_remote_row_o // The source node row
+    , output logic [ ADDR_COL_WIDTH-1:0] signal_remote_col_o // The source node column
+    , output logic [$clog2(OUTPUTS)-1:0] signal_remote_idx_o // The source node output index
+    , output logic                       signal_state_o      // State of the signal
+    , output logic                       signal_valid_o      // Signal update is valid
+    // Instruction load
+    , output logic [INSTR_WIDTH-1:0] instr_data_o  // Instruction data
+    , output logic                   instr_valid_o // Instruction valid
 );
 
 // Parameters and constants
-localparam BC_DECAY_WIDTH = ADDR_ROW_WIDTH + ADDR_COL_WIDTH;
-localparam PAYLOAD_WIDTH  = (
+localparam BIT_INDEX_WIDTH = $clog2(MAX_IO);
+localparam BC_DECAY_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH;
+localparam PAYLOAD_WIDTH   = (
     STREAM_WIDTH - 1 - ADDR_ROW_WIDTH - ADDR_COL_WIDTH - COMMAND_WIDTH
 );
 
 `include "nx_constants.svh"
 
 // Internal state
-`DECLARE_DQ(4,            send_dir,  clk_i, rst_i, 4'd0)
-`DECLARE_DQ(1,            fifo_pop,  clk_i, rst_i, 1'b0)
-`DECLARE_DQ(STREAM_WIDTH, byp_data,  clk_i, rst_i, {STREAM_WIDTH{1'b0}})
-`DECLARE_DQ(2,            byp_dir,   clk_i, rst_i, 2'b0)
-`DECLARE_DQ(1,            byp_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ(4,            send_dir,     clk_i, rst_i, 4'd0)
+`DECLARE_DQ(1,            fifo_pop,     clk_i, rst_i, 1'b0)
+`DECLARE_DQ(STREAM_WIDTH, byp_data,     clk_i, rst_i, {STREAM_WIDTH{1'b0}})
+`DECLARE_DQ(2,            byp_dir,      clk_i, rst_i, 2'b0)
+`DECLARE_DQ(1,            byp_valid,    clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,            map_valid,    clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,            signal_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,            instr_valid,  clk_i, rst_i, 1'b0)
 
 // Construct outputs
 assign bypass_data_o  = byp_data_q;
 assign bypass_dir_o   = byp_dir_q;
 assign bypass_valid_o = byp_valid_q;
+assign map_valid_o    = map_valid;
+assign signal_valid_o = signal_valid;
+assign instr_valid_o  = instr_valid;
 
 // Inbound FIFO - buffer incoming messages ready for digestion
 logic                      fifo_empty, fifo_full;
@@ -94,8 +124,43 @@ logic [BC_DECAY_WIDTH-1:0] bc_decay;
 logic [ COMMAND_WIDTH-1:0] command;
 logic [ PAYLOAD_WIDTH-1:0] payload;
 
+// - Decode fields from the FIFO output data
 assign { arrival_dir, broadcast, addr_row, addr_col, command, payload } = fifo_data;
 assign bc_decay = { addr_row, addr_col };
+
+// - Extract I/O mapping from payload
+localparam MAP_REMOTE_ROW_MSB = PAYLOAD_WIDTH - 1;
+localparam MAP_REMOTE_COL_MSB = MAP_REMOTE_ROW_MSB - ADDR_ROW_WIDTH;
+localparam MAP_REMOTE_IDX_MSB = MAP_REMOTE_COL_MSB - ADDR_COL_WIDTH;
+localparam MAP_IO_MSB         = MAP_REMOTE_IDX_MSB - BIT_INDEX_WIDTH;
+localparam MAP_SEQ_MSB        = MAP_IO_MSB - BIT_INDEX_WIDTH;
+localparam MAP_SLOT_MSB       = MAP_SEQ_MSB;
+localparam MAP_BROADCAST_MSB  = MAP_SLOT_MSB - 1;
+
+assign map_input_o      = (command == CMD_CFG_INPUT);
+assign map_remote_row_o = payload[MAP_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
+assign map_remote_col_o = payload[MAP_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
+assign map_remote_idx_o = payload[MAP_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
+assign map_io_o         = payload[MAP_IO_MSB        -:BIT_INDEX_WIDTH];
+assign map_seq_o        = payload[MAP_SEQ_MSB];
+assign map_slot_o       = payload[MAP_SLOT_MSB];
+assign map_broadcast_o  = payload[MAP_BROADCAST_MSB];
+
+// - Extract signal state update from payload
+localparam SIG_REMOTE_ROW_MSB = PAYLOAD_WIDTH - 1;
+localparam SIG_REMOTE_COL_MSB = SIG_REMOTE_ROW_MSB - ADDR_ROW_WIDTH;
+localparam SIG_REMOTE_IDX_MSB = SIG_REMOTE_COL_MSB - ADDR_COL_WIDTH;
+localparam SIG_STATE_MSB      = SIG_REMOTE_IDX_MSB - BIT_INDEX_WIDTH;
+
+assign signal_remote_row_o = payload[SIG_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
+assign signal_remote_col_o = payload[SIG_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
+assign signal_remote_idx_o = payload[SIG_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
+assign signal_state_o      = payload[SIG_STATE_MSB];
+
+// Extract instruction load from payload
+localparam INSTR_DATA_MSB = PAYLOAD_WIDTH - 1;
+
+assign instr_data_o = payload[INSTR_DATA_MSB-:INSTR_WIDTH];
 
 always_comb begin : p_decode
     // Working variables
@@ -107,6 +172,14 @@ always_comb begin : p_decode
     `INIT_D(byp_data);
     `INIT_D(byp_dir);
     `INIT_D(byp_valid);
+    `INIT_D(map_valid);
+    `INIT_D(signal_valid);
+    `INIT_D(instr_valid);
+
+    // Always clear interface valids (no backpressure on these interfaces)
+    map_valid    = 1'b0;
+    signal_valid = 1'b0;
+    instr_valid  = 1'b0;
 
     // If bypass data accepted, clear the valid and direction flag
     if (byp_valid && bypass_ready_i) begin
@@ -123,16 +196,16 @@ always_comb begin : p_decode
         if (broadcast || (addr_row == node_row_i && addr_col == node_col_i)) begin
             case (command)
                 CMD_LOAD_INSTR: begin
-
+                    instr_valid = 1'b1;
                 end
                 CMD_CFG_INPUT: begin
-
+                    map_valid = 1'b1;
                 end
                 CMD_CFG_OUTPUT: begin
-
+                    map_valid = 1'b1;
                 end
                 CMD_SIG_STATE: begin
-
+                    signal_valid = 1'b1;
                 end
             endcase
         end
