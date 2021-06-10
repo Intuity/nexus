@@ -47,14 +47,18 @@ class BaseIO:
         for comp in self.__init_sigs:
             sig  = f"{self.__name}_{comp}_"
             sig += "o" if self.__role == IORole.INITIATOR else "i"
-            if not hasattr(self.__dut, sig): continue
+            if not hasattr(self.__dut, sig):
+                print(f"{type(self).__name__}: Did not find I/O component {sig} on {dut}")
+                continue
             sig_ptr = getattr(self.__dut, sig)
             self.__initiators.append(sig_ptr)
             setattr(self, comp, sig_ptr)
         for comp in self.__resp_sigs:
             sig  = f"{self.__name}_{comp}_"
             sig += "i" if self.__role == IORole.INITIATOR else "o"
-            if not hasattr(self.__dut, sig): continue
+            if not hasattr(self.__dut, sig):
+                print(f"{type(self).__name__}: Did not find I/O component {sig} on {dut}")
+                continue
             sig_ptr = getattr(self.__dut, sig)
             self.__responders.append(sig_ptr)
             setattr(self, comp, sig_ptr)
