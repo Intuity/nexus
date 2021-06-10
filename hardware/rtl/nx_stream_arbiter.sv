@@ -47,34 +47,29 @@ module nx_stream_arbiter #(
 );
 
 // Constants and enumerations
-typedef enum logic [1:0] {
-      NORTH
-    , EAST
-    , SOUTH
-    , WEST
-} arb_dir_t;
+`include "nx_constants.svh"
 
 // Internal state
-`DECLARE_DQ(2, choice, clk_i, rst_i, NORTH)
+`DECLARE_DQ(2, choice, clk_i, rst_i, DIRX_NORTH)
 `DECLARE_DQ(1, locked, clk_i, rst_i, 1'b0)
 
 // Construct outputs
 assign arb_data_o = (
-     (choice_q == NORTH) ? north_data_i :
-    ((choice_q == EAST ) ? east_data_i  :
-    ((choice_q == SOUTH) ? south_data_i :
-                           west_data_i))
+     (choice_q == DIRX_NORTH) ? north_data_i :
+    ((choice_q == DIRX_EAST ) ? east_data_i  :
+    ((choice_q == DIRX_SOUTH) ? south_data_i :
+                                west_data_i))
 );
 assign arb_valid_o = (
-     (choice_q == NORTH) ? north_valid_i :
-    ((choice_q == EAST ) ? east_valid_i  :
-    ((choice_q == SOUTH) ? south_valid_i :
-                           west_valid_i))
+     (choice_q == DIRX_NORTH) ? north_valid_i :
+    ((choice_q == DIRX_EAST ) ? east_valid_i  :
+    ((choice_q == DIRX_SOUTH) ? south_valid_i :
+                                west_valid_i))
 );
-assign north_ready_o = arb_ready_i && (choice_q == NORTH);
-assign east_ready_o  = arb_ready_i && (choice_q == EAST );
-assign south_ready_o = arb_ready_i && (choice_q == SOUTH);
-assign west_ready_o  = arb_ready_i && (choice_q == WEST );
+assign north_ready_o = arb_ready_i && (choice_q == DIRX_NORTH);
+assign east_ready_o  = arb_ready_i && (choice_q == DIRX_EAST );
+assign south_ready_o = arb_ready_i && (choice_q == DIRX_SOUTH);
+assign west_ready_o  = arb_ready_i && (choice_q == DIRX_WEST );
 assign arb_dir_o     = choice_q;
 
 // Arbitration
@@ -96,10 +91,10 @@ always_comb begin : p_arbitrate
         for (idx = 0; idx < 4; idx = (idx + 1)) begin
             if (!found) begin
                 case (choice + idx[1:0] + 2'd1)
-                    NORTH: found = north_valid_i;
-                    EAST : found = east_valid_i;
-                    SOUTH: found = south_valid_i;
-                    WEST : found = west_valid_i;
+                    DIRX_NORTH: found = north_valid_i;
+                    DIRX_EAST : found = east_valid_i;
+                    DIRX_SOUTH: found = south_valid_i;
+                    DIRX_WEST : found = west_valid_i;
                 endcase
                 if (found) choice = (choice + idx[1:0] + 2'd1);
             end

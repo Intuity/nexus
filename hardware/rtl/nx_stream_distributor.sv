@@ -47,31 +47,26 @@ module nx_stream_distributor #(
 );
 
 // Constants and enumerations
-typedef enum logic [1:0] {
-      NORTH
-    , EAST
-    , SOUTH
-    , WEST
-} dist_dir_t;
+`include "nx_constants.svh"
 
 // Construct outputs
 assign north_data_o  = dist_data_i;
-assign north_valid_o = dist_valid_i && (dist_dir_i == NORTH);
+assign north_valid_o = dist_valid_i && (dist_dir_i == DIRX_NORTH);
 
 assign east_data_o   = dist_data_i;
-assign east_valid_o  = dist_valid_i && (dist_dir_i == EAST);
+assign east_valid_o  = dist_valid_i && (dist_dir_i == DIRX_EAST);
 
 assign south_data_o  = dist_data_i;
-assign south_valid_o = dist_valid_i && (dist_dir_i == SOUTH);
+assign south_valid_o = dist_valid_i && (dist_dir_i == DIRX_SOUTH);
 
 assign west_data_o   = dist_data_i;
-assign west_valid_o  = dist_valid_i && (dist_dir_i == WEST);
+assign west_valid_o  = dist_valid_i && (dist_dir_i == DIRX_WEST);
 
 assign dist_ready_o = (
-     (dist_dir_i == NORTH) ? north_ready_i :
-    ((dist_dir_i == EAST ) ? east_ready_i  :
-    ((dist_dir_i == SOUTH) ? south_ready_i :
-                             west_ready_i))
+     (dist_dir_i == DIRX_NORTH) ? north_ready_i :
+    ((dist_dir_i == DIRX_EAST ) ? east_ready_i  :
+    ((dist_dir_i == DIRX_SOUTH) ? south_ready_i :
+                                  west_ready_i))
 );
 
 endmodule : nx_stream_distributor
