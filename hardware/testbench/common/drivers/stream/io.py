@@ -12,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from enum import IntEnum
+
 from ..io_common import BaseIO
+
+class StreamDirection(IntEnum):
+    NORTH = 0
+    EAST  = 1
+    SOUTH = 2
+    WEST  = 3
 
 class StreamIO(BaseIO):
     """ Message stream interface between nodes """
