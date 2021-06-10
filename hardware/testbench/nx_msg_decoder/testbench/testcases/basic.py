@@ -17,7 +17,7 @@ from random import choice, randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from drivers.stream.io import StreamDirection
+from nx_constants import Direction
 
 from ..testbench import testcase
 
@@ -48,10 +48,15 @@ async def broadcast(dut, backpressure):
     # Activate/deactivate backpressure
     dut.bypass.delays = backpressure
 
+    # Unregister IO mapping, instruction, and signal state interfaces from monitor
+    dut.instr_load._callbacks = []
+    dut.io_map._callbacks     = []
+    dut.state._callbacks      = []
+
     # Generate many random messages
     for _ in range(1000):
         # Choose a random direction
-        dirx = choice(list(StreamDirection))
+        dirx = choice(list(Direction))
 
         # Form and queue a broadcast message
         command = randint(0, (1 <<  2) - 1)
@@ -67,18 +72,18 @@ async def broadcast(dut, backpressure):
         bc_msg  = msg & 0x807F_FFFF
         bc_msg |= (7 << 23) # [30:23] Broadcast decay
         dut.debug(f"Expecting message 0x{bc_msg:08X}")
-        if dirx == StreamDirection.NORTH: # Sends to east, south, & west
-            dut.expected.append((bc_msg, int(StreamDirection.EAST )))
-            dut.expected.append((bc_msg, int(StreamDirection.SOUTH)))
-            dut.expected.append((bc_msg, int(StreamDirection.WEST )))
-        elif dirx == StreamDirection.EAST: # Sends just to the west
-            dut.expected.append((bc_msg, int(StreamDirection.WEST )))
-        elif dirx == StreamDirection.SOUTH: # Sends to north, east, & west
-            dut.expected.append((bc_msg, int(StreamDirection.NORTH)))
-            dut.expected.append((bc_msg, int(StreamDirection.EAST )))
-            dut.expected.append((bc_msg, int(StreamDirection.WEST )))
-        elif dirx == StreamDirection.WEST: # Sends just to the east
-            dut.expected.append((bc_msg, int(StreamDirection.EAST )))
+        if dirx == Direction.NORTH: # Sends to east, south, & west
+            dut.exp_bypass.append((bc_msg, int(Direction.EAST )))
+            dut.exp_bypass.append((bc_msg, int(Direction.SOUTH)))
+            dut.exp_bypass.append((bc_msg, int(Direction.WEST )))
+        elif dirx == Direction.EAST: # Sends just to the west
+            dut.exp_bypass.append((bc_msg, int(Direction.WEST )))
+        elif dirx == Direction.SOUTH: # Sends to north, east, & west
+            dut.exp_bypass.append((bc_msg, int(Direction.NORTH)))
+            dut.exp_bypass.append((bc_msg, int(Direction.EAST )))
+            dut.exp_bypass.append((bc_msg, int(Direction.WEST )))
+        elif dirx == Direction.WEST: # Sends just to the east
+            dut.exp_bypass.append((bc_msg, int(Direction.EAST )))
 
 factory = TestFactory(broadcast)
 factory.add_option("backpressure", [True, False])
@@ -98,6 +103,11 @@ async def redirect(dut):
     # Activate/deactivate backpressure
     dut.bypass.delays = True
 
+    # Unregister IO mapping, instruction, and signal state interfaces from monitor
+    dut.instr_load._callbacks = []
+    dut.io_map._callbacks     = []
+    dut.state._callbacks      = []
+
     for _ in range(1000):
         # Choose a random target (that is not the same as this cell)
         tgt_row, tgt_col = 0, 0
@@ -114,10 +124,10 @@ async def redirect(dut):
         msg |= (command << 21) # [22:21] Command
         msg |= (payload <<  0) # [20: 0] Payload
         dut.debug(f"Transmit message 0x{msg:08X} to {tgt_row}, {tgt_col}")
-        dut.msg.append((msg, int(choice(list(StreamDirection)))))
+        dut.msg.append((msg, int(choice(list(Direction)))))
 
         # Queue up the expected message
-        if   tgt_row < row: dut.expected.append((msg, int(StreamDirection.NORTH)))
-        elif tgt_row > row: dut.expected.append((msg, int(StreamDirection.SOUTH)))
-        elif tgt_col < col: dut.expected.append((msg, int(StreamDirection.WEST )))
-        elif tgt_col > col: dut.expected.append((msg, int(StreamDirection.EAST )))
+        if   tgt_row < row: dut.exp_bypass.append((msg, int(Direction.NORTH)))
+        elif tgt_row > row: dut.exp_bypass.append((msg, int(Direction.SOUTH)))
+        elif tgt_col < col: dut.exp_bypass.append((msg, int(Direction.WEST )))
+        elif tgt_col > col: dut.exp_bypass.append((msg, int(Direction.EAST )))
