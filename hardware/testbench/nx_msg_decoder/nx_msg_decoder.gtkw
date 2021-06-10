@@ -1,0 +1,117 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Thu Jun 10 07:43:06 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_msg_decoder/sim.vcd"
+[dumpfile_mtime] "Thu Jun 10 07:36:32 2021"
+[dumpfile_size] 646873
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_msg_decoder/nx_msg_decoder.gtkw"
+[timestart] 40400
+[size] 1570 1115
+[pos] -1 -1
+*-15.364916 85000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[treeopen] testbench.dut.
+[treeopen] testbench.dut.msg_fifo.
+[sst_width] 193
+[signals_width] 288
+[sst_expanded] 1
+[sst_vpaned_height] 348
+@28
+testbench.dut.clk_i
+testbench.dut.rst_i
+@200
+-
+@22
+testbench.dut.node_row_i[3:0]
+testbench.dut.node_col_i[3:0]
+@200
+-
+@22
+testbench.dut.msg_data_i[31:0]
+@28
+testbench.dut.msg_dir_i[1:0]
+testbench.dut.msg_valid_i
+testbench.dut.msg_ready_o
+@200
+-
+@22
+testbench.dut.bypass_data_o[31:0]
+@28
+testbench.dut.bypass_dir_o[1:0]
+testbench.dut.bypass_valid_o
+testbench.dut.bypass_ready_i
+@200
+-
+@22
+testbench.dut.send_dir[3:0]
+@200
+-
+@22
+testbench.dut.fifo_data[33:0]
+@28
+testbench.dut.arrival_dir[1:0]
+testbench.dut.broadcast
+@c00025
+testbench.dut.addr_row[3:0]
+@28
+(0)testbench.dut.addr_row[3:0]
+(1)testbench.dut.addr_row[3:0]
+(2)testbench.dut.addr_row[3:0]
+(3)testbench.dut.addr_row[3:0]
+@1401201
+-group_end
+@24
+testbench.dut.addr_col[3:0]
+@22
+testbench.dut.bc_decay[7:0]
+@28
+testbench.dut.command[1:0]
+@22
+testbench.dut.payload[20:0]
+@200
+-
+@800200
+-FIFO
+@28
+testbench.dut.msg_fifo.clk_i
+testbench.dut.msg_fifo.rst_i
+@200
+-
+@22
+testbench.dut.msg_fifo.wr_data_i[33:0]
+@28
+testbench.dut.msg_fifo.wr_push_i
+@200
+-
+@22
+testbench.dut.msg_fifo.rd_data_o[33:0]
+@28
+testbench.dut.msg_fifo.rd_pop_i
+@200
+-
+@22
+testbench.dut.msg_fifo.genblk1[0].data_alias[33:0]
+testbench.dut.msg_fifo.genblk1[1].data_alias[33:0]
+@200
+-
+@28
+testbench.dut.msg_fifo.wr_ptr
+testbench.dut.msg_fifo.rd_ptr
+@200
+-
+@28
+testbench.dut.msg_fifo.empty_o
+testbench.dut.msg_fifo.full_o
+@24
+testbench.dut.msg_fifo.level_o[1:0]
+@200
+-
+@24
+testbench.dut.msg_fifo.level[1:0]
+@28
+testbench.dut.msg_fifo.truly_full
+@1000200
+-FIFO
+[pattern_trace] 1
+[pattern_trace] 0
