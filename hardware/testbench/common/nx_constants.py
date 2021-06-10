@@ -14,17 +14,16 @@
 
 from enum import IntEnum
 
-from ..io_common import BaseIO
+class Direction(IntEnum):
+    """ Direction of receival/transmission """
+    NORTH = 0
+    EAST  = 1
+    SOUTH = 2
+    WEST  = 3
 
-class StreamIO(BaseIO):
-    """ Message stream interface between nodes """
-
-    def __init__(self, dut, name, role):
-        """ Initialise StreamIO.
-
-        Args:
-            dut : Pointer to the DUT boundary
-            name: Name of the signal - acts as a prefix
-            role: Role of this signal on the DUT boundary
-        """
-        super().__init__(dut, name, role, ["data", "valid", "dir"], ["ready"])
+class Command(IntEnum):
+    """ Command type """
+    LOAD_INSTR = 0
+    INPUT      = 1
+    OUTPUT     = 2
+    SIG_STATE  = 3
