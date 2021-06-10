@@ -27,7 +27,7 @@ class TestbenchBase:
         # Promote clock & reset
         self.clk = dut.clk
         self.rst = dut.rst
-        # Expose logging methods0
+        # Expose logging methods
         self.debug   = dut._log.debug
         self.info    = dut._log.info
         self.warning = dut._log.warning
