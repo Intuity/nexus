@@ -12,37 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
-
 from cocotb_bus.monitors import Monitor
 from cocotb.triggers import RisingEdge
 
-from drivers.io_common import BaseIO
+from .common import SignalState
 
-class StateIO(BaseIO):
-    """ Signal state interface from decoder """
-
-    def __init__(self, dut, name, role):
-        """ Initialise InstrLoadIO.
-
-        Args:
-            dut : Pointer to the DUT boundary
-            name: Name of the signal - acts as a prefix
-            role: Role of this signal on the DUT boundary
-        """
-        super().__init__(dut, name, role, [
-            "remote_row", "remote_col", "remote_idx", "state", "valid",
-        ], [])
-
-SignalState = namedtuple("SignalState", [
-    "remote_row", "remote_col", "remote_idx", "state"
-])
-
-class StateMon(Monitor):
+class StateMonitor(Monitor):
     """ Monitors signal state updates from the decoder """
 
     def __init__(self, entity, clock, reset, intf):
-        """ Initialise the InstrMon instance.
+        """ Initialise the StateMonitor instance.
 
         Args:
             entity : Pointer to the testbench/DUT
@@ -50,7 +29,7 @@ class StateMon(Monitor):
             reset  : Reset signal for the interface
             intf   : Interface
         """
-        self.name   = "InstrMon"
+        self.name   = "StateMonitor"
         self.entity = entity
         self.clock  = clock
         self.reset  = reset

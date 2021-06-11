@@ -12,39 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
-
 from cocotb_bus.monitors import Monitor
 from cocotb.triggers import RisingEdge
 
-from drivers.io_common import BaseIO
+from .common import IOMapping
 
-class IOMapIO(BaseIO):
-    """ Input/output mapping interface from decoder """
-
-    def __init__(self, dut, name, role):
-        """ Initialise InstrLoadIO.
-
-        Args:
-            dut : Pointer to the DUT boundary
-            name: Name of the signal - acts as a prefix
-            role: Role of this signal on the DUT boundary
-        """
-        super().__init__(dut, name, role, [
-            "io", "input", "remote_row", "remote_col", "remote_idx", "slot",
-            "broadcast", "seq", "valid",
-        ], [])
-
-IOMapping = namedtuple("IOMapping", [
-    "index", "is_input", "remote_row", "remote_col", "remote_idx", "slot",
-    "broadcast", "seq"
-])
-
-class IOMapMon(Monitor):
+class IOMapMonitor(Monitor):
     """ Monitors I/O mapping requests from the decoder """
 
     def __init__(self, entity, clock, reset, intf):
-        """ Initialise the IOMapMon instance.
+        """ Initialise the IOMapMonitor instance.
 
         Args:
             entity : Pointer to the testbench/DUT
@@ -52,7 +29,7 @@ class IOMapMon(Monitor):
             reset  : Reset signal for the interface
             intf   : Interface
         """
-        self.name   = "IOMapMon"
+        self.name   = "IOMapMonitor"
         self.entity = entity
         self.clock  = clock
         self.reset  = reset
