@@ -1,0 +1,68 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Fri Jun 11 21:06:28 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_control/sim.vcd"
+[dumpfile_mtime] "Fri Jun 11 21:03:17 2021"
+[dumpfile_size] 8698
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_control/nx_node_control.gtkw"
+[timestart] 0
+[size] 1400 1120
+[pos] -161 -719
+*-15.019444 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[treeopen] testbench.dut.
+[sst_width] 287
+[signals_width] 236
+[sst_expanded] 1
+[sst_vpaned_height] 349
+@28
+testbench.dut.clk_i
+testbench.dut.rst_i
+@200
+-
+@28
+testbench.dut.trigger_i
+@200
+-
+@22
+testbench.dut.msg_data_o[31:0]
+@28
+testbench.dut.msg_dir_o[1:0]
+testbench.dut.msg_valid_o
+testbench.dut.msg_ready_i
+@200
+-
+@24
+testbench.dut.map_io_i[2:0]
+@28
+testbench.dut.map_input_i
+@24
+testbench.dut.map_remote_row_i[3:0]
+testbench.dut.map_remote_col_i[3:0]
+testbench.dut.map_remote_idx_i[2:0]
+@28
+testbench.dut.map_slot_i
+testbench.dut.map_broadcast_i
+testbench.dut.map_seq_i
+testbench.dut.map_valid_i
+@200
+-
+@22
+testbench.dut.signal_remote_row_i[3:0]
+testbench.dut.signal_remote_col_i[3:0]
+@28
+testbench.dut.signal_remote_idx_i[2:0]
+testbench.dut.signal_state_i
+testbench.dut.signal_valid_i
+@200
+-
+@22
+testbench.dut.core_inputs_o[7:0]
+testbench.dut.core_outputs_i[7:0]
+@28
+testbench.dut.core_trigger_o
+@201
+-
+[pattern_trace] 1
+[pattern_trace] 0
