@@ -12,73 +12,82 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
-
+from dataclasses import dataclass
+from cocotb_bus.drivers import Driver
 from cocotb_bus.monitors import Monitor
-from cocotb.triggers import RisingEdge, ClockCycles
+from cocotb.triggers import RisingEdge
 
-class InstrRequest:
-    """ Represents an instruction fetch """
+@dataclass
+class InstrStore:
+    """ Represents an instruction store request """
 
-    def __init__(self, address, stall, data):
-        """ Initialise the request.
+    core : int = 0 # Which core to store instruction for
+    data : int = 0 # Instruction data
 
-        Args:
-            address: Address being accessed
-            stall  : Number of cycles request stalled for
-            data   : Response data
-        """
-        self.address = address
-        self.stall   = stall
-        self.data    = data
+class InstrStoreInitiator(Driver):
+    """ Drives requests on the instruction store bus """
 
-class InstrStore(Monitor):
-    """ Testbench driven instruction store """
-
-    def __init__(self, entity, clock, reset, intf, resp_cb=None):
-        """ Initialise the instruction store.
+    def __init__(self, entity, clock, reset, intf):
+        """ Initialise the instruction store initiator.
 
         Args:
             entity : Pointer to the testbench/DUT
             clock  : Clock signal for the interface
             reset  : Reset signal for the interface
             intf   : Interface
-            resp_cb: Callback function to retrieve responses
         """
-        self.name    = "InstrStore"
-        self.entity  = entity
-        self.clock   = clock
-        self.reset   = reset
-        self.intf    = intf
-        self.resp_cb = resp_cb
+        self.name   = "InstrStoreInitiator"
+        self.entity = entity
+        self.clock  = clock
+        self.reset  = reset
+        self.intf   = intf
+        super().__init__()
+
+    async def _driver_send(self, transaction, sync=True, **kwargs):
+        """ Send queued transactions onto the interface.
+
+        Args:
+            transaction: Transaction to send
+            sync       : Align to the rising clock edge before sending
+            **kwargs   : Any other arguments
+        """
+        # Synchronise to the rising edge
+        if sync: await RisingEdge(self.clock)
+        # Wait for reset to clear
+        while self.reset == 1: await RisingEdge(self.clock)
+        # Drive the request
+        self.intf.core  <= transaction.core
+        self.intf.data  <= transaction.data
+        self.intf.valid <= 1
+        await RisingEdge(self.clock)
+        self.intf.valid <= 0
+
+class InstrStoreMonitor(Monitor):
+    """ Monitors instruction load events """
+
+    def __init__(self, entity, clock, reset, intf):
+        """ Initialise the InstrStoreMon instance.
+
+        Args:
+            entity : Pointer to the testbench/DUT
+            clock  : Clock signal for the interface
+            reset  : Reset signal for the interface
+            intf   : Interface
+        """
+        self.name   = "InstrStoreMon"
+        self.entity = entity
+        self.clock  = clock
+        self.reset  = reset
+        self.intf   = intf
         super().__init__()
 
     async def _monitor_recv(self):
-        """ Respond to instruction fetch requests """
+        """ Capture instructions being loaded """
         while True:
             # Wait for the next clock edge
             await RisingEdge(self.clock)
-            # Clear interface on reset
-            if self.reset == 1:
-                self.intf.data  <= 0
-                self.intf.stall <= 0
-                continue
-            # Respond to requests
-            if self.intf.rd == 1:
-                address = int(self.intf.addr)
-                # Randomly stall the interface
-                stalled = 0
-                if choice((True, False)):
-                    self.intf.stall <= 1
-                    stalled = randint(1, 5)
-                    self.log.debug(f"Stalling instruction interface for {stalled} cycles")
-                    await ClockCycles(self.clock, stalled)
-                    self.intf.stall <= 0
-                # Respond
-                width = max(self.intf.data._range)-min(self.intf.data._range)+1
-                if self.resp_cb: data = self.resp_cb(self, address)
-                else           : data = randint(0, (1 << width) - 1)
-                self.log.debug(f"Responding with data 0x{data:010X}")
-                self.intf.data <= data
-                # Capture this request
-                self._recv(InstrRequest(address, stalled, data))
+            # Skip cycle if reset
+            if self.reset == 1: continue
+            # Capture any instruction loads
+            if self.intf.valid == 1:
+                self._recv(InstrStore(int(self.intf.core), int(self.intf.data)))

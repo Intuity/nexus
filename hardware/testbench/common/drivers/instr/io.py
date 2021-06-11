@@ -14,11 +14,11 @@
 
 from ..io_common import BaseIO
 
-class InstrIO(BaseIO):
+class InstrFetchIO(BaseIO):
     """ Bus carrying instruction fetch signals """
 
     def __init__(self, dut, name, role):
-        """ Initialise InstrIO.
+        """ Initialise InstrFetchIO.
 
         Args:
             dut : Pointer to the DUT boundary
@@ -26,3 +26,16 @@ class InstrIO(BaseIO):
             role: Role of this signal on the DUT boundary
         """
         super().__init__(dut, name, role, ["addr", "rd"], ["data", "stall"])
+
+class InstrStoreIO(BaseIO):
+    """ Bus carrying instruction store signals """
+
+    def __init__(self, dut, name, role):
+        """ Initialise InstrStoreIO.
+
+        Args:
+            dut : Pointer to the DUT boundary
+            name: Name of the signal - acts as a prefix
+            role: Role of this signal on the DUT boundary
+        """
+        super().__init__(dut, name, role, ["core", "data", "valid"], [])
