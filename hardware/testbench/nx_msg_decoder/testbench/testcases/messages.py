@@ -31,7 +31,7 @@ async def messages(dut):
     dut.node_row_i <= row
     dut.node_col_i <= col
 
-    for _ in range(100):
+    for _ in range(1000):
         # Choose a random direction
         dirx = choice(list(Direction))
 
@@ -39,6 +39,8 @@ async def messages(dut):
         command = choice(list(Command))
 
         # Select a target row and column
+        broadcast = choice((0, 1))
+        bc_decay  = randint(1, 10)
         tgt_row, tgt_col = row, col
         if choice((True, False)):
             tgt_row, tgt_col = randint(0, 15), randint(0, 15)
@@ -51,7 +53,7 @@ async def messages(dut):
         if command == Command.LOAD_INSTR:
             instr    = randint(0, (1 << 15) - 1)
             payload |= instr << 6
-            if tgt_match: dut.exp_instr.append(instr)
+            if broadcast or tgt_match: dut.exp_instr.append(instr)
         elif command == Command.INPUT:
             index   = randint(0,  7)
             rem_row = randint(0, 15)
@@ -63,7 +65,7 @@ async def messages(dut):
             payload |= rem_idx << 10
             payload |= index   <<  7
             payload |= is_seq  <<  6
-            if tgt_match:
+            if broadcast or tgt_match:
                 dut.exp_io.append(IOMapping(
                     index, 1, rem_row, rem_col, rem_idx, is_seq, 0, is_seq,
                 ))
@@ -78,7 +80,7 @@ async def messages(dut):
             payload |= index     <<  7
             payload |= slot      <<  6
             payload |= broadcast << 5
-            if tgt_match:
+            if broadcast or tgt_match:
                 dut.exp_io.append(IOMapping(
                     index, 0, rem_row, rem_col, 0, slot, broadcast, slot,
                 ))
@@ -91,7 +93,7 @@ async def messages(dut):
             payload |= rem_col << 13
             payload |= rem_idx << 10
             payload |= state   <<  9
-            if tgt_match:
+            if broadcast or tgt_match:
                 dut.exp_state.append(SignalState(
                     rem_row, rem_col, rem_idx, state,
                 ))
@@ -101,19 +103,37 @@ async def messages(dut):
             f"MSG - BC: 0, R: {tgt_row}, C: {tgt_col}, CMD: {command}, "
             f"PLD: 0x{payload:08X}"
         )
-        msg  = 0            << 31 # [31] Broadcast flag
-        msg |= tgt_row      << 27 # [30:27] Target row
-        msg |= tgt_col      << 23 # [26:23] Target column
+        msg  = broadcast    << 31 # [31] Broadcast flag
         msg |= int(command) << 21 # [22:21] Command
         msg |= payload      <<  0 # [20: 0] Payload
+        if broadcast:
+            byp_msg = msg | ((bc_decay - 1) << 23)
+            msg |= bc_decay << 23 # [30:23] Broadcast decay
+        else:
+            msg |= tgt_row  << 27 # [30:27] Target row
+            msg |= tgt_col  << 23 # [26:23] Target column
+            byp_msg = msg
 
         # Queue up the message
         dut.msg.append((msg, int(dirx)))
 
         # If not matching this target, expect message to be routed elsewhere
-        if not tgt_match:
+        if broadcast:
+            if dirx == Direction.NORTH:
+                dut.exp_bypass.append((byp_msg, int(Direction.EAST) ))
+                dut.exp_bypass.append((byp_msg, int(Direction.SOUTH)))
+                dut.exp_bypass.append((byp_msg, int(Direction.WEST) ))
+            elif dirx == Direction.EAST:
+                dut.exp_bypass.append((byp_msg, int(Direction.WEST) ))
+            if dirx == Direction.SOUTH:
+                dut.exp_bypass.append((byp_msg, int(Direction.NORTH)))
+                dut.exp_bypass.append((byp_msg, int(Direction.EAST) ))
+                dut.exp_bypass.append((byp_msg, int(Direction.WEST) ))
+            elif dirx == Direction.WEST:
+                dut.exp_bypass.append((byp_msg, int(Direction.EAST) ))
+        elif not tgt_match:
             if   tgt_row < row: tgt_dirx = Direction.NORTH
             elif tgt_row > row: tgt_dirx = Direction.SOUTH
             elif tgt_col < col: tgt_dirx = Direction.WEST
             elif tgt_col > col: tgt_dirx = Direction.EAST
-            dut.exp_bypass.append((msg, tgt_dirx))
+            dut.exp_bypass.append((byp_msg, int(tgt_dirx)))
