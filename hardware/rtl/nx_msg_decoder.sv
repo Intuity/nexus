@@ -60,6 +60,7 @@ module nx_msg_decoder #(
     , output logic                       signal_state_o      // State of the signal
     , output logic                       signal_valid_o      // Signal update is valid
     // Instruction load
+    , output logic                   instr_core_o  // Whether to load to core 0 or 1
     , output logic [INSTR_WIDTH-1:0] instr_data_o  // Instruction data
     , output logic                   instr_valid_o // Instruction valid
 );
@@ -158,8 +159,10 @@ assign signal_remote_idx_o = payload[SIG_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
 assign signal_state_o      = payload[SIG_STATE_MSB];
 
 // Extract instruction load from payload
-localparam INSTR_DATA_MSB = PAYLOAD_WIDTH - 1;
+localparam INSTR_CORE_MSB = PAYLOAD_WIDTH - 1;
+localparam INSTR_DATA_MSB = INSTR_CORE_MSB - 1;
 
+assign instr_core_o = payload[INSTR_CORE_MSB];
 assign instr_data_o = payload[INSTR_DATA_MSB-:INSTR_WIDTH];
 
 always_comb begin : p_decode
