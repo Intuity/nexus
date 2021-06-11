@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`ifndef __NX_CONSTANTS_SVH__
-`define __NX_CONSTANTS_SVH__
-
 typedef enum logic [1:0] {
     DIRX_NORTH, // 0 - Arriving from/sending to the north
     DIRX_EAST,  // 1 - ...the east
@@ -28,5 +25,3 @@ typedef enum logic [1:0] {
     CMD_CFG_OUTPUT, // 2: Configure an output mapping
     CMD_SIG_STATE   // 3: Signal state message
 } nx_command_t;
-
-`endif // __NX_CONSTANTS_SVH__
