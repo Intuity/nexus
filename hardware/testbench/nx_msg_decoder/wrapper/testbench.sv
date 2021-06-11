@@ -53,6 +53,7 @@ module testbench #(
     , output logic                       signal_state_o
     , output logic                       signal_valid_o
     // Instruction load
+    , output logic                   instr_core_o
     , output logic [INSTR_WIDTH-1:0] instr_data_o
     , output logic                   instr_valid_o
 );
@@ -101,6 +102,7 @@ nx_msg_decoder #(
     , .signal_state_o     (signal_state_o     )
     , .signal_valid_o     (signal_valid_o     )
     // Instruction load
+    , .instr_core_o (instr_core_o )
     , .instr_data_o (instr_data_o )
     , .instr_valid_o(instr_valid_o)
 );

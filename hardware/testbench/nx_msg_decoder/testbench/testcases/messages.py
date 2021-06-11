@@ -14,6 +14,8 @@
 
 from random import choice, randint
 
+from drivers.instr.store import InstrStore
+
 from ..testbench import testcase
 from ..monitors.io_map_mon import IOMapping
 from ..monitors.state_mon import SignalState
@@ -51,9 +53,12 @@ async def messages(dut):
         # Generate a payload
         payload = 0
         if command == Command.LOAD_INSTR:
+            core     = choice((0, 1))
             instr    = randint(0, (1 << 15) - 1)
-            payload |= instr << 6
-            if broadcast or tgt_match: dut.exp_instr.append(instr)
+            payload |= core  << 20
+            payload |= instr << 5
+            if broadcast or tgt_match:
+                dut.exp_instr.append(InstrStore(core, instr))
         elif command == Command.INPUT:
             index   = randint(0,  7)
             rem_row = randint(0, 15)

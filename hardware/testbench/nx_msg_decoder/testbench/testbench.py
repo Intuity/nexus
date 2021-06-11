@@ -18,11 +18,12 @@ from cocotb_bus.scoreboard import Scoreboard
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
+from drivers.instr.io import InstrStoreIO
+from drivers.instr.store import InstrStoreMonitor
 from drivers.stream.io import StreamIO
 from drivers.stream.init import StreamInitiator
 from drivers.stream.resp import StreamResponder
 
-from .monitors.instr_load_mon import InstrLoadIO, InstrLoadMon
 from .monitors.io_map_mon import IOMapIO, IOMapMon
 from .monitors.state_mon import StateIO, StateMon
 
@@ -41,8 +42,8 @@ class Testbench(TestbenchBase):
         # Setup drivers/monitors
         self.msg    = StreamInitiator(self, self.clk, self.rst, self.msg_io)
         self.bypass = StreamResponder(self, self.clk, self.rst, self.bypass_io)
-        self.instr_load = InstrLoadMon(
-            self, self.clk, self.rst, InstrLoadIO(self.dut, "instr", IORole.INITIATOR),
+        self.instr_load = InstrStoreMonitor(
+            self, self.clk, self.rst, InstrStoreIO(self.dut, "instr", IORole.INITIATOR),
         )
         self.io_map = IOMapMon(
             self, self.clk, self.rst, IOMapIO(self.dut, "map", IORole.INITIATOR),
@@ -56,7 +57,7 @@ class Testbench(TestbenchBase):
         self.exp_io     = []
         self.exp_state  = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self, fail_immediately=False)
+        self.scoreboard = Scoreboard(self)#, fail_immediately=False)
         self.scoreboard.add_interface(self.bypass,     self.exp_bypass)
         self.scoreboard.add_interface(self.instr_load, self.exp_instr)
         self.scoreboard.add_interface(self.io_map,     self.exp_io)

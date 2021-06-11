@@ -1,22 +1,22 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Thu Jun 10 15:25:12 2021
+[*] Fri Jun 11 16:17:56 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_msg_decoder/sim.vcd"
-[dumpfile_mtime] "Thu Jun 10 15:23:18 2021"
-[dumpfile_size] 2351591
+[dumpfile_mtime] "Fri Jun 11 16:17:24 2021"
+[dumpfile_size] 6321
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_msg_decoder/nx_msg_decoder.gtkw"
-[timestart] 0
-[size] 1570 1115
+[timestart] 70440
+[size] 1440 1199
 [pos] -1 -1
-*-17.681555 443000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.642762 83000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.dut.
 [treeopen] testbench.dut.msg_fifo.
 [sst_width] 193
 [signals_width] 288
 [sst_expanded] 1
-[sst_vpaned_height] 348
+[sst_vpaned_height] 519
 @28
 testbench.dut.clk_i
 testbench.dut.rst_i
@@ -91,10 +91,11 @@ testbench.dut.signal_remote_col_o[3:0]
 @28
 testbench.dut.signal_remote_idx_o[2:0]
 testbench.dut.signal_state_o
-@29
 testbench.dut.signal_valid_o
 @200
 -
+@29
+testbench.dut.instr_core_o
 @22
 testbench.dut.instr_data_o[14:0]
 @28
