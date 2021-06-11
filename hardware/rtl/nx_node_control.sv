@@ -118,14 +118,14 @@ always_comb begin : p_io_mapping
                 map_remote_row_i, map_remote_col_i, map_remote_idx_i
             };
             input_seq[map_io_i[$clog2(INPUTS)-1:0]] = map_seq_i;
-        // Update an output mapping for slot A
+        // Update an output mapping for slot B
         end else if (map_slot_i) begin
-            output_map_a[map_io_i[$clog2(OUTPUTS)-1:0]] = {
+            output_map_b[map_io_i[$clog2(OUTPUTS)-1:0]] = {
                 map_broadcast_i, map_remote_row_i, map_remote_col_i
             };
-        // Update an output mapping for slot B
+        // Update an output mapping for slot A
         end else begin
-            output_map_b[map_io_i[$clog2(OUTPUTS)-1:0]] = {
+            output_map_a[map_io_i[$clog2(OUTPUTS)-1:0]] = {
                 map_broadcast_i, map_remote_row_i, map_remote_col_i
             };
         end
