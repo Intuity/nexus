@@ -16,8 +16,8 @@ import cocotb
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
-from drivers.instr.io import InstrIO
-from drivers.instr.store import InstrStore
+from drivers.instr.io import InstrFetchIO
+from drivers.instr.fetch import InstrFetchResponder
 
 class Testbench(TestbenchBase):
 
@@ -29,9 +29,9 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Wrap complex interfaces
-        self.instr = InstrIO(self.dut, "instr", IORole.INITIATOR)
+        self.instr = InstrFetchIO(self.dut, "instr", IORole.INITIATOR)
         # Setup drivers/monitors
-        self.instr_store = InstrStore(self, self.clk, self.rst, self.instr)
+        self.instr_store = InstrFetchResponder(self, self.clk, self.rst, self.instr)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
