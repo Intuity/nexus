@@ -38,11 +38,16 @@ QUIET     ?= yes
 SIM_VCD   ?= sim.vcd
 SIM_LOG   ?= sim.log
 EN_WAVES  ?= no
+TRACE_RAM ?= no
 
 ifeq ($(QUIET),yes)
   PREFIX := @
 else
   PREFIX :=
+endif
+
+ifeq ($(TRACE_RAM),yes)
+  DEFINES += TRACE_RAM
 endif
 
 # Tool paths

@@ -38,7 +38,7 @@ module nx_ram #(
     , output logic [   DATA_WIDTH-1:0] rd_data_b_o
 );
 
-reg [DATA_WIDTH-1:0] m_memory [DEPTH-1:0];
+reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 
 always_ff @(posedge clk_a_i, posedge rst_a_i) begin : ff_read_a
     if (rst_a_i) begin
@@ -46,9 +46,9 @@ always_ff @(posedge clk_a_i, posedge rst_a_i) begin : ff_read_a
     end else begin
         if (en_a_i) begin
             if (wr_en_a_i) begin
-                m_memory[addr_a_i[$clog2(DEPTH-1):0]] <= wr_data_a_i;
+                memory[addr_a_i] <= wr_data_a_i;
             end else begin
-                rd_data_a_o <= m_memory[addr_a_i[$clog2(DEPTH-1):0]];
+                rd_data_a_o <= memory[addr_a_i];
             end
         end
     end
@@ -60,12 +60,24 @@ always_ff @(posedge clk_b_i, posedge rst_b_i) begin : ff_read_b
     end else begin
         if (en_b_i) begin
             if (wr_en_b_i) begin
-                m_memory[addr_b_i[$clog2(DEPTH-1):0]] <= wr_data_b_i;
+                memory[addr_b_i] <= wr_data_b_i;
             end else begin
-                rd_data_b_o <= m_memory[addr_b_i[$clog2(DEPTH-1):0]];
+                rd_data_b_o <= memory[addr_b_i];
             end
         end
     end
 end
+
+// Aliases for VCD tracing
+`ifdef sim_icarus
+    `ifdef TRACE_RAM
+generate
+    genvar idx;
+    for (idx = 0; idx < DEPTH; idx = (idx + 1)) begin
+        wire [DATA_WIDTH-1:0] memory_alias = memory[idx];
+    end
+endgenerate
+    `endif
+`endif // sim_icarus
 
 endmodule
