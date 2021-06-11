@@ -24,8 +24,10 @@ from drivers.stream.io import StreamIO
 from drivers.stream.init import StreamInitiator
 from drivers.stream.resp import StreamResponder
 
-from .monitors.io_map_mon import IOMapIO, IOMapMon
-from .monitors.state_mon import StateIO, StateMon
+from drivers.map_io.io import IOMapIO
+from drivers.map_io.monitor import IOMapMonitor
+from drivers.state.io import StateIO
+from drivers.state.monitor import StateMonitor
 
 class Testbench(TestbenchBase):
 
@@ -45,10 +47,10 @@ class Testbench(TestbenchBase):
         self.instr_load = InstrStoreMonitor(
             self, self.clk, self.rst, InstrStoreIO(self.dut, "instr", IORole.INITIATOR),
         )
-        self.io_map = IOMapMon(
+        self.io_map = IOMapMonitor(
             self, self.clk, self.rst, IOMapIO(self.dut, "map", IORole.INITIATOR),
         )
-        self.state = StateMon(
+        self.state = StateMonitor(
             self, self.clk, self.rst, StateIO(self.dut, "signal", IORole.INITIATOR),
         )
         # Create queues for expected transactions
@@ -57,7 +59,7 @@ class Testbench(TestbenchBase):
         self.exp_io     = []
         self.exp_state  = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self)#, fail_immediately=False)
+        self.scoreboard = Scoreboard(self, fail_immediately=False)
         self.scoreboard.add_interface(self.bypass,     self.exp_bypass)
         self.scoreboard.add_interface(self.instr_load, self.exp_instr)
         self.scoreboard.add_interface(self.io_map,     self.exp_io)

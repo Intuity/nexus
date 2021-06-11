@@ -17,8 +17,8 @@ from random import choice, randint
 from drivers.instr.store import InstrStore
 
 from ..testbench import testcase
-from ..monitors.io_map_mon import IOMapping
-from ..monitors.state_mon import SignalState
+from drivers.map_io.common import IOMapping
+from drivers.state.common import SignalState
 
 from nx_constants import Command, Direction
 
