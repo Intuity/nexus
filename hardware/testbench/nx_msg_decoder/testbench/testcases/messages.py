@@ -21,6 +21,8 @@ from drivers.map_io.common import IOMapping
 from drivers.state.common import SignalState
 
 from nx_constants import Command, Direction
+from nx_message import (build_load_instr, build_map_input, build_map_output,
+                        build_sig_state)
 
 @testcase()
 async def messages(dut):
@@ -50,13 +52,14 @@ async def messages(dut):
         # Check if this message is targeted at the node
         tgt_match = (tgt_row == row) and (tgt_col == col)
 
-        # Generate a payload
-        payload = 0
+        # Generate a message
+        msg = 0
         if command == Command.LOAD_INSTR:
-            core     = choice((0, 1))
-            instr    = randint(0, (1 << 15) - 1)
-            payload |= core  << 20
-            payload |= instr << 5
+            core  = choice((0, 1))
+            instr = randint(0, (1 << 15) - 1)
+            msg   = build_load_instr(
+                broadcast, tgt_row, tgt_col, bc_decay, core, instr,
+            )
             if broadcast or tgt_match:
                 dut.exp_instr.append(InstrStore(core, instr))
         elif command == Command.INPUT:
@@ -65,39 +68,37 @@ async def messages(dut):
             rem_col = randint(0, 15)
             rem_idx = randint(0,  7)
             is_seq  = choice((0, 1))
-            payload |= rem_row << 17
-            payload |= rem_col << 13
-            payload |= rem_idx << 10
-            payload |= index   <<  7
-            payload |= is_seq  <<  6
+            msg     = build_map_input(
+                broadcast, tgt_row, tgt_col, bc_decay, index, is_seq, rem_row,
+                rem_col, rem_idx,
+            )
             if broadcast or tgt_match:
                 dut.exp_io.append(IOMapping(
                     index, 1, rem_row, rem_col, rem_idx, is_seq, 0, is_seq,
                 ))
         elif command == Command.OUTPUT:
-            index     = randint(0,  7)
-            rem_row   = randint(0, 15)
-            rem_col   = randint(0, 15)
-            slot      = choice((0, 1))
-            broadcast = choice((0, 1))
-            payload |= rem_row   << 17
-            payload |= rem_col   << 13
-            payload |= index     <<  7
-            payload |= slot      <<  6
-            payload |= broadcast << 5
+            index   = randint(0,  7)
+            rem_row = randint(0, 15)
+            rem_col = randint(0, 15)
+            slot    = choice((0, 1))
+            send_bc = choice((0, 1))
+            msg       = build_map_output(
+                broadcast, tgt_row, tgt_col, bc_decay, index, slot, send_bc,
+                rem_row, rem_col,
+            )
             if broadcast or tgt_match:
                 dut.exp_io.append(IOMapping(
-                    index, 0, rem_row, rem_col, 0, slot, broadcast, slot,
+                    index, 0, rem_row, rem_col, 0, slot, send_bc, slot,
                 ))
         elif command == Command.SIG_STATE:
             rem_row = randint(0, 15)
             rem_col = randint(0, 15)
             rem_idx = randint(0,  7)
             state   = choice((0, 1))
-            payload |= rem_row << 17
-            payload |= rem_col << 13
-            payload |= rem_idx << 10
-            payload |= state   <<  9
+            msg     = build_sig_state(
+                broadcast, tgt_row, tgt_col, bc_decay, state, rem_row, rem_col,
+                rem_idx,
+            )
             if broadcast or tgt_match:
                 dut.exp_state.append(SignalState(
                     rem_row, rem_col, rem_idx, state,
@@ -105,19 +106,15 @@ async def messages(dut):
 
         # Create a message
         dut.debug(
-            f"MSG - BC: 0, R: {tgt_row}, C: {tgt_col}, CMD: {command}, "
-            f"PLD: 0x{payload:08X}"
+            f"MSG - BC: {broadcast}, R: {tgt_row}, C: {tgt_col}, CMD: {command} "
+            f"-> 0x{msg:08X}"
         )
-        msg  = broadcast    << 31 # [31] Broadcast flag
-        msg |= int(command) << 21 # [22:21] Command
-        msg |= payload      <<  0 # [20: 0] Payload
+
+        # Generate bypass message
+        byp_msg = msg
         if broadcast:
-            byp_msg = msg | ((bc_decay - 1) << 23)
-            msg |= bc_decay << 23 # [30:23] Broadcast decay
-        else:
-            msg |= tgt_row  << 27 # [30:27] Target row
-            msg |= tgt_col  << 23 # [26:23] Target column
-            byp_msg = msg
+            byp_msg &= 0x807F_FFFF
+            byp_msg |= (bc_decay - 1) << 23
 
         # Queue up the message
         dut.msg.append((msg, int(dirx)))
