@@ -164,8 +164,8 @@ always_comb begin : p_signal_state
                 input_next[i] = signal_state_i;
                 // If not sequential, update current state as well
                 if (!input_seq_q[i]) begin
+                    input_trig    = signal_state_i != input_curr[i];
                     input_curr[i] = signal_state_i;
-                    input_trig    =           1'b1; // Retrigger execution
                 end
             end
         end
