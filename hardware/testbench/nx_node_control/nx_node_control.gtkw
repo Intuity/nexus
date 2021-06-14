@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Fri Jun 11 21:06:28 2021
+[*] Mon Jun 14 07:55:38 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_control/sim.vcd"
-[dumpfile_mtime] "Fri Jun 11 21:03:17 2021"
-[dumpfile_size] 8698
+[dumpfile_mtime] "Mon Jun 14 07:55:31 2021"
+[dumpfile_size] 18598
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_node_control/nx_node_control.gtkw"
-[timestart] 0
+[timestart] 44000
 [size] 1400 1120
-[pos] -161 -719
-*-15.019444 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-16.405943 253000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.dut.
 [sst_width] 287
-[signals_width] 236
+[signals_width] 335
 [sst_expanded] 1
 [sst_vpaned_height] 349
 @28
@@ -25,12 +25,124 @@ testbench.dut.rst_i
 testbench.dut.trigger_i
 @200
 -
-@22
+@24
+testbench.dut.output_state[1:0]
+testbench.dut.output_idx[2:0]
+@28
+testbench.dut.msg_send_dir[3:0]
+@200
+-
+@c00022
 testbench.dut.msg_data_o[31:0]
+@28
+(0)testbench.dut.msg_data_o[31:0]
+(1)testbench.dut.msg_data_o[31:0]
+(2)testbench.dut.msg_data_o[31:0]
+(3)testbench.dut.msg_data_o[31:0]
+(4)testbench.dut.msg_data_o[31:0]
+(5)testbench.dut.msg_data_o[31:0]
+(6)testbench.dut.msg_data_o[31:0]
+(7)testbench.dut.msg_data_o[31:0]
+(8)testbench.dut.msg_data_o[31:0]
+(9)testbench.dut.msg_data_o[31:0]
+(10)testbench.dut.msg_data_o[31:0]
+(11)testbench.dut.msg_data_o[31:0]
+(12)testbench.dut.msg_data_o[31:0]
+(13)testbench.dut.msg_data_o[31:0]
+(14)testbench.dut.msg_data_o[31:0]
+(15)testbench.dut.msg_data_o[31:0]
+(16)testbench.dut.msg_data_o[31:0]
+(17)testbench.dut.msg_data_o[31:0]
+(18)testbench.dut.msg_data_o[31:0]
+(19)testbench.dut.msg_data_o[31:0]
+(20)testbench.dut.msg_data_o[31:0]
+(21)testbench.dut.msg_data_o[31:0]
+(22)testbench.dut.msg_data_o[31:0]
+(23)testbench.dut.msg_data_o[31:0]
+(24)testbench.dut.msg_data_o[31:0]
+(25)testbench.dut.msg_data_o[31:0]
+(26)testbench.dut.msg_data_o[31:0]
+(27)testbench.dut.msg_data_o[31:0]
+(28)testbench.dut.msg_data_o[31:0]
+(29)testbench.dut.msg_data_o[31:0]
+(30)testbench.dut.msg_data_o[31:0]
+(31)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
 @28
 testbench.dut.msg_dir_o[1:0]
 testbench.dut.msg_valid_o
 testbench.dut.msg_ready_i
+@200
+-
+@28
++{msg_bc} (0)testbench.dut.msg_data_o[31:0]
+@c00024
+#{msg_row} (1)testbench.dut.msg_data_o[31:0] (2)testbench.dut.msg_data_o[31:0] (3)testbench.dut.msg_data_o[31:0] (4)testbench.dut.msg_data_o[31:0]
+@28
+(1)testbench.dut.msg_data_o[31:0]
+(2)testbench.dut.msg_data_o[31:0]
+(3)testbench.dut.msg_data_o[31:0]
+(4)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@c00024
+#{msg_col} (5)testbench.dut.msg_data_o[31:0] (6)testbench.dut.msg_data_o[31:0] (7)testbench.dut.msg_data_o[31:0] (8)testbench.dut.msg_data_o[31:0]
+@28
+(5)testbench.dut.msg_data_o[31:0]
+(6)testbench.dut.msg_data_o[31:0]
+(7)testbench.dut.msg_data_o[31:0]
+(8)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@c00024
+#{msg_bc_decay} (1)testbench.dut.msg_data_o[31:0] (2)testbench.dut.msg_data_o[31:0] (3)testbench.dut.msg_data_o[31:0] (4)testbench.dut.msg_data_o[31:0] (5)testbench.dut.msg_data_o[31:0] (6)testbench.dut.msg_data_o[31:0] (7)testbench.dut.msg_data_o[31:0] (8)testbench.dut.msg_data_o[31:0]
+@28
+(1)testbench.dut.msg_data_o[31:0]
+(2)testbench.dut.msg_data_o[31:0]
+(3)testbench.dut.msg_data_o[31:0]
+(4)testbench.dut.msg_data_o[31:0]
+(5)testbench.dut.msg_data_o[31:0]
+(6)testbench.dut.msg_data_o[31:0]
+(7)testbench.dut.msg_data_o[31:0]
+(8)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@c00024
+#{msg_cmd} (9)testbench.dut.msg_data_o[31:0] (10)testbench.dut.msg_data_o[31:0]
+@28
+(9)testbench.dut.msg_data_o[31:0]
+(10)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@c00022
+#{msg_src_row} (11)testbench.dut.msg_data_o[31:0] (12)testbench.dut.msg_data_o[31:0] (13)testbench.dut.msg_data_o[31:0] (14)testbench.dut.msg_data_o[31:0]
+@28
+(11)testbench.dut.msg_data_o[31:0]
+(12)testbench.dut.msg_data_o[31:0]
+(13)testbench.dut.msg_data_o[31:0]
+(14)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@c00022
+#{msg_src_col} (15)testbench.dut.msg_data_o[31:0] (16)testbench.dut.msg_data_o[31:0] (17)testbench.dut.msg_data_o[31:0] (18)testbench.dut.msg_data_o[31:0]
+@28
+(15)testbench.dut.msg_data_o[31:0]
+(16)testbench.dut.msg_data_o[31:0]
+(17)testbench.dut.msg_data_o[31:0]
+(18)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@c00024
+#{msg_src_idx} (19)testbench.dut.msg_data_o[31:0] (20)testbench.dut.msg_data_o[31:0] (21)testbench.dut.msg_data_o[31:0]
+@28
+(19)testbench.dut.msg_data_o[31:0]
+(20)testbench.dut.msg_data_o[31:0]
+(21)testbench.dut.msg_data_o[31:0]
+@1401200
+-group_end
+@28
++{msg_state} (22)testbench.dut.msg_data_o[31:0]
 @200
 -
 @24
@@ -48,21 +160,73 @@ testbench.dut.map_seq_i
 testbench.dut.map_valid_i
 @200
 -
-@22
+@24
 testbench.dut.signal_remote_row_i[3:0]
 testbench.dut.signal_remote_col_i[3:0]
-@28
 testbench.dut.signal_remote_idx_i[2:0]
+@28
 testbench.dut.signal_state_i
 testbench.dut.signal_valid_i
 @200
 -
-@22
+@c00022
 testbench.dut.core_inputs_o[7:0]
+@28
+(0)testbench.dut.core_inputs_o[7:0]
+(1)testbench.dut.core_inputs_o[7:0]
+(2)testbench.dut.core_inputs_o[7:0]
+(3)testbench.dut.core_inputs_o[7:0]
+(4)testbench.dut.core_inputs_o[7:0]
+(5)testbench.dut.core_inputs_o[7:0]
+(6)testbench.dut.core_inputs_o[7:0]
+(7)testbench.dut.core_inputs_o[7:0]
+@1401200
+-group_end
+@800022
 testbench.dut.core_outputs_i[7:0]
 @28
+(0)testbench.dut.core_outputs_i[7:0]
+(1)testbench.dut.core_outputs_i[7:0]
+(2)testbench.dut.core_outputs_i[7:0]
+(3)testbench.dut.core_outputs_i[7:0]
+(4)testbench.dut.core_outputs_i[7:0]
+(5)testbench.dut.core_outputs_i[7:0]
+(6)testbench.dut.core_outputs_i[7:0]
+(7)testbench.dut.core_outputs_i[7:0]
+@1001200
+-group_end
+@28
 testbench.dut.core_trigger_o
-@201
+@200
+-
+@c00022
+testbench.dut.input_next[7:0]
+@28
+(0)testbench.dut.input_next[7:0]
+(1)testbench.dut.input_next[7:0]
+(2)testbench.dut.input_next[7:0]
+(3)testbench.dut.input_next[7:0]
+(4)testbench.dut.input_next[7:0]
+(5)testbench.dut.input_next[7:0]
+(6)testbench.dut.input_next[7:0]
+(7)testbench.dut.input_next[7:0]
+@200
+-
+@c00022
+testbench.dut.input_curr[7:0]
+@28
+(0)testbench.dut.input_curr[7:0]
+(1)testbench.dut.input_curr[7:0]
+(2)testbench.dut.input_curr[7:0]
+(3)testbench.dut.input_curr[7:0]
+(4)testbench.dut.input_curr[7:0]
+(5)testbench.dut.input_curr[7:0]
+(6)testbench.dut.input_curr[7:0]
+(7)testbench.dut.input_curr[7:0]
+@1401200
+-group_end
+-group_end
+@200
 -
 [pattern_trace] 1
 [pattern_trace] 0
