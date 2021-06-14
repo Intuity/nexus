@@ -30,55 +30,55 @@ module nx_node #(
     , parameter MAX_INSTRS     = 512
     , parameter OPCODE_WIDTH   =   3
 ) (
-      input  logic clk_i
-    , input  logic rst_i
+      input  wire clk_i
+    , input  wire rst_i
     // Control signals
-    , input  logic trigger_i
-    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+    , input  wire trigger_i
+    , input  wire [ADDR_ROW_WIDTH-1:0] node_row_i
+    , input  wire [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound interfaces
     // - North
-    , input  logic [STREAM_WIDTH-1:0] ib_north_data_i
-    , input  logic                    ib_north_valid_i
-    , output logic                    ib_north_ready_o
+    , input  wire [STREAM_WIDTH-1:0] ib_north_data_i
+    , input  wire                    ib_north_valid_i
+    , output wire                    ib_north_ready_o
     // - East
-    , input  logic [STREAM_WIDTH-1:0] ib_east_data_i
-    , input  logic                    ib_east_valid_i
-    , output logic                    ib_east_ready_o
+    , input  wire [STREAM_WIDTH-1:0] ib_east_data_i
+    , input  wire                    ib_east_valid_i
+    , output wire                    ib_east_ready_o
     // - South
-    , input  logic [STREAM_WIDTH-1:0] ib_south_data_i
-    , input  logic                    ib_south_valid_i
-    , output logic                    ib_south_ready_o
+    , input  wire [STREAM_WIDTH-1:0] ib_south_data_i
+    , input  wire                    ib_south_valid_i
+    , output wire                    ib_south_ready_o
     // - West
-    , input  logic [STREAM_WIDTH-1:0] ib_west_data_i
-    , input  logic                    ib_west_valid_i
-    , output logic                    ib_west_ready_o
+    , input  wire [STREAM_WIDTH-1:0] ib_west_data_i
+    , input  wire                    ib_west_valid_i
+    , output wire                    ib_west_ready_o
     // Outbound interfaces
     // - North
-    , output logic [STREAM_WIDTH-1:0] ob_north_data_o
-    , output logic                    ob_north_valid_o
-    , input  logic                    ob_north_ready_i
+    , output wire [STREAM_WIDTH-1:0] ob_north_data_o
+    , output wire                    ob_north_valid_o
+    , input  wire                    ob_north_ready_i
     // - East
-    , output logic [STREAM_WIDTH-1:0] ob_east_data_o
-    , output logic                    ob_east_valid_o
-    , input  logic                    ob_east_ready_i
+    , output wire [STREAM_WIDTH-1:0] ob_east_data_o
+    , output wire                    ob_east_valid_o
+    , input  wire                    ob_east_ready_i
     // - South
-    , output logic [STREAM_WIDTH-1:0] ob_south_data_o
-    , output logic                    ob_south_valid_o
-    , input  logic                    ob_south_ready_i
+    , output wire [STREAM_WIDTH-1:0] ob_south_data_o
+    , output wire                    ob_south_valid_o
+    , input  wire                    ob_south_ready_i
     // - West
-    , output logic [STREAM_WIDTH-1:0] ob_west_data_o
-    , output logic                    ob_west_valid_o
-    , input  logic                    ob_west_ready_i
+    , output wire [STREAM_WIDTH-1:0] ob_west_data_o
+    , output wire                    ob_west_valid_o
+    , input  wire                    ob_west_ready_i
 );
 
 // -----------------------------------------------------------------------------
 // Arbiter
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] inbound_data;
-logic [             1:0] inbound_dir;
-logic                    inbound_valid, inbound_ready;
+wire [STREAM_WIDTH-1:0] inbound_data;
+wire [             1:0] inbound_dir;
+wire                    inbound_valid, inbound_ready;
 
 nx_stream_arbiter #(
     .STREAM_WIDTH(STREAM_WIDTH)
@@ -115,9 +115,9 @@ localparam MAX_IO = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS);
 // Distributor
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] outbound_data;
-logic [             1:0] outbound_dir;
-logic                    outbound_valid, outbound_ready;
+wire [STREAM_WIDTH-1:0] outbound_data;
+wire [             1:0] outbound_dir;
+wire                    outbound_valid, outbound_ready;
 
 nx_stream_distributor #(
     .STREAM_WIDTH(STREAM_WIDTH)
@@ -152,23 +152,23 @@ nx_stream_distributor #(
 // Decoder
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] bypass_data;
-logic [             1:0] bypass_dir;
-logic                    bypass_valid, bypass_ready;
+wire [STREAM_WIDTH-1:0] bypass_data;
+wire [             1:0] bypass_dir;
+wire                    bypass_valid, bypass_ready;
 
-logic [ $clog2(MAX_IO)-1:0] map_io;
-logic [ ADDR_ROW_WIDTH-1:0] map_remote_row;
-logic [ ADDR_COL_WIDTH-1:0] map_remote_col;
-logic [$clog2(OUTPUTS)-1:0] map_remote_idx;
-logic                       map_input, map_slot, map_broadcast, map_seq, map_valid;
+wire [ $clog2(MAX_IO)-1:0] map_io;
+wire [ ADDR_ROW_WIDTH-1:0] map_remote_row;
+wire [ ADDR_COL_WIDTH-1:0] map_remote_col;
+wire [$clog2(OUTPUTS)-1:0] map_remote_idx;
+wire                       map_input, map_slot, map_broadcast, map_seq, map_valid;
 
-logic [ ADDR_ROW_WIDTH-1:0] signal_remote_row;
-logic [ ADDR_COL_WIDTH-1:0] signal_remote_col;
-logic [$clog2(OUTPUTS)-1:0] signal_remote_idx;
-logic                       signal_state, signal_valid;
+wire [ ADDR_ROW_WIDTH-1:0] signal_remote_row;
+wire [ ADDR_COL_WIDTH-1:0] signal_remote_col;
+wire [$clog2(OUTPUTS)-1:0] signal_remote_idx;
+wire                       signal_state, signal_valid;
 
-logic [INSTR_WIDTH-1:0] instr_data;
-logic                   instr_core, instr_valid;
+wire [INSTR_WIDTH-1:0] instr_data;
+wire                   instr_core, instr_valid;
 
 nx_msg_decoder #(
       .STREAM_WIDTH  (STREAM_WIDTH  )
@@ -220,13 +220,13 @@ nx_msg_decoder #(
 // Control
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] emit_data;
-logic [             1:0] emit_dir;
-logic                    emit_valid, emit_ready;
+wire [STREAM_WIDTH-1:0] emit_data;
+wire [             1:0] emit_dir;
+wire                    emit_valid, emit_ready;
 
-logic               core_trigger;
-logic [ INPUTS-1:0] core_inputs;
-logic [OUTPUTS-1:0] core_outputs;
+wire               core_trigger;
+wire [ INPUTS-1:0] core_inputs;
+wire [OUTPUTS-1:0] core_outputs;
 
 nx_node_control #(
       .STREAM_WIDTH  (STREAM_WIDTH  )
@@ -301,11 +301,11 @@ nx_stream_combiner #(
 // Instruction Store
 // -----------------------------------------------------------------------------
 
-logic [$clog2(MAX_INSTRS)-1:0] core_populated [1:0];
+wire [$clog2(MAX_INSTRS)-1:0] core_populated [1:0];
 
-logic [$clog2(MAX_INSTRS)-1:0] core_addr [1:0];
-logic [       INSTR_WIDTH-1:0] core_data [1:0];
-logic                          core_rd [1:0], core_stall [1:0];
+wire [$clog2(MAX_INSTRS)-1:0] core_addr [1:0];
+wire [       INSTR_WIDTH-1:0] core_data [1:0];
+wire                          core_rd [1:0], core_stall [1:0];
 
 // TEMP: Tie-off second core as only one core instanced
 assign core_addr[1] = 0;
@@ -341,7 +341,7 @@ nx_instr_store #(
 // Logic Core
 // -----------------------------------------------------------------------------
 
-logic core_idle [1:0];
+wire core_idle [1:0];
 
 nx_node_core #(
       .INPUTS      (INPUTS      )
