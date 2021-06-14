@@ -201,7 +201,8 @@ always_comb begin : p_output_state
                         { tgt_bc, tgt_row, tgt_col } = output_map_a_q[i];
                         msg_data = {
                             tgt_bc, tgt_row, tgt_col, CMD_SIG_STATE,
-                            node_row_i, node_col_i, output_idx, core_outputs_i[i]
+                            node_row_i, node_col_i, output_idx,
+                            core_outputs_i[i], 9'd0
                         };
                         // Don't transmit messages for this node
                         msg_valid = tgt_bc || tgt_row != node_row_i || tgt_col != node_col_i;
@@ -218,6 +219,8 @@ always_comb begin : p_output_state
                         end else if (tgt_col > node_col_i) begin
                             msg_dir = DIRX_EAST;
                         end
+                        // Capture updated state
+                        output_last[i] = core_outputs_i[i];
                         // Change state
                         output_state = OUTPUT_SENT_A;
                     end
@@ -236,13 +239,13 @@ always_comb begin : p_output_state
                     end
                 // Send output B if required
                 end else if (
-                    !output_map_a_q[output_idx][OUT_KEY_WIDTH-1] &&
                     output_map_a_q[output_idx] != output_map_b_q[output_idx]
                 ) begin
                     { tgt_bc, tgt_row, tgt_col } = output_map_b_q[output_idx];
                     msg_data = {
                         tgt_bc, tgt_row, tgt_col, CMD_SIG_STATE,
-                        node_row_i, node_col_i, output_idx, core_outputs_i[i]
+                        node_row_i, node_col_i, output_idx,
+                        core_outputs_i[output_idx], 9'd0
                     };
                     // Don't transmit messages for this node
                     msg_valid = tgt_bc || tgt_row != node_row_i || tgt_col != node_col_i;
