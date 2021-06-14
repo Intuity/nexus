@@ -74,6 +74,12 @@ end
 
 logic [35:0] read_data [1:0], write_data [1:0];
 
+assign rd_data_a_o = read_data[0][DATA_WIDTH-1:0];
+assign rd_data_b_o = read_data[1][DATA_WIDTH-1:0];
+
+assign write_data[0] = { {(DATA_WIDTH-1){1'b0}}, wr_data_a_i };
+assign write_data[1] = { {(DATA_WIDTH-1){1'b0}}, wr_data_b_i };
+
 RAMB36E1 #(
       .RDADDR_COLLISION_HWCONFIG("PERFORMANCE") // No collision possible
     , .SIM_COLLISION_CHECK      ("ALL")         // Warn about any collisions
