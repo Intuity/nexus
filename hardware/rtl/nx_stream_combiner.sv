@@ -48,9 +48,9 @@ module nx_stream_combiner #(
 `DECLARE_DQ(1, locked, clk_i, rst_i, 1'b0)
 
 // Construct outputs
-assign comb_data_o  = choice_q ? stream_a_data_i  : stream_b_data_i;
-assign comb_dir_o   = choice_q ? stream_a_dir_i   : stream_b_dir_i;
-assign comb_valid_o = choice_q ? stream_a_valid_i : stream_b_valid_i;
+assign comb_data_o  = choice_q ? stream_b_data_i  : stream_a_data_i;
+assign comb_dir_o   = choice_q ? stream_b_dir_i   : stream_a_dir_i;
+assign comb_valid_o = choice_q ? stream_b_valid_i : stream_a_valid_i;
 
 assign stream_a_ready_o = comb_ready_i && (choice_q == 1'b0);
 assign stream_b_ready_o = comb_ready_i && (choice_q == 1'b1);
