@@ -56,8 +56,8 @@ wire                    north_ready [NODES-1:0], east_ready [NODES-1:0],
 
 generate
 genvar i_row, i_col;
-for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin
-    for (i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin
+for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
+    for (i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin : g_columns
         wire [STREAM_WIDTH-1:0] ib_north_data, ib_east_data, ib_south_data,
                                 ib_west_data;
         wire                    ib_north_valid, ib_east_valid, ib_south_valid,
@@ -91,9 +91,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin
             assign ib_north_valid = south_valid[(i_row - 1) * COLUMNS + i_col];
             assign south_ready[(i_row - 1) * COLUMNS + i_col] = ib_north_ready;
 
-            assign north_data [i_rows * COLUMNS + i_col] = ob_north_data;
-            assign north_valid[i_rows * COLUMNS + i_col] = ob_north_valid;
-            assign ob_north_ready                        = north_ready;
+            assign north_data [i_row * COLUMNS + i_col] = ob_north_data;
+            assign north_valid[i_row * COLUMNS + i_col] = ob_north_valid;
+            assign ob_north_ready                       = north_ready[i_row * COLUMNS + i_col];
         end
 
         if (i_col == (COLUMNS - 1)) begin
@@ -105,9 +105,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin
             assign ib_east_valid = west_valid[i_row * COLUMNS + i_col + 1];
             assign west_ready[i_row * COLUMNS + i_col + 1] = ib_east_ready;
 
-            assign east_data [i_rows * COLUMNS + i_col] = ob_east_data;
-            assign east_valid[i_rows * COLUMNS + i_col] = ob_east_valid;
-            assign ob_east_ready                        = east_ready;
+            assign east_data [i_row * COLUMNS + i_col] = ob_east_data;
+            assign east_valid[i_row * COLUMNS + i_col] = ob_east_valid;
+            assign ob_east_ready                       = east_ready[i_row * COLUMNS + i_col];
         end
 
         if (i_row == (ROWS - 1)) begin
@@ -119,9 +119,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin
             assign ib_south_valid = north_valid[(i_row + 1) * COLUMNS + i_col];
             assign north_ready[(i_row + 1) * COLUMNS + i_col] = ib_south_ready;
 
-            assign south_data [i_rows * COLUMNS + i_col] = ob_south_data;
-            assign south_valid[i_rows * COLUMNS + i_col] = ob_south_valid;
-            assign ob_south_ready                        = south_ready;
+            assign south_data [i_row * COLUMNS + i_col] = ob_south_data;
+            assign south_valid[i_row * COLUMNS + i_col] = ob_south_valid;
+            assign ob_south_ready                       = south_ready[i_row * COLUMNS + i_col];
         end
 
         if (i_col == 0) begin
@@ -133,9 +133,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin
             assign ib_west_valid = east_valid[i_row * COLUMNS + i_col - 1];
             assign east_ready[i_row * COLUMNS + i_col - 1] = ib_west_ready;
 
-            assign west_data [i_rows * COLUMNS + i_col] = ob_west_data;
-            assign west_valid[i_rows * COLUMNS + i_col] = ob_west_valid;
-            assign ob_west_ready                        = west_ready;
+            assign west_data [i_row * COLUMNS + i_col] = ob_west_data;
+            assign west_valid[i_row * COLUMNS + i_col] = ob_west_valid;
+            assign ob_west_ready                       = west_ready[i_row * COLUMNS + i_col];
         end
 
         nx_node #(
@@ -162,34 +162,34 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin
             , .ib_north_valid_i(ib_north_valid)
             , .ib_north_ready_o(ib_north_ready)
             // - East
-            , .ib_east_data_i (ib_east_data_i )
-            , .ib_east_valid_i(ib_east_valid_i)
-            , .ib_east_ready_o(ib_east_ready_o)
+            , .ib_east_data_i (ib_east_data )
+            , .ib_east_valid_i(ib_east_valid)
+            , .ib_east_ready_o(ib_east_ready)
             // - South
-            , .ib_south_data_i (ib_south_data_i )
-            , .ib_south_valid_i(ib_south_valid_i)
-            , .ib_south_ready_o(ib_south_ready_o)
+            , .ib_south_data_i (ib_south_data )
+            , .ib_south_valid_i(ib_south_valid)
+            , .ib_south_ready_o(ib_south_ready)
             // - West
-            , .ib_west_data_i (ib_west_data_i )
-            , .ib_west_valid_i(ib_west_valid_i)
-            , .ib_west_ready_o(ib_west_ready_o)
+            , .ib_west_data_i (ib_west_data )
+            , .ib_west_valid_i(ib_west_valid)
+            , .ib_west_ready_o(ib_west_ready)
             // Outbound interfaces
             // - North
-            , .ob_north_data_o (ob_north_data_o )
-            , .ob_north_valid_o(ob_north_valid_o)
-            , .ob_north_ready_i(ob_north_ready_i)
+            , .ob_north_data_o (ob_north_data )
+            , .ob_north_valid_o(ob_north_valid)
+            , .ob_north_ready_i(ob_north_ready)
             // - East
-            , .ob_east_data_o (ob_east_data_o )
-            , .ob_east_valid_o(ob_east_valid_o)
-            , .ob_east_ready_i(ob_east_ready_i)
+            , .ob_east_data_o (ob_east_data )
+            , .ob_east_valid_o(ob_east_valid)
+            , .ob_east_ready_i(ob_east_ready)
             // - South
-            , .ob_south_data_o (ob_south_data_o )
-            , .ob_south_valid_o(ob_south_valid_o)
-            , .ob_south_ready_i(ob_south_ready_i)
+            , .ob_south_data_o (ob_south_data )
+            , .ob_south_valid_o(ob_south_valid)
+            , .ob_south_ready_i(ob_south_ready)
             // - West
-            , .ob_west_data_o (ob_west_data_o )
-            , .ob_west_valid_o(ob_west_valid_o)
-            , .ob_west_ready_i(ob_west_ready_i)
+            , .ob_west_data_o (ob_west_data )
+            , .ob_west_valid_o(ob_west_valid)
+            , .ob_west_ready_i(ob_west_ready)
         );
     end
 end
