@@ -1,0 +1,321 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Wed Jun 23 13:45:35 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_core/sim.vcd"
+[dumpfile_mtime] "Wed Jun 23 13:34:33 2021"
+[dumpfile_size] 30820
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_core/nx_node.gtkw"
+[timestart] 0
+[size] 1647 858
+[pos] -1 -1
+*-14.716161 97000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] inbound_arb.
+[treeopen] testbench.
+[treeopen] testbench.dut.
+[sst_width] 282
+[signals_width] 295
+[sst_expanded] 1
+[sst_vpaned_height] 257
+@28
+testbench.dut.clk_i
+testbench.dut.rst_i
+@200
+-
+@c00024
+testbench.dut.node_row_i[3:0]
+@28
+(0)testbench.dut.node_row_i[3:0]
+(1)testbench.dut.node_row_i[3:0]
+(2)testbench.dut.node_row_i[3:0]
+(3)testbench.dut.node_row_i[3:0]
+@1401204
+-group_end
+@24
+testbench.dut.node_col_i[3:0]
+@200
+-
+@c00200
+-Inbound
+@22
+testbench.dut.ib_north_data_i[31:0]
+@28
+testbench.dut.ib_north_valid_i
+testbench.dut.ib_north_ready_o
+@22
+testbench.dut.ib_east_data_i[31:0]
+@28
+testbench.dut.ib_east_valid_i
+testbench.dut.ib_east_ready_o
+@22
+testbench.dut.ib_south_data_i[31:0]
+@28
+testbench.dut.ib_south_valid_i
+testbench.dut.ib_south_ready_o
+@22
+testbench.dut.ib_west_data_i[31:0]
+@28
+testbench.dut.ib_west_valid_i
+testbench.dut.ib_west_ready_o
+@1401200
+-Inbound
+@200
+-
+@24
+inbound_arb.arb_dir_o[1:0]
+@c00022
+inbound_arb.arb_data_o[31:0]
+@28
+(0)inbound_arb.arb_data_o[31:0]
+(1)inbound_arb.arb_data_o[31:0]
+(2)inbound_arb.arb_data_o[31:0]
+(3)inbound_arb.arb_data_o[31:0]
+(4)inbound_arb.arb_data_o[31:0]
+(5)inbound_arb.arb_data_o[31:0]
+(6)inbound_arb.arb_data_o[31:0]
+(7)inbound_arb.arb_data_o[31:0]
+(8)inbound_arb.arb_data_o[31:0]
+(9)inbound_arb.arb_data_o[31:0]
+(10)inbound_arb.arb_data_o[31:0]
+(11)inbound_arb.arb_data_o[31:0]
+(12)inbound_arb.arb_data_o[31:0]
+(13)inbound_arb.arb_data_o[31:0]
+(14)inbound_arb.arb_data_o[31:0]
+(15)inbound_arb.arb_data_o[31:0]
+(16)inbound_arb.arb_data_o[31:0]
+(17)inbound_arb.arb_data_o[31:0]
+(18)inbound_arb.arb_data_o[31:0]
+(19)inbound_arb.arb_data_o[31:0]
+(20)inbound_arb.arb_data_o[31:0]
+(21)inbound_arb.arb_data_o[31:0]
+(22)inbound_arb.arb_data_o[31:0]
+(23)inbound_arb.arb_data_o[31:0]
+(24)inbound_arb.arb_data_o[31:0]
+(25)inbound_arb.arb_data_o[31:0]
+(26)inbound_arb.arb_data_o[31:0]
+(27)inbound_arb.arb_data_o[31:0]
+(28)inbound_arb.arb_data_o[31:0]
+(29)inbound_arb.arb_data_o[31:0]
+(30)inbound_arb.arb_data_o[31:0]
+(31)inbound_arb.arb_data_o[31:0]
+@1401200
+-group_end
+@28
++{arb_broadcast} (0)inbound_arb.arb_data_o[31:0]
+@c00024
+#{arb_bc_decay} (1)inbound_arb.arb_data_o[31:0] (2)inbound_arb.arb_data_o[31:0] (3)inbound_arb.arb_data_o[31:0] (4)inbound_arb.arb_data_o[31:0] (5)inbound_arb.arb_data_o[31:0] (6)inbound_arb.arb_data_o[31:0] (7)inbound_arb.arb_data_o[31:0] (8)inbound_arb.arb_data_o[31:0]
+@28
+(1)inbound_arb.arb_data_o[31:0]
+(2)inbound_arb.arb_data_o[31:0]
+(3)inbound_arb.arb_data_o[31:0]
+(4)inbound_arb.arb_data_o[31:0]
+(5)inbound_arb.arb_data_o[31:0]
+(6)inbound_arb.arb_data_o[31:0]
+(7)inbound_arb.arb_data_o[31:0]
+(8)inbound_arb.arb_data_o[31:0]
+@1401204
+-group_end
+@c00024
+#{arb_tgt_row} (1)inbound_arb.arb_data_o[31:0] (2)inbound_arb.arb_data_o[31:0] (3)inbound_arb.arb_data_o[31:0] (4)inbound_arb.arb_data_o[31:0]
+@28
+(1)inbound_arb.arb_data_o[31:0]
+(2)inbound_arb.arb_data_o[31:0]
+(3)inbound_arb.arb_data_o[31:0]
+(4)inbound_arb.arb_data_o[31:0]
+@1401204
+-group_end
+@c00024
+#{arb_tgt_col} (5)inbound_arb.arb_data_o[31:0] (6)inbound_arb.arb_data_o[31:0] (7)inbound_arb.arb_data_o[31:0] (8)inbound_arb.arb_data_o[31:0]
+@28
+(5)inbound_arb.arb_data_o[31:0]
+(6)inbound_arb.arb_data_o[31:0]
+(7)inbound_arb.arb_data_o[31:0]
+(8)inbound_arb.arb_data_o[31:0]
+@1401204
+-group_end
+@c00028
+#{arb_cmd} (9)inbound_arb.arb_data_o[31:0] (10)inbound_arb.arb_data_o[31:0]
+@28
+(9)inbound_arb.arb_data_o[31:0]
+(10)inbound_arb.arb_data_o[31:0]
+@1401200
+-group_end
+@c00022
+#{arb_payload} (11)inbound_arb.arb_data_o[31:0] (12)inbound_arb.arb_data_o[31:0] (13)inbound_arb.arb_data_o[31:0] (14)inbound_arb.arb_data_o[31:0] (15)inbound_arb.arb_data_o[31:0] (16)inbound_arb.arb_data_o[31:0] (17)inbound_arb.arb_data_o[31:0] (18)inbound_arb.arb_data_o[31:0] (19)inbound_arb.arb_data_o[31:0] (20)inbound_arb.arb_data_o[31:0] (21)inbound_arb.arb_data_o[31:0] (22)inbound_arb.arb_data_o[31:0] (23)inbound_arb.arb_data_o[31:0] (24)inbound_arb.arb_data_o[31:0] (25)inbound_arb.arb_data_o[31:0] (26)inbound_arb.arb_data_o[31:0] (27)inbound_arb.arb_data_o[31:0] (28)inbound_arb.arb_data_o[31:0] (29)inbound_arb.arb_data_o[31:0] (30)inbound_arb.arb_data_o[31:0] (31)inbound_arb.arb_data_o[31:0]
+@28
+(11)inbound_arb.arb_data_o[31:0]
+(12)inbound_arb.arb_data_o[31:0]
+(13)inbound_arb.arb_data_o[31:0]
+(14)inbound_arb.arb_data_o[31:0]
+(15)inbound_arb.arb_data_o[31:0]
+(16)inbound_arb.arb_data_o[31:0]
+(17)inbound_arb.arb_data_o[31:0]
+(18)inbound_arb.arb_data_o[31:0]
+(19)inbound_arb.arb_data_o[31:0]
+(20)inbound_arb.arb_data_o[31:0]
+(21)inbound_arb.arb_data_o[31:0]
+(22)inbound_arb.arb_data_o[31:0]
+(23)inbound_arb.arb_data_o[31:0]
+(24)inbound_arb.arb_data_o[31:0]
+(25)inbound_arb.arb_data_o[31:0]
+(26)inbound_arb.arb_data_o[31:0]
+(27)inbound_arb.arb_data_o[31:0]
+(28)inbound_arb.arb_data_o[31:0]
+(29)inbound_arb.arb_data_o[31:0]
+(30)inbound_arb.arb_data_o[31:0]
+(31)inbound_arb.arb_data_o[31:0]
+@1401200
+-group_end
+@28
+inbound_arb.arb_valid_o
+inbound_arb.arb_ready_i
+@200
+-
+@800200
+-Combiner
+@29
+testbench.dut.combiner.stream_a_valid_i
+@28
+testbench.dut.combiner.stream_a_ready_o
+@200
+-
+@28
+testbench.dut.combiner.stream_b_valid_i
+testbench.dut.combiner.stream_b_ready_o
+@1000200
+-Combiner
+@200
+-
+@24
+outbound_dist.dist_dir_i[1:0]
+@c00022
+outbound_dist.dist_data_i[31:0]
+@28
+(0)outbound_dist.dist_data_i[31:0]
+(1)outbound_dist.dist_data_i[31:0]
+(2)outbound_dist.dist_data_i[31:0]
+(3)outbound_dist.dist_data_i[31:0]
+(4)outbound_dist.dist_data_i[31:0]
+(5)outbound_dist.dist_data_i[31:0]
+(6)outbound_dist.dist_data_i[31:0]
+(7)outbound_dist.dist_data_i[31:0]
+(8)outbound_dist.dist_data_i[31:0]
+(9)outbound_dist.dist_data_i[31:0]
+(10)outbound_dist.dist_data_i[31:0]
+(11)outbound_dist.dist_data_i[31:0]
+(12)outbound_dist.dist_data_i[31:0]
+(13)outbound_dist.dist_data_i[31:0]
+(14)outbound_dist.dist_data_i[31:0]
+(15)outbound_dist.dist_data_i[31:0]
+(16)outbound_dist.dist_data_i[31:0]
+(17)outbound_dist.dist_data_i[31:0]
+(18)outbound_dist.dist_data_i[31:0]
+(19)outbound_dist.dist_data_i[31:0]
+(20)outbound_dist.dist_data_i[31:0]
+(21)outbound_dist.dist_data_i[31:0]
+(22)outbound_dist.dist_data_i[31:0]
+(23)outbound_dist.dist_data_i[31:0]
+(24)outbound_dist.dist_data_i[31:0]
+(25)outbound_dist.dist_data_i[31:0]
+(26)outbound_dist.dist_data_i[31:0]
+(27)outbound_dist.dist_data_i[31:0]
+(28)outbound_dist.dist_data_i[31:0]
+(29)outbound_dist.dist_data_i[31:0]
+(30)outbound_dist.dist_data_i[31:0]
+(31)outbound_dist.dist_data_i[31:0]
+@1401200
+-group_end
+@28
++{dist_broadcast} (0)outbound_dist.dist_data_i[31:0]
+@c00024
+#{dist_bc_decay} (1)outbound_dist.dist_data_i[31:0] (2)outbound_dist.dist_data_i[31:0] (3)outbound_dist.dist_data_i[31:0] (4)outbound_dist.dist_data_i[31:0] (5)outbound_dist.dist_data_i[31:0] (6)outbound_dist.dist_data_i[31:0] (7)outbound_dist.dist_data_i[31:0] (8)outbound_dist.dist_data_i[31:0]
+@28
+(1)outbound_dist.dist_data_i[31:0]
+(2)outbound_dist.dist_data_i[31:0]
+(3)outbound_dist.dist_data_i[31:0]
+(4)outbound_dist.dist_data_i[31:0]
+(5)outbound_dist.dist_data_i[31:0]
+(6)outbound_dist.dist_data_i[31:0]
+(7)outbound_dist.dist_data_i[31:0]
+(8)outbound_dist.dist_data_i[31:0]
+@1401204
+-group_end
+@c00024
+#{dist_tgt_row} (1)outbound_dist.dist_data_i[31:0] (2)outbound_dist.dist_data_i[31:0] (3)outbound_dist.dist_data_i[31:0] (4)outbound_dist.dist_data_i[31:0]
+@28
+(1)outbound_dist.dist_data_i[31:0]
+(2)outbound_dist.dist_data_i[31:0]
+(3)outbound_dist.dist_data_i[31:0]
+(4)outbound_dist.dist_data_i[31:0]
+@1401204
+-group_end
+@c00024
+#{dist_tgt_col} (5)outbound_dist.dist_data_i[31:0] (6)outbound_dist.dist_data_i[31:0] (7)outbound_dist.dist_data_i[31:0] (8)outbound_dist.dist_data_i[31:0]
+@28
+(5)outbound_dist.dist_data_i[31:0]
+(6)outbound_dist.dist_data_i[31:0]
+(7)outbound_dist.dist_data_i[31:0]
+(8)outbound_dist.dist_data_i[31:0]
+@1401204
+-group_end
+@c00028
+#{dist_cmd} (9)outbound_dist.dist_data_i[31:0] (10)outbound_dist.dist_data_i[31:0]
+@28
+(9)outbound_dist.dist_data_i[31:0]
+(10)outbound_dist.dist_data_i[31:0]
+@1401200
+-group_end
+@c00022
+#{dist_payload} (11)outbound_dist.dist_data_i[31:0] (12)outbound_dist.dist_data_i[31:0] (13)outbound_dist.dist_data_i[31:0] (14)outbound_dist.dist_data_i[31:0] (15)outbound_dist.dist_data_i[31:0] (16)outbound_dist.dist_data_i[31:0] (17)outbound_dist.dist_data_i[31:0] (18)outbound_dist.dist_data_i[31:0] (19)outbound_dist.dist_data_i[31:0] (20)outbound_dist.dist_data_i[31:0] (21)outbound_dist.dist_data_i[31:0] (22)outbound_dist.dist_data_i[31:0] (23)outbound_dist.dist_data_i[31:0] (24)outbound_dist.dist_data_i[31:0] (25)outbound_dist.dist_data_i[31:0] (26)outbound_dist.dist_data_i[31:0] (27)outbound_dist.dist_data_i[31:0] (28)outbound_dist.dist_data_i[31:0] (29)outbound_dist.dist_data_i[31:0] (30)outbound_dist.dist_data_i[31:0] (31)outbound_dist.dist_data_i[31:0]
+@28
+(11)outbound_dist.dist_data_i[31:0]
+(12)outbound_dist.dist_data_i[31:0]
+(13)outbound_dist.dist_data_i[31:0]
+(14)outbound_dist.dist_data_i[31:0]
+(15)outbound_dist.dist_data_i[31:0]
+(16)outbound_dist.dist_data_i[31:0]
+(17)outbound_dist.dist_data_i[31:0]
+(18)outbound_dist.dist_data_i[31:0]
+(19)outbound_dist.dist_data_i[31:0]
+(20)outbound_dist.dist_data_i[31:0]
+(21)outbound_dist.dist_data_i[31:0]
+(22)outbound_dist.dist_data_i[31:0]
+(23)outbound_dist.dist_data_i[31:0]
+(24)outbound_dist.dist_data_i[31:0]
+(25)outbound_dist.dist_data_i[31:0]
+(26)outbound_dist.dist_data_i[31:0]
+(27)outbound_dist.dist_data_i[31:0]
+(28)outbound_dist.dist_data_i[31:0]
+(29)outbound_dist.dist_data_i[31:0]
+(30)outbound_dist.dist_data_i[31:0]
+(31)outbound_dist.dist_data_i[31:0]
+@1401200
+-group_end
+@28
+outbound_dist.dist_valid_i
+outbound_dist.dist_ready_o
+@200
+-
+-
+@22
+testbench.dut.ob_north_data_o[31:0]
+@28
+testbench.dut.ob_north_valid_o
+testbench.dut.ob_north_ready_i
+@22
+testbench.dut.ob_east_data_o[31:0]
+@28
+testbench.dut.ob_east_valid_o
+testbench.dut.ob_east_ready_i
+@22
+testbench.dut.ob_south_data_o[31:0]
+@28
+testbench.dut.ob_south_valid_o
+testbench.dut.ob_south_ready_i
+@22
+testbench.dut.ob_west_data_o[31:0]
+@28
+testbench.dut.ob_west_valid_o
+testbench.dut.ob_west_ready_i
+[pattern_trace] 1
+[pattern_trace] 0
