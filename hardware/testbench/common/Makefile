@@ -39,6 +39,7 @@ SIM_VCD   ?= sim.vcd
 SIM_LOG   ?= sim.log
 EN_WAVES  ?= no
 TRACE_RAM ?= no
+EN_TRACE  ?= no
 
 ifeq ($(QUIET),yes)
   PREFIX := @
@@ -70,6 +71,10 @@ COMPILE_ARGS    += $(addprefix -D ,$(DEFINES))
 
 ifneq ($(EN_WAVES),no)
   PLUSARGS += +VCD_FILE=$(SIM_VCD)
+endif
+
+ifneq ($(EN_TRACE),no)
+  COMPILE_ARGS += -pfileline=1
 endif
 
 # Expand the Python path to include the testbench
