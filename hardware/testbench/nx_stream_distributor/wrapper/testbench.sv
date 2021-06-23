@@ -26,18 +26,22 @@ module testbench #(
     , output logic [STREAM_WIDTH-1:0] north_data_o
     , output logic                    north_valid_o
     , input  logic                    north_ready_i
+    , input  logic                    north_present_i
     // - East
     , output logic [STREAM_WIDTH-1:0] east_data_o
     , output logic                    east_valid_o
     , input  logic                    east_ready_i
+    , input  logic                    east_present_i
     // - South
     , output logic [STREAM_WIDTH-1:0] south_data_o
     , output logic                    south_valid_o
     , input  logic                    south_ready_i
+    , input  logic                    south_present_i
     // - West
     , output logic [STREAM_WIDTH-1:0] west_data_o
     , output logic                    west_valid_o
     , input  logic                    west_ready_i
+    , input  logic                    west_present_i
 );
 
 reg clk = 1'b0;
@@ -55,21 +59,25 @@ nx_stream_distributor #(
     , .dist_ready_o(dist_ready_o)
     // Outbound distributed message streams
     // - North
-    , .north_data_o (north_data_o )
-    , .north_valid_o(north_valid_o)
-    , .north_ready_i(north_ready_i)
+    , .north_data_o   (north_data_o   )
+    , .north_valid_o  (north_valid_o  )
+    , .north_ready_i  (north_ready_i  )
+    , .north_present_i(north_present_i)
     // - East
-    , .east_data_o (east_data_o )
-    , .east_valid_o(east_valid_o)
-    , .east_ready_i(east_ready_i)
+    , .east_data_o   (east_data_o   )
+    , .east_valid_o  (east_valid_o  )
+    , .east_ready_i  (east_ready_i  )
+    , .east_present_i(east_present_i)
     // - South
-    , .south_data_o (south_data_o )
-    , .south_valid_o(south_valid_o)
-    , .south_ready_i(south_ready_i)
+    , .south_data_o   (south_data_o   )
+    , .south_valid_o  (south_valid_o  )
+    , .south_ready_i  (south_ready_i  )
+    , .south_present_i(south_present_i)
     // - West
-    , .west_data_o (west_data_o )
-    , .west_valid_o(west_valid_o)
-    , .west_ready_i(west_ready_i)
+    , .west_data_o   (west_data_o   )
+    , .west_valid_o  (west_valid_o  )
+    , .west_ready_i  (west_ready_i  )
+    , .west_present_i(west_present_i)
 );
 
 `ifdef sim_icarus

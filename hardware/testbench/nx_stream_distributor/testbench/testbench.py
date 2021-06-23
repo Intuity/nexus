@@ -37,6 +37,10 @@ class Testbench(TestbenchBase):
         self.east_io  = StreamIO(self.dut, "east",  IORole.INITIATOR)
         self.south_io = StreamIO(self.dut, "south", IORole.INITIATOR)
         self.west_io  = StreamIO(self.dut, "west",  IORole.INITIATOR)
+        self.present  = [
+            self.dut.north_present_i, self.dut.east_present_i,
+            self.dut.south_present_i, self.dut.west_present_i,
+        ]
         # Setup drivers/monitors
         self.dist  = StreamInitiator(self, self.clk, self.rst, self.dist_io )
         self.north = StreamResponder(self, self.clk, self.rst, self.north_io)
@@ -63,6 +67,7 @@ class Testbench(TestbenchBase):
         self.east_io.initialise(IORole.RESPONDER)
         self.south_io.initialise(IORole.RESPONDER)
         self.west_io.initialise(IORole.RESPONDER)
+        for flag in self.present: flag <= 1
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

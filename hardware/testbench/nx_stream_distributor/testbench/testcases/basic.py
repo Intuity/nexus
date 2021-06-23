@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
-
-from cocotb.regression import TestFactory
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import ClockCycles
 
 from ..testbench import testcase
 
@@ -32,59 +29,3 @@ async def sanity(dut):
 
     # All done!
     dut.info("Finished counting cycles")
-
-@testcase()
-async def single_dir(dut):
-    """ Test messages streamed via each interface one at a time """
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
-    # Get the width of the data
-    intf_size = max(dut.dist_io.data._range)-min(dut.dist_io.data._range)+1
-
-    for dirx, exp in enumerate((
-        dut.exp_north, dut.exp_east, dut.exp_south, dut.exp_west
-    )):
-        # Send a random message towards each interface
-        msg = randint(0, (1 << intf_size) - 1)
-        dut.dist.append((msg, dirx))
-
-        # Queue up message on the expected output
-        exp.append((msg, 0))
-
-        # Wait for the expected queue to drain
-        while exp: await RisingEdge(dut.clk)
-
-async def multi_dir(dut, backpressure):
-    """ Queue up many messages onto different interfaces """
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
-    # Activate/deactivate backpressure
-    dut.north.delays = backpressure
-    dut.east.delays  = backpressure
-    dut.south.delays = backpressure
-    dut.west.delays  = backpressure
-
-    # Get the width of the data
-    intf_size = max(dut.dist_io.data._range)-min(dut.dist_io.data._range)+1
-
-    # Queue up many messages to go to different responders
-    exps = (
-        (dut.exp_north, 0), (dut.exp_east, 1),
-        (dut.exp_south, 2), (dut.exp_west, 3),
-    )
-    for _ in range(1000):
-        # Select a random target
-        exp, dirx = choice(exps)
-
-        # Send a random message towards each interface
-        msg = randint(0, (1 << intf_size) - 1)
-        dut.dist.append((msg, dirx))
-
-        # Queue up message on the expected output
-        exp.append((msg, 0))
-
-factory = TestFactory(multi_dir)
-factory.add_option("backpressure", [True, False])
-factory.generate_tests()
