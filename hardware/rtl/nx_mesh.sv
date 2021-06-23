@@ -78,9 +78,12 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
                                  ob_west_valid;
         logic                    ob_north_ready, ob_east_ready, ob_south_ready,
                                  ob_west_ready;
+        logic                    ob_north_present, ob_east_present,
+                                 ob_south_present, ob_west_present;
 
         if (i_row == 0) begin
-            assign ob_north_ready = 1'b0;
+            assign ob_north_ready   = 1'b0;
+            assign ob_north_present = 1'b0;
             if (i_col == 0) begin
                 assign ib_north_data   = inbound_data_i;
                 assign ib_north_valid  = inbound_valid_i;
@@ -97,12 +100,14 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             assign north_data [i_row * COLUMNS + i_col] = ob_north_data;
             assign north_valid[i_row * COLUMNS + i_col] = ob_north_valid;
             assign ob_north_ready                       = north_ready[i_row * COLUMNS + i_col];
+            assign ob_north_present                     = 1'b1;
         end
 
         if (i_col == (COLUMNS - 1)) begin
-            assign ib_east_data  = {STREAM_WIDTH{1'b0}};
-            assign ib_east_valid = 1'b0;
-            assign ob_east_ready = 1'b0;
+            assign ib_east_data    = {STREAM_WIDTH{1'b0}};
+            assign ib_east_valid   = 1'b0;
+            assign ob_east_ready   = 1'b0;
+            assign ob_east_present = 1'b0;
         end else begin
             assign ib_east_data  = west_data [i_row * COLUMNS + i_col + 1];
             assign ib_east_valid = west_valid[i_row * COLUMNS + i_col + 1];
@@ -111,6 +116,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             assign east_data [i_row * COLUMNS + i_col] = ob_east_data;
             assign east_valid[i_row * COLUMNS + i_col] = ob_east_valid;
             assign ob_east_ready                       = east_ready[i_row * COLUMNS + i_col];
+            assign ob_east_present                     = 1'b0;
         end
 
         if (i_row == (ROWS - 1)) begin
@@ -120,8 +126,10 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
                 assign outbound_data_o  = ob_south_data;
                 assign outbound_valid_o = ob_south_valid;
                 assign ob_south_ready   = outbound_ready_i;
+                assign ob_south_present = 1'b1;
             end else begin
-                assign ob_south_ready = 1'b0;
+                assign ob_south_ready   = 1'b0;
+                assign ob_south_present = 1'b0;
             end
         end else begin
             assign ib_south_data  = north_data [(i_row + 1) * COLUMNS + i_col];
@@ -131,12 +139,14 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             assign south_data [i_row * COLUMNS + i_col] = ob_south_data;
             assign south_valid[i_row * COLUMNS + i_col] = ob_south_valid;
             assign ob_south_ready                       = south_ready[i_row * COLUMNS + i_col];
+            assign ob_south_present                     = 1'b1;
         end
 
         if (i_col == 0) begin
-            assign ib_west_data  = {STREAM_WIDTH{1'b0}};
-            assign ib_west_valid = 1'b0;
-            assign ob_west_ready = 1'b0;
+            assign ib_west_data    = {STREAM_WIDTH{1'b0}};
+            assign ib_west_valid   = 1'b0;
+            assign ob_west_ready   = 1'b0;
+            assign ob_west_present = 1'b0;
         end else begin
             assign ib_west_data  = east_data [i_row * COLUMNS + i_col - 1];
             assign ib_west_valid = east_valid[i_row * COLUMNS + i_col - 1];
@@ -145,6 +155,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             assign west_data [i_row * COLUMNS + i_col] = ob_west_data;
             assign west_valid[i_row * COLUMNS + i_col] = ob_west_valid;
             assign ob_west_ready                       = west_ready[i_row * COLUMNS + i_col];
+            assign ob_west_present                     = 1'b1;
         end
 
         nx_node #(
@@ -185,21 +196,25 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             , .ib_west_ready_o(ib_west_ready)
             // Outbound interfaces
             // - North
-            , .ob_north_data_o (ob_north_data )
-            , .ob_north_valid_o(ob_north_valid)
-            , .ob_north_ready_i(ob_north_ready)
+            , .ob_north_data_o   (ob_north_data   )
+            , .ob_north_valid_o  (ob_north_valid  )
+            , .ob_north_ready_i  (ob_north_ready  )
+            , .ob_north_present_i(ob_north_present)
             // - East
-            , .ob_east_data_o (ob_east_data )
-            , .ob_east_valid_o(ob_east_valid)
-            , .ob_east_ready_i(ob_east_ready)
+            , .ob_east_data_o   (ob_east_data   )
+            , .ob_east_valid_o  (ob_east_valid  )
+            , .ob_east_ready_i  (ob_east_ready  )
+            , .ob_east_present_i(ob_east_present)
             // - South
-            , .ob_south_data_o (ob_south_data )
-            , .ob_south_valid_o(ob_south_valid)
-            , .ob_south_ready_i(ob_south_ready)
+            , .ob_south_data_o   (ob_south_data   )
+            , .ob_south_valid_o  (ob_south_valid  )
+            , .ob_south_ready_i  (ob_south_ready  )
+            , .ob_south_present_i(ob_south_present)
             // - West
-            , .ob_west_data_o (ob_west_data )
-            , .ob_west_valid_o(ob_west_valid)
-            , .ob_west_ready_i(ob_west_ready)
+            , .ob_west_data_o   (ob_west_data   )
+            , .ob_west_valid_o  (ob_west_valid  )
+            , .ob_west_ready_i  (ob_west_ready  )
+            , .ob_west_present_i(ob_west_present)
         );
     end
 end

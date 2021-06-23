@@ -59,18 +59,22 @@ module nx_node #(
     , output logic [STREAM_WIDTH-1:0] ob_north_data_o
     , output logic                    ob_north_valid_o
     , input  logic                    ob_north_ready_i
+    , input  logic                    ob_north_present_i
     // - East
     , output logic [STREAM_WIDTH-1:0] ob_east_data_o
     , output logic                    ob_east_valid_o
     , input  logic                    ob_east_ready_i
+    , input  logic                    ob_east_present_i
     // - South
     , output logic [STREAM_WIDTH-1:0] ob_south_data_o
     , output logic                    ob_south_valid_o
     , input  logic                    ob_south_ready_i
+    , input  logic                    ob_south_present_i
     // - West
     , output logic [STREAM_WIDTH-1:0] ob_west_data_o
     , output logic                    ob_west_valid_o
     , input  logic                    ob_west_ready_i
+    , input  logic                    ob_west_present_i
 );
 
 // -----------------------------------------------------------------------------
@@ -138,21 +142,25 @@ nx_stream_distributor #(
     , .dist_ready_o(outbound_ready)
     // Outbound distributed message streams
     // - North
-    , .north_data_o (ob_north_data_o )
-    , .north_valid_o(ob_north_valid_o)
-    , .north_ready_i(ob_north_ready_i)
+    , .north_data_o   (ob_north_data_o   )
+    , .north_valid_o  (ob_north_valid_o  )
+    , .north_ready_i  (ob_north_ready_i  )
+    , .north_present_i(ob_north_present_i)
     // - East
-    , .east_data_o (ob_east_data_o )
-    , .east_valid_o(ob_east_valid_o)
-    , .east_ready_i(ob_east_ready_i)
+    , .east_data_o   (ob_east_data_o   )
+    , .east_valid_o  (ob_east_valid_o  )
+    , .east_ready_i  (ob_east_ready_i  )
+    , .east_present_i(ob_east_present_i)
     // - South
-    , .south_data_o (ob_south_data_o )
-    , .south_valid_o(ob_south_valid_o)
-    , .south_ready_i(ob_south_ready_i)
+    , .south_data_o   (ob_south_data_o   )
+    , .south_valid_o  (ob_south_valid_o  )
+    , .south_ready_i  (ob_south_ready_i  )
+    , .south_present_i(ob_south_present_i)
     // - West
-    , .west_data_o (ob_west_data_o )
-    , .west_valid_o(ob_west_valid_o)
-    , .west_ready_i(ob_west_ready_i)
+    , .west_data_o   (ob_west_data_o   )
+    , .west_valid_o  (ob_west_valid_o  )
+    , .west_ready_i  (ob_west_ready_i  )
+    , .west_present_i(ob_west_present_i)
 );
 
 // -----------------------------------------------------------------------------
