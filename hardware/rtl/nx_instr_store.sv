@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`include "nx_common.svh"
-
 // nx_instr_store
 // Dual-ported instruction store capable of supporting two independent cores
 // within the same node.
@@ -48,12 +46,11 @@ module nx_instr_store #(
 localparam INSTR_ADDR_W = $clog2(MAX_INSTRS);
 
 // Internal state
-`DECLARE_DQ(INSTR_ADDR_W, populated_0, clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
-`DECLARE_DQ(INSTR_ADDR_W, populated_1, clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
+logic [INSTR_ADDR_W-1:0] populated_0_q, populated_1_q;
 
 // Construct outputs
-assign core_0_populated_o = populated_0;
-assign core_1_populated_o = populated_1;
+assign core_0_populated_o = populated_0_q;
+assign core_1_populated_o = populated_1_q;
 
 assign core_0_stall_o = store_valid_i && !store_core_i;
 assign core_1_stall_o = store_valid_i &&  store_core_i;
@@ -86,16 +83,16 @@ nx_ram #(
 );
 
 // Count number of populated instructions
-always_comb begin : p_count
-    // Initialise state
-    `INIT_D(populated_0);
-    `INIT_D(populated_1);
-
-    // Count instructions being written
-    if (store_valid_i && !store_core_i)
-        populated_0 = populated_0 + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
-    if (store_valid_i &&  store_core_i)
-        populated_1 = populated_1 + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
+always_ff @(posedge clk_i, posedge rst_i) begin : p_count
+    if (rst_i) begin
+        populated_0_q <= {INSTR_ADDR_W{1'b0}};
+        populated_1_q <= {INSTR_ADDR_W{1'b0}};
+    end else begin
+        if (store_valid_i && !store_core_i)
+            populated_0_q <= populated_0_q + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
+        if (store_valid_i &&  store_core_i)
+            populated_1_q <= populated_1_q + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
+    end
 end
 
 endmodule : nx_instr_store
