@@ -31,60 +31,63 @@ module nx_mesh #(
     , parameter MAX_INSTRS     = 512
     , parameter OPCODE_WIDTH   =   3
 ) (
-      input  wire clk_i
-    , input  wire rst_i
+      input  logic clk_i
+    , input  logic rst_i
     // Control signals
-    , input  wire trigger_i
+    , input  logic trigger_i
+    , output logic idle_o
     // Inbound stream
-    , input  wire [STREAM_WIDTH-1:0] inbound_data_i
-    , input  wire                    inbound_valid_i
-    , output wire                    inbound_ready_o
+    , input  logic [STREAM_WIDTH-1:0] inbound_data_i
+    , input  logic                    inbound_valid_i
+    , output logic                    inbound_ready_o
     // Outbound stream
-    , output wire [STREAM_WIDTH-1:0] outbound_data_o
-    , output wire                    outbound_valid_o
-    , input  wire                    outbound_ready_i
+    , output logic [STREAM_WIDTH-1:0] outbound_data_o
+    , output logic                    outbound_valid_o
+    , input  logic                    outbound_ready_i
 );
 
 localparam NODES = ROWS * COLUMNS;
 
-wire [STREAM_WIDTH-1:0] north_data [NODES-1:0], east_data [NODES-1:0],
-                        south_data [NODES-1:0], west_data [NODES-1:0];
-wire                    north_valid [NODES-1:0], east_valid [NODES-1:0],
-                        south_valid [NODES-1:0], west_valid [NODES-1:0];
-wire                    north_ready [NODES-1:0], east_ready [NODES-1:0],
-                        south_ready [NODES-1:0], west_ready [NODES-1:0];
+// Idle flag for every node
+logic [NODES-1:0] idle_flags;
+assign idle_o = &idle_flags;
 
+// Message interfaces for every node
+logic [STREAM_WIDTH-1:0] north_data [NODES-1:0], east_data [NODES-1:0],
+                         south_data [NODES-1:0], west_data [NODES-1:0];
+logic                    north_valid [NODES-1:0], east_valid [NODES-1:0],
+                         south_valid [NODES-1:0], west_valid [NODES-1:0];
+logic                    north_ready [NODES-1:0], east_ready [NODES-1:0],
+                         south_ready [NODES-1:0], west_ready [NODES-1:0];
+
+// Generate the mesh
 generate
 genvar i_row, i_col;
 for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
     for (i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin : g_columns
-        wire [STREAM_WIDTH-1:0] ib_north_data, ib_east_data, ib_south_data,
-                                ib_west_data;
-        wire                    ib_north_valid, ib_east_valid, ib_south_valid,
-                                ib_west_valid;
-        wire                    ib_north_ready, ib_east_ready, ib_south_ready,
-                                ib_west_ready;
+        logic [STREAM_WIDTH-1:0] ib_north_data, ib_east_data, ib_south_data,
+                                 ib_west_data;
+        logic                    ib_north_valid, ib_east_valid, ib_south_valid,
+                                 ib_west_valid;
+        logic                    ib_north_ready, ib_east_ready, ib_south_ready,
+                                 ib_west_ready;
 
-        wire [STREAM_WIDTH-1:0] ob_north_data, ob_east_data, ob_south_data,
-                                ob_west_data;
-        wire                    ob_north_valid, ob_east_valid, ob_south_valid,
-                                ob_west_valid;
-        wire                    ob_north_ready, ob_east_ready, ob_south_ready,
-                                ob_west_ready;
+        logic [STREAM_WIDTH-1:0] ob_north_data, ob_east_data, ob_south_data,
+                                 ob_west_data;
+        logic                    ob_north_valid, ob_east_valid, ob_south_valid,
+                                 ob_west_valid;
+        logic                    ob_north_ready, ob_east_ready, ob_south_ready,
+                                 ob_west_ready;
 
         if (i_row == 0) begin
+            assign ob_north_ready = 1'b0;
             if (i_col == 0) begin
                 assign ib_north_data   = inbound_data_i;
                 assign ib_north_valid  = inbound_valid_i;
                 assign inbound_ready_o = ib_north_ready;
-
-                assign outbound_data_o  = ob_north_data;
-                assign outbound_valid_o = ob_north_valid;
-                assign ob_north_ready   = outbound_ready_i;
             end else begin
                 assign ib_north_data  = {STREAM_WIDTH{1'b0}};
                 assign ib_north_valid = 1'b0;
-                assign ob_north_ready = 1'b0;
             end
         end else begin
             assign ib_north_data  = south_data [(i_row - 1) * COLUMNS + i_col];
@@ -113,7 +116,13 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         if (i_row == (ROWS - 1)) begin
             assign ib_south_data  = {STREAM_WIDTH{1'b0}};
             assign ib_south_valid = 1'b0;
-            assign ob_south_ready = 1'b0;
+            if (i_col == 0) begin
+                assign outbound_data_o  = ob_south_data;
+                assign outbound_valid_o = ob_south_valid;
+                assign ob_south_ready   = outbound_ready_i;
+            end else begin
+                assign ob_south_ready = 1'b0;
+            end
         end else begin
             assign ib_south_data  = north_data [(i_row + 1) * COLUMNS + i_col];
             assign ib_south_valid = north_valid[(i_row + 1) * COLUMNS + i_col];
@@ -153,9 +162,10 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
               .clk_i(clk_i)
             , .rst_i(rst_i)
             // Control signals
-            , .trigger_i (trigger_i                )
-            , .node_row_i(i_row[ADDR_ROW_WIDTH-1:0])
-            , .node_col_i(i_col[ADDR_COL_WIDTH-1:0])
+            , .trigger_i (trigger_i                          )
+            , .idle_o    (idle_flags[i_row * COLUMNS + i_col])
+            , .node_row_i(i_row[ADDR_ROW_WIDTH-1:0]          )
+            , .node_col_i(i_col[ADDR_COL_WIDTH-1:0]          )
             // Inbound interfaces
             // - North
             , .ib_north_data_i (ib_north_data )
