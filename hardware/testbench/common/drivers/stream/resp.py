@@ -20,7 +20,9 @@ from cocotb.triggers import RisingEdge, ClockCycles
 class StreamResponder(Monitor):
     """ Testbench driver acting as a responder to a stream interface """
 
-    def __init__(self, entity, clock, reset, intf, delays=True):
+    def __init__(
+        self, entity, clock, reset, intf, delays=True, name="StreamResponder",
+    ):
         """ Initialise the StreamResponder instance.
 
         Args:
@@ -29,8 +31,9 @@ class StreamResponder(Monitor):
             reset  : Reset signal for the interface
             intf   : Interface
             delays : Enable randomised backpressure (defaults to True)
+            name   : Optional name of the driver (defaults to StreamResponder)
         """
-        self.name   = "StreamResponder"
+        self.name   = name
         self.entity = entity
         self.clock  = clock
         self.reset  = reset
