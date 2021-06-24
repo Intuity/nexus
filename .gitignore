@@ -136,6 +136,7 @@ tests/*/work
 
 # Hardware design
 *.vcd
+*.lxt
 *.log
 *.vvp
 
