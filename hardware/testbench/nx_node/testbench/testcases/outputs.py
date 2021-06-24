@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 from random import choice, randint, random
 
 import cocotb
@@ -37,7 +36,6 @@ async def map_outputs(dut):
     num_outputs = int(dut.dut.dut.OUTPUTS)
     row_width   = int(dut.dut.dut.ADDR_ROW_WIDTH)
     col_width   = int(dut.dut.dut.ADDR_COL_WIDTH)
-    idx_width   = math.ceil(math.log2(num_outputs))
 
     for _ in range(100):
         # Map the I/Os in a random order
@@ -67,6 +65,9 @@ async def map_outputs(dut):
             got_col = (map_key >> (                    0)) & ((1 << col_width) - 1)
             got_row = (map_key >> (            col_width)) & ((1 << row_width) - 1)
             got_bc  = (map_key >> (row_width + col_width)) & 1
-            assert rem_row == got_row, f"O/P {idx} S {slot} - row exp: {rem_row}, got {got_row}"
-            assert rem_col == got_col, f"O/P {idx} S {slot} - col exp: {rem_col}, got {got_col}"
-            assert bc      == got_bc,  f"O/P {idx} S {slot} - bc exp: {bc}, got {got_bc}"
+            assert rem_row == got_row, \
+                f"O/P {idx} S {slot} - row exp: {rem_row}, got {got_row}"
+            assert rem_col == got_col, \
+                f"O/P {idx} S {slot} - col exp: {rem_col}, got {got_col}"
+            assert bc      == got_bc,  \
+                f"O/P {idx} S {slot} - bc exp: {bc}, got {got_bc}"
