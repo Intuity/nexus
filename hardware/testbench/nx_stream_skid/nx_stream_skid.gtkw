@@ -1,0 +1,44 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Thu Jun 24 11:08:47 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_skid/sim.lxt"
+[dumpfile_mtime] "Thu Jun 24 11:08:40 2021"
+[dumpfile_size] 51697
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_skid/nx_stream_skid.gtkw"
+[timestart] 0
+[size] 1457 972
+[pos] -1 -1
+*-23.926466 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[sst_width] 193
+[signals_width] 210
+[sst_expanded] 1
+[sst_vpaned_height] 298
+@28
+testbench.dut.clk_i[0]
+testbench.dut.rst_i[0]
+@200
+-
+@22
+testbench.dut.inbound_data_i[31:0]
+@28
+testbench.dut.inbound_valid_i[0]
+testbench.dut.inbound_ready_o[0]
+@200
+-
+@22
+testbench.dut.outbound_data_o[31:0]
+@28
+testbench.dut.outbound_valid_o[0]
+testbench.dut.outbound_ready_i[0]
+@200
+-
+@22
+testbench.dut.buffer[31:0]
+@28
+testbench.dut.buffer_valid[0]
+@200
+-
+[pattern_trace] 1
+[pattern_trace] 0
