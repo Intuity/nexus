@@ -106,6 +106,7 @@ assign core_inputs_o  = input_curr_q;
 
 // Handle I/O mapping updates
 always_comb begin : p_io_mapping
+    `INIT_D(input_seq);
     `INIT_D_ARRAY(input_map);
     `INIT_D_ARRAY(output_map_a);
     `INIT_D_ARRAY(output_map_b);
