@@ -28,44 +28,55 @@ async def map_inputs(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.node_row_i <= row
-    dut.node_col_i <= col
-
     # Work out the number of inputs
+    num_rows   = int(dut.dut.dut.ROWS)
+    num_cols   = int(dut.dut.dut.COLUMNS)
     num_inputs = int(dut.dut.dut.INPUTS)
     row_width  = int(dut.dut.dut.ADDR_ROW_WIDTH)
     col_width  = int(dut.dut.dut.ADDR_COL_WIDTH)
     idx_width  = math.ceil(math.log2(num_inputs))
 
-    for _ in range(100):
-        # Map the I/Os in a random order
-        mapped = {}
-        for idx in sorted(range(num_inputs), key=lambda _: random()):
-            rem_row = randint(0, 15)
-            rem_col = randint(0, 15)
-            rem_idx = randint(0, num_inputs-1)
-            is_seq  = choice((0, 1))
-            choice(dut.inbound).append(build_map_input(
-                0, row, col, 0, idx, is_seq, rem_row, rem_col, rem_idx,
-            ))
-            mapped[idx] = (rem_row, rem_col, rem_idx, is_seq)
+    # Setup random input mappings for every node
+    mapped = [[{} for _ in range(num_cols)] for _ in range(num_rows)]
+    for row in range(num_rows):
+        for col in range(num_cols):
+            # Map the I/Os in a random order
+            for idx in sorted(range(num_inputs), key=lambda _: random()):
+                rem_row = randint(0, 15)
+                rem_col = randint(0, 15)
+                rem_idx = randint(0, num_inputs-1)
+                is_seq  = choice((0, 1))
+                dut.inbound.append(build_map_input(
+                    0, row, col, 0, idx, is_seq, rem_row, rem_col, rem_idx,
+                ))
+                mapped[row][col][idx] = (rem_row, rem_col, rem_idx, is_seq)
 
-        # Wait for all inbound drivers to drain
-        for ib in dut.inbound:
-            while ib._sendQ: await RisingEdge(dut.clk)
-            while ib.intf.valid == 1: await RisingEdge(dut.clk)
-        await ClockCycles(dut.clk, 10)
+    # Wait for the inbound driver to drain
+    dut.info("Waiting for mappings to drain")
+    while dut.inbound._sendQ: await RisingEdge(dut.clk)
+    while dut.inbound.intf.valid == 1: await RisingEdge(dut.clk)
 
-        # Check the mapping
-        for idx, (rem_row, rem_col, rem_idx, is_seq) in mapped.items():
-            map_key = int(dut.dut.dut.control.input_map[idx])
-            got_idx = (map_key >> (                    0)) & ((1 << idx_width) - 1)
-            got_col = (map_key >> (            idx_width)) & ((1 << col_width) - 1)
-            got_row = (map_key >> (col_width + idx_width)) & ((1 << row_width) - 1)
-            assert rem_row == got_row, f"Input {idx} - row exp: {rem_row}, got {got_row}"
-            assert rem_col == got_col, f"Input {idx} - col exp: {rem_col}, got {got_col}"
-            assert rem_idx == got_idx, f"Input {idx} - idx exp: {rem_idx}, got {got_idx}"
-            assert dut.dut.dut.control.input_seq[idx] == is_seq, \
-                f"Input {idx} - sequential exp: {is_seq}, got {int(dut.dut.dut.control.input_seq[idx])}"
+    # Wait for the idle flag to go high
+    if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
+
+    # Wait for some extra time
+    await ClockCycles(dut.clk, 10)
+
+    # Check the mappings
+    for row in range(num_rows):
+        for col in range(num_cols):
+            for idx, (rem_row, rem_col, rem_idx, is_seq) in mapped[row][col].items():
+                node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
+                map_key = int(node.control.input_map[idx])
+                got_idx = (map_key >> (                    0)) & ((1 << idx_width) - 1)
+                got_col = (map_key >> (            idx_width)) & ((1 << col_width) - 1)
+                got_row = (map_key >> (col_width + idx_width)) & ((1 << row_width) - 1)
+                got_seq = int(node.control.input_seq[idx])
+                assert rem_row == got_row, \
+                    f"{row}, {col}: Input {idx} - row exp: {rem_row}, got {got_row}"
+                assert rem_col == got_col, \
+                    f"{row}, {col}: Input {idx} - col exp: {rem_col}, got {got_col}"
+                assert rem_idx == got_idx, \
+                    f"{row}, {col}: Input {idx} - idx exp: {rem_idx}, got {got_idx}"
+                assert got_seq == is_seq, \
+                    f"{row}, {col}: Input {idx} - seq exp: {is_seq}, got {got_seq}"

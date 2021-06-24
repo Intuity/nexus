@@ -22,44 +22,55 @@ from ..testbench import testcase
 
 @testcase()
 async def load(dut):
-    """ Load instructions into a node via messages """
+    """ Load instructions into every node via messages """
     # Reset the DUT
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.info(f"Setting row to {row} & column to {col}")
-    dut.node_row_i <= row
-    dut.node_col_i <= col
+    # Determine parameters
+    num_rows = int(dut.dut.dut.ROWS)
+    num_cols = int(dut.dut.dut.COLUMNS)
 
-    # Select an inbound pipe
-    inbound = choice(dut.inbound)
+    # Load a random number of instructions into every node
+    loaded  = [[[ [], [] ] for _ in range(num_cols)] for _ in range(num_rows)]
+    counter = 0
+    for row in range(num_rows):
+        for col in range(num_cols):
+            for _ in range(randint(50, 200)):
+                core  = choice((0, 1))
+                instr = randint(0, (1 << 15) - 1)
+                dut.inbound.append(build_load_instr(0, row, col, 0, core, instr))
+                loaded[row][col][core].append(instr)
+                counter += 1
 
-    # Load a random number of instructions
-    loaded = [[] for _ in range(2)]
-    for _ in range(randint(10, 500)):
-        # Generate instruction
-        core  = choice((0, 1))
-        instr = randint(0, (1 << 15) - 1)
-        inbound.append(build_load_instr(0, row, col, 0, core, instr))
-        loaded[core].append(instr)
+    # Wait for the inbound driver to drain
+    dut.info(f"Waiting for {counter} loads")
+    while dut.inbound._sendQ: await RisingEdge(dut.clk)
+    while dut.inbound.intf.valid == 1: await RisingEdge(dut.clk)
 
-    # Wait for all inbound drivers to drain
-    dut.info(f"Waiting for {sum([len(x) for x in loaded])} loads")
-    for ib in dut.inbound:
-        while ib._sendQ: await RisingEdge(dut.clk)
-        while ib.intf.valid == 1: await RisingEdge(dut.clk)
+    # Wait for the idle flag to go high
+    if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
+
+    # Wait for some extra time
     await ClockCycles(dut.clk, 10)
 
-    # Check the instruction counters
-    assert dut.dut.dut.instr_store.core_0_populated_o == len(loaded[0]), \
-        f"Expected {len(loaded[0])}, got {int(dut.dut.dut.instr_store.core_0_populated_o)}"
-    assert dut.dut.dut.instr_store.core_1_populated_o == len(loaded[1]), \
-        f"Expected {len(loaded[1])}, got {int(dut.dut.dut.instr_store.core_1_populated_o)}"
+    # Check the instruction counters for every core
+    for row in range(num_rows):
+        for col in range(num_cols):
+            node   = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
+            core_0 = int(node.instr_store.core_0_populated_o)
+            core_1 = int(node.instr_store.core_1_populated_o)
+            assert core_0 == len(loaded[row][col][0]), \
+                f"{row}, {col}: Expected {len(loaded[0])}, got {core_0}"
+            assert core_1 == len(loaded[row][col][1]), \
+                f"{row}, {col}: Expected {len(loaded[1])}, got {core_1}"
 
     # Check the loaded instructions
-    for core_idx, instrs in enumerate(loaded):
-        for op_idx, op in enumerate(instrs):
-            got = int(dut.dut.dut.instr_store.ram.memory[op_idx+(core_idx*512)])
-            assert got == op, f"C{core_idx} O{op_idx} - exp {hex(op)}, got {hex(got)}"
+    for row in range(num_rows):
+        for col in range(num_cols):
+            node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
+            for core_idx, instrs in enumerate(loaded[row][col]):
+                for op_idx, op in enumerate(instrs):
+                    got = int(node.instr_store.ram.memory[op_idx+(core_idx*512)])
+                    assert got == op, \
+                        f"{row}, {col}: C{core_idx} O{op_idx} - exp {hex(op)}, got {hex(got)}"
