@@ -81,15 +81,15 @@ nx_stream_distributor #(
 );
 
 `ifdef sim_icarus
-initial begin : i_vcd
+initial begin : i_trace
     string f_name;
     $timeformat(-9, 2, " ns", 20);
-    if ($value$plusargs("VCD_FILE=%s", f_name)) begin
-        $display("%0t: Capturing VCD file %s", $time, f_name);
+    if ($value$plusargs("WAVE_FILE=%s", f_name)) begin
+        $display("%0t: Capturing wave file %s", $time, f_name);
         $dumpfile(f_name);
         $dumpvars(0, testbench);
     end else begin
-        $display("%0t: No VCD filename provided - disabling VCD capture", $time);
+        $display("%0t: No filename provided - disabling wave capture", $time);
     end
 end
 `endif // sim_icarus

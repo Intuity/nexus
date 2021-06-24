@@ -35,7 +35,7 @@ TB_TOP ?= testbench
 # Runtime controls
 BENCHNAME ?= $(notdir $(abspath .))
 QUIET     ?= yes
-SIM_VCD   ?= sim.vcd
+SIM_WAVES ?= sim.lxt
 SIM_LOG   ?= sim.log
 EN_WAVES  ?= no
 TRACE_RAM ?= no
@@ -69,8 +69,10 @@ MODULE          ?= entrypoint
 COMPILE_ARGS    += $(addprefix -I ,$(abspath $(SRC_DIRS)))
 COMPILE_ARGS    += $(addprefix -D ,$(DEFINES))
 
+export IVERILOG_DUMPER=lxt
+
 ifneq ($(EN_WAVES),no)
-  PLUSARGS += +VCD_FILE=$(SIM_VCD)
+  PLUSARGS += +WAVE_FILE=$(SIM_WAVES)
 endif
 
 ifneq ($(EN_TRACE),no)
@@ -88,4 +90,4 @@ run: results.xml
 
 .PHONY: view
 view:
-	$(PREFIX)$(GTKWAVE) $(SIM_VCD) $(wildcard $(GTKW_CFG)) &
+	$(PREFIX)$(GTKWAVE) $(SIM_WAVES) $(wildcard $(GTKW_CFG)) &
