@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
+from random import randint
 
 from cocotb_bus.monitors import Monitor
 from cocotb.triggers import RisingEdge, ClockCycles
@@ -22,23 +22,26 @@ class StreamResponder(Monitor):
 
     def __init__(
         self, entity, clock, reset, intf, delays=True, name="StreamResponder",
+        probability=0.5,
     ):
         """ Initialise the StreamResponder instance.
 
         Args:
-            entity : Pointer to the testbench/DUT
-            clock  : Clock signal for the interface
-            reset  : Reset signal for the interface
-            intf   : Interface
-            delays : Enable randomised backpressure (defaults to True)
-            name   : Optional name of the driver (defaults to StreamResponder)
+            entity     : Pointer to the testbench/DUT
+            clock      : Clock signal for the interface
+            reset      : Reset signal for the interface
+            intf       : Interface
+            delays     : Enable randomised backpressure (defaults to True)
+            name       : Optional name of the driver (defaults to StreamResponder)
+            probability: Probability of delay
         """
-        self.name   = name
-        self.entity = entity
-        self.clock  = clock
-        self.reset  = reset
-        self.intf   = intf
-        self.delays = delays
+        self.name        = name
+        self.entity      = entity
+        self.clock       = clock
+        self.reset       = reset
+        self.intf        = intf
+        self.delays      = delays
+        self.probability = probability
         super().__init__()
 
     async def _monitor_recv(self):
@@ -57,7 +60,7 @@ class StreamResponder(Monitor):
                 else:
                     self._recv((int(self.intf.data), 0))
             # Generate random backpressure
-            if self.delays and choice((True, False)):
+            if self.delays and randint(0, 99) < int(100 * self.probability):
                 self.intf.ready <= 0
                 await ClockCycles(self.clock, randint(1, 10))
                 self.intf.ready <= 1
