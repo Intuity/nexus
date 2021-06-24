@@ -116,7 +116,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             assign east_data [i_row * COLUMNS + i_col] = ob_east_data;
             assign east_valid[i_row * COLUMNS + i_col] = ob_east_valid;
             assign ob_east_ready                       = east_ready[i_row * COLUMNS + i_col];
-            assign ob_east_present                     = 1'b0;
+            assign ob_east_present                     = 1'b1;
         end
 
         if (i_row == (ROWS - 1)) begin
