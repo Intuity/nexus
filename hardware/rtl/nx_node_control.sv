@@ -79,6 +79,8 @@ typedef enum logic [1:0] {
 } output_state_t;
 
 // Internal state
+`DECLARE_DQ(1, first_cycle, clk_i, rst_i, 1'b1)
+
 `DECLARE_DQ(INPUTS, input_curr, clk_i, rst_i, {INPUTS{1'b0}})
 `DECLARE_DQ(INPUTS, input_next, clk_i, rst_i, {INPUTS{1'b0}})
 `DECLARE_DQ(1,      input_trig, clk_i, rst_i, 1'b0)
@@ -137,6 +139,7 @@ end
 always_comb begin : p_signal_state
     int i;
     logic [IN_KEY_WIDTH-1:0] key;
+    `INIT_D(first_cycle);
     `INIT_D(input_curr);
     `INIT_D(input_next);
     `INIT_D(input_trig);
@@ -147,14 +150,18 @@ always_comb begin : p_signal_state
     // Assemble the lookup key
     key = { signal_remote_row_i, signal_remote_col_i, signal_remote_idx_i };
 
-    // If the external trigger is raised, copy state from next to current
+    // If the external trigger is raised...
     if (trigger_i) begin
+        // Copy next state into current, and look for differences
         for (i = 0; i < INPUTS; i++) begin
             // If there is a difference in input, trigger execution
             if (input_curr[i] != input_next[i]) input_trig = 1'b1;
             // Keep track of the state
             input_curr[i] = input_next[i];
         end
+        // On the very first cycle after setup, always trigger
+        input_trig  = input_trig | first_cycle;
+        first_cycle = 1'b0;
     end
 
     // Perform a signal state update
