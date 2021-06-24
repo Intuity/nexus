@@ -91,3 +91,7 @@ run: results.xml
 .PHONY: view
 view:
 	$(PREFIX)$(GTKWAVE) $(SIM_WAVES) $(wildcard $(GTKW_CFG)) &
+
+.PHONY: clean
+clean::
+	$(PREFIX)rm -f *.vcd *.lxt results.xml
