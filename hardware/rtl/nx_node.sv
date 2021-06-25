@@ -131,7 +131,8 @@ logic [             1:0] outbound_dir;
 logic                    outbound_valid, outbound_ready;
 
 nx_stream_distributor #(
-    .STREAM_WIDTH(STREAM_WIDTH)
+      .STREAM_WIDTH(STREAM_WIDTH)
+    , .SKID_BUFFERS("no"        )
 ) outbound_dist (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -290,7 +291,8 @@ nx_node_control #(
 // -----------------------------------------------------------------------------
 
 nx_stream_combiner #(
-    .STREAM_WIDTH(STREAM_WIDTH)
+      .STREAM_WIDTH(STREAM_WIDTH)
+    , .ARB_SCHEME  ("prefer_a"  )
 ) combiner (
       .clk_i(clk_i)
     , .rst_i(rst_i)
