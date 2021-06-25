@@ -14,6 +14,7 @@
 
 import json
 import re
+from pathlib import Path
 from timeit import default_timer as timer
 
 import simpy
@@ -80,13 +81,13 @@ class Manager(Base):
         self.cycles        = cycles
         self.break_on_idle = break_on_idle
         # Create interface and state
-        self.outbound = Pipe(self.env, 1, 1)
+        self.outbound = Pipe(self.env, 1, 1) if self.env else None
         self.queue    = []
         self.observer = []
         self.loaded   = []
-        self.tx_loop  = self.env.process(self.transmit())
-        self.gen_tick = self.env.process(self.tick())
-        self.complete = self.env.event()
+        self.tx_loop  = self.env.process(self.transmit()) if self.env else None
+        self.gen_tick = self.env.process(self.tick()) if self.env else None
+        self.complete = self.env.event() if self.env else None
 
     def add_observer(self, cb):
         """ Add a callback to an observer to be notified of a tick event.
@@ -100,19 +101,24 @@ class Manager(Base):
         """ Load a design into the mesh.
 
         Args:
-            design: File handle to the JSON description of the design
+            design: File handle or Path to the JSON description of the design
         """
         # Parse in the JSON description
-        model = json.load(design)
+        if isinstance(design, Path):
+            with open(design, "r") as fh:
+                model = json.load(fh)
+        else:
+            model = json.load(design)
         # Pickup the configuration section
-        config   = model[Manager.DESIGN_CONFIG]
-        cfg_rows = config[Manager.CONFIG_ROWS]
-        cfg_cols = config[Manager.CONFIG_COLUMNS]
+        self.config = model[Manager.DESIGN_CONFIG]
+        cfg_rows    = self.config[Manager.CONFIG_ROWS]
+        cfg_cols    = self.config[Manager.CONFIG_COLUMNS]
         # Check that the mesh matches
-        assert cfg_rows == self.mesh.rows, \
-            f"Serialised design requires {cfg_rows} rows"
-        assert cfg_cols == self.mesh.columns, \
-            f"Serialised design requires {cfg_cols} columns"
+        if self.mesh:
+            assert cfg_rows == self.mesh.rows, \
+                f"Serialised design requires {cfg_rows} rows"
+            assert cfg_cols == self.mesh.columns, \
+                f"Serialised design requires {cfg_cols} columns"
         # Track what should be loaded to each node
         self.loaded = [[[] for _ in range(cfg_cols)] for _ in range(cfg_rows)]
         # Start loading the compiled design into the mesh
@@ -152,9 +158,10 @@ class Manager(Base):
                 ))
         # Set input names
         rgx_pos = re.compile(r"^R([0-9]+)C([0-9]+)I([0-9]+)")
-        for entry, name in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_STATE].items():
-            row, col, idx = [int(x) for x in rgx_pos.match(entry).groups()]
-            self.mesh[row, col].input_names[idx] = name
+        if self.mesh:
+            for entry, name in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_STATE].items():
+                row, col, idx = [int(x) for x in rgx_pos.match(entry).groups()]
+                self.mesh[row, col].input_names[idx] = name
         return model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS]
 
     def check_loaded(self):

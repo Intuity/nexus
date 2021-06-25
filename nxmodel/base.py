@@ -28,11 +28,11 @@ class Base:
         Args:
             env: SimPy Environment
         """
-        assert isinstance(env, simpy.Environment)
+        assert isinstance(env, simpy.Environment) or env == None
         self.id      = Base.issue_id(self)
         self.env     = env
         self.name    = f"{type(self).__name__}[{self.id}]"
-        self.created = self.env.now
+        self.created = self.env.now if self.env else 0
 
     @classmethod
     def issue_id(cls, inst):
@@ -60,7 +60,18 @@ class Base:
             fh.setFormatter(formatter)
 
     # Logging aliases
-    def error(self, msg): return Base.LOG.error(msg)
-    def warn (self, msg): return Base.LOG.warning(msg)
-    def info (self, msg): return Base.LOG.info(msg)
-    def debug(self, msg): return Base.LOG.debug(msg)
+    def error(self, msg):
+        if Base.LOG: return Base.LOG.error(msg)
+        else       : print(f"ERROR: {msg}")
+
+    def warn (self, msg):
+        if Base.LOG: return Base.LOG.warning(msg)
+        else       : print(f"WARN: {msg}")
+
+    def info (self, msg):
+        if Base.LOG: return Base.LOG.info(msg)
+        else       : print(f"INFO: {msg}")
+
+    def debug(self, msg):
+        if Base.LOG: return Base.LOG.debug(msg)
+        else       : print(f"DEBUG: {msg}")
