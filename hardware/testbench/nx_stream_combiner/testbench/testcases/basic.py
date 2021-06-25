@@ -81,15 +81,26 @@ async def multi_dir(dut, backpressure):
     for msg, dirx in msg_a: dut.stream_a.append((msg, dirx))
     for msg, dirx in msg_b: dut.stream_b.append((msg, dirx))
 
-    # Construct the expected arbitration (using round robin)
-    last = 0
+    # Construct the expected arbitration using the active scheme
+    arb_scheme = dut.dut.dut.ARB_SCHEME.value.decode("utf-8")
+    last       = 0
     while msg_a or msg_b:
-        for idx in range(4):
-            active = (idx + last + 1) % 2
-            if   active == 0 and msg_a: dut.expected.append(msg_a.pop(0))
-            elif active == 1 and msg_b: dut.expected.append(msg_b.pop(0))
+        active = None
+        if arb_scheme == "round_robin":
+            for idx in range(2):
+                active = (idx + last + 1) % 2
+                if   active == 0 and msg_a: dut.expected.append(msg_a.pop(0))
+                elif active == 1 and msg_b: dut.expected.append(msg_b.pop(0))
+        elif arb_scheme == "prefer_a":
+            if   msg_a: dut.expected.append(msg_a.pop(0))
+            elif msg_b: dut.expected.append(msg_b.pop(0))
+        elif arb_scheme == "prefer_b":
+            if   msg_b: dut.expected.append(msg_b.pop(0))
+            elif msg_a: dut.expected.append(msg_a.pop(0))
+        else:
+            raise Exception(f"Unknown arbitration scheme: {arb_scheme = }")
         # Capture the last selection
-        last = active
+        if active != None: last = active
 
 factory = TestFactory(multi_dir)
 factory.add_option("backpressure", [True, False])

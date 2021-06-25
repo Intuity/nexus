@@ -13,7 +13,8 @@
 // limitations under the License.
 
 module testbench #(
-    parameter STREAM_WIDTH = 32
+      parameter STREAM_WIDTH = 32
+    , parameter ARB_SCHEME   = "round_robin" // round_robin, prefer_a, prefer_b
 ) (
       input  logic                    rst
     // Inbound message streams
@@ -38,7 +39,8 @@ reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_stream_combiner #(
-    .STREAM_WIDTH(STREAM_WIDTH)
+      .STREAM_WIDTH(STREAM_WIDTH)
+    , .ARB_SCHEME  (ARB_SCHEME  )
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)

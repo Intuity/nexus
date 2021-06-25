@@ -45,7 +45,19 @@ class Testbench(TestbenchBase):
         self.expected = []
         # Create a scoreboard
         self.scoreboard = Scoreboard(self, fail_immediately=False)
-        self.scoreboard.add_interface(self.comb, self.expected, reorder_depth=2)
+        def find_exp(tran):
+            # Set the maximum length to search to based on arbitration scheme
+            if dut.dut.ARB_SCHEME.value.decode("utf-8") == "round_robin":
+                search_to = min(3, len(self.expected))
+            else:
+                search_to = len(self.expected)
+            # Search for the entry
+            for i in range(search_to):
+                if self.expected[i] == tran: break
+            else:
+                i = 0
+            return self.expected.pop(i)
+        self.scoreboard.add_interface(self.comb, find_exp, reorder_depth=2)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
