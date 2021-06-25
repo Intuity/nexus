@@ -54,7 +54,7 @@ class StreamResponder(Monitor):
                 self.intf.ready <= 1
                 continue
             # Capture a request
-            if self.intf.valid == 1:
+            if self.intf.valid == 1 and self.intf.ready == 1:
                 if hasattr(self.intf, "dir"):
                     self._recv((int(self.intf.data), int(self.intf.dir)))
                 else:
