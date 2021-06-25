@@ -30,7 +30,8 @@ module nx_msg_decoder #(
 ) (
       input  logic clk_i
     , input  logic rst_i
-    // Node identity
+    // Control signals
+    , output logic                      idle_o
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound message stream
@@ -85,6 +86,7 @@ localparam PAYLOAD_WIDTH   = (
 `DECLARE_DQ(1,            instr_valid,  clk_i, rst_i, 1'b0)
 
 // Construct outputs
+assign idle_o         = fifo_empty && !msg_valid_i && !byp_valid;
 assign bypass_data_o  = byp_data_q;
 assign bypass_dir_o   = byp_dir_q;
 assign bypass_valid_o = byp_valid_q;
@@ -97,7 +99,7 @@ logic                      fifo_empty, fifo_full;
 logic [STREAM_WIDTH+2-1:0] fifo_data;
 
 nx_fifo #(
-      .DEPTH(             2)
+      .DEPTH(            64) // TEMP: Raising depth to avoid deadlock (not realistic)
     , .WIDTH(STREAM_WIDTH+2)
 ) msg_fifo (
       .clk_i    (clk_i)

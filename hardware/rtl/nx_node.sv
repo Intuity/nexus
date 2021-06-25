@@ -81,7 +81,9 @@ module nx_node #(
 // Idle Control
 // -----------------------------------------------------------------------------
 
-assign idle_o = core_idle[0] && core_idle[1] && !inbound_valid && !outbound_valid;
+assign idle_o = (
+    core_idle[0] && core_idle[1] && decode_idle && !inbound_valid && !outbound_valid
+);
 
 // -----------------------------------------------------------------------------
 // Arbiter
@@ -168,6 +170,8 @@ nx_stream_distributor #(
 // Decoder
 // -----------------------------------------------------------------------------
 
+logic decode_idle;
+
 logic [STREAM_WIDTH-1:0] bypass_data;
 logic [             1:0] bypass_dir;
 logic                    bypass_valid, bypass_ready;
@@ -197,9 +201,10 @@ nx_msg_decoder #(
 ) decoder (
       .clk_i(clk_i)
     , .rst_i(rst_i)
-    // Node identity
-    , .node_row_i(node_row_i)
-    , .node_col_i(node_col_i)
+    // Control signals
+    , .idle_o    (decode_idle)
+    , .node_row_i(node_row_i )
+    , .node_col_i(node_col_i )
     // Inbound message stream
     , .msg_data_i (inbound_data )
     , .msg_dir_i  (inbound_dir  )
