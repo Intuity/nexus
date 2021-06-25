@@ -1,59 +1,105 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Wed Jun  9 15:52:44 2021
+[*] Thu Jun 24 15:25:37 2021
 [*]
-[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_distributer/sim.vcd"
-[dumpfile_mtime] "Wed Jun  9 15:51:27 2021"
-[dumpfile_size] 269059
-[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_distributer/nx_stream_distributer.gtkw"
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_distributor/sim.lxt"
+[dumpfile_mtime] "Thu Jun 24 15:25:09 2021"
+[dumpfile_size] 302977
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_distributor/nx_stream_distributor.gtkw"
 [timestart] 0
-[size] 1666 1011
-[pos] -93 -412
-*-16.569851 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[size] 1440 847
+[pos] -1 -1
+*-21.964731 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [sst_width] 193
 [signals_width] 208
 [sst_expanded] 1
 [sst_vpaned_height] 311
 @28
-testbench.dut.clk_i
-testbench.dut.rst_i
+testbench.dut.clk_i[0]
+testbench.dut.rst_i[0]
 @200
 -
-@22
+@c00022
 testbench.dut.dist_data_i[31:0]
 @28
+(0)testbench.dut.dist_data_i[31:0]
+(1)testbench.dut.dist_data_i[31:0]
+(2)testbench.dut.dist_data_i[31:0]
+(3)testbench.dut.dist_data_i[31:0]
+(4)testbench.dut.dist_data_i[31:0]
+(5)testbench.dut.dist_data_i[31:0]
+(6)testbench.dut.dist_data_i[31:0]
+(7)testbench.dut.dist_data_i[31:0]
+(8)testbench.dut.dist_data_i[31:0]
+(9)testbench.dut.dist_data_i[31:0]
+(10)testbench.dut.dist_data_i[31:0]
+(11)testbench.dut.dist_data_i[31:0]
+(12)testbench.dut.dist_data_i[31:0]
+(13)testbench.dut.dist_data_i[31:0]
+(14)testbench.dut.dist_data_i[31:0]
+(15)testbench.dut.dist_data_i[31:0]
+(16)testbench.dut.dist_data_i[31:0]
+(17)testbench.dut.dist_data_i[31:0]
+(18)testbench.dut.dist_data_i[31:0]
+(19)testbench.dut.dist_data_i[31:0]
+(20)testbench.dut.dist_data_i[31:0]
+(21)testbench.dut.dist_data_i[31:0]
+(22)testbench.dut.dist_data_i[31:0]
+(23)testbench.dut.dist_data_i[31:0]
+(24)testbench.dut.dist_data_i[31:0]
+(25)testbench.dut.dist_data_i[31:0]
+(26)testbench.dut.dist_data_i[31:0]
+(27)testbench.dut.dist_data_i[31:0]
+(28)testbench.dut.dist_data_i[31:0]
+(29)testbench.dut.dist_data_i[31:0]
+(30)testbench.dut.dist_data_i[31:0]
+(31)testbench.dut.dist_data_i[31:0]
+@1401200
+-group_end
+@28
 testbench.dut.dist_dir_i[1:0]
-testbench.dut.dist_valid_i
-testbench.dut.dist_ready_o
+testbench.dut.dist_valid_i[0]
+testbench.dut.dist_ready_o[0]
 @200
 -
+@28
+testbench.dut.broadcast[0]
+@200
+-
+@28
+testbench.dut.north_present_i[0]
 @22
 testbench.dut.north_data_o[31:0]
-@29
-testbench.dut.north_valid_o
 @28
-testbench.dut.north_ready_i
+testbench.dut.north_valid_o[0]
+testbench.dut.north_ready_i[0]
 @200
 -
+@28
+testbench.dut.east_present_i[0]
 @22
 testbench.dut.east_data_o[31:0]
 @28
-testbench.dut.east_valid_o
-testbench.dut.east_ready_i
+testbench.dut.east_valid_o[0]
+testbench.dut.east_ready_i[0]
 @200
 -
+@28
+testbench.dut.south_present_i[0]
 @22
 testbench.dut.south_data_o[31:0]
 @28
-testbench.dut.south_valid_o
-testbench.dut.south_ready_i
+testbench.dut.south_valid_o[0]
+testbench.dut.south_ready_i[0]
 @200
 -
+@29
+testbench.dut.west_present_i[0]
 @22
 testbench.dut.west_data_o[31:0]
 @28
-testbench.dut.west_valid_o
-testbench.dut.west_ready_i
+testbench.dut.west_valid_o[0]
+testbench.dut.west_ready_i[0]
 [pattern_trace] 1
 [pattern_trace] 0

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 module testbench #(
-    parameter STREAM_WIDTH = 32
+      parameter STREAM_WIDTH = 32
+    , parameter SKID_BUFFERS = "yes"
 ) (
       input  logic                    rst
     // Inbound message stream
@@ -48,7 +49,8 @@ reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_stream_distributor #(
-    .STREAM_WIDTH(STREAM_WIDTH)
+      .STREAM_WIDTH(STREAM_WIDTH)
+    , .SKID_BUFFERS(SKID_BUFFERS)
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)

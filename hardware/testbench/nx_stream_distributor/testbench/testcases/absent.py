@@ -14,26 +14,29 @@
 
 from random import choice, randint
 
+from cocotb.handle import Force, Release
 from cocotb.regression import TestFactory
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import ClockCycles, RisingEdge
 
 from ..testbench import testcase
 
-@testcase()
-async def absent_single_dir(dut):
+async def absent_single_dir(dut, absent):
     """ Test messages streamed via each interface one at a time """
     dut.info("Resetting the DUT")
     await dut.reset()
 
     # Get the width of the data
-    intf_size = max(dut.dist_io.data._range)-min(dut.dist_io.data._range)+1
+    intf_size = int(dut.dut.dut.STREAM_WIDTH)
 
-    # Select a random interface and lower the presence flag
-    absent = randint(0, 3)
+    # Drop presence and force ready low for the absent interface
     dut.present[absent] <= 0
+    if   absent == 0: dut.north.intf.ready <= Force(0)
+    elif absent == 1: dut.east.intf.ready  <= Force(0)
+    elif absent == 2: dut.south.intf.ready <= Force(0)
+    elif absent == 3: dut.west.intf.ready  <= Force(0)
 
     # Assemble the queues
-    queues = [dut.exp_north, dut.exp_east, dut.exp_south, dut.exp_west]
+    queues = [ dut.exp_north, dut.exp_east, dut.exp_south, dut.exp_west]
     if   absent == 0: queues[0] = dut.exp_east
     elif absent == 1: queues[1] = dut.exp_south
     elif absent == 2: queues[2] = dut.exp_west
@@ -46,12 +49,25 @@ async def absent_single_dir(dut):
         dut.dist.append((msg, dirx))
 
         # Queue up message on the expected output
-        exp.append((msg, 0))
+        if dirx != absent or ((msg >> (intf_size - 1)) & 0x1) == 0:
+            exp.append((msg, 0))
+            # Wait for the expected queue to drain
+            while exp: await RisingEdge(dut.clk)
 
-        # Wait for the expected queue to drain
-        while exp: await RisingEdge(dut.clk)
+    # Wait for some time after
+    await ClockCycles(dut.clk, 100)
 
-async def absent_multi_dir(dut, backpressure):
+    # Release I/O forces
+    if   absent == 0: dut.north.intf.ready <= Release()
+    elif absent == 1: dut.east.intf.ready  <= Release()
+    elif absent == 2: dut.south.intf.ready <= Release()
+    elif absent == 3: dut.west.intf.ready  <= Release()
+
+factory = TestFactory(absent_single_dir)
+factory.add_option("absent", [0, 1, 2, 3])
+factory.generate_tests()
+
+async def absent_multi_dir(dut, backpressure, absent):
     """ Queue up many messages onto different interfaces """
     dut.info("Resetting the DUT")
     await dut.reset()
@@ -63,11 +79,14 @@ async def absent_multi_dir(dut, backpressure):
     dut.west.delays  = backpressure
 
     # Get the width of the data
-    intf_size = max(dut.dist_io.data._range)-min(dut.dist_io.data._range)+1
+    intf_size = int(dut.dut.dut.STREAM_WIDTH)
 
-    # Select a random interface and lower the presence flag
-    absent = randint(0, 3)
+    # Drop presence and force ready low for the absent interface
     dut.present[absent] <= 0
+    if   absent == 0: dut.north.intf.ready <= Force(0)
+    elif absent == 1: dut.east.intf.ready  <= Force(0)
+    elif absent == 2: dut.south.intf.ready <= Force(0)
+    elif absent == 3: dut.west.intf.ready  <= Force(0)
 
     # Assemble the queues
     exps = [
@@ -89,8 +108,20 @@ async def absent_multi_dir(dut, backpressure):
         dut.dist.append((msg, dirx))
 
         # Queue up message on the expected output
-        exp.append((msg, 0))
+        if dirx != absent or ((msg >> (intf_size - 1)) & 0x1) == 0:
+            exp.append((msg, 0))
+
+    # Wait for the send queue to drain
+    for exp, _ in exps:
+        while len(exp): await RisingEdge(dut.clk)
+
+    # Release I/O forces
+    if   absent == 0: dut.north.intf.ready <= Release()
+    elif absent == 1: dut.east.intf.ready  <= Release()
+    elif absent == 2: dut.south.intf.ready <= Release()
+    elif absent == 3: dut.west.intf.ready  <= Release()
 
 factory = TestFactory(absent_multi_dir)
 factory.add_option("backpressure", [True, False])
+factory.add_option("absent", [0, 1, 2, 3])
 factory.generate_tests()
