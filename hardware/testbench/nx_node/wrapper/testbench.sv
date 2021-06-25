@@ -26,43 +26,47 @@ module testbench #(
 ) (
       input  logic rst
     // Control signals
-    , input  wire                      trigger_i
-    , input  wire [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  wire [ADDR_COL_WIDTH-1:0] node_col_i
+    , input  logic                      trigger_i
+    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
+    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound interfaces
     // - North
-    , input  wire [STREAM_WIDTH-1:0] ib_north_data_i
-    , input  wire                    ib_north_valid_i
-    , output wire                    ib_north_ready_o
+    , input  logic [STREAM_WIDTH-1:0] ib_north_data_i
+    , input  logic                    ib_north_valid_i
+    , output logic                    ib_north_ready_o
     // - East
-    , input  wire [STREAM_WIDTH-1:0] ib_east_data_i
-    , input  wire                    ib_east_valid_i
-    , output wire                    ib_east_ready_o
+    , input  logic [STREAM_WIDTH-1:0] ib_east_data_i
+    , input  logic                    ib_east_valid_i
+    , output logic                    ib_east_ready_o
     // - South
-    , input  wire [STREAM_WIDTH-1:0] ib_south_data_i
-    , input  wire                    ib_south_valid_i
-    , output wire                    ib_south_ready_o
+    , input  logic [STREAM_WIDTH-1:0] ib_south_data_i
+    , input  logic                    ib_south_valid_i
+    , output logic                    ib_south_ready_o
     // - West
-    , input  wire [STREAM_WIDTH-1:0] ib_west_data_i
-    , input  wire                    ib_west_valid_i
-    , output wire                    ib_west_ready_o
+    , input  logic [STREAM_WIDTH-1:0] ib_west_data_i
+    , input  logic                    ib_west_valid_i
+    , output logic                    ib_west_ready_o
     // Outbound interfaces
     // - North
-    , output wire [STREAM_WIDTH-1:0] ob_north_data_o
-    , output wire                    ob_north_valid_o
-    , input  wire                    ob_north_ready_i
+    , output logic [STREAM_WIDTH-1:0] ob_north_data_o
+    , output logic                    ob_north_valid_o
+    , input  logic                    ob_north_ready_i
+    , input  logic                    ob_north_present_i
     // - East
-    , output wire [STREAM_WIDTH-1:0] ob_east_data_o
-    , output wire                    ob_east_valid_o
-    , input  wire                    ob_east_ready_i
+    , output logic [STREAM_WIDTH-1:0] ob_east_data_o
+    , output logic                    ob_east_valid_o
+    , input  logic                    ob_east_ready_i
+    , input  logic                    ob_east_present_i
     // - South
-    , output wire [STREAM_WIDTH-1:0] ob_south_data_o
-    , output wire                    ob_south_valid_o
-    , input  wire                    ob_south_ready_i
+    , output logic [STREAM_WIDTH-1:0] ob_south_data_o
+    , output logic                    ob_south_valid_o
+    , input  logic                    ob_south_ready_i
+    , input  logic                    ob_south_present_i
     // - West
-    , output wire [STREAM_WIDTH-1:0] ob_west_data_o
-    , output wire                    ob_west_valid_o
-    , input  wire                    ob_west_ready_i
+    , output logic [STREAM_WIDTH-1:0] ob_west_data_o
+    , output logic                    ob_west_valid_o
+    , input  logic                    ob_west_ready_i
+    , input  logic                    ob_west_present_i
 );
 
 reg clk = 1'b0;
@@ -105,21 +109,25 @@ nx_node #(
     , .ib_west_ready_o(ib_west_ready_o)
     // Outbound interfaces
     // - North
-    , .ob_north_data_o (ob_north_data_o )
-    , .ob_north_valid_o(ob_north_valid_o)
-    , .ob_north_ready_i(ob_north_ready_i)
+    , .ob_north_data_o   (ob_north_data_o   )
+    , .ob_north_valid_o  (ob_north_valid_o  )
+    , .ob_north_ready_i  (ob_north_ready_i  )
+    , .ob_north_present_i(ob_north_present_i)
     // - East
-    , .ob_east_data_o (ob_east_data_o )
-    , .ob_east_valid_o(ob_east_valid_o)
-    , .ob_east_ready_i(ob_east_ready_i)
+    , .ob_east_data_o   (ob_east_data_o   )
+    , .ob_east_valid_o  (ob_east_valid_o  )
+    , .ob_east_ready_i  (ob_east_ready_i  )
+    , .ob_east_present_i(ob_east_present_i)
     // - South
-    , .ob_south_data_o (ob_south_data_o )
-    , .ob_south_valid_o(ob_south_valid_o)
-    , .ob_south_ready_i(ob_south_ready_i)
+    , .ob_south_data_o   (ob_south_data_o   )
+    , .ob_south_valid_o  (ob_south_valid_o  )
+    , .ob_south_ready_i  (ob_south_ready_i  )
+    , .ob_south_present_i(ob_south_present_i)
     // - West
-    , .ob_west_data_o (ob_west_data_o )
-    , .ob_west_valid_o(ob_west_valid_o)
-    , .ob_west_ready_i(ob_west_ready_i)
+    , .ob_west_data_o   (ob_west_data_o   )
+    , .ob_west_valid_o  (ob_west_valid_o  )
+    , .ob_west_ready_i  (ob_west_ready_i  )
+    , .ob_west_present_i(ob_west_present_i)
 );
 
 `ifdef sim_icarus

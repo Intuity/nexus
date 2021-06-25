@@ -31,6 +31,11 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
+        # Wrap I/Os
+        self.present = [
+            self.dut.ob_north_present_i, self.dut.ob_east_present_i,
+            self.dut.ob_south_present_i, self.dut.ob_west_present_i,
+        ]
         # Setup drivers/monitors
         self.inbound = [
             StreamInitiator(
@@ -56,6 +61,7 @@ class Testbench(TestbenchBase):
         await super().initialise()
         for init in self.inbound : init.intf.initialise(IORole.INITIATOR)
         for resp in self.outbound: resp.intf.initialise(IORole.RESPONDER)
+        for flag in self.present : flag <= 1
         self.trigger_i  <= 0
         self.node_row_i <= 0
         self.node_col_i <= 0

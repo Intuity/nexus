@@ -35,7 +35,10 @@ async def routing(dut):
 
     for _ in range(1000):
         # Choose a random command type
-        command = choice(list(Command))
+        # NOTE: Don't use SIG_STATE as this risks triggering an emitted message
+        command = choice((
+            Command.LOAD_INSTR, Command.INPUT, Command.OUTPUT,
+        ))
 
         # Select a target row and column
         broadcast = choice((0, 1))
@@ -64,11 +67,8 @@ async def routing(dut):
                 broadcast, tgt_row, tgt_col, bc_decay, randint(0,  7),
                 choice((0, 1)), choice((0, 1)), randint(0, 15), randint(0, 15),
             )
-        elif command == Command.SIG_STATE:
-            msg = build_sig_state(
-                broadcast, tgt_row, tgt_col, bc_decay, choice((0, 1)),
-                randint(0, 15), randint(0, 15), randint(0,  7),
-            )
+        else:
+            raise Exception(f"Unsupported {command = }")
 
         # Create a message
         dut.debug(
