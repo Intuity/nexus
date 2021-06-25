@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`include "nx_common.svh"
-
 // nx_stream_combiner
-// Combines two directed streams
+// Combines two directed streams, in different modes
 //
 module nx_stream_combiner #(
-    parameter STREAM_WIDTH = 32
+      parameter STREAM_WIDTH = 32
+    , parameter ARB_SCHEME   = "round_robin" // round_robin, prefer_a, prefer_b
 ) (
       input  logic                    clk_i
     , input  logic                    rst_i
@@ -40,47 +39,40 @@ module nx_stream_combiner #(
     , input  logic                    comb_ready_i
 );
 
-// Constants and enumerations
-`include "nx_constants.svh"
+// State
+logic active, next, last, lock;
 
-// Internal state
-`DECLARE_DQ(1, choice, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1, locked, clk_i, rst_i, 1'b0)
+// Output wiring
+assign comb_data_o  = active ? stream_b_data_i  : stream_a_data_i;
+assign comb_dir_o   = active ? stream_b_dir_i   : stream_a_dir_i;
+assign comb_valid_o = active ? stream_b_valid_i : stream_a_valid_i;
 
-// Construct outputs
-assign comb_data_o  = choice_q ? stream_b_data_i  : stream_a_data_i;
-assign comb_dir_o   = choice_q ? stream_b_dir_i   : stream_a_dir_i;
-assign comb_valid_o = choice_q ? stream_b_valid_i : stream_a_valid_i;
-
-assign stream_a_ready_o = comb_ready_i && (choice_q == 1'b0);
-assign stream_b_ready_o = comb_ready_i && (choice_q == 1'b1);
+assign stream_a_ready_o = comb_ready_i && (active == 1'b0);
+assign stream_b_ready_o = comb_ready_i && (active == 1'b1);
 
 // Arbitration
-always_comb begin : p_arbitrate
-    // Temporary variables
-    int   idx;
-    logic found;
+generate
+if (ARB_SCHEME == "round_robin") begin
+    assign next = !last || !stream_a_valid_i;
+end else if (ARB_SCHEME == "prefer_a") begin
+    assign next = !stream_a_valid_i;
+end else if (ARB_SCHEME == "prefer_b") begin
+    assign next = stream_b_valid_i;
+end
+endgenerate
 
-    // Initialise
-    `INIT_D(choice);
-    `INIT_D(locked);
-
-    // Clear lock if READY is high
-    if (comb_ready_i) locked = 1'b0;
-
-    // If not locked to a source, arbitrate using a round-robin
-    if (!locked) begin
-        found = 1'b0;
-        for (idx = 0; idx < 2; idx = (idx + 1)) begin
-            if (!found) begin
-                case (choice + idx[0] + 1'b1)
-                    1'b0: found = stream_a_valid_i;
-                    1'b1: found = stream_b_valid_i;
-                endcase
-                if (found) choice = (choice + idx[0] + 1'b1);
-            end
+// Sequential logic
+always_ff @(posedge clk_i, posedge rst_i) begin : p_arb
+    if (rst_i) begin
+        active <= 1'b0;
+        last   <= 1'b0;
+        lock   <= 1'b0;
+    end else begin
+        if (!lock || comb_ready_i) begin
+            last   <= active;
+            active <= next;
+            lock   <= next ? stream_b_valid_i : stream_a_valid_i;
         end
-        locked = found;
     end
 end
 
