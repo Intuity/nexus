@@ -30,13 +30,14 @@ async def load(dut):
     # Determine parameters
     num_rows = int(dut.dut.dut.ROWS)
     num_cols = int(dut.dut.dut.COLUMNS)
+    dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
     # Load a random number of instructions into every node
     loaded  = [[[ [], [] ] for _ in range(num_cols)] for _ in range(num_rows)]
     counter = 0
     for row in range(num_rows):
         for col in range(num_cols):
-            for _ in range(randint(50, 200)):
+            for _ in range(randint(10, 30)):
                 core  = choice((0, 1))
                 instr = randint(0, (1 << 15) - 1)
                 dut.inbound.append(build_load_instr(0, row, col, 0, core, instr))

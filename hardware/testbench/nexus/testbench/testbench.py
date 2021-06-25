@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pathlib import Path
+
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
+from drivers.node.monitor import NodeMonitor
 from drivers.stream.io import StreamIO
 from drivers.stream.init import StreamInitiator
 from drivers.stream.resp import StreamResponder
@@ -52,6 +55,20 @@ class Testbench(TestbenchBase):
         self.inbound.intf.initialise(IORole.INITIATOR)
         self.outbound.intf.initialise(IORole.RESPONDER)
         self.active_i <= 0
+
+    def start_node_monitors(self):
+        """ Create monitor for every node in the mesh on request """
+        self.nodes = []
+        for row in range(int(self.dut.dut.ROWS)):
+            self.nodes.append(entries := [])
+            for col in range(int(self.dut.dut.COLUMNS)):
+                entries.append(NodeMonitor(
+                    self.dut.dut.mesh.g_rows[row].g_columns[col].node,
+                    self.clk, self.rst, name=f"row_{row}_col_{col}"
+                ))
+
+    @property
+    def base_dir(self): return Path(__file__).absolute().parent
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

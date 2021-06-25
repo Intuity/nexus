@@ -13,8 +13,8 @@
 // limitations under the License.
 
 module testbench #(
-      parameter ROWS           =   3
-    , parameter COLUMNS        =   3
+      parameter ROWS           =   6
+    , parameter COLUMNS        =   6
     , parameter STREAM_WIDTH   =  32
     , parameter ADDR_ROW_WIDTH =   4
     , parameter ADDR_COL_WIDTH =   4
@@ -74,6 +74,21 @@ nexus #(
     , .outbound_ready_i(outbound_ready_i)
 );
 
+// Debug probing signals
+logic [ROWS-1:0][COLUMNS-1:0] debug_valid;
+logic [ROWS-1:0][COLUMNS-1:0] debug_ready;
+
+generate
+genvar row, col;
+for (row = 0; row < ROWS; row = (row + 1)) begin
+    for (col = 0; col < COLUMNS; col = (col + 1)) begin
+        assign debug_valid[row][col] = dut.mesh.g_rows[row].g_columns[col].node.outbound_dist.dist_valid_i;
+        assign debug_ready[row][col] = dut.mesh.g_rows[row].g_columns[col].node.outbound_dist.dist_ready_o;
+    end
+end
+endgenerate
+
+// Wave tracing
 `ifdef sim_icarus
 initial begin : i_trace
     string f_name;
