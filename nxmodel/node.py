@@ -173,6 +173,8 @@ class Node(Base):
     @property
     def input_state(self): return self.__inputs[:]
     @property
+    def next_input_state(self): return self.__next_inputs[:]
+    @property
     def output_state(self): return self.__outputs[:]
 
     @property

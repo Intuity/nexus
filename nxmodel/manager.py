@@ -187,7 +187,6 @@ class Manager(Base):
                 yield self.env.timeout(1)
                 continue
             # Pop the next message and transmit it
-            self.debug("Transmitting message into mesh")
             msg = self.queue.pop(0)
             yield self.env.process(self.outbound.push(msg))
 

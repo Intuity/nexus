@@ -22,7 +22,7 @@ from .node import OutputState
 class Capture(Base):
     """ Captures signal state outputs from the mesh """
 
-    def __init__(self, env, mesh, columns, lookup):
+    def __init__(self, env, mesh, columns, lookup, debug=False):
         """ Initialise the Capture instance.
 
         Args:
@@ -30,6 +30,7 @@ class Capture(Base):
             mesh   : Pointer to the mesh
             columns: Number of columns in the mesh (number of inbound pipes)
             lookup : Dictionary to lookup output port names
+            debug  : Log end of cycle summaries for every node (default: False)
         """
         super().__init__(env)
         self.mesh      = mesh
@@ -39,6 +40,7 @@ class Capture(Base):
         self.snapshots = []
         self.ticks     = 0
         self.lookup    = lookup
+        self.debug_log = debug
 
     def write_to_vcd(self, vcd_path):
         """ Write all captured snapshots to a VCD file.
@@ -109,6 +111,23 @@ class Capture(Base):
         for node in self.mesh.all_nodes:
             node_inputs[node.position]  = node.input_state
             node_outputs[node.position] = node.output_state
+        # Debug logging
+        if self.debug_log:
+            for row, row_entries in enumerate(self.mesh.nodes):
+                for col, node in enumerate(row_entries):
+                    i_curr = sum([
+                        ((1 if y else 0) << x) for x, y in enumerate(node.input_state)
+                    ])
+                    i_next = sum([
+                        ((1 if y else 0) << x) for x, y in enumerate(node.next_input_state)
+                    ])
+                    o_curr = sum([
+                        ((1 if y else 0) << x) for x, y in enumerate(node.output_state)
+                    ])
+                    self.info(
+                        f"[{self.ticks-1:04d}] {row:2d}, {col:2d} - IC: {i_curr:08b}, "
+                        f"IN: {i_next:08b}, OC: {o_curr:08b} - Δ: {i_curr != i_next}"
+                    )
         # Log and store snapshot
         self.info(f"Captured {len(snapshot)} outputs from tick {self.ticks-1}")
         self.snapshots.append((self.env.now, snapshot, node_inputs, node_outputs))
@@ -119,7 +138,7 @@ class Capture(Base):
             # Allow a cycle to elapse
             yield self.env.timeout(1)
             # Check all pipes
-            for idx, pipe in enumerate(self.inbound):
+            for pipe in self.inbound:
                 # Skip unattached pipes
                 if pipe == None: continue
                 # Skip empty pipes
