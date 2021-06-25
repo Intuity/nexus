@@ -139,6 +139,7 @@ tests/*/work
 *.lxt
 *.log
 *.vvp
+hardware/testbench/*/*.png
 
 # CocoTB
 *.xml
