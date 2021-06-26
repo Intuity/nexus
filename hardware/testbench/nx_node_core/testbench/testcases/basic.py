@@ -112,10 +112,11 @@ async def restart(dut):
         await RisingEdge(dut.clk)
         assert dut.idle_o == 0, "DUT is still idle"
 
-        # Wait for roughly 10% of fetches to occur
-        dut.info("Waiting for 10% of fetches to occur")
-        while (dut.instr_store.stats.received_transactions - last) < (0.1 * populated):
-            await RisingEdge(dut.clk)
+        # Wait for some fetches to occur
+        dut.info("Waiting for some of fetches to occur")
+        while (dut.instr_store.stats.received_transactions - last) < randint(
+            int(0.1 * populated), int(0.9 * populated)
+        ): await RisingEdge(dut.clk)
 
         # Check DUT is still active
         assert dut.idle_o == 0, "DUT is not active"
@@ -136,8 +137,8 @@ async def restart(dut):
         # Check fetch delta
         rcvd  = dut.instr_store.stats.received_transactions
         delta = rcvd - last
-        exp   = int(populated * 1.1)
-        assert abs(delta - exp) <= 2, f"Expected ~{exp} fetches, got {delta}"
+        exp   = populated * 2
+        assert delta == exp, f"Expected ~{exp} fetches, got {delta}"
 
         # Check instruction fetches
         seq  = [x for x in range(delta - populated)]

@@ -42,12 +42,15 @@ async def execute(dut):
         gen_outputs = 0
         actv_regs   = 0
         for _ in range(randint(50, 100)):
-            instr = Instruction.randomise()
-            # If instruction uses a register, ensure it's been initialised
-            if not instr.is_input_a and ((actv_regs >> instr.source_a) & 0x1) == 0:
-                continue
-            if not instr.is_input_b and ((actv_regs >> instr.source_b) & 0x1) == 0:
-                continue
+            while True:
+                instr = Instruction.randomise()
+                # If instruction uses a register, ensure it's been initialised
+                if not instr.is_input_a and ((actv_regs >> instr.source_a) & 0x1) == 0:
+                    continue
+                if not instr.is_input_b and ((actv_regs >> instr.source_b) & 0x1) == 0:
+                    continue
+                # This one is good
+                break
             # Append to the memory
             memory.append(instr)
             # Mark a register as active
@@ -60,6 +63,7 @@ async def execute(dut):
 
         # Generate a random starting point & setup I/O
         inputs = randint(0, (1 << 8) - 1)
+        dut.info(f"Setting input vector to {inputs:08b}")
         dut.inputs_i    <= inputs
         dut.populated_i <= len(memory)
 
@@ -108,6 +112,11 @@ async def execute(dut):
 
         # Compare and contrast result
         dut.info("Checking outputs against model")
+        mismatches = 0
         for idx, output in enumerate(outputs):
-            assert int(dut.outputs_o[idx]) == output, \
-                f"Output {idx} - expecting: {output}, got: {int(dut.outputs_o[idx])}"
+            if int(dut.outputs_o[idx]) != output:
+                dut.error(
+                    f"Output {idx} - exp: {output}, got: {int(dut.outputs_o[idx])}"
+                )
+                mismatches += 1
+        assert mismatches == 0, f"Detected {mismatches} output errors"
