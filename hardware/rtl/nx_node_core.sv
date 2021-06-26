@@ -67,8 +67,10 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 } core_op_t;
 
 // Internal state
-`DECLARE_DQ(2,            fetch_state, clk_i, rst_i, IDLE)
-`DECLARE_DQ(2,            exec_state,  clk_i, rst_i, IDLE)
+`DECLARE_DQ(1,            restart_req, clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,            fetch_idle,  clk_i, rst_i, 1'b1)
+`DECLARE_DQ(1,            exec_idle,   clk_i, rst_i, 1'b1)
+`DECLARE_DQ(2,            fetch_first, clk_i, rst_i, 2'd0)
 `DECLARE_DQ(INSTR_ADDR_W, pc,          clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
 `DECLARE_DQ(REGISTERS,    working,     clk_i, rst_i, {REGISTERS{1'b0}})
 `DECLARE_DQ(OUTPUTS,      outputs,     clk_i, rst_i, {OUTPUTS{1'b0}})
@@ -76,29 +78,38 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 
 // Construct outputs
 assign outputs_o    = outputs_q;
-assign idle_o       = (fetch_state_q == IDLE && exec_state_q == IDLE);
+assign idle_o       = fetch_idle_q && exec_idle_q;
 assign instr_addr_o = pc_q;
-assign instr_rd_o   = (fetch_state_q != IDLE);
+assign instr_rd_o   = !fetch_idle_q;
 
 // Fetch handling
 always_comb begin : p_fetch
-    `INIT_D(fetch_state);
+    `INIT_D(restart_req);
+    `INIT_D(fetch_idle);
+    `INIT_D(fetch_first);
     `INIT_D(pc);
 
-    // Start/restart execution on request
-    if (trigger_i) begin
-        fetch_state = (fetch_state == ACTIVE) ? RESTART : ACTIVE;
-        pc          = {INSTR_ADDR_W{1'b0}};
+    // Rotate fetch first as long as not stalled
+    if (!instr_stall_i) fetch_first = { fetch_first[0], 1'b0 };
 
-    // If active and not stalled, increment to the next PC
-    end else if (fetch_state != IDLE && !instr_stall_i) begin
-        fetch_state = ACTIVE;
-        pc          = pc + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
+    // If a trigger is seen, raise restart request
+    if (trigger_i) restart_req = 1'b1;
+
+    // If inactive, and restart request seen, start fetch
+    if (fetch_idle && restart_req) begin
+        fetch_idle     = 1'b0;
+        restart_req    = 1'b0;
+        pc             = {INSTR_ADDR_W{1'b0}};
+        fetch_first[0] = 1'b1;
+
+    // Otherwise, if active and not stalled, fetch the next instruction
+    end else if (!fetch_idle && !instr_stall_i) begin
+        pc = pc + { {(INSTR_ADDR_W-1){1'b0}}, 1'b1 };
 
     end
 
     // If all instructions are consumed, returned to idle
-    if (pc == populated_i && !instr_stall_i) fetch_state = IDLE;
+    if (pc == populated_i && !instr_stall_i) fetch_idle = 1'b1;
 end
 
 // Execution handling
@@ -112,22 +123,16 @@ always_comb begin : p_execute
     logic                    val_a, val_b, result;
 
     // Initialise state
-    `INIT_D(exec_state);
+    `INIT_D(exec_idle);
     `INIT_D(working);
     `INIT_D(outputs);
     `INIT_D(output_idx);
 
-    // On a restart request, abort execution and reset output index
-    if (exec_state == ACTIVE && trigger_i) begin
-        exec_state = RESTART;
-        output_idx = {OUTPUT_IDX_W{1'b0}};
-    // When fetch returns to ACTIVE, allow execution to resume
-    end else if (exec_state == RESTART && fetch_state_q == ACTIVE) begin
-        exec_state = ACTIVE;
-    end
+    // If this is a first fetch, reset output index
+    if (fetch_first_q[1]) output_idx = {OUTPUT_IDX_W{1'b0}};
 
     // If execute is active, and fetch not stalled, execute
-    if (exec_state == ACTIVE && !instr_stall_i) begin
+    if (!exec_idle && !instr_stall_i) begin
         // Decode the operation
         {
             opcode,          // Operation [14:12]
@@ -163,14 +168,8 @@ always_comb begin : p_execute
         end
     end
 
-    // When transitioning to active, reset the outputs
-    if (exec_state == IDLE && fetch_state_q == ACTIVE)
-        output_idx = {OUTPUT_IDX_W{1'b0}};
-
     // Copy the fetch state to inform the next execute cycle
-    if (!instr_stall_i && exec_state != RESTART) begin
-        exec_state = fetch_state_q;
-    end
+    if (!instr_stall_i) exec_idle = fetch_idle_q;
 end
 
 endmodule : nx_node_core
