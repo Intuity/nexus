@@ -138,7 +138,9 @@ end
 // Handle signal state updates
 always_comb begin : p_signal_state
     int i;
-    logic [IN_KEY_WIDTH-1:0] key;
+    logic [ ADDR_ROW_WIDTH-1:0] rem_row;
+    logic [ ADDR_COL_WIDTH-1:0] rem_col;
+    logic [BIT_INDEX_WIDTH-1:0] rem_idx;
     `INIT_D(first_cycle);
     `INIT_D(input_curr);
     `INIT_D(input_next);
@@ -146,9 +148,6 @@ always_comb begin : p_signal_state
 
     // Always clear the input trigger after one cycle
     input_trig = 1'b0;
-
-    // Assemble the lookup key
-    key = { signal_remote_row_i, signal_remote_col_i, signal_remote_idx_i };
 
     // If the external trigger is raised...
     if (trigger_i) begin
@@ -165,16 +164,33 @@ always_comb begin : p_signal_state
     end
 
     // Perform a signal state update
-    if (signal_valid_i) begin
-        for (i = 0; i < INPUTS; i = (i + 1)) begin
-            if (key == input_map_q[i]) begin
-                // Always update next state
-                input_next[i] = signal_state_i;
-                // If not sequential, update current state as well
-                if (!input_seq_q[i]) begin
-                    input_trig    = signal_state_i != input_curr[i];
-                    input_curr[i] = signal_state_i;
-                end
+    for (i = 0; i < INPUTS; i = (i + 1)) begin
+        { rem_row, rem_col, rem_idx } = input_map_q[i];
+        // Handle signal state updates from the decoder
+        if (
+            rem_row == signal_remote_row_i &&
+            rem_col == signal_remote_col_i &&
+            rem_idx == signal_remote_idx_i &&
+            signal_valid_i
+        ) begin
+            // Always update next state
+            input_next[i] = signal_state_i;
+            // If not sequential, update current state as well
+            if (!input_seq_q[i]) begin
+                input_trig    = input_trig | (signal_state_i != input_curr[i]);
+                input_curr[i] = signal_state_i;
+            end
+        // Handle output->input loopbacks
+        end else if (
+            rem_row == node_row_i &&
+            rem_col == node_col_i
+        ) begin
+            // Always update next state
+            input_next[i] = core_outputs_i[rem_idx];
+            // If not sequential, update current state as well
+            if (!input_seq_q[i]) begin
+                input_trig    = input_trig | (core_outputs_i[rem_idx] != input_curr[i]);
+                input_curr[i] = core_outputs_i[rem_idx];
             end
         end
     end
