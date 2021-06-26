@@ -29,7 +29,8 @@ module nx_node_control #(
 ) (
       input  logic clk_i
     , input  logic rst_i
-    // Node identity
+    // Control signals
+    , output logic                      idle_o
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // External trigger signal
@@ -85,6 +86,7 @@ typedef enum logic [1:0] {
 `DECLARE_DQ(INPUTS, input_next, clk_i, rst_i, {INPUTS{1'b0}})
 `DECLARE_DQ(1,      input_trig, clk_i, rst_i, 1'b0)
 `DECLARE_DQ(INPUTS, input_seq,  clk_i, rst_i, {INPUTS{1'b0}})
+`DECLARE_DQ(INPUTS, input_actv, clk_i, rst_i, {INPUTS{1'b0}})
 `DECLARE_DQ_ARRAY(IN_KEY_WIDTH, INPUTS, input_map, clk_i, rst_i, {IN_KEY_WIDTH{1'b0}})
 
 `DECLARE_DQ(OUTPUTS,         output_last,  clk_i, rst_i, {OUTPUTS{1'b0}})
@@ -99,6 +101,8 @@ typedef enum logic [1:0] {
 `DECLARE_DQ(1,            msg_valid,    clk_i, rst_i, 1'b0)
 
 // Construct outputs
+assign idle_o = (output_state == OUTPUT_WAIT) && !msg_valid && !msg_send_dir;
+
 assign msg_data_o  = msg_data_q;
 assign msg_dir_o   = msg_dir_q;
 assign msg_valid_o = msg_valid_q;
@@ -109,6 +113,7 @@ assign core_inputs_o  = input_curr_q;
 // Handle I/O mapping updates
 always_comb begin : p_io_mapping
     `INIT_D(input_seq);
+    `INIT_D(input_actv);
     `INIT_D_ARRAY(input_map);
     `INIT_D_ARRAY(output_map_a);
     `INIT_D_ARRAY(output_map_b);
@@ -120,7 +125,8 @@ always_comb begin : p_io_mapping
             input_map[map_io_i[$clog2(INPUTS)-1:0]] = {
                 map_remote_row_i, map_remote_col_i, map_remote_idx_i
             };
-            input_seq[map_io_i[$clog2(INPUTS)-1:0]] = map_seq_i;
+            input_seq[map_io_i[$clog2(INPUTS)-1:0]]  = map_seq_i;
+            input_actv[map_io_i[$clog2(INPUTS)-1:0]] = 1'b1;
         // Update an output mapping for slot B
         end else if (map_slot_i) begin
             output_map_b[map_io_i[$clog2(OUTPUTS)-1:0]] = {
@@ -166,31 +172,34 @@ always_comb begin : p_signal_state
     // Perform a signal state update
     for (i = 0; i < INPUTS; i = (i + 1)) begin
         { rem_row, rem_col, rem_idx } = input_map_q[i];
-        // Handle signal state updates from the decoder
-        if (
-            rem_row == signal_remote_row_i &&
-            rem_col == signal_remote_col_i &&
-            rem_idx == signal_remote_idx_i &&
-            signal_valid_i
-        ) begin
-            // Always update next state
-            input_next[i] = signal_state_i;
-            // If not sequential, update current state as well
-            if (!input_seq_q[i]) begin
-                input_trig    = input_trig | (signal_state_i != input_curr[i]);
-                input_curr[i] = signal_state_i;
-            end
-        // Handle output->input loopbacks
-        end else if (
-            rem_row == node_row_i &&
-            rem_col == node_col_i
-        ) begin
-            // Always update next state
-            input_next[i] = core_outputs_i[rem_idx];
-            // If not sequential, update current state as well
-            if (!input_seq_q[i]) begin
-                input_trig    = input_trig | (core_outputs_i[rem_idx] != input_curr[i]);
-                input_curr[i] = core_outputs_i[rem_idx];
+        // Is this input active?
+        if (input_actv_q[i]) begin
+            // Handle signal state updates from the decoder
+            if (
+                rem_row == signal_remote_row_i &&
+                rem_col == signal_remote_col_i &&
+                rem_idx == signal_remote_idx_i &&
+                signal_valid_i
+            ) begin
+                // Always update next state
+                input_next[i] = signal_state_i;
+                // If not sequential, update current state as well
+                if (!input_seq_q[i]) begin
+                    input_trig    = input_trig | (signal_state_i != input_curr[i]);
+                    input_curr[i] = signal_state_i;
+                end
+            // Handle output->input loopbacks
+            end else if (
+                rem_row == node_row_i &&
+                rem_col == node_col_i
+            ) begin
+                // Always update next state
+                input_next[i] = core_outputs_i[rem_idx];
+                // If not sequential, update current state as well
+                if (!input_seq_q[i]) begin
+                    input_trig    = input_trig | (core_outputs_i[rem_idx] != input_curr[i]);
+                    input_curr[i] = core_outputs_i[rem_idx];
+                end
             end
         end
     end

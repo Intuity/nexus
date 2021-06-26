@@ -83,6 +83,7 @@ module nx_node #(
 
 assign idle_o = (
     core_idle[0] && core_idle[1] && decode_idle && !inbound_valid && !outbound_valid
+    && ctrl_idle
 );
 
 // -----------------------------------------------------------------------------
@@ -241,6 +242,8 @@ nx_msg_decoder #(
 // Control
 // -----------------------------------------------------------------------------
 
+logic ctrl_idle;
+
 logic [STREAM_WIDTH-1:0] emit_data;
 logic [             1:0] emit_dir;
 logic                    emit_valid, emit_ready;
@@ -259,7 +262,8 @@ nx_node_control #(
 ) control (
       .clk_i(clk_i)
     , .rst_i(rst_i)
-    // Node identity
+    // Control signals
+    , .idle_o    (ctrl_idle )
     , .node_row_i(node_row_i)
     , .node_col_i(node_col_i)
     // External trigger signal
