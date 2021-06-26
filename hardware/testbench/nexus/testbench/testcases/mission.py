@@ -149,6 +149,10 @@ async def mission_mode(dut):
                 assert instr.raw == got, \
                     f"Instruction {idx} - {hex(instr.raw)=}, {hex(got)=}"
 
+    # Raise active and let nexus tick
+    dut.info("Enabling nexus")
+    dut.active_i <= 1
+
     # Print out how many nodes are blocked
     rtl_outputs = {}
     for cycle in range(256):
@@ -156,14 +160,6 @@ async def mission_mode(dut):
         dut.info("Running model until tick")
         env.run(until=mngr.on_tick)
         dut.info("Model reached next tick")
-
-        # Trigger a single cycle
-        dut.info("Triggering a single cycle")
-        await RisingEdge(dut.clk)
-        dut.active_i <= 1
-        await RisingEdge(dut.clk)
-        dut.active_i <= 0
-        await RisingEdge(dut.clk)
 
         # Wait for activity
         dut.info("Waiting for idle to fall")
