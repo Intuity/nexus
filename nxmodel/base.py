@@ -42,7 +42,7 @@ class Base:
         return issued
 
     @classmethod
-    def setup_log(cls, env, verbosity, log_path):
+    def setup_log(cls, env, verbosity, log_path=None):
         assert isinstance(env, simpy.Environment)
         class LogFilter(logging.Filter):
             def filter(self, record):

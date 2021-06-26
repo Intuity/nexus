@@ -88,6 +88,8 @@ class Manager(Base):
         self.tx_loop  = self.env.process(self.transmit()) if self.env else None
         self.gen_tick = self.env.process(self.tick()) if self.env else None
         self.complete = self.env.event() if self.env else None
+        self.is_idle  = self.env.event() if self.env else None
+        self.on_tick  = self.env.event() if self.env else None
 
     def add_observer(self, cb):
         """ Add a callback to an observer to be notified of a tick event.
@@ -201,6 +203,8 @@ class Manager(Base):
                 idle &= node.idle
                 if not idle: break
             if not idle: break
+        self.is_idle.succeed()
+        self.is_idle = self.env.event()
         return idle
 
     def tick(self):
@@ -226,6 +230,9 @@ class Manager(Base):
             self.info(f"Generating tick {cycle}")
             # First notify any observers
             for observer in self.observer: observer()
+            # Trigger event
+            self.on_tick.succeed()
+            self.on_tick = self.env.event()
             # Now notify all nodes in the mesh
             for row in self.mesh.nodes:
                 for node in row:

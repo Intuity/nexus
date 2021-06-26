@@ -99,8 +99,12 @@ class Capture(Base):
                             )
 
     def tick(self):
-        # Increment tick counter
+        """ Increment tick counter """
         self.ticks += 1
+        self.snapshot()
+
+    def snapshot(self):
+        """ Snapshot the model state """
         # Summarise final output states from this tick
         snapshot = {}
         while self.received:
