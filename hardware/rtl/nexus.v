@@ -50,20 +50,24 @@ module nexus #(
 // Control signals
 reg                      trigger;
 reg  [COUNTER_WIDTH-1:0] cycle;
-wire                     idle;
+wire                     mesh_idle;
+reg                      idle_low;
 
 assign counter_o = cycle;
 
 always @(posedge clk_i, posedge rst_i) begin : p_trigger
     if (rst_i) begin
-        trigger <=  1'b0;
-        cycle   <= {COUNTER_WIDTH{1'b0}};
+        trigger  <=  1'b0;
+        cycle    <= {COUNTER_WIDTH{1'b0}};
+        idle_low <= 1'b0;
     end else begin
-        if (active_i && idle) begin
-            trigger <= 1'b1;
-            cycle   <= cycle + { {(COUNTER_WIDTH-1){1'b0}}, 1'b1 };
+        if (active_i && mesh_idle && idle_low) begin
+            trigger  <= 1'b1;
+            cycle    <= cycle + { {(COUNTER_WIDTH-1){1'b0}}, 1'b1 };
+            idle_low <= 1'b0;
         end else begin
             trigger <= 1'b0;
+            if (!mesh_idle) idle_low <= 1'b1;
         end
     end
 end
@@ -86,8 +90,8 @@ nx_mesh #(
       .clk_i(clk_i)
     , .rst_i(rst_i)
     // Control signals
-    , .trigger_i(trigger)
-    , .idle_o   (idle   )
+    , .trigger_i(trigger  )
+    , .idle_o   (mesh_idle)
     // Inbound stream
     , .inbound_data_i (inbound_data_i )
     , .inbound_valid_i(inbound_valid_i)
