@@ -17,6 +17,8 @@ from pathlib import Path
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
+import matplotlib.pyplot as plt
+import networkx as nx
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
@@ -58,6 +60,9 @@ class Testbench(TestbenchBase):
 
     def start_node_monitors(self):
         """ Create monitor for every node in the mesh on request """
+        # Check if node monitors already exist
+        if hasattr(self, "nodes") and self.nodes: return
+        # Create a monitor for every node in the mesh
         self.nodes = []
         for row in range(int(self.dut.dut.ROWS)):
             self.nodes.append(entries := [])
@@ -66,6 +71,76 @@ class Testbench(TestbenchBase):
                     self.dut.dut.mesh.g_rows[row].g_columns[col].node,
                     self.clk, self.rst, name=f"row_{row}_col_{col}"
                 ))
+
+    def plot_mesh_state(self, path):
+        """ Plot the state of the mesh using NetworkX.
+
+        Args:
+            path: Path to write the rendered image to
+        """
+        # If node monitors don't exist, create them
+        if not hasattr(self, "nodes") or not self.nodes:
+            self.start_node_monitors()
+        # Create each node in the mesh
+        graph = nx.DiGraph()
+        for row, row_entries in enumerate(self.nodes):
+            for col, _ in enumerate(row_entries):
+                graph.add_node((row, col))
+        # Create the output message node
+        graph.add_node((len(self.nodes), 0))
+        # Add all of the edges (representing messages)
+        labels = {}
+        for row, row_entries in enumerate(self.nodes):
+            for col, node in enumerate(row_entries):
+                src  = (row, col)
+                tgt  = None
+                data = 0
+                if node.outbound[0].valid == 1:
+                    data = int(node.outbound[0].data)
+                    tgt  = (row - 1, col)
+                if node.outbound[1].valid == 1:
+                    data = int(node.outbound[1].data)
+                    tgt  = (row, col + 1)
+                if node.outbound[2].valid == 1:
+                    data = int(node.outbound[2].data)
+                    tgt  = (row + 1, col)
+                if node.outbound[3].valid == 1:
+                    data = int(node.outbound[3].data)
+                    tgt  = (row, col - 1)
+                if tgt != None:
+                    graph.add_edge(src, tgt)
+                    bc    = (data >> 31) & 0x1
+                    decay = (data >> 23) & 0xFF
+                    tgt_r = (data >> 27) & 0x0F
+                    tgt_c = (data >> 23) & 0x0F
+                    labels[(src, tgt)] = f"BC {decay}" if bc else f"R {tgt_r}, C {tgt_c}"
+        # Setup the Matplotlib plot
+        plt.figure(figsize=(8, 8), dpi=100)
+        # Draw the graph
+        nx.draw(
+            graph,
+            pos        ={ (x, y): (y, -x) for x, y in graph.nodes() },
+            with_labels=True,
+            node_shape ="s",
+            node_size  =1000,
+            node_color ="white",
+            edgecolors ="black",
+            linewidths =1,
+            width      =1,
+        )
+        # Label the edges
+        nx.draw_networkx_edge_labels(
+            graph,
+            pos        ={ (x, y): (y, -x) for x, y in graph.nodes() },
+            edge_labels=labels,
+            label_pos  =0.5,
+            font_color ="red",
+            font_size  =5,
+        )
+        # Write out to file
+        plt.savefig(path, dpi=100)
+        # Clean up
+        plt.close()
 
     @property
     def base_dir(self): return Path(__file__).absolute().parent
