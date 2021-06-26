@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 from random import choice, randint
 
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
-import networkx as nx
-import matplotlib.pyplot as plt
 
 from nx_message import build_load_instr, build_map_input, build_map_output
 from nxmodel.manager import Manager
@@ -47,7 +46,7 @@ async def mission_mode(dut):
         f"Design requires {dsgn_cols} columns, mesh has {num_cols} columns"
 
     # Push all of the queued messages into the design
-    loaded = [[0 for y in range(num_cols)] for x in range(num_rows)]
+    loaded = [[[] for _y in range(num_cols)] for _x in range(num_rows)]
     for msg in mngr.queue:
         common = (1 if msg.broadcast else 0, msg.tgt_row, msg.tgt_col, msg.decay)
         # Attempt to translate the message
@@ -67,11 +66,12 @@ async def mission_mode(dut):
                     *common, msg.out_pos, 0, 0, msg.msg_a_row, msg.msg_a_col
                 ))
                 dut.inbound.append(build_map_output(
-                    *common, msg.out_pos, 0, 0, msg.msg_b_row, msg.msg_b_col
+                    *common, msg.out_pos, 1, 0, msg.msg_b_row, msg.msg_b_col
                 ))
         elif isinstance(msg, LoadInstruction):
             dut.inbound.append(build_load_instr(*common, 0, msg.instr.raw))
-            if not msg.broadcast: loaded[msg.tgt_row][msg.tgt_col] += 1
+            if not msg.broadcast:
+                loaded[msg.tgt_row][msg.tgt_col].append(msg.instr.raw)
         else:
             raise Exception(f"Unexpected message {msg}")
 
@@ -80,108 +80,114 @@ async def mission_mode(dut):
     while dut.inbound._sendQ: await RisingEdge(dut.clk)
     while dut.inbound.intf.valid == 1: await RisingEdge(dut.clk)
 
+    # Plot the mesh state
+    dut.plot_mesh_state("loading.png")
+
     # Wait for the idle flag to go high
     if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
 
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)
 
-    # Check the instruction counters for every core
-    for row in range(num_rows):
-        for col in range(num_cols):
-            node   = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
-            core_0 = int(node.instr_store.core_0_populated_o)
-            core_1 = int(node.instr_store.core_1_populated_o)
-            assert core_0 == loaded[row][col], \
-                f"{row}, {col}: Expected {len(loaded[row][col])}, got {core_0}"
-            assert core_1 == 0, \
-                f"{row}, {col}: Expected 0, got {core_1}"
-
     # Start monitoring the mesh
     dut.info("Starting node monitors")
     dut.start_node_monitors()
 
-    # Trigger a single cycle
-    dut.info("Triggering a single cycle")
-    await RisingEdge(dut.clk)
-    dut.active_i <= 1
-    await RisingEdge(dut.clk)
-    dut.active_i <= 0
-    await RisingEdge(dut.clk)
+    # Check the instruction counters for every core
+    for row in range(num_rows):
+        for col in range(num_cols):
+            node   = dut.nodes[row][col].entity
+            core_0 = int(node.instr_store.core_0_populated_o)
+            core_1 = int(node.instr_store.core_1_populated_o)
+            assert core_0 == len(loaded[row][col]), \
+                f"{row}, {col}: Expected {len(loaded[row][col])}, got {core_0}"
+            assert core_1 == 0, \
+                f"{row}, {col}: Expected 0, got {core_1}"
+            # Check the loaded instructions
+            dut.info(f"Checking {len(loaded[row][col])} instructions for {row}, {col}")
+            for idx, instr in enumerate(loaded[row][col]):
+                got = int(node.instr_store.ram.memory[idx])
+                assert instr == got, f"Instruction {idx} - {hex(instr)=}, {hex(got)=}"
 
-    # Wait for idle
-    dut.info("Waiting for idle to fall")
-    if dut.dut.dut.mesh.idle_o == 1: await FallingEdge(dut.dut.dut.mesh.idle_o)
+    # Build a map for linked inputs and outputs
+    linked = {}
+    seq_in = {}
+    bc_out = {}
+    slots  = {}
+    for msg in mngr.queue:
+        # Filter input messages to build up a picture of the links
+        if isinstance(msg, ConfigureInput):
+            # Create mapping
+            src_key = msg.src_row, msg.src_col, msg.src_pos
+            tgt_key = msg.tgt_row, msg.tgt_col, msg.tgt_pos
+            if src_key not in linked: linked[src_key] = []
+            linked[src_key].append(tgt_key)
+            # Mark if this input is sequential
+            seq_in[tgt_key] = msg.state
+        # Filter output messages to detect broadcast
+        elif isinstance(msg, ConfigureOutput):
+            src_key = msg.tgt_row, msg.tgt_col, msg.out_pos
+            bc_out[src_key] = msg.msg_as_bc
+            if not msg.msg_as_bc:
+                slots[src_key] = (
+                    (msg.msg_a_row, msg.msg_a_col),
+                    (msg.msg_b_row, msg.msg_b_col),
+                )
 
     # Print out how many nodes are blocked
-    dut.info("Waiting for idle to rise")
-    cycle = 0
-    while dut.dut.dut.mesh.idle_o == 0:
-        await ClockCycles(dut.clk, 1)
-        # ib_blocked, ob_blocked = 0, 0
-        # for row in dut.nodes:
-        #     for node in row:
-        #         ib_blocked += 1 if (node.ib_blocked > 0) else 0
-        #         ob_blocked += 1 if (node.ob_blocked > 0) else 0
-        # dut.info(f"Blocked - Inbound {ib_blocked}, Outbound {ob_blocked}")
-        # Search for a deadlock
-        graph = nx.DiGraph()
-        for row, row_entries in enumerate(dut.nodes):
-            for col, _ in enumerate(row_entries):
-                graph.add_node((row, col))
-        graph.add_node((len(dut.nodes), 0))
-        labels = {}
+    for cycle in range(10):
+        # Trigger a single cycle
+        dut.info("Triggering a single cycle")
+        await RisingEdge(dut.clk)
+        dut.active_i <= 1
+        await RisingEdge(dut.clk)
+        dut.active_i <= 0
+        await RisingEdge(dut.clk)
+
+        # Wait for activity
+        dut.info("Waiting for idle to fall")
+        if dut.dut.dut.mesh.idle_o == 1: await FallingEdge(dut.dut.dut.mesh.idle_o)
+
+        # Wait for idle
+        dut.info("Waiting for idle to rise")
+        await RisingEdge(dut.dut.dut.mesh.idle_o)
+
+        # Little delay
+        await ClockCycles(dut.clk, 100)
+
+        # Print out the input state for every node
         for row, row_entries in enumerate(dut.nodes):
             for col, node in enumerate(row_entries):
-                src  = (row, col)
-                tgt  = None
-                data = 0
-                if node.outbound[0].valid == 1:
-                    data = int(node.outbound[0].data)
-                    tgt  = (row - 1, col)
-                if node.outbound[1].valid == 1:
-                    data = int(node.outbound[1].data)
-                    tgt  = (row, col + 1)
-                if node.outbound[2].valid == 1:
-                    data = int(node.outbound[2].data)
-                    tgt  = (row + 1, col)
-                if node.outbound[3].valid == 1:
-                    data = int(node.outbound[3].data)
-                    tgt  = (row, col - 1)
-                if tgt != None:
-                    graph.add_edge(src, tgt)
-                    bc    = (data >> 31) & 0x1
-                    decay = (data >> 23) & 0xFF
-                    tgt_r = (data >> 27) & 0x0F
-                    tgt_c = (data >> 23) & 0x0F
-                    labels[(src, tgt)] = f"BC {decay}" if bc else f"R {tgt_r}, C {tgt_c}"
+                ctrl = node.entity.control
+                i_curr = int(ctrl.input_curr_q)
+                i_next = int(ctrl.input_next_q)
+                o_curr = int(ctrl.output_last_q)
+                dut.info(
+                    f"[{cycle:04d}] {row:2d}, {col:2d} - IC: {i_curr:08b}, "
+                    f"IN: {i_next:08b}, OC: {o_curr:08b} - Δ: {i_curr != i_next}"
+                )
 
-        plt.figure(figsize=(8, 8), dpi=100)
-
-        nx.draw(
-            graph,
-            pos        ={ (x, y): (y, -x) for x, y in graph.nodes() },
-            with_labels=True,
-            node_shape ="s",
-            node_size  =1000,
-            node_color ="white",
-            edgecolors ="black",
-            linewidths =1,
-            width      =1,
-        )
-        nx.draw_networkx_edge_labels(
-            graph,
-            pos        ={ (x, y): (y, -x) for x, y in graph.nodes() },
-            edge_labels=labels,
-            label_pos  =0.5,
-            font_color ="red",
-            font_size  =5,
-        )
-
-        # plt.show()
-        plt.savefig(f"state_{cycle}.png", dpi=100)
-        plt.close()
-        cycle += 1
-        if cycle > 100: break
-
-    # await RisingEdge(dut.dut.dut.mesh.idle_o)
+        # Check for I/O consistency
+        io_error = 0
+        io_match = 0
+        for (src_row, src_col, src_pos), entries in linked.items():
+            src_node = dut.nodes[src_row][src_col]
+            src_out  = int(src_node.entity.control.output_last_q[src_pos])
+            for tgt_row, tgt_col, tgt_pos in entries:
+                tgt_node = dut.nodes[tgt_row][tgt_col]
+                tgt_in   = int(tgt_node.entity.control.input_next_q[tgt_pos])
+                if src_out != tgt_in:
+                    is_bc_out = bc_out[src_row, src_col, src_pos]
+                    is_seq_in = seq_in[tgt_row, tgt_col, tgt_pos]
+                    slots_out = slots.get((src_row, src_col, src_pos), None)
+                    dut.error(
+                        f"I/O Mismatch: {src_row}, {src_col} O[{src_pos}] -> "
+                        f"{tgt_row}, {tgt_col} I[{tgt_pos}]: {src_out=}, "
+                        f"{tgt_in=} - BC: {is_bc_out}, Seq: {is_seq_in}, "
+                        f"Slots: {slots_out}"
+                    )
+                    io_error += 1
+                else:
+                    io_match += 1
+        assert io_error == 0, \
+            f"{io_error} I/O inconsistencies detected, while {io_match} matched"
