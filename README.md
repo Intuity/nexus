@@ -33,30 +33,56 @@ As Nexus is only a proof-of-concept, there are number of major limitations to be
  2. Only a single clock domain is supported and logic can only be rising edge triggered.
  3. Flops can only be reset to a low logic state.
  4. External inputs are not yet supported - designs must be self-sustaining (outputs are accessible).
+ 5. Only output signal values can be recorded, no ability to probe into the design.
+ 6. No form of debug triggering exists (i.e. cannot wait for a certain signal value).
+ 7. Mesh network can easily deadlock, current workaround is a large (expensive) FIFO inside each node but a better solution needs to be found.
+ 8. Constants will be propagated through flops regardless of their reset value, this means any logic requiring a state for a single cycle after reset will be broken.
+ 9. Only gates and flops are currently supported - RAMs, ROMs, and other types of memory are not.
+ 10. No support for bidirectional I/O.
 
 These limitations will be overcome in time, some of them are only due to the current software maturity (e.g. 3 & 4) as the mesh is already capable of supporting them.
 
-## Model
-The `nxmodel` folder contains an architectural model of Nexus, which uses the [SimPy](http://simpy.readthedocs.io) discrete event simulation framework. This can model an arbitrary mesh configuration and run basic simulations.
+## Technology Stack
+The mesh itself is a relatively simple machine, and is intrinsically linked to a custom compiler to make it behave in a sensible fashion. The compiler in turn relies on [yosys](https://github.com/YosysHQ/yosys) to perform the transformation from RTL into a generic cell mapped design.
 
-## Compiler
-The `nxcompile` folder contains the flow for translating Yosys' JSON output into instructions which can run on a Nexus mesh.
+### nxcompile
+Starting with the JSON export of the synthesised RTL from [yosys](https://github.com/YosysHQ/yosys), the compiler is responsible for producing a design which can run on the mesh. This not only includes producing the instruction listing for each node, but also the input and output mappings, and the messages which pass between the nodes.
 
-### Parser
-The `nxcompile/parser` folder contains a Python module capable of parsing Yosys' JSON output and converting it into an explorable model of the design.
+The compiler works through a number of steps to transform the design:
 
-### Current Limitations
-There are a number of limitations with the compiler at the moment - not because these items are impossible to address, but instead to reduce complexity in the initial implementation:
+ 1. Flattens all hierarchy from the Yosys export creating a single module containing all logical operations;
+ 2. Performs constant propagation to simplify the design - stripping out any gates or flops that produce a static value (see limitation 8 above);
+ 3. Duplicated gates are eliminated;
+ 4. Chains of inverters are truncated;
+ 5. Gates and flops are then converted into instructions and input/output mappings (without yet assigning them to a node);
+ 6. Placement of each instruction then starts following the procedure:
+    1. First operation is placed into any node;
+    2. If the next operation is not dependent on any previous operation, it is placed into the next node with spare capacity;
+    3. If the next operation is dependent on a previous operation then the compiler will:
+        * attempt to place it into the same node as the operation it depends upon,
+        * if that's not possible then the compiler will attempt to transfer the entire logic tree (including the new operation) into a different node,
+        * finally if the operation still isn't placed then the compiler will place it in the nearest node with spare capacity.
+ 7. Once all operations are placed, the compiler then runs a further compilation step on each node which assigns input and output positions as well as use of the temporary registers.
+ 8. Finally, input and output positions are linked to configure the messages each node will produce.
 
- * Only a single clock domain is supported, with no support for clock gating
- * Flops do not support an enable signal - so will always propagate a value
- * Flops do not have a reset value input - so will always reset to Q=0
- * Constants attached to a flop's D input will always be propagated through the flop - regardless of what the reset state of the flop should be (this means if a high value is driven on a flop input, the flop will be flattened and the Q output will be driven statically high - even if the intention was to create an initial state)
- * No support for memories - only gates and flops are currently supported
- * No support for bidirectional I/O
+The compiler can undoubtedly be optimised to improve instruction placement as well as input and output mappings, this will help to increase the capacity of the platform.
 
-## Tests
-The `tests` folder contains basic RTL designs and synthesis flows for generating Yosys JSON inputs into the compiler.
+The compiler can be run by executing `./bin/nxcompile` or `python3 -m nxcompile` - an example of its use is shown in a section below.
 
-## RTL/Hardware
-The `hardware` folder contains the Verilog implementation of Nexus accelerator, including testbenches.
+### nxmodel
+To aid development of the compiler and provide a golden reference for the RTL design, an architectural model of Nexus was developed using the [SimPy](http://simpy.readthedocs.io) discrete event simulation framework. This tool can model any configuration of the mesh, and provides VCD capture as well as debug logging as the design runs.
+
+Just like the RTL design, the model is composed of nodes within a mesh:
+
+ * The `Node` class, defined in `nxmodel/node.py`, represents a single node and can decode and execute instructions produced by the compiler. It is also responsible for consuming, routing, decoding, and emitting messages (which are defined in `nxmodel/message.py`).
+ * The `Mesh` class, defined in `nxmodel/mesh.py`, sets up the required number of `Node` instances and links them together.
+
+The model can be run by executing `./bin/nxmodel` or `python3 -m nxmodel`.
+
+### nxdisasm
+Debugging a design spread across a mesh network is tricky, especially when the compiler and model are untrusted. To go some way to solving this problem, the disassembler consumes a design produced by `nxcompile` and produces two outputs:
+
+ * A listing of the instruction set for every node in the design (helpful for hand-calculating the output state);
+ * A Verilog version of the translated design, which can be simulated under the same testbench to check for consistent behaviour in a trusted simulator.
+
+The disassembler can be run by executing `./bin/nxdisasm` or `python3 -m nxdisasm`.
