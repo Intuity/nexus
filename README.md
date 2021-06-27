@@ -42,6 +42,18 @@ As Nexus is only a proof-of-concept, there are number of major limitations to be
 
 These limitations will be overcome in time, some of them are only due to the current software maturity (e.g. 3 & 4) as the mesh is already capable of supporting them.
 
+## Planned Improvements
+From this proof-of-concept design, there are a number of obvious improvements required:
+
+ * Find a proper solution to deadlock or at least significantly lowering the chance of deadlock;
+ * Stop using broadcast messages for signal state as this creates a lot of unnecessary noise;
+ * Store output messages in RAM using the second port to allow for a much larger number of unique outputs;
+ * Encode input signal position as well as target row and column in output message, this will simplify the input mapping function which becomes very large as the number of inputs are increased;
+ * Use temporary registers to hold state between cycles allowing for flops to exist within a node - at the moment a flop can only exist on the inputs to a node, which means extra hardware to handle mapping outputs back to inputs (wastes I/O and is more costly than necessary);
+ * Add a control command allowing for the behaviour of nodes to be configured dynamically.
+
+In addition to these improvements - work needs to be done to map Nexus onto an FPGA. Initial out-of-context synthesis trials have produced resource utilisation figures, but this has been done without timing or any form of interface with an external system.
+
 ## Technology Stack
 The mesh itself is a relatively simple machine, and is intrinsically linked to a custom compiler to make it behave in a sensible fashion. The compiler in turn relies on [yosys](https://github.com/YosysHQ/yosys) to perform the transformation from RTL into a generic cell mapped design.
 
