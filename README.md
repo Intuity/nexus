@@ -50,7 +50,10 @@ From this proof-of-concept design, there are a number of obvious improvements re
  * Store output messages in RAM using the second port to allow for a much larger number of unique outputs;
  * Encode input signal position as well as target row and column in output message, this will simplify the input mapping function which becomes very large as the number of inputs are increased;
  * Use temporary registers to hold state between cycles allowing for flops to exist within a node - at the moment a flop can only exist on the inputs to a node, which means extra hardware to handle mapping outputs back to inputs (wastes I/O and is more costly than necessary);
- * Add a control command allowing for the behaviour of nodes to be configured dynamically.
+ * Add a control command allowing for the behaviour of nodes to be configured dynamically;
+ * Move away from using explicit operations like AND, OR, INVERT and instead use a truth table encoded within the instruction - the compiler will need to assemble these truth tables on the fly;
+ * Add support for three input operations - the compiler will need to collapse one and two input operations until it achieves a three input operation then generate the associated truth table;
+ * Add support for multiple phases of execution - dividing the entire design on purely sequential boundaries and executing each phase in a loop (this will require an inter-phase message store in RAM).
 
 In addition to these improvements - work needs to be done to map Nexus onto an FPGA. Initial out-of-context synthesis trials have produced resource utilisation figures, but this has been done without timing or any form of interface with an external system.
 
