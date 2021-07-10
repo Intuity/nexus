@@ -33,10 +33,13 @@ module nx_node #(
       input  logic clk_i
     , input  logic rst_i
     // Control signals
-    , input  logic trigger_i
-    , output logic idle_o
+    , input  logic                      trigger_i
+    , output logic                      idle_o
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+    // Channel tokens
+    , input  logic token_grant_i
+    , output logic token_release_o
     // Inbound interfaces
     // - North
     , input  logic [STREAM_WIDTH-1:0] ib_north_data_i
@@ -95,7 +98,8 @@ logic [             1:0] inbound_dir;
 logic                    inbound_valid, inbound_ready;
 
 nx_stream_arbiter #(
-    .STREAM_WIDTH(STREAM_WIDTH)
+      .STREAM_WIDTH(STREAM_WIDTH)
+    , .SKID_BUFFERS("yes"       )
 ) inbound_arb (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -268,6 +272,9 @@ nx_node_control #(
     , .node_col_i(node_col_i)
     // External trigger signal
     , .trigger_i(trigger_i)
+    // Channel tokens
+    , .token_grant_i  (token_grant_i  )
+    , .token_release_o(token_release_o)
     // Outbound message stream
     , .msg_data_o (emit_data )
     , .msg_dir_o  (emit_dir  )

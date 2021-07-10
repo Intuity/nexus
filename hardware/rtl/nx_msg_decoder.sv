@@ -99,7 +99,7 @@ logic                      fifo_empty, fifo_full;
 logic [STREAM_WIDTH+2-1:0] fifo_data;
 
 nx_fifo #(
-      .DEPTH(            64) // TEMP: Raising depth to avoid deadlock (not realistic)
+      .DEPTH(             4)
     , .WIDTH(STREAM_WIDTH+2)
 ) msg_fifo (
       .clk_i    (clk_i)

@@ -36,6 +36,9 @@ module nx_mesh #(
     // Control signals
     , input  logic trigger_i
     , output logic idle_o
+    // Token signals
+    , input  logic [COLUMNS-1:0] token_grant_i
+    , output logic [COLUMNS-1:0] token_release_o
     // Inbound stream
     , input  logic [STREAM_WIDTH-1:0] inbound_data_i
     , input  logic                    inbound_valid_i
@@ -52,6 +55,9 @@ localparam NODES = ROWS * COLUMNS;
 logic [NODES-1:0] idle_flags;
 assign idle_o = &idle_flags;
 
+// Token grant and release for every node in every column
+logic [NODES-1:0] column_grant, column_release;
+
 // Message interfaces for every node
 logic [STREAM_WIDTH-1:0] north_data [NODES-1:0], east_data [NODES-1:0],
                          south_data [NODES-1:0], west_data [NODES-1:0];
@@ -65,6 +71,34 @@ generate
 genvar i_row, i_col;
 for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
     for (i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin : g_columns
+        // =====================================================================
+        // Link the token grant/release along columns. Columns have counter
+        // rotating tokens to lower the chance of adjacent nodes communicating
+        // in the same cycle.
+        // =====================================================================
+        // For EVEN columns, tokens travel from top-to-bottom
+        if ((i_col % 2) == 0) begin
+            if (i_row == 0)
+                assign column_grant[i_col] = token_grant_i[i_col];
+            if (i_row == (ROWS - 1))
+                assign token_release_o[i_col] = column_release[i_row * COLUMNS + i_col];
+            if (i_row > 0)
+                assign column_grant[i_row * COLUMNS + i_col] = column_release[(i_row - 1) * COLUMNS + i_col];
+
+        // For ODD columns, tokens travel from bottom-to-top
+        end else begin
+            if (i_row == 0)
+                assign token_release_o[i_col] = column_release[i_col];
+            if (i_row == (ROWS - 1))
+                assign column_grant[i_row * COLUMNS + i_col] = token_grant_i[i_col];
+            if (i_row < (ROWS - 1))
+                assign column_grant[i_row * COLUMNS + i_col] = column_release[(i_row + 1) * COLUMNS + i_col];
+
+        end
+
+        // =====================================================================
+        // Link up message interfaces
+        // =====================================================================
         logic [STREAM_WIDTH-1:0] ib_north_data, ib_east_data, ib_south_data,
                                  ib_west_data;
         logic                    ib_north_valid, ib_east_valid, ib_south_valid,
@@ -158,6 +192,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             assign ob_west_present                     = 1'b1;
         end
 
+        // =====================================================================
+        // Instance the node
+        // =====================================================================
         nx_node #(
               .STREAM_WIDTH  (STREAM_WIDTH  )
             , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
@@ -177,6 +214,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
             , .idle_o    (idle_flags[i_row * COLUMNS + i_col])
             , .node_row_i(i_row[ADDR_ROW_WIDTH-1:0]          )
             , .node_col_i(i_col[ADDR_COL_WIDTH-1:0]          )
+            // Channel tokens
+            , .token_grant_i  (column_grant[i_row * COLUMNS + i_col]  )
+            , .token_release_o(column_release[i_row * COLUMNS + i_col])
             // Inbound interfaces
             // - North
             , .ib_north_data_i (ib_north_data )

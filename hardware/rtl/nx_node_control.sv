@@ -35,6 +35,9 @@ module nx_node_control #(
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // External trigger signal
     , input  logic trigger_i
+    // Channel tokens
+    , input  logic token_grant_i   // Inbound token
+    , output logic token_release_o // Outbound token
     // Outbound message stream
     , output logic [STREAM_WIDTH-1:0] msg_data_o
     , output logic [             1:0] msg_dir_o
@@ -82,6 +85,9 @@ typedef enum logic [1:0] {
 // Internal state
 `DECLARE_DQ(1, first_cycle, clk_i, rst_i, 1'b1)
 
+`DECLARE_DQ(1, token_held,    clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1, token_release, clk_i, rst_i, 1'b0)
+
 `DECLARE_DQ(INPUTS, input_curr, clk_i, rst_i, {INPUTS{1'b0}})
 `DECLARE_DQ(INPUTS, input_next, clk_i, rst_i, {INPUTS{1'b0}})
 `DECLARE_DQ(1,      input_trig, clk_i, rst_i, 1'b0)
@@ -101,7 +107,14 @@ typedef enum logic [1:0] {
 `DECLARE_DQ(1,            msg_valid,    clk_i, rst_i, 1'b0)
 
 // Construct outputs
-assign idle_o = (output_state == OUTPUT_WAIT) && !msg_valid && !msg_send_dir;
+assign idle_o = (
+    (output_state   == OUTPUT_WAIT) && // Not currently preparing messages
+    (core_outputs_i == output_last) && // No outstanding output changes
+    !msg_valid                      && // No active message
+    !msg_send_dir                      // No pending broadcast
+);
+
+assign token_release_o = token_release_q;
 
 assign msg_data_o  = msg_data_q;
 assign msg_dir_o   = msg_dir_q;
@@ -212,6 +225,8 @@ always_comb begin : p_output_state
     logic [ADDR_ROW_WIDTH-1:0] tgt_row;
     logic [ADDR_COL_WIDTH-1:0] tgt_col;
     logic [ OUT_KEY_WIDTH-1:0] key;
+    `INIT_D(token_held);
+    `INIT_D(token_release);
     `INIT_D(output_last);
     `INIT_D(output_idx);
     `INIT_D(output_state);
@@ -220,11 +235,17 @@ always_comb begin : p_output_state
     `INIT_D(msg_send_dir);
     `INIT_D(msg_valid);
 
+    // Always clean token release on the next cycle
+    token_release = 1'b0;
+
+    // Check if token has been granted
+    if (token_grant_i) token_held = 1'b1;
+
     // Clear the valid if message accepted
     if (msg_ready_i) msg_valid = 1'b0;
 
     // Track updating state
-    if (!msg_valid) begin
+    if (!msg_valid && token_held) begin
         case (output_state)
             // Wait for a signal state to change, then send A
             OUTPUT_WAIT: begin
@@ -321,6 +342,12 @@ always_comb begin : p_output_state
             // Default, return to WAIT
             default: output_state = OUTPUT_WAIT;
         endcase
+
+        // If in WAIT and a token is held, release it
+        if (output_state == OUTPUT_WAIT) begin
+            token_release = token_held;
+            token_held    = 1'b0;
+        end
     end
 end
 

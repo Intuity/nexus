@@ -48,19 +48,23 @@ module nexus #(
 );
 
 // Control signals
+reg                      first_cycle;
 reg                      trigger;
 reg  [COUNTER_WIDTH-1:0] cycle;
 wire                     mesh_idle;
 reg                      idle_low;
+wire [      COLUMNS-1:0] token_grant, token_release;
 
 assign counter_o = cycle;
 
 always @(posedge clk_i, posedge rst_i) begin : p_trigger
     if (rst_i) begin
-        trigger  <=  1'b0;
-        cycle    <= {COUNTER_WIDTH{1'b0}};
-        idle_low <= 1'b0;
+        first_cycle <= 1'b1;
+        trigger     <=  1'b0;
+        cycle       <= {COUNTER_WIDTH{1'b0}};
+        idle_low    <= 1'b0;
     end else begin
+        first_cycle <= 1'b0;
         if (active_i && mesh_idle && idle_low) begin
             trigger  <= 1'b1;
             cycle    <= cycle + { {(COUNTER_WIDTH-1){1'b0}}, 1'b1 };
@@ -71,6 +75,9 @@ always @(posedge clk_i, posedge rst_i) begin : p_trigger
         end
     end
 end
+
+// Drive the token grant signal
+assign token_grant = first_cycle ? {COLUMNS{1'b1}} : token_release;
 
 // Instance the mesh
 nx_mesh #(
@@ -92,6 +99,9 @@ nx_mesh #(
     // Control signals
     , .trigger_i(trigger  )
     , .idle_o   (mesh_idle)
+    // Token signals
+    , .token_grant_i  (token_grant  )
+    , .token_release_o(token_release)
     // Inbound stream
     , .inbound_data_i (inbound_data_i )
     , .inbound_valid_i(inbound_valid_i)

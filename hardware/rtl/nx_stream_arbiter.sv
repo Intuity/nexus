@@ -18,7 +18,8 @@
 // Arbitrates between multiple inbound message streams
 //
 module nx_stream_arbiter #(
-    parameter STREAM_WIDTH = 32
+      parameter STREAM_WIDTH = 32
+    , parameter SKID_BUFFERS = "no"
 ) (
       input  logic                    clk_i
     , input  logic                    rst_i
@@ -57,6 +58,8 @@ module nx_stream_arbiter #(
 logic [3:0][STREAM_WIDTH-1:0] skid_data;
 logic [3:0]                   skid_valid, skid_ready;
 
+generate
+if (SKID_BUFFERS == "yes") begin
 nx_stream_skid #(
     .STREAM_WIDTH(STREAM_WIDTH)
 ) skid_north (
@@ -116,6 +119,24 @@ nx_stream_skid #(
     , .outbound_valid_o(skid_valid[3])
     , .outbound_ready_i(skid_ready[3])
 );
+end else begin
+    assign skid_data[0]  = north_data_i;
+    assign skid_valid[0] = north_valid_i;
+    assign north_ready_o = skid_ready[0];
+
+    assign skid_data[1]  = east_data_i;
+    assign skid_valid[1] = east_valid_i;
+    assign east_ready_o  = skid_ready[1];
+
+    assign skid_data[2]  = south_data_i;
+    assign skid_valid[2] = south_valid_i;
+    assign south_ready_o = skid_ready[2];
+
+    assign skid_data[3]  = west_data_i;
+    assign skid_valid[3] = west_valid_i;
+    assign west_ready_o  = skid_ready[3];
+end
+endgenerate
 
 // Construct outputs
 assign arb_data_o = (
