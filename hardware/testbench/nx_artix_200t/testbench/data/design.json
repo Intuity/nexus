@@ -1,0 +1,2282 @@
+{
+    "configuration": {
+        "rows": 6,
+        "columns": 6,
+        "node": {
+            "inputs": 8,
+            "outputs": 8,
+            "registers": 8,
+            "slots": 16
+        }
+    },
+    "nodes": [
+        {
+            "row": 0,
+            "column": 0,
+            "instructions": [
+                4401,
+                5490,
+                8228,
+                10672,
+                5123,
+                3329
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": true
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 2,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 3,
+                    "target_bit": 5,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 3,
+                    "target_bit": 6,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 1
+                },
+                {
+                    "position": 1,
+                    "row_a": 6,
+                    "column_a": 0
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 3,
+                    "row_b": 1,
+                    "column_b": 2
+                }
+            ]
+        },
+        {
+            "row": 0,
+            "column": 1,
+            "instructions": [
+                257,
+                769,
+                1281,
+                1795,
+                8229,
+                2305,
+                2817
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": true
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 2,
+                    "target_bit": 5,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "broadcast": true,
+                    "decay": 4
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 5
+                },
+                {
+                    "position": 2,
+                    "row_a": 3,
+                    "column_a": 3
+                },
+                {
+                    "position": 3,
+                    "row_a": 4,
+                    "column_a": 2
+                },
+                {
+                    "position": 4,
+                    "broadcast": true,
+                    "decay": 4
+                },
+                {
+                    "position": 5,
+                    "row_a": 5,
+                    "column_a": 3,
+                    "row_b": 1,
+                    "column_b": 5
+                },
+                {
+                    "position": 6,
+                    "row_a": 2,
+                    "column_a": 0,
+                    "row_b": 1,
+                    "column_b": 2
+                }
+            ]
+        },
+        {
+            "row": 0,
+            "column": 2,
+            "instructions": [
+                8497,
+                9474,
+                6032,
+                8709,
+                11217,
+                3
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 6,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 2,
+                    "column_a": 1,
+                    "row_b": 1,
+                    "column_b": 1
+                },
+                {
+                    "position": 1,
+                    "row_a": 2,
+                    "column_a": 0
+                },
+                {
+                    "position": 2,
+                    "row_a": 1,
+                    "column_a": 5,
+                    "row_b": 2,
+                    "column_b": 3
+                },
+                {
+                    "position": 3,
+                    "row_a": 2,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 0,
+            "column": 3,
+            "instructions": [
+                8497,
+                9586,
+                4133,
+                2305,
+                2817,
+                8403
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": true
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 6,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 0,
+                    "column_a": 0
+                },
+                {
+                    "position": 1,
+                    "row_a": 6,
+                    "column_a": 0
+                },
+                {
+                    "position": 2,
+                    "row_a": 1,
+                    "column_a": 4,
+                    "row_b": 4,
+                    "column_b": 3
+                },
+                {
+                    "position": 3,
+                    "row_a": 1,
+                    "column_a": 5
+                },
+                {
+                    "position": 4,
+                    "row_a": 2,
+                    "column_a": 5
+                }
+            ]
+        },
+        {
+            "row": 0,
+            "column": 4,
+            "instructions": [
+                257,
+                771,
+                8229,
+                9537,
+                1793,
+                2307,
+                8229
+            ],
+            "in_handling": [
+                {
+                    "source_row": 2,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": true
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 4
+                },
+                {
+                    "position": 1,
+                    "row_a": 2,
+                    "column_a": 4
+                },
+                {
+                    "position": 2,
+                    "row_a": 0,
+                    "column_a": 0,
+                    "row_b": 1,
+                    "column_b": 1
+                },
+                {
+                    "position": 3,
+                    "row_a": 0,
+                    "column_a": 0
+                },
+                {
+                    "position": 4,
+                    "row_a": 2,
+                    "column_a": 3
+                },
+                {
+                    "position": 5,
+                    "row_a": 2,
+                    "column_a": 5
+                },
+                {
+                    "position": 6,
+                    "broadcast": true,
+                    "decay": 8
+                }
+            ]
+        },
+        {
+            "row": 0,
+            "column": 5,
+            "instructions": [
+                257,
+                769,
+                1281,
+                10129,
+                11219,
+                4133
+            ],
+            "in_handling": [
+                {
+                    "source_row": 3,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": true
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": true
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": true
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 5,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 6,
+                    "target_bit": 6,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 5,
+                    "row_b": 0,
+                    "column_b": 2
+                },
+                {
+                    "position": 1,
+                    "row_a": 3,
+                    "column_a": 1,
+                    "row_b": 0,
+                    "column_b": 2
+                },
+                {
+                    "position": 2,
+                    "row_a": 1,
+                    "column_a": 4,
+                    "row_b": 5,
+                    "column_b": 2
+                },
+                {
+                    "position": 3,
+                    "broadcast": true,
+                    "decay": 9
+                },
+                {
+                    "position": 4,
+                    "row_a": 1,
+                    "column_a": 2
+                },
+                {
+                    "position": 5,
+                    "row_a": 2,
+                    "column_a": 2
+                }
+            ]
+        },
+        {
+            "row": 1,
+            "column": 0,
+            "instructions": [
+                8496,
+                5490,
+                8228,
+                10672,
+                4163
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 3,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 6,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 3,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 6,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 1,
+            "column": 1,
+            "instructions": [
+                8497,
+                9587,
+                8709,
+                6576,
+                9219
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 0,
+                    "source_bit": 0,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 2,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 0,
+                    "column_a": 2
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 4
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 1
+                },
+                {
+                    "position": 3,
+                    "row_a": 2,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 1,
+            "column": 2,
+            "instructions": [
+                8496,
+                9586,
+                4613,
+                8709,
+                10677,
+                9222,
+                8801
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 0,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 6,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 3,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 2,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 3,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 4,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 2,
+                    "column_a": 2
+                },
+                {
+                    "position": 1,
+                    "row_a": 2,
+                    "column_a": 2
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 2
+                },
+                {
+                    "position": 3,
+                    "row_a": 6,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 1,
+            "column": 3,
+            "instructions": [
+                8496,
+                5490,
+                8228,
+                10672,
+                4163
+            ],
+            "in_handling": [
+                {
+                    "source_row": 3,
+                    "source_column": 0,
+                    "source_bit": 1,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 4,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 3,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 6,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 1,
+            "column": 4,
+            "instructions": [
+                8497,
+                9474,
+                6032,
+                8709,
+                11217
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 2,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 0,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 0,
+                    "source_bit": 0,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 0,
+                    "target_bit": 6,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 4,
+                    "column_a": 1,
+                    "row_b": 3,
+                    "column_b": 0
+                },
+                {
+                    "position": 1,
+                    "row_a": 4,
+                    "column_a": 0
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 3
+                }
+            ]
+        },
+        {
+            "row": 1,
+            "column": 5,
+            "instructions": [
+                8497,
+                9474,
+                6032,
+                8709,
+                11217
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 5,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 3,
+                    "source_bit": 3,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 2,
+                    "source_bit": 2,
+                    "target_bit": 6,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 4,
+                    "column_a": 1,
+                    "row_b": 5,
+                    "column_b": 1
+                },
+                {
+                    "position": 1,
+                    "row_a": 5,
+                    "column_a": 0
+                },
+                {
+                    "position": 2,
+                    "row_a": 3,
+                    "column_a": 2
+                }
+            ]
+        },
+        {
+            "row": 2,
+            "column": 0,
+            "instructions": [
+                4401,
+                9585,
+                3,
+                10673
+            ],
+            "in_handling": [
+                {
+                    "source_row": 1,
+                    "source_column": 1,
+                    "source_bit": 3,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 2,
+                    "source_bit": 3,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 6,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 3,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 6,
+                    "column_a": 0
+                },
+                {
+                    "position": 1,
+                    "row_a": 3,
+                    "column_a": 2,
+                    "row_b": 3,
+                    "column_b": 3
+                },
+                {
+                    "position": 2,
+                    "row_a": 3,
+                    "column_a": 3
+                },
+                {
+                    "position": 3,
+                    "row_a": 2,
+                    "column_a": 5
+                }
+            ]
+        },
+        {
+            "row": 2,
+            "column": 1,
+            "instructions": [
+                8497,
+                9587,
+                8709,
+                6577
+            ],
+            "in_handling": [
+                {
+                    "source_row": 1,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 0,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 4,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 3
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 3
+                },
+                {
+                    "position": 2,
+                    "row_a": 3,
+                    "column_a": 0,
+                    "row_b": 1,
+                    "column_b": 3
+                },
+                {
+                    "position": 3,
+                    "row_a": 1,
+                    "column_a": 3
+                }
+            ]
+        },
+        {
+            "row": 2,
+            "column": 2,
+            "instructions": [
+                8496,
+                9586,
+                4613,
+                6577
+            ],
+            "in_handling": [
+                {
+                    "source_row": 1,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 5,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 2,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 6,
+                    "column_a": 0
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 5
+                }
+            ]
+        },
+        {
+            "row": 2,
+            "column": 3,
+            "instructions": [
+                4401,
+                9585,
+                10673
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 2,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 4,
+                    "source_bit": 2,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 4,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 0,
+                    "source_bit": 2,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "broadcast": true,
+                    "decay": 3
+                },
+                {
+                    "position": 1,
+                    "row_a": 2,
+                    "column_a": 2
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 4
+                }
+            ]
+        },
+        {
+            "row": 2,
+            "column": 4,
+            "instructions": [
+                8497,
+                9586,
+                4133,
+                3,
+                6577
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 0,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 3,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 3,
+                    "column_a": 1
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 4
+                },
+                {
+                    "position": 2,
+                    "row_a": 3,
+                    "column_a": 1
+                },
+                {
+                    "position": 3,
+                    "broadcast": true,
+                    "decay": 6
+                }
+            ]
+        },
+        {
+            "row": 2,
+            "column": 5,
+            "instructions": [
+                4401,
+                9488,
+                5891,
+                6577
+            ],
+            "in_handling": [
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 3,
+                    "source_bit": 4,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 5,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 3,
+                    "target_bit": 3,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 4,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 0,
+                    "source_bit": 3,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "broadcast": true,
+                    "decay": 7
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 6
+                },
+                {
+                    "position": 2,
+                    "broadcast": true,
+                    "decay": 6
+                }
+            ]
+        },
+        {
+            "row": 3,
+            "column": 0,
+            "instructions": [
+                8497,
+                9587,
+                8709,
+                6576,
+                9219
+            ],
+            "in_handling": [
+                {
+                    "source_row": 2,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 4,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 4,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 4
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 6
+                },
+                {
+                    "position": 2,
+                    "row_a": 4,
+                    "column_a": 1
+                },
+                {
+                    "position": 3,
+                    "row_a": 4,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 3,
+            "column": 1,
+            "instructions": [
+                8496,
+                9587,
+                4613,
+                513
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 1,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 4,
+                    "column_a": 2
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 7
+                },
+                {
+                    "position": 2,
+                    "row_a": 4,
+                    "column_a": 2
+                }
+            ]
+        },
+        {
+            "row": 3,
+            "column": 2,
+            "instructions": [
+                4401
+            ],
+            "in_handling": [
+                {
+                    "source_row": 2,
+                    "source_column": 0,
+                    "source_bit": 1,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 5,
+                    "source_bit": 2,
+                    "target_bit": 1,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "broadcast": true,
+                    "decay": 6
+                }
+            ]
+        },
+        {
+            "row": 3,
+            "column": 3,
+            "instructions": [
+                8496,
+                9587,
+                4613,
+                513
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 0,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 0,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 4,
+                    "column_a": 3
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 5
+                },
+                {
+                    "position": 2,
+                    "row_a": 4,
+                    "column_a": 3
+                }
+            ]
+        },
+        {
+            "row": 3,
+            "column": 4,
+            "instructions": [],
+            "in_handling": [],
+            "out_handling": []
+        },
+        {
+            "row": 3,
+            "column": 5,
+            "instructions": [],
+            "in_handling": [],
+            "out_handling": []
+        },
+        {
+            "row": 4,
+            "column": 0,
+            "instructions": [
+                4401
+            ],
+            "in_handling": [
+                {
+                    "source_row": 3,
+                    "source_column": 0,
+                    "source_bit": 3,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 4,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 6,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 4,
+            "column": 1,
+            "instructions": [
+                8497,
+                9587,
+                8709,
+                6576,
+                9219
+            ],
+            "in_handling": [
+                {
+                    "source_row": 3,
+                    "source_column": 0,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 4,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 1,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 5
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 7
+                },
+                {
+                    "position": 2,
+                    "row_a": 5,
+                    "column_a": 1
+                },
+                {
+                    "position": 3,
+                    "row_a": 5,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 4,
+            "column": 2,
+            "instructions": [
+                8496,
+                9587,
+                4613,
+                513
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 3,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 1,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 5,
+                    "column_a": 2
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 5
+                },
+                {
+                    "position": 2,
+                    "row_a": 5,
+                    "column_a": 2
+                }
+            ]
+        },
+        {
+            "row": 4,
+            "column": 3,
+            "instructions": [
+                8496,
+                9587,
+                4613,
+                513
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 3,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 5,
+                    "column_a": 3
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 4
+                },
+                {
+                    "position": 2,
+                    "row_a": 5,
+                    "column_a": 3
+                }
+            ]
+        },
+        {
+            "row": 4,
+            "column": 4,
+            "instructions": [],
+            "in_handling": [],
+            "out_handling": []
+        },
+        {
+            "row": 4,
+            "column": 5,
+            "instructions": [],
+            "in_handling": [],
+            "out_handling": []
+        },
+        {
+            "row": 5,
+            "column": 0,
+            "instructions": [
+                4401
+            ],
+            "in_handling": [
+                {
+                    "source_row": 4,
+                    "source_column": 1,
+                    "source_bit": 3,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 5,
+                    "source_bit": 1,
+                    "target_bit": 1,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 6,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 5,
+            "column": 1,
+            "instructions": [
+                8497,
+                9587,
+                8709,
+                6577
+            ],
+            "in_handling": [
+                {
+                    "source_row": 4,
+                    "source_column": 1,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 1,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 2,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 3,
+                    "target_bit": 4,
+                    "is_state": false
+                },
+                {
+                    "source_row": 0,
+                    "source_column": 4,
+                    "source_bit": 6,
+                    "target_bit": 5,
+                    "is_state": false
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 1,
+                    "column_a": 0
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 8
+                },
+                {
+                    "position": 2,
+                    "row_a": 0,
+                    "column_a": 5,
+                    "row_b": 1,
+                    "column_b": 0
+                },
+                {
+                    "position": 3,
+                    "row_a": 1,
+                    "column_a": 0
+                }
+            ]
+        },
+        {
+            "row": 5,
+            "column": 2,
+            "instructions": [
+                8496,
+                9587,
+                4613,
+                512,
+                8339,
+                512,
+                8371,
+                512,
+                8403
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 5,
+                    "source_bit": 2,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 2,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 2,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 0,
+                    "target_bit": 4,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 1,
+                    "target_bit": 5,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 5,
+                    "source_bit": 2,
+                    "target_bit": 6,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 0,
+                    "column_a": 3
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 8
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 5,
+                    "row_b": 2,
+                    "column_b": 5
+                },
+                {
+                    "position": 3,
+                    "row_a": 2,
+                    "column_a": 0,
+                    "row_b": 2,
+                    "column_b": 5
+                },
+                {
+                    "position": 4,
+                    "row_a": 2,
+                    "column_a": 5
+                }
+            ]
+        },
+        {
+            "row": 5,
+            "column": 3,
+            "instructions": [
+                8496,
+                9587,
+                4613,
+                512,
+                8339,
+                512,
+                8371
+            ],
+            "in_handling": [
+                {
+                    "source_row": 0,
+                    "source_column": 1,
+                    "source_bit": 5,
+                    "target_bit": 0,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 3,
+                    "source_bit": 0,
+                    "target_bit": 1,
+                    "is_state": false
+                },
+                {
+                    "source_row": 4,
+                    "source_column": 3,
+                    "source_bit": 2,
+                    "target_bit": 2,
+                    "is_state": false
+                },
+                {
+                    "source_row": 5,
+                    "source_column": 3,
+                    "source_bit": 1,
+                    "target_bit": 3,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 2,
+                    "source_bit": 1,
+                    "target_bit": 4,
+                    "is_state": true
+                },
+                {
+                    "source_row": 2,
+                    "source_column": 4,
+                    "source_bit": 3,
+                    "target_bit": 5,
+                    "is_state": true
+                }
+            ],
+            "out_handling": [
+                {
+                    "position": 0,
+                    "row_a": 2,
+                    "column_a": 3
+                },
+                {
+                    "position": 1,
+                    "broadcast": true,
+                    "decay": 7
+                },
+                {
+                    "position": 2,
+                    "row_a": 2,
+                    "column_a": 2,
+                    "row_b": 2,
+                    "column_b": 3
+                },
+                {
+                    "position": 3,
+                    "row_a": 2,
+                    "column_a": 4
+                }
+            ]
+        },
+        {
+            "row": 5,
+            "column": 4,
+            "instructions": [],
+            "in_handling": [],
+            "out_handling": []
+        },
+        {
+            "row": 5,
+            "column": 5,
+            "instructions": [],
+            "in_handling": [],
+            "out_handling": []
+        }
+    ],
+    "reports": {
+        "state": {
+            "R0C0I0": "Top.m_counter_a_$procdff$5_0.Q[0]",
+            "R0C0I1": "Top.m_counter_b_$procdff$5_0.Q[0]",
+            "R0C0I6": "Top.m_counter_a_$procdff$5_7.Q[0]",
+            "R0C1I0": "Top.m_counter_a_$procdff$5_0.Q[0]",
+            "R0C1I1": "Top.m_counter_b_$procdff$5_0.Q[0]",
+            "R0C1I2": "Top.m_counter_a_$procdff$5_3.Q[0]",
+            "R0C1I3": "Top.m_counter_b_$procdff$5_3.Q[0]",
+            "R0C1I4": "Top.m_counter_a_$procdff$5_5.Q[0]",
+            "R0C1I5": "Top.m_counter_b_$procdff$5_7.Q[0]",
+            "R0C2I5": "Top.m_counter_a_$procdff$5_0.Q[0]",
+            "R0C2I6": "Top.m_counter_a_$procdff$5_1.Q[0]",
+            "R0C3I0": "Top.m_counter_a_$procdff$5_0.Q[0]",
+            "R0C3I1": "Top.m_counter_b_$procdff$5_0.Q[0]",
+            "R0C3I4": "Top.m_counter_a_$procdff$5_4.Q[0]",
+            "R0C3I5": "Top.m_counter_b_$procdff$5_5.Q[0]",
+            "R0C4I0": "Top.m_counter_a_$procdff$5_1.Q[0]",
+            "R0C4I1": "Top.m_counter_b_$procdff$5_1.Q[0]",
+            "R0C4I3": "Top.m_counter_a_$procdff$5_6.Q[0]",
+            "R0C4I4": "Top.m_counter_b_$procdff$5_6.Q[0]",
+            "R0C5I0": "Top.m_counter_a_$procdff$5_2.Q[0]",
+            "R0C5I1": "Top.m_counter_b_$procdff$5_2.Q[0]",
+            "R0C5I2": "Top.m_counter_b_$procdff$5_4.Q[0]",
+            "R0C5I3": "Top.m_counter_a_$procdff$5_6.Q[0]",
+            "R0C5I4": "Top.m_counter_b_$procdff$5_6.Q[0]",
+            "R1C1I2": "Top.m_counter_a_$procdff$5_1.Q[0]",
+            "R1C1I3": "Top.m_counter_b_$procdff$5_1.Q[0]",
+            "R1C2I2": "Top.m_counter_a_$procdff$5_7.Q[0]",
+            "R1C2I3": "Top.m_counter_b_$procdff$5_7.Q[0]",
+            "R2C0I3": "Top.m_counter_a_$procdff$5_2.Q[0]",
+            "R2C1I2": "Top.m_counter_a_$procdff$5_2.Q[0]",
+            "R2C1I3": "Top.m_counter_b_$procdff$5_2.Q[0]",
+            "R2C4I0": "Top.m_counter_b_$procdff$5_0.Q[0]",
+            "R2C4I1": "Top.m_counter_b_$procdff$5_1.Q[0]",
+            "R3C0I2": "Top.m_counter_a_$procdff$5_3.Q[0]",
+            "R3C0I3": "Top.m_counter_b_$procdff$5_3.Q[0]",
+            "R3C1I3": "Top.m_counter_b_$procdff$5_2.Q[0]",
+            "R3C3I3": "Top.m_counter_a_$procdff$5_3.Q[0]",
+            "R4C1I2": "Top.m_counter_a_$procdff$5_4.Q[0]",
+            "R4C1I3": "Top.m_counter_b_$procdff$5_4.Q[0]",
+            "R4C2I3": "Top.m_counter_b_$procdff$5_3.Q[0]",
+            "R4C3I3": "Top.m_counter_a_$procdff$5_4.Q[0]",
+            "R5C1I2": "Top.m_counter_a_$procdff$5_5.Q[0]",
+            "R5C1I3": "Top.m_counter_b_$procdff$5_5.Q[0]",
+            "R5C2I3": "Top.m_counter_b_$procdff$5_4.Q[0]",
+            "R5C2I4": "Top.m_counter_b_$procdff$5_5.Q[0]",
+            "R5C2I5": "Top.m_counter_b_$procdff$5_6.Q[0]",
+            "R5C2I6": "Top.m_counter_b_$procdff$5_7.Q[0]",
+            "R5C3I3": "Top.m_counter_a_$procdff$5_5.Q[0]",
+            "R5C3I4": "Top.m_counter_a_$procdff$5_6.Q[0]",
+            "R5C3I5": "Top.m_counter_a_$procdff$5_7.Q[0]"
+        },
+        "outputs": {
+            "R0C0I1": "Top.sum[1]",
+            "R0C3I1": "Top.sum[0]",
+            "R1C0I0": "Top.sum[6]",
+            "R1C2I3": "Top.overflow[0]",
+            "R1C3I0": "Top.sum[3]",
+            "R2C0I0": "Top.sum[2]",
+            "R2C2I0": "Top.sum[7]",
+            "R4C0I0": "Top.sum[4]",
+            "R5C0I0": "Top.sum[5]"
+        }
+    }
+}
