@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`include "nx_common.svh"
-
 // nexus
 // Top-level of the Nexus simulation accelerator.
 //
