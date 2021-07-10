@@ -20,7 +20,7 @@ SPACE ?=
 SPACE := $(SPACE) $(SPACE)
 
 # Input files
-SRC_DIRS  ?= ../../rtl ./
+SRC_DIRS  += ../../rtl ./
 SRC_EXTS  ?= .sv .v
 HDR_EXTS  ?= .svh .vh
 SRC_FILES ?= $(foreach d,$(SRC_DIRS),$(foreach x,$(SRC_EXTS),$(abspath $(wildcard $(d)/*$(x)))))
