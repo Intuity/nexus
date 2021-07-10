@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`include "nx_common.svh"
-
 // nx_artix_200t
 // Nexus 7 instance for the Artix-7 XC7A200T
 //
@@ -22,26 +20,26 @@ module nx_artix_200t #(
     , parameter AXI4_STRB_WIDTH = AXI4_DATA_WIDTH / 8
     , parameter AXI4_ID_WIDTH   =                   1
 ) (
-      input  wire clk_i
-    , input  wire rstn_i
+      input  wire clk
+    , input  wire rstn
     // Status
-    , output wire active_o
+    , output wire status_active
     // Inbound AXI4-stream
-    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata_i
-    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tkeep_i
-    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tstrb_i
-    , input  wire [  AXI4_ID_WIDTH-1:0] inbound_tid_i
-    , input  wire                       inbound_tlast_i
-    , input  wire                       inbound_tvalid_i
-    , output wire                       inbound_tready_o
+    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata
+    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tkeep
+    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tstrb
+    , input  wire [  AXI4_ID_WIDTH-1:0] inbound_tid
+    , input  wire                       inbound_tlast
+    , input  wire                       inbound_tvalid
+    , output wire                       inbound_tready
     // Outbound AXI4-stream
-    , output wire [AXI4_DATA_WIDTH-1:0] outbound_tdata_o
-    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tkeep_o
-    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tstrb_o
-    , output wire [  AXI4_ID_WIDTH-1:0] outbound_tid_o
-    , output wire                       outbound_tlast_o
-    , output wire                       outbound_tvalid_o
-    , input  wire                       outbound_tready_i
+    , output wire [AXI4_DATA_WIDTH-1:0] outbound_tdata
+    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tkeep
+    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tstrb
+    , output wire [  AXI4_ID_WIDTH-1:0] outbound_tid
+    , output wire                       outbound_tlast
+    , output wire                       outbound_tvalid
+    , input  wire                       outbound_tready
 );
 
 // Internal state
@@ -49,7 +47,7 @@ reg         active, active_q;
 wire [31:0] counter;
 
 // Status signals
-assign active_o = active_q;
+assign status_active = active_q;
 
 // Instance skid to support decode of inbound stream
 wire [AXI4_DATA_WIDTH-1:0] skid_ib_data;
@@ -61,12 +59,12 @@ reg                        skid_ib_ready, skid_ib_ready_q;
 nx_stream_skid #(
     .STREAM_WIDTH(AXI4_DATA_WIDTH + AXI4_STRB_WIDTH + AXI4_ID_WIDTH)
 ) skid_axi_ib (
-      .clk_i( clk_i )
-    , .rst_i(~rstn_i)
+      .clk_i( clk )
+    , .rst_i(~rstn)
     // Inbound message stream
-    , .inbound_data_i ({ inbound_tdata_i, inbound_tkeep_i & inbound_tstrb_i, inbound_tid_i })
-    , .inbound_valid_i(inbound_tvalid_i)
-    , .inbound_ready_o(inbound_tready_o)
+    , .inbound_data_i ({ inbound_tdata, inbound_tkeep & inbound_tstrb, inbound_tid })
+    , .inbound_valid_i(inbound_tvalid)
+    , .inbound_ready_o(inbound_tready)
     // Outbound message stream
     , .outbound_data_o ({ skid_ib_data, skid_ib_strobe, skid_ib_id })
     , .outbound_valid_o(skid_ib_valid)
@@ -144,8 +142,8 @@ always @(*) begin : p_decode
     end
 end
 
-always @(posedge clk_i, negedge rstn_i) begin
-    if (!rstn_i) begin
+always @(posedge clk, negedge rstn) begin
+    if (!rstn) begin
         active_q        <=  1'b0;
         skid_ib_ready_q <=  1'b0;
         decode_high_q   <=  1'b0;
@@ -183,8 +181,8 @@ nexus #(
     , .OPCODE_WIDTH  (  3)
     , .COUNTER_WIDTH ( 32)
 ) core (
-      .clk_i( clk_i )
-    , .rst_i(~rstn_i)
+      .clk_i( clk )
+    , .rst_i(~rstn)
     // Control signals
     , .active_i (active )
     , .counter_o(counter)
@@ -199,20 +197,20 @@ nexus #(
 );
 
 // Mux between the core and control output streams (control gets priority)
-assign ctrl_ob_ready = outbound_tready_i;
-assign core_ob_ready = outbound_tready_i && !ctrl_ob_valid_q;
+assign ctrl_ob_ready = outbound_tready;
+assign core_ob_ready = outbound_tready && !ctrl_ob_valid_q;
 
-assign outbound_tdata_o = {
+assign outbound_tdata = {
     32'd0,                                 // 32-bit padding
     ctrl_ob_valid_q,                       // Bit 31 indicates control/core
     ctrl_ob_valid_q ? ctrl_ob_data_q[30:0] // Bits 30:0 carry payload
                     : core_ob_data[30:0]
 };
 
-assign outbound_tkeep_o  = 8'h0F;
-assign outbound_tstrb_o  = 8'h0F;
-assign outbound_tid_o    = {AXI4_ID_WIDTH{1'b0}};
-assign outbound_tlast_o  = 1'b1;
-assign outbound_tvalid_o = ctrl_ob_valid_q || core_ob_valid;
+assign outbound_tkeep  = 8'h0F;
+assign outbound_tstrb  = 8'h0F;
+assign outbound_tid    = {AXI4_ID_WIDTH{1'b0}};
+assign outbound_tlast  = 1'b1;
+assign outbound_tvalid = ctrl_ob_valid_q || core_ob_valid;
 
 endmodule : nx_artix_200t
