@@ -27,6 +27,9 @@ module testbench #(
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // External trigger signal
     , input  logic trigger_i
+    // Channel tokens
+    , input  logic token_grant_i
+    , output logic token_release_o
     // Outbound message stream
     , output logic [STREAM_WIDTH-1:0] msg_data_o
     , output logic [             1:0] msg_dir_o
@@ -73,6 +76,9 @@ nx_node_control #(
     , .node_col_i(node_col_i)
     // External trigger signal
     , .trigger_i(trigger_i)
+    // Channel tokens
+    , .token_grant_i  (token_grant_i  )
+    , .token_release_o(token_release_o)
     // Outbound message stream
     , .msg_data_o (msg_data_o )
     , .msg_dir_o  (msg_dir_o  )

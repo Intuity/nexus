@@ -39,6 +39,8 @@ class Testbench(TestbenchBase):
         self.trigger     = dut.core_trigger_o
         self.inputs      = dut.core_inputs_o
         self.outputs     = dut.core_outputs_i
+        self.grant       = dut.token_grant_i
+        self.release     = dut.token_release_o
         # Setup drivers/monitors
         self.msg = StreamResponder(
             self, self.clk, self.rst, StreamIO(self.dut, "msg", IORole.INITIATOR),
@@ -60,6 +62,8 @@ class Testbench(TestbenchBase):
         await super().initialise()
         self.ext_trigger <= 0
         self.outputs     <= 0
+        self.grant       <= 0
+        self.release     <= 0
         self.msg.intf.initialise(IORole.RESPONDER)
         self.io.intf.initialise(IORole.INITIATOR)
         self.signal.intf.initialise(IORole.INITIATOR)

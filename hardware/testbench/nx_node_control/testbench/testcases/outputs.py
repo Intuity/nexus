@@ -14,7 +14,8 @@
 
 from random import choice, randint, random
 
-from cocotb.triggers import ClockCycles, RisingEdge
+import cocotb
+from cocotb.triggers import ClockCycles, Event, RisingEdge
 
 from drivers.map_io.common import IOMapping
 from nx_constants import Direction
@@ -78,6 +79,19 @@ async def output_drive(dut):
     row, col = randint(1, 14), randint(1, 14)
     dut.node_row_i <= row
     dut.node_col_i <= col
+
+    # Create a basic driver for the grant
+    grant_flag = Event()
+    async def do_grant():
+        nonlocal grant_flag
+        while True:
+            await grant_flag.wait()
+            grant_flag.clear()
+            await RisingEdge(dut.clk)
+            dut.grant <= 1
+            await RisingEdge(dut.clk)
+            dut.grant <= 0
+    cocotb.fork(do_grant())
 
     # Work out the number of outputs
     num_outputs = max(dut.outputs._range) - min(dut.outputs._range) + 1
@@ -165,5 +179,13 @@ async def output_drive(dut):
         dut.outputs <= sum([(y << x) for x, y in curr_state.items()])
         # Keep track of the last state
         last_state = { x: y for x, y in curr_state.items() }
-        # Wait for the expected message queue to drain
-        while dut.exp_msg: await RisingEdge(dut.clk)
+        # Loop until all expected messages are produced
+        while dut.exp_msg:
+            # Wait for some time, then check no messages have been received
+            num_exp = len(dut.exp_msg)
+            await ClockCycles(dut.clk, randint(1, 100))
+            assert len(dut.exp_msg) == num_exp, "Messages were sent before grant"
+            # Raise trigger to let a chunk of messages be sent
+            grant_flag.set()
+            while dut.release == 0: await RisingEdge(dut.clk)
+            await RisingEdge(dut.clk)
