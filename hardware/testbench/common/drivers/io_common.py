@@ -43,7 +43,7 @@ class BaseIO:
         self.__init_sigs = init_sigs[:]
         self.__resp_sigs = resp_sigs[:]
         # Pickup attributes
-        self.__initiators, self.__responders = [], []
+        self.__initiators, self.__responders = {}, {}
         for comp in self.__init_sigs:
             sig  = f"{self.__name}_{comp}_"
             sig += "o" if self.__role == IORole.INITIATOR else "i"
@@ -51,7 +51,7 @@ class BaseIO:
                 print(f"{type(self).__name__}: Did not find I/O component {sig} on {dut}")
                 continue
             sig_ptr = getattr(self.__dut, sig)
-            self.__initiators.append(sig_ptr)
+            self.__initiators[comp] = sig_ptr
             setattr(self, comp, sig_ptr)
         for comp in self.__resp_sigs:
             sig  = f"{self.__name}_{comp}_"
@@ -60,12 +60,26 @@ class BaseIO:
                 print(f"{type(self).__name__}: Did not find I/O component {sig} on {dut}")
                 continue
             sig_ptr = getattr(self.__dut, sig)
-            self.__responders.append(sig_ptr)
+            self.__responders[comp] = sig_ptr
             setattr(self, comp, sig_ptr)
 
     def initialise(self, role):
         """ Initialise signals according to the active role """
         for sig in (
             self.__initiators if role == IORole.INITIATOR else self.__responders
-        ):
+        ).values():
             sig <= 0
+
+    def has(self, comp):
+        return (comp in self.__initiators) or (comp in self.__responders)
+
+    def get(self, comp, default=None):
+        return getattr(self, comp).value if self.has(comp) else default
+
+    def set(self, comp, value):
+        if not self.has(comp): return
+        getattr(self, comp) <= value
+
+    def width(self, comp):
+        sig = getattr(self, comp)
+        return max(sig._range) - min(sig._range) + 1
