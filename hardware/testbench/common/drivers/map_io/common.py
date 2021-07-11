@@ -15,6 +15,5 @@
 from collections import namedtuple
 
 IOMapping = namedtuple("IOMapping", [
-    "index", "is_input", "remote_row", "remote_col", "remote_idx", "slot",
-    "broadcast", "seq"
+    "index", "target_row", "target_col", "target_idx", "target_seq"
 ])

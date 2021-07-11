@@ -26,6 +26,5 @@ class IOMapIO(BaseIO):
             role: Role of this signal on the DUT boundary
         """
         super().__init__(dut, name, role, [
-            "io", "input", "remote_row", "remote_col", "remote_idx", "slot",
-            "broadcast", "seq", "valid",
+            "idx", "tgt_row", "tgt_col", "tgt_idx", "tgt_seq", "valid"
         ], [])

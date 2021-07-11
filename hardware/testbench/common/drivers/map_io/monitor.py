@@ -46,12 +46,9 @@ class IOMapMonitor(Monitor):
             # Capture any I/O mappings
             if self.intf.valid == 1:
                 self._recv(IOMapping(
-                    index     =int(self.intf.io),
-                    is_input  =int(self.intf.input),
-                    remote_row=int(self.intf.remote_row),
-                    remote_col=int(self.intf.remote_col),
-                    remote_idx=int(self.intf.remote_idx),
-                    slot      =int(self.intf.slot),
-                    broadcast =int(self.intf.broadcast),
-                    seq       =int(self.intf.seq),
+                    index     =int(self.intf.idx),
+                    target_row=int(self.intf.tgt_row),
+                    target_col=int(self.intf.tgt_col),
+                    target_idx=int(self.intf.tgt_idx),
+                    target_seq=int(self.intf.tgt_seq),
                 ))

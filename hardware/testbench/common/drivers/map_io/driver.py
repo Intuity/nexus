@@ -47,14 +47,11 @@ class IOMapInitiator(Driver):
         # Wait for reset to clear
         while self.reset == 1: await RisingEdge(self.clock)
         # Drive the request
-        self.intf.io         <= transaction.index
-        self.intf.input      <= transaction.is_input
-        self.intf.remote_row <= transaction.remote_row
-        self.intf.remote_col <= transaction.remote_col
-        self.intf.remote_idx <= transaction.remote_idx
-        self.intf.slot       <= transaction.slot
-        self.intf.broadcast  <= transaction.broadcast
-        self.intf.seq        <= transaction.seq
-        self.intf.valid      <= 1
+        self.intf.idx     <= transaction.index
+        self.intf.tgt_row <= transaction.target_row
+        self.intf.tgt_col <= transaction.target_col
+        self.intf.tgt_idx <= transaction.target_idx
+        self.intf.tgt_seq <= transaction.target_seq
+        self.intf.valid   <= 1
         await RisingEdge(self.clock)
         self.intf.valid      <= 0
