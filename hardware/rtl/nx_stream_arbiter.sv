@@ -51,7 +51,7 @@ module nx_stream_arbiter #(
 `include "nx_constants.svh"
 
 // Internal state
-`DECLARE_DQ(2, choice, clk_i, rst_i, DIRX_NORTH)
+`DECLARE_DQ(2, choice, clk_i, rst_i, NX_DIRX_NORTH)
 `DECLARE_DQ(1, locked, clk_i, rst_i, 1'b0)
 
 // Skid buffers for each stream
@@ -140,21 +140,21 @@ endgenerate
 
 // Construct outputs
 assign arb_data_o = (
-     (choice_q == DIRX_NORTH) ? skid_data[0] :
-    ((choice_q == DIRX_EAST ) ? skid_data[1] :
-    ((choice_q == DIRX_SOUTH) ? skid_data[2] :
-                                skid_data[3]))
+     (choice_q == NX_DIRX_NORTH) ? skid_data[0] :
+    ((choice_q == NX_DIRX_EAST ) ? skid_data[1] :
+    ((choice_q == NX_DIRX_SOUTH) ? skid_data[2] :
+                                   skid_data[3]))
 );
 assign arb_valid_o = (
-     (choice_q == DIRX_NORTH) ? skid_valid[0] :
-    ((choice_q == DIRX_EAST ) ? skid_valid[1] :
-    ((choice_q == DIRX_SOUTH) ? skid_valid[2] :
-                                skid_valid[3]))
+     (choice_q == NX_DIRX_NORTH) ? skid_valid[0] :
+    ((choice_q == NX_DIRX_EAST ) ? skid_valid[1] :
+    ((choice_q == NX_DIRX_SOUTH) ? skid_valid[2] :
+                                   skid_valid[3]))
 );
-assign skid_ready[0] = arb_ready_i && (!locked || choice_q == DIRX_NORTH);
-assign skid_ready[1] = arb_ready_i && (!locked || choice_q == DIRX_EAST );
-assign skid_ready[2] = arb_ready_i && (!locked || choice_q == DIRX_SOUTH);
-assign skid_ready[3] = arb_ready_i && (!locked || choice_q == DIRX_WEST );
+assign skid_ready[0] = arb_ready_i && (!locked || choice_q == NX_DIRX_NORTH);
+assign skid_ready[1] = arb_ready_i && (!locked || choice_q == NX_DIRX_EAST );
+assign skid_ready[2] = arb_ready_i && (!locked || choice_q == NX_DIRX_SOUTH);
+assign skid_ready[3] = arb_ready_i && (!locked || choice_q == NX_DIRX_WEST );
 assign arb_dir_o     = choice_q;
 
 // Arbitration
@@ -176,10 +176,10 @@ always_comb begin : p_arbitrate
         for (idx = 0; idx < 4; idx = (idx + 1)) begin
             if (!found) begin
                 case (choice + idx[1:0] + 2'd1)
-                    DIRX_NORTH: found = skid_valid[0];
-                    DIRX_EAST : found = skid_valid[1];
-                    DIRX_SOUTH: found = skid_valid[2];
-                    DIRX_WEST : found = skid_valid[3];
+                    NX_DIRX_NORTH: found = skid_valid[0];
+                    NX_DIRX_EAST : found = skid_valid[1];
+                    NX_DIRX_SOUTH: found = skid_valid[2];
+                    NX_DIRX_WEST : found = skid_valid[3];
                 endcase
                 if (found) choice = (choice + idx[1:0] + 2'd1);
             end

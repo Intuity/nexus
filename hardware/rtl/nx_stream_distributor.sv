@@ -70,33 +70,33 @@ logic [3:0]                   skid_valid, skid_ready;
 
 assign skid_data[0]  = dist_data_i;
 assign skid_valid[0] = dist_valid_i && (
-    (dist_dir_i == DIRX_NORTH &&  north_present_i              ) ||
-    (dist_dir_i == DIRX_WEST  && !west_present_i  && !broadcast)
+    (dist_dir_i == NX_DIRX_NORTH &&  north_present_i              ) ||
+    (dist_dir_i == NX_DIRX_WEST  && !west_present_i  && !broadcast)
 );
 
 assign skid_data[1]   = dist_data_i;
 assign skid_valid[1]  = dist_valid_i && (
-    (dist_dir_i == DIRX_EAST  &&  east_present_i               ) ||
-    (dist_dir_i == DIRX_NORTH && !north_present_i && !broadcast)
+    (dist_dir_i == NX_DIRX_EAST  &&  east_present_i               ) ||
+    (dist_dir_i == NX_DIRX_NORTH && !north_present_i && !broadcast)
 );
 
 assign skid_data[2]  = dist_data_i;
 assign skid_valid[2] = dist_valid_i && (
-    (dist_dir_i == DIRX_SOUTH &&  south_present_i              ) ||
-    (dist_dir_i == DIRX_EAST  && !east_present_i  && !broadcast)
+    (dist_dir_i == NX_DIRX_SOUTH &&  south_present_i              ) ||
+    (dist_dir_i == NX_DIRX_EAST  && !east_present_i  && !broadcast)
 );
 
 assign skid_data[3]   = dist_data_i;
 assign skid_valid[3]  = dist_valid_i && (
-    (dist_dir_i == DIRX_WEST  &&  west_present_i               ) ||
-    (dist_dir_i == DIRX_SOUTH && !south_present_i && !broadcast)
+    (dist_dir_i == NX_DIRX_WEST  &&  west_present_i               ) ||
+    (dist_dir_i == NX_DIRX_SOUTH && !south_present_i && !broadcast)
 );
 
 assign dist_ready_o = (
-     (dist_dir_i == DIRX_NORTH) ? (skid_ready[0] && north_present_i || (skid_ready[1] || broadcast) && !north_present_i) :
-    ((dist_dir_i == DIRX_EAST ) ? (skid_ready[1] && east_present_i  || (skid_ready[2] || broadcast) && !east_present_i ) :
-    ((dist_dir_i == DIRX_SOUTH) ? (skid_ready[2] && south_present_i || (skid_ready[3] || broadcast) && !south_present_i) :
-                                  (skid_ready[3] && west_present_i  || (skid_ready[0] || broadcast) && !west_present_i )))
+     (dist_dir_i == NX_DIRX_NORTH) ? (skid_ready[0] && north_present_i || (skid_ready[1] || broadcast) && !north_present_i) :
+    ((dist_dir_i == NX_DIRX_EAST ) ? (skid_ready[1] && east_present_i  || (skid_ready[2] || broadcast) && !east_present_i ) :
+    ((dist_dir_i == NX_DIRX_SOUTH) ? (skid_ready[2] && south_present_i || (skid_ready[3] || broadcast) && !south_present_i) :
+                                     (skid_ready[3] && west_present_i  || (skid_ready[0] || broadcast) && !west_present_i )))
 );
 
 
