@@ -19,16 +19,18 @@
 // tiled into a grid
 //
 module nx_node #(
-      parameter STREAM_WIDTH   =  32
-    , parameter ADDR_ROW_WIDTH =   4
-    , parameter ADDR_COL_WIDTH =   4
-    , parameter COMMAND_WIDTH  =   2
-    , parameter INSTR_WIDTH    =  15
-    , parameter INPUTS         =   8
-    , parameter OUTPUTS        =   8
-    , parameter REGISTERS      =   8
-    , parameter MAX_INSTRS     = 512
-    , parameter OPCODE_WIDTH   =   3
+      parameter STREAM_WIDTH    =  32
+    , parameter ADDR_ROW_WIDTH  =   4
+    , parameter ADDR_COL_WIDTH  =   4
+    , parameter COMMAND_WIDTH   =   2
+    , parameter INSTR_WIDTH     =  15
+    , parameter INPUTS          =   8
+    , parameter OUTPUTS         =   8
+    , parameter REGISTERS       =   8
+    , parameter MAX_INSTRS      = 512
+    , parameter OPCODE_WIDTH    =   3
+    , parameter OP_STORE_LENGTH = 512
+    , parameter OP_STORE_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -87,8 +89,7 @@ module nx_node #(
 `DECLARE_DQ(1, idle, clk_i, rst_i, 1'b0)
 
 assign idle = (
-    core_idle[0] && core_idle[1] && decode_idle && !inbound_valid && !outbound_valid
-    && ctrl_idle
+    core_idle && decode_idle && !inbound_valid && !outbound_valid && ctrl_idle
 );
 
 assign idle_o = idle_q;
@@ -185,19 +186,17 @@ logic [STREAM_WIDTH-1:0] bypass_data;
 logic [             1:0] bypass_dir;
 logic                    bypass_valid, bypass_ready;
 
-logic [ $clog2(MAX_IO)-1:0] map_io;
-logic [ ADDR_ROW_WIDTH-1:0] map_remote_row;
-logic [ ADDR_COL_WIDTH-1:0] map_remote_col;
-logic [$clog2(OUTPUTS)-1:0] map_remote_idx;
-logic                       map_input, map_slot, map_broadcast, map_seq, map_valid;
+logic [$clog2(OUTPUTS)-1:0] map_idx;
+logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row;
+logic [ ADDR_COL_WIDTH-1:0] map_tgt_col;
+logic [ $clog2(INPUTS)-1:0] map_tgt_idx;
+logic                       map_tgt_seq, map_valid;
 
-logic [ ADDR_ROW_WIDTH-1:0] signal_remote_row;
-logic [ ADDR_COL_WIDTH-1:0] signal_remote_col;
-logic [$clog2(OUTPUTS)-1:0] signal_remote_idx;
-logic                       signal_state, signal_valid;
+logic [$clog2(INPUTS)-1:0] signal_index;
+logic                      signal_is_seq, signal_state, signal_valid;
 
 logic [INSTR_WIDTH-1:0] instr_data;
-logic                   instr_core, instr_valid;
+logic                   instr_valid;
 
 nx_msg_decoder #(
       .STREAM_WIDTH  (STREAM_WIDTH  )
@@ -225,23 +224,18 @@ nx_msg_decoder #(
     , .bypass_valid_o(bypass_valid)
     , .bypass_ready_i(bypass_ready)
     // I/O mapping handling
-    , .map_io_o        (map_io        )
-    , .map_input_o     (map_input     )
-    , .map_remote_row_o(map_remote_row)
-    , .map_remote_col_o(map_remote_col)
-    , .map_remote_idx_o(map_remote_idx)
-    , .map_slot_o      (map_slot      )
-    , .map_broadcast_o (map_broadcast )
-    , .map_seq_o       (map_seq       )
-    , .map_valid_o     (map_valid     )
+    , .map_idx_o    (map_idx    ) // Output to configure
+    , .map_tgt_row_o(map_tgt_row) // Target node's row
+    , .map_tgt_col_o(map_tgt_col) // Target node's column
+    , .map_tgt_idx_o(map_tgt_idx) // Target node's I/O index
+    , .map_tgt_seq_o(map_tgt_seq) // Target node's input is sequential
+    , .map_valid_o  (map_valid  ) // Mapping is valid
     // Signal state update
-    , .signal_remote_row_o(signal_remote_row)
-    , .signal_remote_col_o(signal_remote_col)
-    , .signal_remote_idx_o(signal_remote_idx)
-    , .signal_state_o     (signal_state     )
-    , .signal_valid_o     (signal_valid     )
+    , .signal_index_o (signal_index )
+    , .signal_is_seq_o(signal_is_seq)
+    , .signal_state_o (signal_state )
+    , .signal_valid_o (signal_valid )
     // Instruction load
-    , .instr_core_o (instr_core )
     , .instr_data_o (instr_data )
     , .instr_valid_o(instr_valid)
 );
@@ -260,13 +254,19 @@ logic               core_trigger;
 logic [ INPUTS-1:0] core_inputs;
 logic [OUTPUTS-1:0] core_outputs;
 
+logic [$clog2(OP_STORE_LENGTH)-1:0] ctrl_addr;
+logic [         OP_STORE_WIDTH-1:0] ctrl_wr_data, ctrl_rd_data;
+logic                               ctrl_wr_en, ctrl_rd_en;
+
 nx_node_control #(
-      .STREAM_WIDTH  (STREAM_WIDTH  )
-    , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-    , .COMMAND_WIDTH (COMMAND_WIDTH )
-    , .INPUTS        (INPUTS        )
-    , .OUTPUTS       (OUTPUTS       )
+      .STREAM_WIDTH   (STREAM_WIDTH   )
+    , .ADDR_ROW_WIDTH (ADDR_ROW_WIDTH )
+    , .ADDR_COL_WIDTH (ADDR_COL_WIDTH )
+    , .COMMAND_WIDTH  (COMMAND_WIDTH  )
+    , .INPUTS         (INPUTS         )
+    , .OUTPUTS        (OUTPUTS        )
+    , .OP_STORE_LENGTH(OP_STORE_LENGTH)
+    , .OP_STORE_WIDTH (OP_STORE_WIDTH )
 ) control (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -285,25 +285,27 @@ nx_node_control #(
     , .msg_valid_o(emit_valid)
     , .msg_ready_i(emit_ready)
     // I/O mapping
-    , .map_io_i        (map_io        )
-    , .map_input_i     (map_input     )
-    , .map_remote_row_i(map_remote_row)
-    , .map_remote_col_i(map_remote_col)
-    , .map_remote_idx_i(map_remote_idx)
-    , .map_slot_i      (map_slot      )
-    , .map_broadcast_i (map_broadcast )
-    , .map_seq_i       (map_seq       )
-    , .map_valid_i     (map_valid     )
+    , .map_idx_i    (map_idx    )
+    , .map_tgt_row_i(map_tgt_row)
+    , .map_tgt_col_i(map_tgt_col)
+    , .map_tgt_idx_i(map_tgt_idx)
+    , .map_tgt_seq_i(map_tgt_seq)
+    , .map_valid_i  (map_valid  )
     // Signal state update
-    , .signal_remote_row_i(signal_remote_row)
-    , .signal_remote_col_i(signal_remote_col)
-    , .signal_remote_idx_i(signal_remote_idx)
-    , .signal_state_i     (signal_state     )
-    , .signal_valid_i     (signal_valid     )
+    , .signal_index_i (signal_index )
+    , .signal_is_seq_i(signal_is_seq)
+    , .signal_state_i (signal_state )
+    , .signal_valid_i (signal_valid )
     // Interface to core
     , .core_trigger_o(core_trigger)
     , .core_inputs_o (core_inputs )
     , .core_outputs_i(core_outputs)
+    // Interface to memory
+    , .store_addr_o   (ctrl_addr   )
+    , .store_wr_data_o(ctrl_wr_data)
+    , .store_wr_en_o  (ctrl_wr_en  )
+    , .store_rd_en_o  (ctrl_rd_en  )
+    , .store_rd_data_i(ctrl_rd_data)
 );
 
 // -----------------------------------------------------------------------------
@@ -338,49 +340,43 @@ nx_stream_combiner #(
 // Instruction Store
 // -----------------------------------------------------------------------------
 
-logic [$clog2(MAX_INSTRS)-1:0] core_populated [1:0];
+logic [$clog2(MAX_INSTRS)-1:0] core_populated;
 
-logic [$clog2(MAX_INSTRS)-1:0] core_addr [1:0];
-logic [       INSTR_WIDTH-1:0] core_data [1:0];
-logic                          core_rd [1:0], core_stall [1:0];
+logic [$clog2(MAX_INSTRS)-1:0] core_addr;
+logic [       INSTR_WIDTH-1:0] core_data;
+logic                          core_rd, core_stall;
 
-// TEMP: Tie-off second core as only one core instanced
-assign core_addr[1] = 0;
-assign core_rd[1]   = 0;
-
-nx_instr_store #(
-      .INSTR_WIDTH(INSTR_WIDTH)
-    , .MAX_INSTRS (MAX_INSTRS )
-) instr_store (
+nx_node_store #(
+      .INSTR_WIDTH(INSTR_WIDTH    )
+    , .MAX_INSTRS (MAX_INSTRS     )
+    , .CTRL_WIDTH (OP_STORE_WIDTH )
+    , .MAX_CTRL   (OP_STORE_LENGTH)
+) store (
       .clk_i(clk_i)
     , .rst_i(rst_i)
+    // Populated instruction counter
+    , .instr_count_o(core_populated)
     // Instruction load interface
-    , .store_core_i (instr_core )
     , .store_data_i (instr_data )
     , .store_valid_i(instr_valid)
-    // Populated instruction counters
-    , .core_0_populated_o(core_populated[0])
-    , .core_1_populated_o(core_populated[1])
     // Instruction fetch interfaces
-    // - Core 0
-    , .core_0_addr_i (core_addr[0] )
-    , .core_0_rd_i   (core_rd[0]   )
-    , .core_0_data_o (core_data[0] )
-    , .core_0_stall_o(core_stall[0])
-    // - Core 1
-    , .core_1_addr_i (core_addr[1] )
-    , .core_1_rd_i   (core_rd[1]   )
-    , .core_1_data_o (core_data[1] )
-    , .core_1_stall_o(core_stall[1])
+    , .fetch_addr_i (core_addr )
+    , .fetch_rd_i   (core_rd   )
+    , .fetch_data_o (core_data )
+    , .fetch_stall_o(core_stall)
+    // Control block interface
+    , .ctrl_addr_i   (ctrl_addr   )
+    , .ctrl_wr_data_i(ctrl_wr_data)
+    , .ctrl_wr_en_i  (ctrl_wr_en  )
+    , .ctrl_rd_en_i  (ctrl_rd_en  )
+    , .ctrl_rd_data_o(ctrl_rd_data)
 );
 
 // -----------------------------------------------------------------------------
 // Logic Core
 // -----------------------------------------------------------------------------
 
-logic core_idle [1:0];
-
-assign core_idle[1] = 1'b1;
+logic core_idle;
 
 nx_node_core #(
       .INPUTS      (INPUTS      )
@@ -389,21 +385,21 @@ nx_node_core #(
     , .MAX_INSTRS  (MAX_INSTRS  )
     , .INSTR_WIDTH (INSTR_WIDTH )
     , .OPCODE_WIDTH(OPCODE_WIDTH)
-) core_0 (
+) core (
       .clk_i(clk_i)
     , .rst_i(rst_i)
     // I/O from simulated logic
     , .inputs_i (core_inputs )
     , .outputs_o(core_outputs)
     // Execution controls
-    , .populated_i(core_populated[0])
-    , .trigger_i  (core_trigger     )
-    , .idle_o     (core_idle[0]     )
+    , .populated_i(core_populated)
+    , .trigger_i  (core_trigger  )
+    , .idle_o     (core_idle     )
     // Instruction fetch
-    , .instr_addr_o (core_addr[0] )
-    , .instr_rd_o   (core_rd[0]   )
-    , .instr_data_i (core_data[0] )
-    , .instr_stall_i(core_stall[0])
+    , .instr_addr_o (core_addr )
+    , .instr_rd_o   (core_rd   )
+    , .instr_data_i (core_data )
+    , .instr_stall_i(core_stall)
 );
 
 endmodule : nx_node
