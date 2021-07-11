@@ -24,6 +24,6 @@ class Direction(IntEnum):
 class Command(IntEnum):
     """ Command type """
     LOAD_INSTR = 0
-    INPUT      = 1
-    OUTPUT     = 2
-    SIG_STATE  = 3
+    OUTPUT     = 1
+    SIG_STATE  = 2
+    CONTROL    = 3

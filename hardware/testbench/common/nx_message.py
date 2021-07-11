@@ -14,62 +14,41 @@
 
 from nx_constants import Command
 
-def payload_load_instr(core, instr):
-    payload  = core  << 20
-    payload |= instr << 5
+def payload_load_instr(instr):
+    return instr << 7
+
+def payload_map_output(index, tgt_row, tgt_col, tgt_idx, tgt_seq):
+    payload  = index   << 19
+    payload |= tgt_row << 15
+    payload |= tgt_col << 11
+    payload |= tgt_idx <<  8
+    payload |= tgt_seq <<  7
     return payload
 
-def payload_map_input(index, is_seq, rem_row, rem_col, rem_idx):
-    payload  = rem_row << 17
-    payload |= rem_col << 13
-    payload |= rem_idx << 10
-    payload |= index   <<  7
-    payload |= is_seq  <<  6
+def payload_sig_state(index, is_seq, state):
+    payload  = index  << 19
+    payload |= is_seq << 18
+    payload |= state  << 17
     return payload
 
-def payload_map_output(index, slot, send_bc, rem_row, rem_col):
-    payload  = rem_row << 17
-    payload |= rem_col << 13
-    payload |= index   <<  7
-    payload |= slot    <<  6
-    payload |= send_bc <<  5
-    return payload
-
-def payload_sig_state(state, row, col, index):
-    payload  = row   << 17
-    payload |= col   << 13
-    payload |= index << 10
-    payload |= state <<  9
-    return payload
-
-def build_message(command, broadcast, tgt_row, tgt_col, bc_decay, *args, **kwargs):
-    # Generate the payload
-    payload = {
-        Command.LOAD_INSTR: payload_load_instr,
-        Command.INPUT     : payload_map_input,
-        Command.OUTPUT    : payload_map_output,
-        Command.SIG_STATE : payload_sig_state,
-    }[command](*args, **kwargs)
+def build_message(command, payload, tgt_row, tgt_col, *args, **kwargs):
     # Build the message
-    msg = broadcast     << 31 # [   31] Broadcast flag
-    if broadcast:
-        msg |= bc_decay << 23 # [30:23] Broadcast decay
-    else:
-        msg |= tgt_row  << 27 # [30:27] Target row
-        msg |= tgt_col  << 23 # [26:23] Target column
-    msg |= int(command) << 21 # [22:21] Command
-    msg |= payload            # [20: 0] Payload
+    msg  = tgt_row      << 28                             # [31:28] Target row
+    msg |= tgt_col      << 24                             # [27:24] Target column
+    msg |= int(command) << 22                             # [23:22] Command
+    if callable(payload): msg |= payload(*args, **kwargs) # [21: 0] Payload
+    else                : msg |= payload                  # [21: 0] Payload
     # Return the compiled message
     return msg
 
 def build_load_instr(*args, **kwargs):
-    return build_message(Command.LOAD_INSTR, *args, **kwargs)
-
-def build_map_input(*args, **kwargs):
-    return build_message(Command.INPUT, *args, **kwargs)
+    return build_message(Command.LOAD_INSTR, payload_load_instr, *args, **kwargs)
 
 def build_map_output(*args, **kwargs):
-    return build_message(Command.OUTPUT, *args, **kwargs)
+    return build_message(Command.OUTPUT, payload_map_output, *args, **kwargs)
 
 def build_sig_state(*args, **kwargs):
-    return build_message(Command.SIG_STATE, *args, **kwargs)
+    return build_message(Command.SIG_STATE, payload_sig_state, *args, **kwargs)
+
+def build_control(tgt_row, tgt_col, payload):
+    return build_message(Command.CONTROL, payload, tgt_row, tgt_col)
