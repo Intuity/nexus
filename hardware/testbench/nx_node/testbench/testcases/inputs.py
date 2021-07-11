@@ -53,9 +53,7 @@ async def map_inputs(dut):
             mapped[idx] = (rem_row, rem_col, rem_idx, is_seq)
 
         # Wait for all inbound drivers to drain
-        for ib in dut.inbound:
-            while ib._sendQ: await RisingEdge(dut.clk)
-            while ib.intf.valid == 1: await RisingEdge(dut.clk)
+        for ib in dut.inbound: await ib.idle()
         await ClockCycles(dut.clk, 10)
 
         # Check the mapping

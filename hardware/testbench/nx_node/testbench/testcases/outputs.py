@@ -51,9 +51,7 @@ async def map_outputs(dut):
             mapped[idx] = (rem_row, rem_col, slot, send_bc)
 
         # Wait for all inbound drivers to drain
-        for ib in dut.inbound:
-            while ib._sendQ: await RisingEdge(dut.clk)
-            while ib.intf.valid == 1: await RisingEdge(dut.clk)
+        for ib in dut.inbound: await ib.idle()
         await ClockCycles(dut.clk, 10)
 
         # Check the mapping
