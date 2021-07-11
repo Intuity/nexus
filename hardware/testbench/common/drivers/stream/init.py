@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cocotb_bus.drivers import Driver
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import Lock, RisingEdge
 
 class StreamInitiator(Driver):
     """ Testbench driver acting as an initiator of a stream interface """
@@ -32,7 +32,29 @@ class StreamInitiator(Driver):
         self.reset  = reset
         self.intf   = intf
         self.busy   = False
+        self.lock   = Lock()
         super().__init__()
+
+    async def _send_thread(self):
+        while True:
+            # Sleep until there is something to send
+            while not self._sendQ:
+                self._pending.clear()
+                await self._pending.wait()
+            # Always start out-of-sync
+            synchronised = False
+            # Send in all queued packets
+            await self.lock.acquire()
+            self.busy = True
+            self.lock.release()
+            while self._sendQ:
+                tran, cb, evt, kwargs = self._sendQ.popleft()
+                self.log.debug("Sending queued packet")
+                await self._send(tran, cb, evt, sync=not synchronised, **kwargs)
+                synchronised = True
+            await self.lock.acquire()
+            self.busy = False
+            self.lock.release()
 
     async def _driver_send(self, transaction, sync=True, **kwargs):
         """ Send queued transactions onto the interface.
@@ -42,8 +64,6 @@ class StreamInitiator(Driver):
             sync       : Align to the rising clock edge before sending
             **kwargs   : Any other arguments
         """
-        # Lock
-        self.busy = True
         # Synchronise to the rising edge
         if sync: await RisingEdge(self.clock)
         # Wait for reset to clear
@@ -58,10 +78,11 @@ class StreamInitiator(Driver):
             await RisingEdge(self.clock)
             if self.intf.ready == 1: break
         self.intf.valid <= 0
-        # Release
-        self.busy = False
 
     async def idle(self):
-        await RisingEdge(self.clock)
-        if not self._sendQ and not self.busy: return
-        while self._sendQ or self.busy: await RisingEdge(self.clock)
+        while True:
+            await RisingEdge(self.clock)
+            await self.lock.acquire()
+            active = len(self._sendQ) > 0 or self.busy
+            self.lock.release()
+            if not active: break
