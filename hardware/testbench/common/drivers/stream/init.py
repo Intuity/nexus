@@ -27,10 +27,11 @@ class StreamInitiator(Driver):
             reset  : Reset signal for the interface
             intf   : Interface
         """
-        self.entity  = entity
-        self.clock   = clock
-        self.reset   = reset
-        self.intf    = intf
+        self.entity = entity
+        self.clock  = clock
+        self.reset  = reset
+        self.intf   = intf
+        self.busy   = False
         super().__init__()
 
     async def _driver_send(self, transaction, sync=True, **kwargs):
@@ -41,6 +42,8 @@ class StreamInitiator(Driver):
             sync       : Align to the rising clock edge before sending
             **kwargs   : Any other arguments
         """
+        # Lock
+        self.busy = True
         # Synchronise to the rising edge
         if sync: await RisingEdge(self.clock)
         # Wait for reset to clear
@@ -55,3 +58,10 @@ class StreamInitiator(Driver):
             await RisingEdge(self.clock)
             if self.intf.ready == 1: break
         self.intf.valid <= 0
+        # Release
+        self.busy = False
+
+    async def idle(self):
+        await RisingEdge(self.clock)
+        if not self._sendQ and not self.busy: return
+        while self._sendQ or self.busy: await RisingEdge(self.clock)
