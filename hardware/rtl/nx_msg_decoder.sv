@@ -13,6 +13,7 @@
 // limitations under the License.
 
 `include "nx_common.svh"
+`include "nx_constants.svh"
 
 // nx_msg_decoder
 // Decode messages, route commands to control blocks, and distribute messages
@@ -26,7 +27,6 @@ module nx_msg_decoder #(
     , parameter INSTR_WIDTH    = 15 // Width of each instruction
     , parameter INPUTS         =  8 // Number of inputs
     , parameter OUTPUTS        =  8 // Number of outputs
-    , parameter MAX_IO         = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS)
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -35,52 +35,37 @@ module nx_msg_decoder #(
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound message stream
-    , input  logic [STREAM_WIDTH-1:0] msg_data_i
-    , input  logic [             1:0] msg_dir_i
-    , input  logic                    msg_valid_i
-    , output logic                    msg_ready_o
+    , input  nx_message_t   msg_data_i
+    , input  nx_direction_t msg_dir_i
+    , input  logic          msg_valid_i
+    , output logic          msg_ready_o
     // Outbound bypass message stream
-    , output logic [STREAM_WIDTH-1:0] bypass_data_o
-    , output logic [             1:0] bypass_dir_o
-    , output logic                    bypass_valid_o
-    , input  logic                    bypass_ready_i
+    , output nx_message_t   bypass_data_o
+    , output nx_direction_t bypass_dir_o
+    , output logic          bypass_valid_o
+    , input  logic          bypass_ready_i
     // I/O mapping handling
-    , output logic [ $clog2(MAX_IO)-1:0] map_io_o         // Which slot to configure
-    , output logic                       map_input_o      // High - maps an input, low - maps an output
-    , output logic [ ADDR_ROW_WIDTH-1:0] map_remote_row_o // The destination/source node row
-    , output logic [ ADDR_COL_WIDTH-1:0] map_remote_col_o // The destination/source node column
-    , output logic [$clog2(OUTPUTS)-1:0] map_remote_idx_o // The destination/source node I/O index
-    , output logic                       map_slot_o       // Which slot to program (for multiple outputs)
-    , output logic                       map_broadcast_o  // Flag to send output as broadcast
-    , output logic                       map_seq_o        // Flag to set input as sequential
-    , output logic                       map_valid_o      // Mapping is valid
+    , output logic [$clog2(OUTPUTS)-1:0] map_idx_o     // Output to configure
+    , output logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
+    , output logic [ ADDR_COL_WIDTH-1:0] map_tgt_col_o // Target node's column
+    , output logic [ $clog2(INPUTS)-1:0] map_tgt_idx_o // Target node's I/O index
+    , output logic                       map_tgt_seq_o // Target node's input is sequential
+    , output logic                       map_valid_o   // Mapping is valid
     // Signal state update
-    , output logic [ ADDR_ROW_WIDTH-1:0] signal_remote_row_o // The source node row
-    , output logic [ ADDR_COL_WIDTH-1:0] signal_remote_col_o // The source node column
-    , output logic [$clog2(OUTPUTS)-1:0] signal_remote_idx_o // The source node output index
-    , output logic                       signal_state_o      // State of the signal
-    , output logic                       signal_valid_o      // Signal update is valid
+    , output logic [$clog2(INPUTS)-1:0] signal_index_o  // Input index
+    , output logic                      signal_is_seq_o // Input is sequential
+    , output logic                      signal_state_o  // Signal state
+    , output logic                      signal_valid_o  // Update is valid
     // Instruction load
-    , output logic                   instr_core_o  // Whether to load to core 0 or 1
     , output logic [INSTR_WIDTH-1:0] instr_data_o  // Instruction data
     , output logic                   instr_valid_o // Instruction valid
 );
 
-// Parameters and constants
-localparam BIT_INDEX_WIDTH = $clog2(MAX_IO);
-localparam BC_DECAY_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH;
-localparam PAYLOAD_WIDTH   = (
-    STREAM_WIDTH - 1 - ADDR_ROW_WIDTH - ADDR_COL_WIDTH - COMMAND_WIDTH
-);
-
-`include "nx_constants.svh"
-
 // Internal state
-`DECLARE_DQ(4,            send_dir,     clk_i, rst_i, 4'd0)
-`DECLARE_DQ(1,            fifo_pop,     clk_i, rst_i, 1'b0)
-`DECLARE_DQ(STREAM_WIDTH, byp_data,     clk_i, rst_i, {STREAM_WIDTH{1'b0}})
-`DECLARE_DQ(2,            byp_dir,      clk_i, rst_i, 2'b0)
-`DECLARE_DQ(1,            byp_valid,    clk_i, rst_i, 1'b0)
+`DECLARE_DQ (1,              fifo_pop,  clk_i, rst_i, 1'b0)
+`DECLARE_DQ (STREAM_WIDTH,   byp_data,  clk_i, rst_i, {STREAM_WIDTH{1'b0}})
+`DECLARE_DQT(nx_direction_t, byp_dir,   clk_i, rst_i, NX_DIRX_NORTH)
+`DECLARE_DQ (1,              byp_valid, clk_i, rst_i, 1'b0)
 
 // Construct outputs
 assign idle_o         = fifo_empty && !msg_valid_i && !byp_valid;
@@ -113,100 +98,69 @@ nx_fifo #(
 assign msg_ready_o = ~fifo_full;
 
 // Decode the next message
-nx_direction_t             arrival_dir;
-logic                      broadcast;
-logic [ADDR_ROW_WIDTH-1:0] addr_row;
-logic [ADDR_COL_WIDTH-1:0] addr_col;
-logic [BC_DECAY_WIDTH-1:0] bc_decay;
-logic [ COMMAND_WIDTH-1:0] command;
-logic [ PAYLOAD_WIDTH-1:0] payload;
+nx_message_t message;
+assign message = fifo_data;
 
-// - Decode fields from the FIFO output data
-assign { arrival_dir, broadcast, addr_row, addr_col, command, payload } = fifo_data;
-assign bc_decay = { addr_row, addr_col };
+// - Extract output mapping from payload
+`DECLARE_DQ($clog2(OUTPUTS), map_idx,     clk_i, rst_i, {$clog2(OUTPUTS){1'b0}})
+`DECLARE_DQ( ADDR_ROW_WIDTH, map_tgt_row, clk_i, rst_i, { ADDR_ROW_WIDTH{1'b0}})
+`DECLARE_DQ( ADDR_COL_WIDTH, map_tgt_col, clk_i, rst_i, { ADDR_COL_WIDTH{1'b0}})
+`DECLARE_DQ( $clog2(INPUTS), map_tgt_idx, clk_i, rst_i, { $clog2(INPUTS){1'b0}})
+`DECLARE_DQ(              1, map_tgt_seq, clk_i, rst_i,                    1'b0)
+`DECLARE_DQ(              1, map_valid,   clk_i, rst_i,                    1'b0)
 
-// - Extract I/O mapping from payload
-localparam MAP_REMOTE_ROW_MSB = PAYLOAD_WIDTH - 1;
-localparam MAP_REMOTE_COL_MSB = MAP_REMOTE_ROW_MSB - ADDR_ROW_WIDTH;
-localparam MAP_REMOTE_IDX_MSB = MAP_REMOTE_COL_MSB - ADDR_COL_WIDTH;
-localparam MAP_IO_MSB         = MAP_REMOTE_IDX_MSB - BIT_INDEX_WIDTH;
-localparam MAP_SEQ_MSB        = MAP_IO_MSB - BIT_INDEX_WIDTH;
-localparam MAP_SLOT_MSB       = MAP_SEQ_MSB;
-localparam MAP_BROADCAST_MSB  = MAP_SLOT_MSB - 1;
+nx_msg_map_output_t msg_map_out;
+assign msg_map_out = message;
 
-`DECLARE_DQ( $clog2(MAX_IO), map_io,         clk_i, rst_i, { $clog2(MAX_IO){1'b0}})
-`DECLARE_DQ(              1, map_input,      clk_i, rst_i,                    1'b0)
-`DECLARE_DQ( ADDR_ROW_WIDTH, map_remote_row, clk_i, rst_i, { ADDR_ROW_WIDTH{1'b0}})
-`DECLARE_DQ( ADDR_COL_WIDTH, map_remote_col, clk_i, rst_i, { ADDR_COL_WIDTH{1'b0}})
-`DECLARE_DQ($clog2(OUTPUTS), map_remote_idx, clk_i, rst_i, {$clog2(OUTPUTS){1'b0}})
-`DECLARE_DQ(              1, map_slot,       clk_i, rst_i,                    1'b0)
-`DECLARE_DQ(              1, map_broadcast,  clk_i, rst_i,                    1'b0)
-`DECLARE_DQ(              1, map_seq,        clk_i, rst_i,                    1'b0)
-`DECLARE_DQ(              1, map_valid,      clk_i, rst_i,                    1'b0)
+assign map_idx     = msg_map_out.source_index;
+assign map_tgt_row = msg_map_out.target_row;
+assign map_tgt_col = msg_map_out.target_column;
+assign map_tgt_idx = msg_map_out.target_index;
+assign map_tgt_seq = msg_map_out.target_is_seq;
 
-assign map_input      = (command == CMD_CFG_INPUT);
-assign map_remote_row = payload[MAP_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
-assign map_remote_col = payload[MAP_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
-assign map_remote_idx = payload[MAP_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
-assign map_io         = payload[MAP_IO_MSB        -:BIT_INDEX_WIDTH];
-assign map_seq        = payload[MAP_SEQ_MSB];
-assign map_slot       = payload[MAP_SLOT_MSB];
-assign map_broadcast  = payload[MAP_BROADCAST_MSB];
-
-assign map_input_o      = map_input_q;
-assign map_remote_row_o = map_remote_row_q;
-assign map_remote_col_o = map_remote_col_q;
-assign map_remote_idx_o = map_remote_idx_q;
-assign map_io_o         = map_io_q;
-assign map_seq_o        = map_seq_q;
-assign map_slot_o       = map_slot_q;
-assign map_broadcast_o  = map_broadcast_q;
-assign map_valid_o      = map_valid_q;
+assign map_idx_o     = map_idx_q;
+assign map_tgt_row_o = map_tgt_row_q;
+assign map_tgt_col_o = map_tgt_col_q;
+assign map_tgt_idx_o = map_tgt_idx_q;
+assign map_tgt_seq_o = map_tgt_seq_q;
+assign map_valid_o   = map_valid_q;
 
 // - Extract signal state update from payload
-localparam SIG_REMOTE_ROW_MSB = PAYLOAD_WIDTH - 1;
-localparam SIG_REMOTE_COL_MSB = SIG_REMOTE_ROW_MSB - ADDR_ROW_WIDTH;
-localparam SIG_REMOTE_IDX_MSB = SIG_REMOTE_COL_MSB - ADDR_COL_WIDTH;
-localparam SIG_STATE_MSB      = SIG_REMOTE_IDX_MSB - BIT_INDEX_WIDTH;
+`DECLARE_DQ($clog2(INPUTS), signal_index,  clk_i, rst_i, {$clog2(INPUTS){1'b0}})
+`DECLARE_DQ(1,              signal_is_seq, clk_i, rst_i,                   1'b0)
+`DECLARE_DQ(1,              signal_state,  clk_i, rst_i,                   1'b0)
+`DECLARE_DQ(1,              signal_valid,  clk_i, rst_i,                   1'b0)
 
-`DECLARE_DQ( ADDR_ROW_WIDTH, signal_remote_row, clk_i, rst_i, { ADDR_ROW_WIDTH{1'b0}})
-`DECLARE_DQ( ADDR_COL_WIDTH, signal_remote_col, clk_i, rst_i, { ADDR_COL_WIDTH{1'b0}})
-`DECLARE_DQ($clog2(OUTPUTS), signal_remote_idx, clk_i, rst_i, {$clog2(OUTPUTS){1'b0}})
-`DECLARE_DQ(               , signal_state,      clk_i, rst_i,                    1'b0)
-`DECLARE_DQ(               , signal_valid,      clk_i, rst_i,                    1'b0)
+nx_msg_sig_state_t msg_sig_state;
+assign msg_sig_state = message;
 
-assign signal_remote_row = payload[SIG_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
-assign signal_remote_col = payload[SIG_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
-assign signal_remote_idx = payload[SIG_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
-assign signal_state      = payload[SIG_STATE_MSB];
+assign signal_index  = msg_sig_state.target_index;
+assign signal_is_seq = msg_sig_state.target_is_seq;
+assign signal_state  = msg_sig_state.state;
 
-assign signal_remote_row_o = signal_remote_row_q;
-assign signal_remote_col_o = signal_remote_col_q;
-assign signal_remote_idx_o = signal_remote_idx_q;
-assign signal_state_o      = signal_state_q;
-assign signal_valid_o      = signal_valid_q;
+assign signal_index_o  = signal_index_q;
+assign signal_is_seq_o = signal_is_seq_q;
+assign signal_state_o  = signal_state_q;
+assign signal_valid_o  = signal_valid_q;
 
-// Extract instruction load from payload
-localparam INSTR_CORE_MSB = PAYLOAD_WIDTH - 1;
-localparam INSTR_DATA_MSB = INSTR_CORE_MSB - 1;
-
-`DECLARE_DQ(           , instr_core,  clk_i, rst_i,                1'b0)
+// - Extract instruction load from payload
 `DECLARE_DQ(INSTR_WIDTH, instr_data,  clk_i, rst_i, {INSTR_WIDTH{1'b0}})
 `DECLARE_DQ(           , instr_valid, clk_i, rst_i,                1'b0)
 
-assign instr_core = payload[INSTR_CORE_MSB];
-assign instr_data = payload[INSTR_DATA_MSB-:INSTR_WIDTH];
+nx_msg_load_instr_t msg_load_instr;
+assign msg_load_instr = message;
 
-assign instr_core_o  = instr_core_q;
+assign instr_data = msg_load_instr.instruction;
+
 assign instr_data_o  = instr_data_q;
 assign instr_valid_o = instr_valid_q;
 
+// Decode and routing
 always_comb begin : p_decode
     // Working variables
     int idx;
 
     // Initialise state
-    `INIT_D(send_dir);
     `INIT_D(fifo_pop);
     `INIT_D(byp_data);
     `INIT_D(byp_dir);
@@ -220,81 +174,38 @@ always_comb begin : p_decode
     signal_valid = 1'b0;
     instr_valid  = 1'b0;
 
-    // If bypass data accepted, clear the valid and direction flag
-    if (byp_valid && bypass_ready_i) begin
-        byp_valid         = 1'b0;
-        send_dir[byp_dir] = 1'b0;
-    end
+    // If bypass data accepted, clear the valid
+    if (bypass_ready_i) byp_valid = 1'b0;
 
     // Decode the next entry in the FIFO
-    if (!send_dir && !fifo_empty && !fifo_pop) begin
+    if (!byp_valid && !fifo_empty && !fifo_pop) begin
         // Pop the FIFO as the data has been picked up
         fifo_pop = 1'b1;
 
-        // This node needs to handle the message
-        if (broadcast || (addr_row == node_row_i && addr_col == node_col_i)) begin
-            case (command)
-                CMD_LOAD_INSTR: begin
-                    instr_valid = 1'b1;
-                end
-                CMD_CFG_INPUT: begin
-                    map_valid = 1'b1;
-                end
-                CMD_CFG_OUTPUT: begin
-                    map_valid = 1'b1;
-                end
-                CMD_SIG_STATE: begin
-                    signal_valid = 1'b1;
-                end
-            endcase
-        end
-
-        // Does this message need to be sent on to anyone else?
+        // Is this message addressed to this node?
         if (
-            ( broadcast && bc_decay > {BC_DECAY_WIDTH{1'b0}}) ||
-            (!broadcast && (addr_row != node_row_i || addr_col != node_col_i))
+            message.header.row    == node_row_i &&
+            message.header.column == node_col_i
         ) begin
-            // Mark the directions to send in
-            if (broadcast) begin
-                case (arrival_dir)                  // W  S  E  N
-                    DIRX_NORTH: send_dir = 4'b1110; // X  X  X
-                    DIRX_EAST : send_dir = 4'b1000; // X
-                    DIRX_SOUTH: send_dir = 4'b1011; // X     X  X
-                    DIRX_WEST : send_dir = 4'b0010; //       X
-                endcase
-            end else if (addr_row < node_row_i) begin
-                send_dir = 4'b0001; // Send north
-            end else if (addr_row > node_row_i) begin
-                send_dir = 4'b0100; // Send south
-            end else if (addr_col < node_col_i) begin
-                send_dir = 4'b1000; // Send west
-            end else if (addr_col > node_col_i) begin
-                send_dir = 4'b0010; // Send east
-            end
-            // Setup the data to send
-            byp_data = (
-                broadcast ? {
-                    broadcast,
-                    bc_decay - { {(BC_DECAY_WIDTH-1){1'b0}}, 1'b1 },
-                    command,
-                    payload
-                }
-                : fifo_data
-            );
+            instr_valid  = (message.header.command == NX_CMD_LOAD_INSTR);
+            map_valid    = (message.header.command == NX_CMD_MAP_OUTPUT);
+            signal_valid = (message.header.command == NX_CMD_SIG_STATE );
+
+        // Otherwise redirect the message
+        end else begin
+            byp_data  = message;
+            byp_valid = 1'b1;
+            if      (message.header.row    < node_row_i) byp_dir = NX_DIRX_NORTH;
+            else if (message.header.row    > node_row_i) byp_dir = NX_DIRX_SOUTH;
+            else if (message.header.column < node_col_i) byp_dir = NX_DIRX_WEST;
+            else if (message.header.column > node_col_i) byp_dir = NX_DIRX_EAST;
+
         end
 
     // If not doing anything, clear the pop flag
     end else begin
         fifo_pop = 1'b0;
 
-    end
-
-    // Are there any outstanding messages to be sent?
-    for (idx = 0; idx < 4; idx = (idx + 1)) begin
-        if (!byp_valid && send_dir[idx]) begin
-            byp_dir   = idx;
-            byp_valid = 1'b1;
-        end
     end
 end
 
