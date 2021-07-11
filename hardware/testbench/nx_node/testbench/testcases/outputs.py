@@ -52,7 +52,9 @@ async def map_outputs(dut):
 
         # Wait for all inbound drivers to drain
         for ib in dut.inbound: await ib.idle()
-        await ClockCycles(dut.clk, 10)
+
+        # Wait for node to go idle
+        while dut.idle_o == 0: await RisingEdge(dut.clk)
 
         # Check the mapping
         for idx, (rem_row, rem_col, slot, bc) in mapped.items():

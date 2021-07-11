@@ -54,7 +54,9 @@ async def map_inputs(dut):
 
         # Wait for all inbound drivers to drain
         for ib in dut.inbound: await ib.idle()
-        await ClockCycles(dut.clk, 10)
+
+        # Wait for node to go idle
+        while dut.idle_o == 0: await RisingEdge(dut.clk)
 
         # Check the mapping
         for idx, (rem_row, rem_col, rem_idx, is_seq) in mapped.items():
@@ -62,6 +64,9 @@ async def map_inputs(dut):
             got_idx = (map_key >> (                    0)) & ((1 << idx_width) - 1)
             got_col = (map_key >> (            idx_width)) & ((1 << col_width) - 1)
             got_row = (map_key >> (col_width + idx_width)) & ((1 << row_width) - 1)
+            if rem_row != got_row:
+                dut.info("Detected mismatch after going idle")
+                await ClockCycles(dut.clk, 100)
             assert rem_row == got_row, f"Input {idx} - row exp: {rem_row}, got {got_row}"
             assert rem_col == got_col, f"Input {idx} - col exp: {rem_col}, got {got_col}"
             assert rem_idx == got_idx, f"Input {idx} - idx exp: {rem_idx}, got {got_idx}"

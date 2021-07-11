@@ -27,6 +27,7 @@ module testbench #(
       input  logic rst
     // Control signals
     , input  logic                      trigger_i
+    , output logic                      idle_o
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound interfaces
@@ -88,6 +89,7 @@ nx_node #(
     , .rst_i(rst)
     // Control signals
     , .trigger_i (trigger_i )
+    , .idle_o    (idle_o    )
     , .node_row_i(node_row_i)
     , .node_col_i(node_col_i)
     // Inbound interfaces
