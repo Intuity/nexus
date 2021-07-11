@@ -38,4 +38,4 @@ class InstrStoreIO(BaseIO):
             name: Name of the signal - acts as a prefix
             role: Role of this signal on the DUT boundary
         """
-        super().__init__(dut, name, role, ["core", "data", "valid"], [])
+        super().__init__(dut, name, role, ["data", "valid"], [])

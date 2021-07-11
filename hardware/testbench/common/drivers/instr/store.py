@@ -20,8 +20,6 @@ from cocotb.triggers import RisingEdge
 @dataclass
 class InstrStore:
     """ Represents an instruction store request """
-
-    core : int = 0 # Which core to store instruction for
     data : int = 0 # Instruction data
 
 class InstrStoreInitiator(Driver):
@@ -56,7 +54,6 @@ class InstrStoreInitiator(Driver):
         # Wait for reset to clear
         while self.reset == 1: await RisingEdge(self.clock)
         # Drive the request
-        self.intf.core  <= transaction.core
         self.intf.data  <= transaction.data
         self.intf.valid <= 1
         await RisingEdge(self.clock)
@@ -90,4 +87,4 @@ class InstrStoreMonitor(Monitor):
             if self.reset == 1: continue
             # Capture any instruction loads
             if self.intf.valid == 1:
-                self._recv(InstrStore(int(self.intf.core), int(self.intf.data)))
+                self._recv(InstrStore(int(self.intf.data)))
