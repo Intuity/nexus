@@ -81,18 +81,12 @@ localparam PAYLOAD_WIDTH   = (
 `DECLARE_DQ(STREAM_WIDTH, byp_data,     clk_i, rst_i, {STREAM_WIDTH{1'b0}})
 `DECLARE_DQ(2,            byp_dir,      clk_i, rst_i, 2'b0)
 `DECLARE_DQ(1,            byp_valid,    clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,            map_valid,    clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,            signal_valid, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,            instr_valid,  clk_i, rst_i, 1'b0)
 
 // Construct outputs
 assign idle_o         = fifo_empty && !msg_valid_i && !byp_valid;
 assign bypass_data_o  = byp_data_q;
 assign bypass_dir_o   = byp_dir_q;
 assign bypass_valid_o = byp_valid_q;
-assign map_valid_o    = map_valid;
-assign signal_valid_o = signal_valid;
-assign instr_valid_o  = instr_valid;
 
 // Inbound FIFO - buffer incoming messages ready for digestion
 logic                      fifo_empty, fifo_full;
@@ -140,14 +134,34 @@ localparam MAP_SEQ_MSB        = MAP_IO_MSB - BIT_INDEX_WIDTH;
 localparam MAP_SLOT_MSB       = MAP_SEQ_MSB;
 localparam MAP_BROADCAST_MSB  = MAP_SLOT_MSB - 1;
 
-assign map_input_o      = (command == CMD_CFG_INPUT);
-assign map_remote_row_o = payload[MAP_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
-assign map_remote_col_o = payload[MAP_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
-assign map_remote_idx_o = payload[MAP_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
-assign map_io_o         = payload[MAP_IO_MSB        -:BIT_INDEX_WIDTH];
-assign map_seq_o        = payload[MAP_SEQ_MSB];
-assign map_slot_o       = payload[MAP_SLOT_MSB];
-assign map_broadcast_o  = payload[MAP_BROADCAST_MSB];
+`DECLARE_DQ( $clog2(MAX_IO), map_io,         clk_i, rst_i, { $clog2(MAX_IO){1'b0}})
+`DECLARE_DQ(              1, map_input,      clk_i, rst_i,                    1'b0)
+`DECLARE_DQ( ADDR_ROW_WIDTH, map_remote_row, clk_i, rst_i, { ADDR_ROW_WIDTH{1'b0}})
+`DECLARE_DQ( ADDR_COL_WIDTH, map_remote_col, clk_i, rst_i, { ADDR_COL_WIDTH{1'b0}})
+`DECLARE_DQ($clog2(OUTPUTS), map_remote_idx, clk_i, rst_i, {$clog2(OUTPUTS){1'b0}})
+`DECLARE_DQ(              1, map_slot,       clk_i, rst_i,                    1'b0)
+`DECLARE_DQ(              1, map_broadcast,  clk_i, rst_i,                    1'b0)
+`DECLARE_DQ(              1, map_seq,        clk_i, rst_i,                    1'b0)
+`DECLARE_DQ(              1, map_valid,      clk_i, rst_i,                    1'b0)
+
+assign map_input      = (command == CMD_CFG_INPUT);
+assign map_remote_row = payload[MAP_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
+assign map_remote_col = payload[MAP_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
+assign map_remote_idx = payload[MAP_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
+assign map_io         = payload[MAP_IO_MSB        -:BIT_INDEX_WIDTH];
+assign map_seq        = payload[MAP_SEQ_MSB];
+assign map_slot       = payload[MAP_SLOT_MSB];
+assign map_broadcast  = payload[MAP_BROADCAST_MSB];
+
+assign map_input_o      = map_input_q;
+assign map_remote_row_o = map_remote_row_q;
+assign map_remote_col_o = map_remote_col_q;
+assign map_remote_idx_o = map_remote_idx_q;
+assign map_io_o         = map_io_q;
+assign map_seq_o        = map_seq_q;
+assign map_slot_o       = map_slot_q;
+assign map_broadcast_o  = map_broadcast_q;
+assign map_valid_o      = map_valid_q;
 
 // - Extract signal state update from payload
 localparam SIG_REMOTE_ROW_MSB = PAYLOAD_WIDTH - 1;
@@ -155,17 +169,37 @@ localparam SIG_REMOTE_COL_MSB = SIG_REMOTE_ROW_MSB - ADDR_ROW_WIDTH;
 localparam SIG_REMOTE_IDX_MSB = SIG_REMOTE_COL_MSB - ADDR_COL_WIDTH;
 localparam SIG_STATE_MSB      = SIG_REMOTE_IDX_MSB - BIT_INDEX_WIDTH;
 
-assign signal_remote_row_o = payload[SIG_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
-assign signal_remote_col_o = payload[SIG_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
-assign signal_remote_idx_o = payload[SIG_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
-assign signal_state_o      = payload[SIG_STATE_MSB];
+`DECLARE_DQ( ADDR_ROW_WIDTH, signal_remote_row, clk_i, rst_i, { ADDR_ROW_WIDTH{1'b0}})
+`DECLARE_DQ( ADDR_COL_WIDTH, signal_remote_col, clk_i, rst_i, { ADDR_COL_WIDTH{1'b0}})
+`DECLARE_DQ($clog2(OUTPUTS), signal_remote_idx, clk_i, rst_i, {$clog2(OUTPUTS){1'b0}})
+`DECLARE_DQ(               , signal_state,      clk_i, rst_i,                    1'b0)
+`DECLARE_DQ(               , signal_valid,      clk_i, rst_i,                    1'b0)
+
+assign signal_remote_row = payload[SIG_REMOTE_ROW_MSB-:ADDR_ROW_WIDTH];
+assign signal_remote_col = payload[SIG_REMOTE_COL_MSB-:ADDR_COL_WIDTH];
+assign signal_remote_idx = payload[SIG_REMOTE_IDX_MSB-:BIT_INDEX_WIDTH];
+assign signal_state      = payload[SIG_STATE_MSB];
+
+assign signal_remote_row_o = signal_remote_row_q;
+assign signal_remote_col_o = signal_remote_col_q;
+assign signal_remote_idx_o = signal_remote_idx_q;
+assign signal_state_o      = signal_state_q;
+assign signal_valid_o      = signal_valid_q;
 
 // Extract instruction load from payload
 localparam INSTR_CORE_MSB = PAYLOAD_WIDTH - 1;
 localparam INSTR_DATA_MSB = INSTR_CORE_MSB - 1;
 
-assign instr_core_o = payload[INSTR_CORE_MSB];
-assign instr_data_o = payload[INSTR_DATA_MSB-:INSTR_WIDTH];
+`DECLARE_DQ(           , instr_core,  clk_i, rst_i,                1'b0)
+`DECLARE_DQ(INSTR_WIDTH, instr_data,  clk_i, rst_i, {INSTR_WIDTH{1'b0}})
+`DECLARE_DQ(           , instr_valid, clk_i, rst_i,                1'b0)
+
+assign instr_core = payload[INSTR_CORE_MSB];
+assign instr_data = payload[INSTR_DATA_MSB-:INSTR_WIDTH];
+
+assign instr_core_o  = instr_core_q;
+assign instr_data_o  = instr_data_q;
+assign instr_valid_o = instr_valid_q;
 
 always_comb begin : p_decode
     // Working variables
