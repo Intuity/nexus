@@ -16,7 +16,7 @@ from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 import simpy
 
 from nx_constants import Command
-from nx_message import build_load_instr, build_map_input, build_map_output
+from nx_message import build_load_instr, build_map_output
 from nxmodel.base import Base
 from nxmodel.capture import Capture
 from nxmodel.manager import Manager

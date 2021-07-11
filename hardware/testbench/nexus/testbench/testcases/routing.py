@@ -14,9 +14,9 @@
 
 from random import choice, randint
 
-from nx_constants import Command, Direction
-from nx_message import (build_load_instr, build_map_input, build_map_output,
-                        build_sig_state)
+from nx_constants import Command
+from nx_message import (build_load_instr, build_map_output, build_sig_state,
+                        build_control)
 
 from ..testbench import testcase
 
@@ -36,33 +36,31 @@ async def routing(dut):
 
     for _ in range(1000):
         # Choose a random command type
-        command = choice(list(Command))
+        command = choice((
+            Command.LOAD_INSTR, Command.OUTPUT, Command.SIG_STATE,
+            Command.CONTROL,
+        ))
 
-        # Select a target row and column
+        # Route all the way through the fabric
         tgt_row, tgt_col = num_rows, 0
 
         # Generate a message
         msg = 0
         if command == Command.LOAD_INSTR:
-            msg = build_load_instr(
-                0, tgt_row, tgt_col, 0, choice((0, 1)),
-                randint(0, (1 << 15) - 1),
-            )
-        elif command == Command.INPUT:
-            msg = build_map_input(
-                0, tgt_row, tgt_col, 0, randint(0, 7),
-                choice((0, 1)), randint(0, 15), randint(0, 15), randint(0, 7),
-            )
+            msg = build_load_instr(tgt_row, tgt_col, randint(0, (1 << 15) - 1))
         elif command == Command.OUTPUT:
             msg = build_map_output(
-                0, tgt_row, tgt_col, 0, randint(0,  7),
-                choice((0, 1)), choice((0, 1)), randint(0, 15), randint(0, 15),
+                tgt_row, tgt_col, randint(0, 7), randint(0,  15), randint(0, 15),
+                randint(0, 7), choice((0, 1)),
             )
         elif command == Command.SIG_STATE:
             msg = build_sig_state(
-                0, tgt_row, tgt_col, 0, choice((0, 1)),
-                randint(0, 15), randint(0, 15), randint(0,  7),
+                tgt_row, tgt_col, randint(0, 7), choice((0, 1)), choice((0, 1)),
             )
+        elif command == Command.CONTROL:
+            msg = build_control(tgt_row, tgt_col, randint(0, (1 << 21) - 1))
+        else:
+            raise Exception(f"Unsupported {command = }")
 
         # Create a message
         dut.debug(

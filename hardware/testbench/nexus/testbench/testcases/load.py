@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
+from random import randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
@@ -33,21 +33,19 @@ async def load(dut):
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
     # Load a random number of instructions into every node
-    loaded  = [[[ [], [] ] for _ in range(num_cols)] for _ in range(num_rows)]
+    loaded  = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
     counter = 0
     for row in range(num_rows):
         for col in range(num_cols):
             for _ in range(randint(10, 30)):
-                core  = choice((0, 1))
                 instr = randint(0, (1 << 15) - 1)
-                dut.inbound.append(build_load_instr(0, row, col, 0, core, instr))
-                loaded[row][col][core].append(instr)
+                dut.inbound.append(build_load_instr(row, col, instr))
+                loaded[row][col].append(instr)
                 counter += 1
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {counter} loads")
-    while dut.inbound._sendQ: await RisingEdge(dut.clk)
-    while dut.inbound.intf.valid == 1: await RisingEdge(dut.clk)
+    await dut.inbound.idle()
 
     # Wait for the idle flag to go high
     if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
@@ -58,20 +56,16 @@ async def load(dut):
     # Check the instruction counters for every core
     for row in range(num_rows):
         for col in range(num_cols):
-            node   = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
-            core_0 = int(node.instr_store.core_0_populated_o)
-            core_1 = int(node.instr_store.core_1_populated_o)
-            assert core_0 == len(loaded[row][col][0]), \
-                f"{row}, {col}: Expected {len(loaded[0])}, got {core_0}"
-            assert core_1 == len(loaded[row][col][1]), \
-                f"{row}, {col}: Expected {len(loaded[1])}, got {core_1}"
+            node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
+            pop  = int(node.store.instr_count_o)
+            assert pop == len(loaded[row][col]), \
+                f"{row}, {col}: Expected {len(loaded[row][col])}, got {pop}"
 
     # Check the loaded instructions
     for row in range(num_rows):
         for col in range(num_cols):
             node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
-            for core_idx, instrs in enumerate(loaded[row][col]):
-                for op_idx, op in enumerate(instrs):
-                    got = int(node.instr_store.ram.memory[op_idx+(core_idx*512)])
-                    assert got == op, \
-                        f"{row}, {col}: C{core_idx} O{op_idx} - exp {hex(op)}, got {hex(got)}"
+            for op_idx, op in enumerate(loaded[row][col]):
+                got = int(node.store.ram.memory[op_idx])
+                assert got == op, \
+                    f"{row}, {col}: O{op_idx} - exp {hex(op)}, got {hex(got)}"
