@@ -32,25 +32,27 @@ module nx_stream_skid #(
     , input  logic                    outbound_ready_i
 );
 
-logic [STREAM_WIDTH-1:0] buffer;
-logic                    buffer_valid;
+logic [STREAM_WIDTH-1:0] buffer_q;
+logic                    buffer_valid_q;
 
-assign outbound_data_o  = buffer_valid ? buffer : inbound_data_i;
-assign outbound_valid_o = buffer_valid || inbound_valid_i;
-assign inbound_ready_o  = outbound_ready_i || !buffer_valid;
+assign outbound_data_o  = buffer_valid_q ? buffer_q : inbound_data_i;
+assign outbound_valid_o = buffer_valid_q || inbound_valid_i;
+assign inbound_ready_o  = !buffer_valid_q;
 
 always_ff @(posedge clk_i, posedge rst_i) begin : p_skid
     if (rst_i) begin
-        buffer       <= {STREAM_WIDTH{1'b0}};
-        buffer_valid <= 1'b0;
+        buffer_q       <= {STREAM_WIDTH{1'b0}};
+        buffer_valid_q <= 1'b0;
     end else begin
-        // Refill buffer where...
-        if (
-            ( buffer_valid &&  outbound_ready_i) || // It has been decanted
-            (!buffer_valid && !outbound_ready_i)    // It is empty and outbound is blocking
-        ) begin
-            buffer       <= inbound_data_i;
-            buffer_valid <= inbound_valid_i;
+        // Fill buffer when it is empty and skid is backpressured
+        if (!buffer_valid_q && !outbound_ready_i) begin
+            buffer_q       <= inbound_data_i;
+            buffer_valid_q <= inbound_valid_i;
+
+        // Empty buffer with priority
+        end else if (outbound_ready_i) begin
+            buffer_valid_q <= 1'b0;
+
         end
     end
 end
