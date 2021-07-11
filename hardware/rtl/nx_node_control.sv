@@ -88,7 +88,8 @@ localparam OUTPUT_W        = $clog2(OUTPUTS);
 `DECLARE_DQ(      OUTPUTS,                  output_last, clk_i, rst_i, {OUTPUTS{1'b0}})
 `DECLARE_DQ(      OUTPUTS,                  output_actv, clk_i, rst_i, {OUTPUTS{1'b0}})
 `DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_base, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(      OP_STORE_ADDR_W+1,        output_max,  clk_i, rst_i, {(OP_STORE_ADDR_W+1){1'b0}})
+`DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_num,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+`DECLARE_DQ(      OP_STORE_ADDR_W,          output_next, clk_i, rst_i, {(OP_STORE_ADDR_W+1){1'b0}})
 
 `DECLARE_DQ(INPUT_W, loopback_index, clk_i, rst_i, {INPUT_W{1'b0}})
 `DECLARE_DQ(1,       loopback_state, clk_i, rst_i, 1'b0)
@@ -125,15 +126,16 @@ always_comb begin : p_detect_change
         if (
             !update_req                         && // No change found yet
             core_outputs_i[i] != output_last[i] && // Output has changed
-            output_actv_q[i]                       // Output is active
+            output_num_q[i]   > 0                 // Output is active
         ) begin
             update_index = i[OUTPUT_W-1:0];
             update_req   = 1'b1;
             update_base  = output_base_q[i];
             update_final = (
-                (i < (OUTPUTS - 1) && output_actv_q[i+1]) ? output_base_q[i+1]
-                                                          : output_max_q
-            ) - { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 };
+                output_base_q[i]  +
+                output_num_q[i]  -
+                { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 }
+            );
         end
     end
 end
@@ -178,10 +180,11 @@ nx_fifo #(
 always_comb begin : p_output_memory
     int i;
 
-    `INIT_D_ARRAY(output_base);
-    `INIT_D(output_max);
-    `INIT_D(output_actv);
     `INIT_D(output_last);
+    `INIT_D(output_actv);
+    `INIT_D_ARRAY(output_base);
+    `INIT_D_ARRAY(output_num);
+    `INIT_D(output_next);
     `INIT_D(store_addr);
     `INIT_D(store_wr_data);
     `INIT_D(store_wr_en);
@@ -201,7 +204,7 @@ always_comb begin : p_output_memory
     // When a mapping update arrives, write it into the RAM
     if (map_valid_i) begin
         // Place into the next available slot
-        store_addr    = output_max[OP_STORE_ADDR_W-1:0];
+        store_addr    = output_next;
         store_wr_en   = 1'b1;
         store_rd_en   = 1'b0;
         store_wr_data = {
@@ -210,13 +213,12 @@ always_comb begin : p_output_memory
             , map_tgt_idx_i // Target input index
             , map_tgt_seq_i // Target input is sequential
         };
-        // If output is not active, setup the base address
-        if (!output_actv[map_idx_i]) begin
-            output_base[map_idx_i] = output_max[OP_STORE_ADDR_W-1:0];
-            output_actv[map_idx_i] = 1'b1;
-        end
-        // Increment max counter
-        output_max = output_max + { {OP_STORE_ADDR_W{1'b0}}, 1'b1 };
+        // If no messages for this output, setup the base address
+        if (!output_num[map_idx_i]) output_base[map_idx_i] = output_next;
+        // Increment this output's counter
+        output_num[map_idx_i]  = output_num[map_idx_i] + { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 };
+        // Increment next pointer
+        output_next = output_next + { {OP_STORE_ADDR_W{1'b0}}, 1'b1 };
 
     // Otherwise handle output state generation
     end else if (!state_fifo_full) begin
