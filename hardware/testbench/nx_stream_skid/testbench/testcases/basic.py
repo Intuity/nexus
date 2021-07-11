@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import randint, choice
+from random import randint
 
 from cocotb.regression import TestFactory
-from cocotb.triggers import ClockCycles, RisingEdge
-
-from nx_constants import Direction
+from cocotb.triggers import ClockCycles
 
 from ..testbench import testcase
 
@@ -35,11 +33,13 @@ async def sanity(dut):
     # All done!
     dut.info("Finished counting cycles")
 
-@testcase()
-async def stream(dut):
+async def stream(dut, backpressure, gaps):
     """ Stream many messages with randomised backpressure """
     dut.info("Resetting the DUT")
     await dut.reset()
+
+    # Activate/deactivate backpressure
+    dut.outbound.delays = backpressure
 
     # Alter the delay probability
     dut.outbound.probability = 0.1
@@ -52,4 +52,9 @@ async def stream(dut):
         msg = randint(0, (1 << intf_size) - 1)
         dut.expected.append((msg, 0))
         dut.inbound.append(msg)
-        await ClockCycles(dut.clk, randint(1, 50))
+        if gaps: await ClockCycles(dut.clk, randint(1, 50))
+
+factory = TestFactory(stream)
+factory.add_option("backpressure", [True, False])
+factory.add_option("gaps",         [True, False])
+factory.generate_tests()
