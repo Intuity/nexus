@@ -38,7 +38,7 @@ module nx_fifo #(
 
 // Parameters and constants
 localparam PTR_W    = $clog2(DEPTH);
-localparam PTR_STEP = { {PTR_W{1'b0}}, 1'b1 };
+localparam PTR_STEP = { {(PTR_W - 1){1'b0}}, 1'b1 };
 localparam LVL_STEP = { 1'b0, PTR_STEP };
 
 // Internal state
@@ -49,7 +49,7 @@ logic [PTR_W  :0] level;
 assign rd_data_o = data[rd_ptr];
 assign level_o   = level;
 assign empty_o   = (level ==        0);
-assign full_o    = (level == FULL_LVL);
+assign full_o    = (level >= FULL_LVL);
 
 logic truly_full;
 assign truly_full = (level == DEPTH);
@@ -63,7 +63,7 @@ always @(posedge clk_i, posedge rst_i) begin : p_handle
         // Pop from FIFO if not empty
         if (rd_pop_i && !empty_o) begin
             rd_ptr <= (
-                ((rd_ptr + PTR_STEP) > DEPTH)
+                ((rd_ptr + PTR_STEP) >= DEPTH)
                     ? (rd_ptr + PTR_STEP - DEPTH)
                     : (rd_ptr + PTR_STEP)
             );
@@ -72,7 +72,7 @@ always @(posedge clk_i, posedge rst_i) begin : p_handle
         if (wr_push_i && (!truly_full || rd_pop_i)) begin
             data[wr_ptr] <= wr_data_i;
             wr_ptr       <= (
-                ((wr_ptr + PTR_STEP) > DEPTH)
+                ((wr_ptr + PTR_STEP) >= DEPTH)
                     ? (wr_ptr + PTR_STEP - DEPTH)
                     : (wr_ptr + PTR_STEP)
             );
