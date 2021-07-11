@@ -13,57 +13,57 @@
 // limitations under the License.
 
 module testbench #(
-      parameter INSTR_WIDTH =  15
-    , parameter MAX_INSTRS  = 512
+      parameter INSTR_WIDTH =  15 // Width of each instruction
+    , parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
+    , parameter CTRL_WIDTH  =  12 // Width of each control entry
+    , parameter MAX_CTRL    = 512 // Maximum number of control entries
 ) (
       input  logic rst
+    // Populated instruction counter
+    , output logic [$clog2(MAX_INSTRS)-1:0] instr_count_o
     // Instruction load interface
-    , input  logic                   store_core_i
     , input  logic [INSTR_WIDTH-1:0] store_data_i
     , input  logic                   store_valid_i
-    // Populated instruction counters
-    , output logic [$clog2(MAX_INSTRS)-1:0] core_0_populated_o
-    , output logic [$clog2(MAX_INSTRS)-1:0] core_1_populated_o
     // Instruction fetch interfaces
-    // - Core 0
-    , input  logic [$clog2(MAX_INSTRS)-1:0] core_0_addr_i
-    , input  logic                          core_0_rd_i
-    , output logic [       INSTR_WIDTH-1:0] core_0_data_o
-    , output logic                          core_0_stall_o
-    // - Core 1
-    , input  logic [$clog2(MAX_INSTRS)-1:0] core_1_addr_i
-    , input  logic                          core_1_rd_i
-    , output logic [       INSTR_WIDTH-1:0] core_1_data_o
-    , output logic                          core_1_stall_o
+    , input  logic [$clog2(MAX_INSTRS)-1:0] fetch_addr_i
+    , input  logic                          fetch_rd_i
+    , output logic [       INSTR_WIDTH-1:0] fetch_data_o
+    , output logic                          fetch_stall_o
+    // Control block interface
+    , input  logic [$clog2(MAX_CTRL)-1:0] ctrl_addr_i
+    , input  logic [      CTRL_WIDTH-1:0] ctrl_wr_data_i
+    , input  logic                        ctrl_wr_en_i
+    , input  logic                        ctrl_rd_en_i
+    , output logic [      CTRL_WIDTH-1:0] ctrl_rd_data_o
 );
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
-nx_instr_store #(
+nx_node_store #(
       .INSTR_WIDTH(INSTR_WIDTH)
     , .MAX_INSTRS (MAX_INSTRS )
+    , .CTRL_WIDTH (CTRL_WIDTH )
+    , .MAX_CTRL   (MAX_CTRL   )
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)
+    // Populated instruction counter
+    , .instr_count_o(instr_count_o)
     // Instruction load interface
-    , .store_core_i (store_core_i )
     , .store_data_i (store_data_i )
     , .store_valid_i(store_valid_i)
-    // Populated instruction counters
-    , .core_0_populated_o(core_0_populated_o)
-    , .core_1_populated_o(core_1_populated_o)
     // Instruction fetch interfaces
-    // - Core 0
-    , .core_0_addr_i (core_0_addr_i )
-    , .core_0_rd_i   (core_0_rd_i   )
-    , .core_0_data_o (core_0_data_o )
-    , .core_0_stall_o(core_0_stall_o)
-    // - Core 1
-    , .core_1_addr_i (core_1_addr_i )
-    , .core_1_rd_i   (core_1_rd_i   )
-    , .core_1_data_o (core_1_data_o )
-    , .core_1_stall_o(core_1_stall_o)
+    , .fetch_addr_i (fetch_addr_i )
+    , .fetch_rd_i   (fetch_rd_i   )
+    , .fetch_data_o (fetch_data_o )
+    , .fetch_stall_o(fetch_stall_o)
+    // Control block interface
+    , .ctrl_addr_i   (ctrl_addr_i   )
+    , .ctrl_wr_data_i(ctrl_wr_data_i)
+    , .ctrl_wr_en_i  (ctrl_wr_en_i  )
+    , .ctrl_rd_en_i  (ctrl_rd_en_i  )
+    , .ctrl_rd_data_o(ctrl_rd_data_o)
 );
 
 `ifdef sim_icarus

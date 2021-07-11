@@ -19,6 +19,8 @@ from drivers.io_common import IORole
 from drivers.instr.io import InstrFetchIO, InstrStoreIO
 from drivers.instr.fetch import InstrFetchInitiator
 from drivers.instr.store import InstrStoreInitiator
+from drivers.memory.io import MemoryIO
+from drivers.memory.init import MemoryInitiator
 
 class Testbench(TestbenchBase):
 
@@ -30,26 +32,24 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Pickup signals
-        self.populated = [dut.core_0_populated_o, dut.core_1_populated_o]
+        self.populated = dut.instr_count_o
         # Setup drivers/monitors
         self.store = InstrStoreInitiator(
             self, self.clk, self.rst, InstrStoreIO(self.dut, "store", IORole.RESPONDER),
         )
-        self.core = [
-            InstrFetchInitiator(
-                self, self.clk, self.rst, InstrFetchIO(self.dut, "core_0", IORole.RESPONDER),
-            ),
-            InstrFetchInitiator(
-                self, self.clk, self.rst, InstrFetchIO(self.dut, "core_1", IORole.RESPONDER),
-            )
-        ]
+        self.fetch = InstrFetchInitiator(
+            self, self.clk, self.rst, InstrFetchIO(self.dut, "fetch", IORole.RESPONDER),
+        )
+        self.ctrl = MemoryInitiator(
+            self, self.clk, self.rst, MemoryIO(self.dut, "ctrl", IORole.RESPONDER),
+        )
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
         self.store.intf.initialise(IORole.INITIATOR)
-        self.core[0].intf.initialise(IORole.INITIATOR)
-        self.core[1].intf.initialise(IORole.INITIATOR)
+        self.fetch.intf.initialise(IORole.INITIATOR)
+        self.ctrl.intf.initialise(IORole.INITIATOR)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
