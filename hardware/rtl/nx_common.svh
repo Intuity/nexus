@@ -15,6 +15,26 @@
 `ifndef __NX_COMMON_SVH__
 `define __NX_COMMON_SVH__
 
+// DECLARE_DQT(T, X, C, R, I)
+// Declares a typed combinatorial-sequential logic pair, and sets up the
+// sequential logic portion.
+// Args:
+//  T: Type of the signal
+//  X: Name of the signal
+//  C: Clock signal driving sequential logic
+//  R: Reset signal driving sequential logic
+//  I: Initial value for the signal to take
+//
+`define DECLARE_DQT(T, X, C, R, I) \
+    T X, ``X``_q; \
+    always_ff @(posedge C, posedge R) begin : s_``X \
+        if (R) begin \
+            ``X``_q <= (I); \
+        end else begin \
+            ``X``_q <= X; \
+        end \
+    end
+
 // DECLARE_DQ(W, X, C, R, I)
 // Declares a combinatorial-sequential logic pair, and sets up the sequential
 // logic portion.
@@ -25,15 +45,7 @@
 //  R: Reset signal driving sequential logic
 //  I: Initial value for the signal to take
 //
-`define DECLARE_DQ(W, X, C, R, I) \
-    logic [W-1:0] X, ``X``_q; \
-    always_ff @(posedge C, posedge R) begin : s_``X \
-        if (R) begin \
-            ``X``_q <= (I); \
-        end else begin \
-            ``X``_q <= X; \
-        end \
-    end
+`define DECLARE_DQ(W, X, C, R, I) `DECLARE_DQT(logic [W-1:0], X, C, R, I)
 
 // DECLARE_DQ_ARRAY(W, N, X, C, R, I)
 // Declares a combinatorial-sequential logic pair for an array, and sets up the
