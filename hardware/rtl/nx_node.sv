@@ -84,10 +84,14 @@ module nx_node #(
 // Idle Control
 // -----------------------------------------------------------------------------
 
-assign idle_o = (
+`DECLARE_DQ(1, idle, clk_i, rst_i, 1'b0)
+
+assign idle = (
     core_idle[0] && core_idle[1] && decode_idle && !inbound_valid && !outbound_valid
     && ctrl_idle
 );
+
+assign idle_o = idle_q;
 
 // -----------------------------------------------------------------------------
 // Arbiter
