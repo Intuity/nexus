@@ -86,7 +86,6 @@ localparam OUTPUT_W        = $clog2(OUTPUTS);
 `DECLARE_DQ(1,      input_trig, clk_i, rst_i, 1'b0)
 
 `DECLARE_DQ(      OUTPUTS,                  output_last, clk_i, rst_i, {OUTPUTS{1'b0}})
-`DECLARE_DQ(      OUTPUTS,                  output_actv, clk_i, rst_i, {OUTPUTS{1'b0}})
 `DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_base, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
 `DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_num,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
 `DECLARE_DQ(      OP_STORE_ADDR_W,          output_next, clk_i, rst_i, {(OP_STORE_ADDR_W+1){1'b0}})
@@ -107,12 +106,40 @@ assign core_inputs_o  = input_curr_q;
 
 // Detect outputs needing update
 `DECLARE_DQ(OUTPUT_W,        update_index, clk_i, rst_i, {OUTPUT_W{1'b0}})
-`DECLARE_DQ(       1,        update_req,   clk_i, rst_i, 1'b0)
 `DECLARE_DQ(OP_STORE_ADDR_W, update_base,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
 `DECLARE_DQ(OP_STORE_ADDR_W, update_final, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+`DECLARE_DQ(              1, update_state, clk_i, rst_i, 1'b0)
+`DECLARE_DQ(              1, update_req,   clk_i, rst_i, 1'b0)
+
+logic                       queue_fifo_full, queue_fifo_empty;
+logic [       OUTPUT_W-1:0] queued_index;
+logic [OP_STORE_ADDR_W-1:0] queued_base, queued_final;
+logic                       queued_state;
+
+`DECLARE_DQ(1, queued_pop, clk_i, rst_i, 1'b0)
+
+nx_fifo #(
+      .DEPTH   (3)
+    , .WIDTH   (OUTPUT_W + OP_STORE_ADDR_W * 2 + 1)
+    , .FULL_LVL(2)
+) queue_fifo (
+      .clk_i(clk_i)
+    , .rst_i(rst_i)
+    // Write interface
+    , .wr_data_i({ update_index_q, update_base_q, update_final_q, update_state_q })
+    , .wr_push_i(update_req_q)
+    // Read interface
+    , .rd_data_o({ queued_index, queued_base, queued_final, queued_state })
+    , .rd_pop_i (queued_pop_q)
+    // Status
+    , .level_o(                )
+    , .empty_o(queue_fifo_empty)
+    , .full_o (queue_fifo_full )
+);
 
 always_comb begin : p_detect_change
     int i;
+    `INIT_D(output_last);
     `INIT_D(update_index);
     `INIT_D(update_req);
     `INIT_D(update_base);
@@ -122,20 +149,24 @@ always_comb begin : p_detect_change
     update_req = 1'b0;
 
     // Search for the first delta
-    for (i = 0; i < OUTPUTS; i = (i + 1)) begin
-        if (
-            !update_req                         && // No change found yet
-            core_outputs_i[i] != output_last[i] && // Output has changed
-            output_num_q[i]   > 0                 // Output is active
-        ) begin
-            update_index = i[OUTPUT_W-1:0];
-            update_req   = 1'b1;
-            update_base  = output_base_q[i];
-            update_final = (
-                output_base_q[i]  +
-                output_num_q[i]  -
-                { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 }
-            );
+    if (!queue_fifo_full) begin
+        for (i = 0; i < OUTPUTS; i = (i + 1)) begin
+            if (
+                !update_req                           && // No change found yet
+                core_outputs_i[i] != output_last_q[i] && // Output has changed
+                output_num_q[i]    > 0                   // Output is active
+            ) begin
+                update_index = i[OUTPUT_W-1:0];
+                update_base  = output_base_q[i];
+                update_final = (
+                    output_base_q[i]  +
+                    output_num_q[i]  -
+                    { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 }
+                );
+                update_req     = 1'b1;
+                update_state   = core_outputs_i[i];
+                output_last[i] = core_outputs_i[i];
+            end
         end
     end
 end
@@ -180,11 +211,10 @@ nx_fifo #(
 always_comb begin : p_output_memory
     int i;
 
-    `INIT_D(output_last);
-    `INIT_D(output_actv);
     `INIT_D_ARRAY(output_base);
     `INIT_D_ARRAY(output_num);
     `INIT_D(output_next);
+    `INIT_D(queued_pop);
     `INIT_D(store_addr);
     `INIT_D(store_wr_data);
     `INIT_D(store_wr_en);
@@ -200,6 +230,9 @@ always_comb begin : p_output_memory
     // Always clear write and read enable
     store_wr_en = 1'b0;
     store_rd_en = 1'b0;
+
+    // Always clear queued pop
+    queued_pop = 1'b0;
 
     // When a mapping update arrives, write it into the RAM
     if (map_valid_i) begin
@@ -228,20 +261,17 @@ always_comb begin : p_output_memory
             store_rd_en  = 1'b1;
 
         // Pick-up the next update request
-        end else if (update_req_q) begin
-            // Store base address, final address, and value to send
-            send_address = update_base_q;
-            send_final   = update_final_q;
-            send_value   = core_outputs_i[update_index_q];
+        end else if (!queue_fifo_empty && !queued_pop_q) begin
+            send_address = queued_base;
+            send_final   = queued_final;
+            send_value   = queued_state;
             store_rd_en  = 1'b1;
-            // Update output_last to track emitted value
-            output_last[update_index_q] = core_outputs_i[update_index_q];
+            queued_pop   = 1'b1;
 
         end
 
         // Form the memory request
-        store_addr  = send_address;
-        store_wr_en = 1'b0;
+        store_addr = send_address;
 
     end
 end
@@ -297,7 +327,8 @@ nx_fifo #(
 );
 
 assign idle_o = (
-    state_fifo_empty && msg_fifo_empty && !msg_valid_q && !loopback_valid_q
+    queue_fifo_empty && state_fifo_empty && msg_fifo_empty && !msg_valid_q &&
+    !loopback_valid_q
 );
 
 always_comb begin : p_output
