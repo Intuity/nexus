@@ -46,8 +46,7 @@ class StateMonitor(Monitor):
             # Capture any I/O mappings
             if self.intf.valid == 1:
                 self._recv(SignalState(
-                    remote_row=int(self.intf.remote_row),
-                    remote_col=int(self.intf.remote_col),
-                    remote_idx=int(self.intf.remote_idx),
+                    index     =int(self.intf.index),
+                    sequential=int(self.intf.is_seq),
                     state     =int(self.intf.state),
                 ))

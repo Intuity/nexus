@@ -14,6 +14,4 @@
 
 from collections import namedtuple
 
-SignalState = namedtuple("SignalState", [
-    "remote_row", "remote_col", "remote_idx", "state"
-])
+SignalState = namedtuple("SignalState", ["index", "sequential", "state"])

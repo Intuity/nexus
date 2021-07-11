@@ -47,10 +47,9 @@ class StateInitiator(Driver):
         # Wait for reset to clear
         while self.reset == 1: await RisingEdge(self.clock)
         # Drive the request
-        self.intf.remote_row <= transaction.remote_row
-        self.intf.remote_col <= transaction.remote_col
-        self.intf.remote_idx <= transaction.remote_idx
-        self.intf.state      <= transaction.state
-        self.intf.valid      <= 1
+        self.intf.index  <= transaction.index
+        self.intf.is_seq <= transaction.sequential
+        self.intf.state  <= transaction.state
+        self.intf.valid  <= 1
         await RisingEdge(self.clock)
-        self.intf.valid      <= 0
+        self.intf.valid  <= 0

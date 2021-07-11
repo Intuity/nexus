@@ -18,13 +18,13 @@ class StateIO(BaseIO):
     """ Signal state interface from decoder """
 
     def __init__(self, dut, name, role):
-        """ Initialise InstrLoadIO.
+        """ Initialise StateIO.
 
         Args:
             dut : Pointer to the DUT boundary
             name: Name of the signal - acts as a prefix
             role: Role of this signal on the DUT boundary
         """
-        super().__init__(dut, name, role, [
-            "remote_row", "remote_col", "remote_idx", "state", "valid",
-        ], [])
+        super().__init__(
+            dut, name, role, ["index", "is_seq", "state", "valid",], []
+        )
