@@ -14,8 +14,7 @@
 
 from random import choice, randint
 
-from cocotb.regression import TestFactory
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import ClockCycles
 
 from nx_constants import Direction
 
@@ -34,60 +33,6 @@ async def sanity(dut):
 
     # All done!
     dut.info("Finished counting cycles")
-
-async def broadcast(dut, backpressure):
-    """ Check routing of a broadcast message """
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.node_row_i <= row
-    dut.node_col_i <= col
-
-    # Activate/deactivate backpressure
-    dut.bypass.delays = backpressure
-
-    # Unregister IO mapping, instruction, and signal state interfaces from monitor
-    dut.instr_load._callbacks = []
-    dut.io_map._callbacks     = []
-    dut.state._callbacks      = []
-
-    # Generate many random messages
-    for _ in range(1000):
-        # Choose a random direction
-        dirx = choice(list(Direction))
-
-        # Form and queue a broadcast message
-        command = randint(0, (1 <<  2) - 1)
-        payload = randint(0, (1 << 21) - 1)
-        msg  = (1       << 31) # [   31] Broadcast flag
-        msg |= (8       << 23) # [30:23] Broadcast decay
-        msg |= (command << 21) # [22:21] Command
-        msg |= (payload <<  0) # [20: 0] Payload
-        dut.debug(f"Transmit message 0x{msg:08X}")
-        dut.msg.append((msg, int(dirx)))
-
-        # Should be received with decay less one
-        bc_msg  = msg & 0x807F_FFFF
-        bc_msg |= (7 << 23) # [30:23] Broadcast decay
-        dut.debug(f"Expecting message 0x{bc_msg:08X}")
-        if dirx == Direction.NORTH: # Sends to east, south, & west
-            dut.exp_bypass.append((bc_msg, int(Direction.EAST )))
-            dut.exp_bypass.append((bc_msg, int(Direction.SOUTH)))
-            dut.exp_bypass.append((bc_msg, int(Direction.WEST )))
-        elif dirx == Direction.EAST: # Sends just to the west
-            dut.exp_bypass.append((bc_msg, int(Direction.WEST )))
-        elif dirx == Direction.SOUTH: # Sends to north, east, & west
-            dut.exp_bypass.append((bc_msg, int(Direction.NORTH)))
-            dut.exp_bypass.append((bc_msg, int(Direction.EAST )))
-            dut.exp_bypass.append((bc_msg, int(Direction.WEST )))
-        elif dirx == Direction.WEST: # Sends just to the east
-            dut.exp_bypass.append((bc_msg, int(Direction.EAST )))
-
-factory = TestFactory(broadcast)
-factory.add_option("backpressure", [True, False])
-factory.generate_tests()
 
 @testcase()
 async def redirect(dut):
@@ -117,12 +62,11 @@ async def redirect(dut):
 
         # Form and send an addressed message
         command = randint(0, (1 <<  2) - 1)
-        payload = randint(0, (1 << 21) - 1)
-        msg  = (0       << 31) # [   31] Broadcast flag
-        msg |= (tgt_row << 27) # [30:27] Target row
-        msg |= (tgt_col << 23) # [26:23] Target column
-        msg |= (command << 21) # [22:21] Command
-        msg |= (payload <<  0) # [20: 0] Payload
+        payload = randint(0, (1 << 22) - 1)
+        msg  = (tgt_row << 28) # [31:28] Target row
+        msg |= (tgt_col << 24) # [27:24] Target column
+        msg |= (command << 22) # [23:22] Command
+        msg |= (payload <<  0) # [21: 0] Payload
         dut.debug(f"Transmit message 0x{msg:08X} to {tgt_row}, {tgt_col}")
         dut.msg.append((msg, int(choice(list(Direction)))))
 

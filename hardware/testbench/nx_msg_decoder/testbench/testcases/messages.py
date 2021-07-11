@@ -21,8 +21,7 @@ from drivers.map_io.common import IOMapping
 from drivers.state.common import SignalState
 
 from nx_constants import Command, Direction
-from nx_message import (build_load_instr, build_map_input, build_map_output,
-                        build_sig_state)
+from nx_message import build_load_instr, build_map_output, build_sig_state
 
 @testcase()
 async def messages(dut):
@@ -43,8 +42,6 @@ async def messages(dut):
         command = choice(list(Command))
 
         # Select a target row and column
-        broadcast = choice((0, 1))
-        bc_decay  = randint(1, 10)
         tgt_row, tgt_col = row, col
         if choice((True, False)):
             tgt_row, tgt_col = randint(0, 15), randint(0, 15)
@@ -55,87 +52,42 @@ async def messages(dut):
         # Generate a message
         msg = 0
         if command == Command.LOAD_INSTR:
-            core  = choice((0, 1))
             instr = randint(0, (1 << 15) - 1)
-            msg   = build_load_instr(
-                broadcast, tgt_row, tgt_col, bc_decay, core, instr,
-            )
-            if broadcast or tgt_match:
-                dut.exp_instr.append(InstrStore(core, instr))
-        elif command == Command.INPUT:
+            msg   = build_load_instr(tgt_row, tgt_col, instr)
+            if tgt_match: dut.exp_instr.append(InstrStore(instr))
+        elif command == Command.OUTPUT:
             index   = randint(0,  7)
             rem_row = randint(0, 15)
             rem_col = randint(0, 15)
             rem_idx = randint(0,  7)
             is_seq  = choice((0, 1))
-            msg     = build_map_input(
-                broadcast, tgt_row, tgt_col, bc_decay, index, is_seq, rem_row,
-                rem_col, rem_idx,
+            msg     = build_map_output(
+                tgt_row, tgt_col, index, rem_row, rem_col, rem_idx, is_seq
             )
-            if broadcast or tgt_match:
+            if tgt_match:
                 dut.exp_io.append(IOMapping(
-                    index, 1, rem_row, rem_col, rem_idx, is_seq, 0, is_seq,
-                ))
-        elif command == Command.OUTPUT:
-            index   = randint(0,  7)
-            rem_row = randint(0, 15)
-            rem_col = randint(0, 15)
-            slot    = choice((0, 1))
-            send_bc = choice((0, 1))
-            msg       = build_map_output(
-                broadcast, tgt_row, tgt_col, bc_decay, index, slot, send_bc,
-                rem_row, rem_col,
-            )
-            if broadcast or tgt_match:
-                dut.exp_io.append(IOMapping(
-                    index, 0, rem_row, rem_col, 0, slot, send_bc, slot,
+                    index, rem_row, rem_col, rem_idx, is_seq
                 ))
         elif command == Command.SIG_STATE:
-            rem_row = randint(0, 15)
-            rem_col = randint(0, 15)
-            rem_idx = randint(0,  7)
-            state   = choice((0, 1))
-            msg     = build_sig_state(
-                broadcast, tgt_row, tgt_col, bc_decay, state, rem_row, rem_col,
-                rem_idx,
-            )
-            if broadcast or tgt_match:
-                dut.exp_state.append(SignalState(
-                    rem_row, rem_col, rem_idx, state,
-                ))
+            index  = randint(0, 7)
+            is_seq = choice((0, 1))
+            state  = choice((0, 1))
+            msg    = build_sig_state(tgt_row, tgt_col, index, is_seq, state)
+            if tgt_match:
+                dut.exp_state.append(SignalState(index, is_seq, state))
 
         # Create a message
         dut.debug(
-            f"MSG - BC: {broadcast}, R: {tgt_row}, C: {tgt_col}, CMD: {command} "
-            f"-> 0x{msg:08X}"
+            f"MSG - R: {tgt_row}, C: {tgt_col}, CMD: {command} -> 0x{msg:08X}"
         )
-
-        # Generate bypass message
-        byp_msg = msg
-        if broadcast:
-            byp_msg &= 0x807F_FFFF
-            byp_msg |= (bc_decay - 1) << 23
 
         # Queue up the message
         dut.msg.append((msg, int(dirx)))
 
         # If not matching this target, expect message to be routed elsewhere
-        if broadcast:
-            if dirx == Direction.NORTH:
-                dut.exp_bypass.append((byp_msg, int(Direction.EAST) ))
-                dut.exp_bypass.append((byp_msg, int(Direction.SOUTH)))
-                dut.exp_bypass.append((byp_msg, int(Direction.WEST) ))
-            elif dirx == Direction.EAST:
-                dut.exp_bypass.append((byp_msg, int(Direction.WEST) ))
-            if dirx == Direction.SOUTH:
-                dut.exp_bypass.append((byp_msg, int(Direction.NORTH)))
-                dut.exp_bypass.append((byp_msg, int(Direction.EAST) ))
-                dut.exp_bypass.append((byp_msg, int(Direction.WEST) ))
-            elif dirx == Direction.WEST:
-                dut.exp_bypass.append((byp_msg, int(Direction.EAST) ))
-        elif not tgt_match:
+        if not tgt_match:
             if   tgt_row < row: tgt_dirx = Direction.NORTH
             elif tgt_row > row: tgt_dirx = Direction.SOUTH
             elif tgt_col < col: tgt_dirx = Direction.WEST
             elif tgt_col > col: tgt_dirx = Direction.EAST
-            dut.exp_bypass.append((byp_msg, int(tgt_dirx)))
+            dut.exp_bypass.append((msg, int(tgt_dirx)))

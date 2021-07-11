@@ -59,7 +59,7 @@ class Testbench(TestbenchBase):
         self.exp_io     = []
         self.exp_state  = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self, fail_immediately=False)
+        self.scoreboard = Scoreboard(self) # , fail_immediately=False)
         self.scoreboard.add_interface(self.bypass,     self.exp_bypass)
         self.scoreboard.add_interface(self.instr_load, self.exp_instr)
         self.scoreboard.add_interface(self.io_map,     self.exp_io)
