@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from math import ceil, log2
 from random import choice, randint, random
 
 import cocotb
@@ -34,40 +35,61 @@ async def map_outputs(dut):
     dut.node_row_i <= row
     dut.node_col_i <= col
 
-    # Work out the number of outputs
+    # Work out interface sizings
+    num_inputs  = max(dut.inputs._range) - min(dut.inputs._range) + 1
     num_outputs = max(dut.outputs._range) - min(dut.outputs._range) + 1
-    row_width   = max(dut.io.intf.remote_row._range) - min(dut.io.intf.remote_row._range) + 1
-    col_width   = max(dut.io.intf.remote_col._range) - min(dut.io.intf.remote_col._range) + 1
+    input_width = int(ceil(log2(num_inputs)))
+    row_width   = max(dut.io.intf.tgt_row._range) - min(dut.io.intf.tgt_row._range) + 1
+    col_width   = max(dut.io.intf.tgt_col._range) - min(dut.io.intf.tgt_col._range) + 1
 
-    # Map the I/Os in a random order
+    # Map the outputs in order
     mapped = {}
-    for idx in sorted(range(num_outputs), key=lambda _: random()):
-        rem_row = randint(0, 15)
-        rem_col = randint(0, 15)
-        slot    = choice((0, 1))
-        bc      = choice((0, 1))
-        dut.io.append(IOMapping(
-            index=idx, is_input=0, remote_row=rem_row, remote_col=rem_col,
-            remote_idx=0, seq=0, slot=slot, broadcast=bc,
-        ))
-        mapped[idx] = (rem_row, rem_col, slot, bc)
+    total  = 0
+    for output in range(num_outputs):
+        mapped[output] = []
+        for _ in range(randint(1, 8)):
+            rem_row = randint(0, (1 << row_width) - 1)
+            rem_col = randint(0, (1 << col_width) - 1)
+            rem_idx = randint(0, num_inputs-1)
+            rem_seq = choice((0, 1))
+            dut.io.append(IOMapping(
+                index=output, target_row=rem_row, target_col=rem_col,
+                target_idx=rem_idx, target_seq=rem_seq,
+            ))
+            mapped[output].append((rem_row, rem_col, rem_idx, rem_seq))
+            total += 1
 
     # Wait for the queue to drain
     while dut.io._sendQ: await RisingEdge(dut.clk)
     await ClockCycles(dut.clk, 10)
 
-    # Check the mapping
-    for idx, (rem_row, rem_col, slot, bc) in mapped.items():
-        if slot:
-            map_key = int(dut.dut.dut.output_map_b[idx])
-        else:
-            map_key = int(dut.dut.dut.output_map_a[idx])
-        got_col = (map_key >> (                    0)) & ((1 << col_width) - 1)
-        got_row = (map_key >> (            col_width)) & ((1 << row_width) - 1)
-        got_bc  = (map_key >> (row_width + col_width)) & 1
-        assert rem_row == got_row, f"Output {idx} - row exp: {rem_row}, got {got_row}"
-        assert rem_col == got_col, f"Output {idx} - col exp: {rem_col}, got {got_col}"
-        assert bc      == got_bc, f"Output {idx} - bc exp: {bc}, got {got_bc}"
+    # Check the correct number of mappings have been stored
+    assert dut.dut.dut.output_next_q == total, \
+        f"Expecting {total} mappings, hardware recorded {int(dut.dut.dut.output_next_q)}"
+
+    # Check the mappings
+    for output, targets in mapped.items():
+        # Pickup the base address and count of this output
+        output_base  = int(dut.dut.dut.output_base_q[output])
+        output_count = int(dut.dut.dut.output_num_q[output])
+        # Check the correct number of outputs were loaded
+        assert output_count == len(targets), \
+            f"Output {output} - expecting {len(targets)}, recorded {output_count}"
+        # Check each output mapping
+        for idx, (tgt_row, tgt_col, tgt_idx, tgt_seq) in enumerate(targets):
+            ram_data = dut.memory.memory[output_base + idx]
+            ram_seq  = (ram_data >> (0                          )) & 0x1
+            ram_idx  = (ram_data >> (1                          )) & 0x7
+            ram_col  = (ram_data >> (1 + input_width            )) & 0xF
+            ram_row  = (ram_data >> (1 + input_width + col_width)) & 0xF
+            assert tgt_row == ram_row, \
+                f"Output {output}[{idx}] - row exp: {tgt_row}, got: {ram_row}"
+            assert tgt_col == ram_col, \
+                f"Output {output}[{idx}] - col exp: {tgt_col}, got: {ram_col}"
+            assert tgt_idx == ram_idx, \
+                f"Output {output}[{idx}] - idx exp: {tgt_idx}, got: {ram_idx}"
+            assert tgt_seq == ram_seq, \
+                f"Output {output}[{idx}] - seq exp: {tgt_seq}, got: {ram_seq}"
 
 @testcase()
 async def output_drive(dut):
@@ -79,6 +101,12 @@ async def output_drive(dut):
     row, col = randint(1, 14), randint(1, 14)
     dut.node_row_i <= row
     dut.node_col_i <= col
+
+    # Work out interface sizings
+    num_inputs  = max(dut.inputs._range) - min(dut.inputs._range) + 1
+    num_outputs = max(dut.outputs._range) - min(dut.outputs._range) + 1
+    row_width   = max(dut.io.intf.tgt_row._range) - min(dut.io.intf.tgt_row._range) + 1
+    col_width   = max(dut.io.intf.tgt_col._range) - min(dut.io.intf.tgt_col._range) + 1
 
     # Create a basic driver for the grant
     grant_flag = Event()
@@ -96,34 +124,26 @@ async def output_drive(dut):
     # Work out the number of outputs
     num_outputs = max(dut.outputs._range) - min(dut.outputs._range) + 1
 
-    # Map the I/Os in a random order
-    mapped     = {}
-    last_state = {}
-    curr_state = {}
-    for idx in sorted(range(num_outputs), key=lambda _: random()):
-        rem_row_a = randint(0, 15)
-        rem_col_a = randint(0, 15)
-        bc_a      = choice((0, 1))
-        dut.io.append(IOMapping(
-            index=idx, is_input=0, remote_row=rem_row_a, remote_col=rem_col_a,
-            remote_idx=0, seq=0, slot=0, broadcast=bc_a,
-        ))
-        # 50% of the time, use different values for slot B
-        rem_row_b, rem_col_b, bc_b = rem_row_a, rem_col_a, bc_a
-        if choice((True, False)):
-            rem_row_b = randint(0, 15)
-            rem_col_b = randint(0, 15)
-            bc_b      = choice((0, 1))
-        dut.io.append(IOMapping(
-            index=idx, is_input=0, remote_row=rem_row_b, remote_col=rem_col_b,
-            remote_idx=0, seq=0, slot=1, broadcast=bc_b,
-        ))
-        last_state[idx] = curr_state[idx] = 0
-        dut.info(
-            f"Output[{idx}] - RA: {rem_row_a:2d}, CA: {rem_col_a:2d}, BA: {bc_a:2d}, "
-            f"RB: {rem_row_b:2d}, CB: {rem_col_b:2d}, BB: {bc_b:2d}"
-        )
-        mapped[idx] = (rem_row_a, rem_col_a, bc_a, rem_row_b, rem_col_b, bc_b)
+    # Map the outputs in order
+    mapped = {}
+    total  = 0
+    for output in range(num_outputs):
+        mapped[output] = []
+        for _ in range(randint(1, 8)):
+            rem_row = randint(0, (1 << row_width) - 1)
+            rem_col = randint(0, (1 << col_width) - 1)
+            rem_idx = randint(0, num_inputs-1)
+            rem_seq = choice((0, 1))
+            dut.io.append(IOMapping(
+                index=output, target_row=rem_row, target_col=rem_col,
+                target_idx=rem_idx, target_seq=rem_seq,
+            ))
+            mapped[output].append((rem_row, rem_col, rem_idx, rem_seq))
+            total += 1
+
+    # Track state of each output
+    last_state = [0 for _ in range(num_outputs)]
+    curr_state = [0 for _ in range(num_outputs)]
 
     # Wait for the queue to drain
     while dut.io._sendQ: await RisingEdge(dut.clk)
@@ -133,52 +153,23 @@ async def output_drive(dut):
     for _ in range(100):
         # Generate a random state
         for idx in range(num_outputs): curr_state[idx] = choice((0, 1))
-        # Queue up expected messages
-        for idx, (row_a, col_a, bc_a, row_b, col_b, bc_b) in sorted(mapped.items(), key=lambda x: x[0]):
-            # If no change in state, no message will be generated
+        # Run through every output
+        for idx, targets in sorted(mapped.items(), key=lambda x: x[0]):
+            # If no change in state, no message should be generated
             if curr_state[idx] == last_state[idx]: continue
-            # Generate expected messages from A
-            if bc_a:
-                bc_decay = (row_a << 4) | col_a
+            # Generate expected messages
+            for tgt_row, tgt_col, tgt_idx, tgt_seq in targets:
                 msg = build_sig_state(
-                    1, 0, 0, bc_decay, curr_state[idx], row, col, idx
+                    tgt_row, tgt_col, tgt_idx, tgt_seq, curr_state[idx]
                 )
-                dut.exp_msg.append((msg, int(Direction.NORTH)))
-                dut.exp_msg.append((msg, int(Direction.EAST )))
-                dut.exp_msg.append((msg, int(Direction.SOUTH)))
-                dut.exp_msg.append((msg, int(Direction.WEST )))
-            else:
-                msg = build_sig_state(
-                    0, row_a, col_a, 0, curr_state[idx], row, col, idx
-                )
-                if   row_a < row: dut.exp_msg.append((msg, int(Direction.NORTH)))
-                elif row_a > row: dut.exp_msg.append((msg, int(Direction.SOUTH)))
-                elif col_a < col: dut.exp_msg.append((msg, int(Direction.WEST )))
-                elif col_a > col: dut.exp_msg.append((msg, int(Direction.EAST )))
-            # If A & B are the same, no second message will be generated
-            if (row_a, col_a, bc_a) == (row_b, col_b, bc_b): continue
-            # Generate expected messages from A
-            if bc_b:
-                bc_decay = (row_b << 4) | col_b
-                msg = build_sig_state(
-                    1, 0, 0, bc_decay, curr_state[idx], row, col, idx
-                )
-                dut.exp_msg.append((msg, int(Direction.NORTH)))
-                dut.exp_msg.append((msg, int(Direction.EAST )))
-                dut.exp_msg.append((msg, int(Direction.SOUTH)))
-                dut.exp_msg.append((msg, int(Direction.WEST )))
-            else:
-                msg = build_sig_state(
-                    0, row_b, col_b, 0, curr_state[idx], row, col, idx
-                )
-                if   row_b < row: dut.exp_msg.append((msg, int(Direction.NORTH)))
-                elif row_b > row: dut.exp_msg.append((msg, int(Direction.SOUTH)))
-                elif col_b < col: dut.exp_msg.append((msg, int(Direction.WEST )))
-                elif col_b > col: dut.exp_msg.append((msg, int(Direction.EAST )))
+                if   tgt_row < row: dut.exp_msg.append((msg, int(Direction.NORTH)))
+                elif tgt_row > row: dut.exp_msg.append((msg, int(Direction.SOUTH)))
+                elif tgt_col < col: dut.exp_msg.append((msg, int(Direction.WEST )))
+                elif tgt_col > col: dut.exp_msg.append((msg, int(Direction.EAST )))
         # Drive the new state
-        dut.outputs <= sum([(y << x) for x, y in curr_state.items()])
+        dut.outputs <= sum([(y << x) for x, y in enumerate(curr_state)])
         # Keep track of the last state
-        last_state = { x: y for x, y in curr_state.items() }
+        last_state = curr_state[:]
         # Loop until all expected messages are produced
         while dut.exp_msg:
             # Wait for some time, then check no messages have been received

@@ -24,6 +24,8 @@ from drivers.state.io import StateIO
 from drivers.state.driver import StateInitiator
 from drivers.stream.io import StreamIO
 from drivers.stream.resp import StreamResponder
+from drivers.memory.io import MemoryIO
+from drivers.memory.resp import MemoryResponder
 
 class Testbench(TestbenchBase):
 
@@ -51,6 +53,9 @@ class Testbench(TestbenchBase):
         self.signal = StateInitiator(
             self, self.clk, self.rst, StateIO(self.dut, "signal", IORole.RESPONDER),
         )
+        self.memory = MemoryResponder(
+            self, self.clk, self.rst, MemoryIO(self.dut, "store", IORole.INITIATOR),
+        )
         # Create queues for expected transactions
         self.exp_msg = []
         # Create a scoreboard
@@ -64,9 +69,12 @@ class Testbench(TestbenchBase):
         self.outputs     <= 0
         self.grant       <= 0
         self.release     <= 0
+        self.node_row_i  <= 0
+        self.node_col_i  <= 0
         self.msg.intf.initialise(IORole.RESPONDER)
         self.io.intf.initialise(IORole.INITIATOR)
         self.signal.intf.initialise(IORole.INITIATOR)
+        self.memory.intf.initialise(IORole.RESPONDER)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

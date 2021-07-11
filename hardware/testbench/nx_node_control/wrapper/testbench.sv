@@ -13,13 +13,14 @@
 // limitations under the License.
 
 module testbench #(
-      parameter STREAM_WIDTH   = 32
-    , parameter ADDR_ROW_WIDTH = 4
-    , parameter ADDR_COL_WIDTH = 4
-    , parameter COMMAND_WIDTH  =  2
-    , parameter INPUTS         =  8
-    , parameter OUTPUTS        =  8
-    , parameter MAX_IO         = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS)
+      parameter STREAM_WIDTH    =  32
+    , parameter ADDR_ROW_WIDTH  =   4
+    , parameter ADDR_COL_WIDTH  =   4
+    , parameter COMMAND_WIDTH   =   2
+    , parameter INPUTS          =   8
+    , parameter OUTPUTS         =   8
+    , parameter OP_STORE_LENGTH = 256
+    , parameter OP_STORE_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
 ) (
       input  logic rst
     // Node identity
@@ -36,42 +37,46 @@ module testbench #(
     , output logic                    msg_valid_o
     , input  logic                    msg_ready_i
     // I/O mapping
-    , input  logic [ $clog2(MAX_IO)-1:0] map_io_i
-    , input  logic                       map_input_i
-    , input  logic [ ADDR_ROW_WIDTH-1:0] map_remote_row_i
-    , input  logic [ ADDR_COL_WIDTH-1:0] map_remote_col_i
-    , input  logic [$clog2(OUTPUTS)-1:0] map_remote_idx_i
-    , input  logic                       map_slot_i
-    , input  logic                       map_broadcast_i
-    , input  logic                       map_seq_i
-    , input  logic                       map_valid_i
+    , input  logic [$clog2(OUTPUTS)-1:0] map_idx_i     // Which output to configure
+    , input  logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
+    , input  logic [ ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
+    , input  logic [ $clog2(INPUTS)-1:0] map_tgt_idx_i // Target node's input index
+    , input  logic                       map_tgt_seq_i // Target node's input is sequential
+    , input  logic                       map_valid_i   // Mapping is valid
     // Signal state update
-    , input  logic [ ADDR_ROW_WIDTH-1:0] signal_remote_row_i
-    , input  logic [ ADDR_COL_WIDTH-1:0] signal_remote_col_i
-    , input  logic [$clog2(OUTPUTS)-1:0] signal_remote_idx_i
-    , input  logic                       signal_state_i
-    , input  logic                       signal_valid_i
+    , input  logic [$clog2(OUTPUTS)-1:0] signal_index_i  // Input index
+    , input  logic                       signal_is_seq_i // Input is sequential
+    , input  logic                       signal_state_i  // Signal state
+    , input  logic                       signal_valid_i  // Update is valid
     // Interface to core
     , output logic               core_trigger_o
     , output logic [ INPUTS-1:0] core_inputs_o
     , input  logic [OUTPUTS-1:0] core_outputs_i
+    // Interface to memory
+    , output logic [$clog2(OP_STORE_LENGTH)-1:0] store_addr_o    // Output store row address
+    , output logic [         OP_STORE_WIDTH-1:0] store_wr_data_o // Output store write data
+    , output logic                               store_wr_en_o   // Output store write enable
+    , output logic                               store_rd_en_o   // Output store read enable
+    , input  logic [         OP_STORE_WIDTH-1:0] store_rd_data_i // Output store read data
 );
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_node_control #(
-      .STREAM_WIDTH  (STREAM_WIDTH  )
-    , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-    , .COMMAND_WIDTH (COMMAND_WIDTH )
-    , .INPUTS        (INPUTS        )
-    , .OUTPUTS       (OUTPUTS       )
-    , .MAX_IO        (MAX_IO        )
+      .STREAM_WIDTH   (STREAM_WIDTH   )
+    , .ADDR_ROW_WIDTH (ADDR_ROW_WIDTH )
+    , .ADDR_COL_WIDTH (ADDR_COL_WIDTH )
+    , .COMMAND_WIDTH  (COMMAND_WIDTH  )
+    , .INPUTS         (INPUTS         )
+    , .OUTPUTS        (OUTPUTS        )
+    , .OP_STORE_LENGTH(OP_STORE_LENGTH)
+    , .OP_STORE_WIDTH (OP_STORE_WIDTH )
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)
-    // Node identity
+    // Control signals
+    , .idle_o    (idle_o    )
     , .node_row_i(node_row_i)
     , .node_col_i(node_col_i)
     // External trigger signal
@@ -85,25 +90,27 @@ nx_node_control #(
     , .msg_valid_o(msg_valid_o)
     , .msg_ready_i(msg_ready_i)
     // I/O mapping
-    , .map_io_i        (map_io_i        )
-    , .map_input_i     (map_input_i     )
-    , .map_remote_row_i(map_remote_row_i)
-    , .map_remote_col_i(map_remote_col_i)
-    , .map_remote_idx_i(map_remote_idx_i)
-    , .map_slot_i      (map_slot_i      )
-    , .map_broadcast_i (map_broadcast_i )
-    , .map_seq_i       (map_seq_i       )
-    , .map_valid_i     (map_valid_i     )
+    , .map_idx_i    (map_idx_i    )
+    , .map_tgt_row_i(map_tgt_row_i)
+    , .map_tgt_col_i(map_tgt_col_i)
+    , .map_tgt_idx_i(map_tgt_idx_i)
+    , .map_tgt_seq_i(map_tgt_seq_i)
+    , .map_valid_i  (map_valid_i  )
     // Signal state update
-    , .signal_remote_row_i(signal_remote_row_i)
-    , .signal_remote_col_i(signal_remote_col_i)
-    , .signal_remote_idx_i(signal_remote_idx_i)
-    , .signal_state_i     (signal_state_i     )
-    , .signal_valid_i     (signal_valid_i     )
+    , .signal_index_i (signal_index_i )
+    , .signal_is_seq_i(signal_is_seq_i)
+    , .signal_state_i (signal_state_i )
+    , .signal_valid_i (signal_valid_i )
     // Interface to core
     , .core_trigger_o(core_trigger_o)
     , .core_inputs_o (core_inputs_o )
     , .core_outputs_i(core_outputs_i)
+    // Interface to memory
+    , .store_addr_o   (store_addr_o   )
+    , .store_wr_data_o(store_wr_data_o)
+    , .store_wr_en_o  (store_wr_en_o  )
+    , .store_rd_en_o  (store_rd_en_o  )
+    , .store_rd_data_i(store_rd_data_i)
 );
 
 `ifdef sim_icarus
