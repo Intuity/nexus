@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from .basic import *
-from .inputs import *
 from .load import *
 from .outputs import *
 from .routing import *

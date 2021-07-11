@@ -37,29 +37,24 @@ async def load(dut):
     inbound = choice(dut.inbound)
 
     # Load a random number of instructions
-    loaded = [[] for _ in range(2)]
+    loaded = []
     for _ in range(randint(10, 500)):
-        # Generate instruction
-        core  = choice((0, 1))
         instr = randint(0, (1 << 15) - 1)
-        inbound.append(build_load_instr(0, row, col, 0, core, instr))
-        loaded[core].append(instr)
+        inbound.append(build_load_instr(row, col, instr))
+        loaded.append(instr)
 
     # Wait for all inbound drivers to drain
-    dut.info(f"Waiting for {sum([len(x) for x in loaded])} loads")
+    dut.info(f"Waiting for {len(loaded)} loads")
     for ib in dut.inbound:
         while ib._sendQ: await RisingEdge(dut.clk)
         while ib.intf.valid == 1: await RisingEdge(dut.clk)
     await ClockCycles(dut.clk, 10)
 
     # Check the instruction counters
-    assert dut.dut.dut.instr_store.core_0_populated_o == len(loaded[0]), \
-        f"Expected {len(loaded[0])}, got {int(dut.dut.dut.instr_store.core_0_populated_o)}"
-    assert dut.dut.dut.instr_store.core_1_populated_o == len(loaded[1]), \
-        f"Expected {len(loaded[1])}, got {int(dut.dut.dut.instr_store.core_1_populated_o)}"
+    assert dut.dut.dut.store.instr_count_o == len(loaded), \
+        f"Expected {len(loaded)}, got {int(dut.dut.dut.store.instr_count_o)}"
 
     # Check the loaded instructions
-    for core_idx, instrs in enumerate(loaded):
-        for op_idx, op in enumerate(instrs):
-            got = int(dut.dut.dut.instr_store.ram.memory[op_idx+(core_idx*512)])
-            assert got == op, f"C{core_idx} O{op_idx} - exp {hex(op)}, got {hex(got)}"
+    for op_idx, op in enumerate(loaded):
+        got = int(dut.dut.dut.store.ram.memory[op_idx])
+        assert got == op, f"O{op_idx} - exp {hex(op)}, got {hex(got)}"

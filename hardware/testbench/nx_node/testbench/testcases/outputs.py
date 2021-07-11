@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from math import ceil, log2
 from random import choice, randint, random
 
-import cocotb
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import RisingEdge
 
 from nx_message import build_map_output
 
@@ -34,40 +34,56 @@ async def map_outputs(dut):
 
     # Work out the number of inputs
     num_outputs = int(dut.dut.dut.OUTPUTS)
-    row_width   = int(dut.dut.dut.ADDR_ROW_WIDTH)
+    num_inputs  = int(dut.dut.dut.INPUTS)
+    input_width = int(ceil(log2(num_inputs)))
     col_width   = int(dut.dut.dut.ADDR_COL_WIDTH)
 
-    for _ in range(100):
-        # Map the I/Os in a random order
-        mapped = {}
-        for idx in sorted(range(num_outputs), key=lambda _: random()):
-            rem_row = randint(0, 15)
-            rem_col = randint(0, 15)
-            slot    = choice((0, 1))
-            send_bc = choice((0, 1))
-            choice(dut.inbound).append(build_map_output(
-                0, row, col, 0, idx, slot, send_bc, rem_row, rem_col,
+    # Map the outputs in order
+    mapped  = {}
+    inbound = choice(dut.inbound)
+    for idx in range(num_outputs):
+        mapped[idx] = []
+        for _ in range(randint(1, 8)):
+            tgt_row = randint(0, 15)
+            tgt_col = randint(0, 15)
+            tgt_idx = randint(0,  7)
+            is_seq  = choice((0, 1))
+            inbound.append(build_map_output(
+                row, col, idx, tgt_row, tgt_col, tgt_idx, is_seq,
             ))
-            mapped[idx] = (rem_row, rem_col, slot, send_bc)
+            mapped[idx].append((tgt_row, tgt_col, tgt_idx, is_seq))
 
-        # Wait for all inbound drivers to drain
-        for ib in dut.inbound: await ib.idle()
+    # Wait for all inbound drivers to drain
+    for ib in dut.inbound: await ib.idle()
 
-        # Wait for node to go idle
-        while dut.idle_o == 0: await RisingEdge(dut.clk)
+    # Wait for node to go idle
+    while dut.idle_o == 0: await RisingEdge(dut.clk)
 
-        # Check the mapping
-        for idx, (rem_row, rem_col, slot, bc) in mapped.items():
-            if slot:
-                map_key = int(dut.dut.dut.control.output_map_b[idx])
-            else:
-                map_key = int(dut.dut.dut.control.output_map_a[idx])
-            got_col = (map_key >> (                    0)) & ((1 << col_width) - 1)
-            got_row = (map_key >> (            col_width)) & ((1 << row_width) - 1)
-            got_bc  = (map_key >> (row_width + col_width)) & 1
-            assert rem_row == got_row, \
-                f"O/P {idx} S {slot} - row exp: {rem_row}, got {got_row}"
-            assert rem_col == got_col, \
-                f"O/P {idx} S {slot} - col exp: {rem_col}, got {got_col}"
-            assert bc      == got_bc,  \
-                f"O/P {idx} S {slot} - bc exp: {bc}, got {got_bc}"
+    # Check the mapping
+    for output, targets in mapped.items():
+        # Pickup the base address and final address of each output
+        output_base  = int(dut.dut.dut.control.output_base_q[output])
+        output_final = (
+            int(dut.dut.dut.control.output_base_q[output+1])
+            if output < (num_outputs - 1) else
+            int(dut.dut.dut.control.output_max_q)
+        ) - 1
+        # Check the correct number of outputs were loaded
+        output_count = ((output_final - output_base) + 1)
+        assert output_count == len(targets), \
+            f"Output {output} - expecting {len(targets)}, recorded {output_count}"
+        # Check each output mapping
+        for idx, (tgt_row, tgt_col, tgt_idx, tgt_seq) in enumerate(targets):
+            ram_data = int(dut.dut.dut.store.ram.memory[512 + output_base + idx])
+            ram_seq  = (ram_data >> (0                          )) & 0x1
+            ram_idx  = (ram_data >> (1                          )) & 0x7
+            ram_col  = (ram_data >> (1 + input_width            )) & 0xF
+            ram_row  = (ram_data >> (1 + input_width + col_width)) & 0xF
+            assert tgt_row == ram_row, \
+                f"Output {output}[{idx}] - row exp: {tgt_row}, got: {ram_row}"
+            assert tgt_col == ram_col, \
+                f"Output {output}[{idx}] - col exp: {tgt_col}, got: {ram_col}"
+            assert tgt_idx == ram_idx, \
+                f"Output {output}[{idx}] - idx exp: {tgt_idx}, got: {ram_idx}"
+            assert tgt_seq == ram_seq, \
+                f"Output {output}[{idx}] - seq exp: {tgt_seq}, got: {ram_seq}"
