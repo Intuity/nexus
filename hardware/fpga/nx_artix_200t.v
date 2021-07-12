@@ -49,26 +49,33 @@ wire [31:0] counter;
 // Status signals
 assign status_active = active_q;
 
-// Instance skid to support decode of inbound stream
-wire [AXI4_DATA_WIDTH-1:0] skid_ib_data;
-wire [AXI4_STRB_WIDTH-1:0] skid_ib_strobe;
-wire [  AXI4_ID_WIDTH-1:0] skid_ib_id;
-wire                       skid_ib_valid;
-reg                        skid_ib_ready, skid_ib_ready_q;
+// Instance FIFO to support decode of inbound stream
+wire [AXI4_DATA_WIDTH-1:0] buff_ib_data;
+wire [AXI4_STRB_WIDTH-1:0] buff_ib_strobe;
+wire                       buff_ib_valid;
+reg                        buff_ib_pop;
 
-nx_stream_skid #(
-    .STREAM_WIDTH(AXI4_DATA_WIDTH + AXI4_STRB_WIDTH + AXI4_ID_WIDTH)
-) skid_axi_ib (
+wire ib_fifo_full, ib_fifo_empty;
+
+assign buff_ib_valid  = !ib_fifo_empty;
+assign inbound_tready = !ib_fifo_full;
+
+nx_fifo #(
+      .DEPTH(2)
+    , .WIDTH(AXI4_DATA_WIDTH + AXI4_STRB_WIDTH + AXI4_ID_WIDTH)
+) ib_fifo (
       .clk_i( clk )
     , .rst_i(~rstn)
-    // Inbound message stream
-    , .inbound_data_i ({ inbound_tdata, inbound_tkeep & inbound_tstrb, inbound_tid })
-    , .inbound_valid_i(inbound_tvalid)
-    , .inbound_ready_o(inbound_tready)
-    // Outbound message stream
-    , .outbound_data_o ({ skid_ib_data, skid_ib_strobe, skid_ib_id })
-    , .outbound_valid_o(skid_ib_valid)
-    , .outbound_ready_i(skid_ib_ready)
+    // Write interface
+    , .wr_data_i({ inbound_tdata, inbound_tkeep & inbound_tstrb })
+    , .wr_push_i(inbound_tvalid && !ib_fifo_full)
+    // Read interface
+    , .rd_data_o({ buff_ib_data, buff_ib_strobe })
+    , .rd_pop_i (buff_ib_pop)
+    // Status
+    , .level_o(             )
+    , .empty_o(ib_fifo_empty)
+    , .full_o (ib_fifo_full )
 );
 
 // Core inbound
@@ -90,12 +97,14 @@ always @(*) begin : p_decode
     reg [ 3:0] strobe;
 
     active        = active_q;
-    skid_ib_ready = skid_ib_ready_q;
     core_ib_data  = core_ib_data_q;
     core_ib_valid = core_ib_valid_q;
     ctrl_ob_data  = ctrl_ob_data_q;
     ctrl_ob_valid = ctrl_ob_valid_q;
     decode_high   = decode_high_q;
+
+    // Always clear pop
+    buff_ib_pop = 1'b0;
 
     // If the core is ready, clear valid
     if (core_ib_ready) core_ib_valid = 1'b0;
@@ -106,11 +115,11 @@ always @(*) begin : p_decode
     // If valid clear, attempt the next decode
     if (!core_ib_valid && !ctrl_ob_valid) begin
         // If decode high is set, decode the upper 32-bits
-        { is_ctrl, payload } = decode_high ? skid_ib_data[63:32] : skid_ib_data[31:0];
-        strobe               = decode_high ? skid_ib_strobe[7:4] : skid_ib_strobe[3:0];
+        { is_ctrl, payload } = decode_high ? buff_ib_data[63:32] : buff_ib_data[31:0];
+        strobe               = decode_high ? buff_ib_strobe[7:4] : buff_ib_strobe[3:0];
 
         // If stream is valid, perform an action
-        if (skid_ib_valid && strobe == 4'hF) begin
+        if (buff_ib_valid && strobe == 4'hF) begin
             // If is_ctrl, setup active and publish cycle count
             if (is_ctrl) begin
                 active        = payload[0];
@@ -119,10 +128,13 @@ always @(*) begin : p_decode
 
             // If not set, redirect into the core
             end else begin
-                core_ib_data  = { 1'b0, payload };
+                core_ib_data  = { payload, 1'b0 };
                 core_ib_valid = 1'b1;
 
             end
+
+            // If decode is high, pop
+            buff_ib_pop = decode_high || (buff_ib_strobe[7:4] == 4'h0);
 
             // Alternate decode high
             decode_high = ~decode_high;
@@ -132,20 +144,12 @@ always @(*) begin : p_decode
 
         end
 
-        // If decode high is set, drop the ready (need 2nd decode cycle)
-        skid_ib_ready = !decode_high;
-
-    // Otherwise keep inbound ready low
-    end else begin
-        skid_ib_ready = 1'b0;
-
     end
 end
 
 always @(posedge clk, negedge rstn) begin
     if (!rstn) begin
         active_q        <=  1'b0;
-        skid_ib_ready_q <=  1'b0;
         decode_high_q   <=  1'b0;
         core_ib_data_q  <= 32'd0;
         core_ib_valid_q <=  1'b0;
@@ -153,7 +157,6 @@ always @(posedge clk, negedge rstn) begin
         ctrl_ob_valid_q <=  1'b0;
     end else begin
         active_q        <= active;
-        skid_ib_ready_q <= skid_ib_ready;
         decode_high_q   <= decode_high;
         core_ib_data_q  <= core_ib_data;
         core_ib_valid_q <= core_ib_valid;
@@ -197,20 +200,43 @@ nexus #(
 );
 
 // Mux between the core and control output streams (control gets priority)
-assign ctrl_ob_ready = outbound_tready;
-assign core_ob_ready = outbound_tready && !ctrl_ob_valid_q;
+assign ctrl_ob_ready = !ob_fifo_full;
+assign core_ob_ready = !ob_fifo_full && !ctrl_ob_valid_q;
 
-assign outbound_tdata = {
-    32'd0,                                 // 32-bit padding
+wire [31:0] ctrl_or_core_data;
+assign ctrl_or_core_data = {
     ctrl_ob_valid_q,                       // Bit 31 indicates control/core
     ctrl_ob_valid_q ? ctrl_ob_data_q[30:0] // Bits 30:0 carry payload
                     : core_ob_data[30:0]
 };
 
-assign outbound_tkeep  = 8'h0F;
+// Outbound FIFO
+wire [31:0] ob_fifo_data;
+wire                    ob_fifo_empty, ob_fifo_full;
+
+assign outbound_tdata = { 32'd0, ob_fifo_data };
 assign outbound_tstrb  = 8'h0F;
+assign outbound_tkeep  = 8'h0F;
 assign outbound_tid    = {AXI4_ID_WIDTH{1'b0}};
 assign outbound_tlast  = 1'b1;
-assign outbound_tvalid = ctrl_ob_valid_q || core_ob_valid;
+assign outbound_tvalid = !ob_fifo_empty;
+
+nx_fifo #(
+      .DEPTH(2)
+    , .WIDTH(32)
+) ob_fifo (
+      .clk_i( clk )
+    , .rst_i(~rstn)
+    // Write interface
+    , .wr_data_i({ ctrl_or_core_data })
+    , .wr_push_i(ctrl_ob_valid || core_ob_valid)
+    // Read interface
+    , .rd_data_o(ob_fifo_data)
+    , .rd_pop_i (!ob_fifo_empty && outbound_tready)
+    // Status
+    , .level_o(             )
+    , .empty_o(ob_fifo_empty)
+    , .full_o (ob_fifo_full )
+);
 
 endmodule : nx_artix_200t
