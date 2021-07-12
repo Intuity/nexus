@@ -42,15 +42,23 @@ module nx_stream_combiner #(
 // State
 logic active, next, last, lock;
 
-// Output wiring
-assign comb_data_o  = active ? stream_b_data_i  : stream_a_data_i;
-assign comb_dir_o   = active ? stream_b_dir_i   : stream_a_dir_i;
-assign comb_valid_o = active ? stream_b_valid_i : stream_a_valid_i;
-
-assign stream_a_ready_o = comb_ready_i && (active == 1'b0);
-assign stream_b_ready_o = comb_ready_i && (active == 1'b1);
+// FIFO signals
+logic fifo_empty, fifo_full;
 
 // Arbitration
+logic [STREAM_WIDTH-1:0] arb_data;
+logic [             1:0] arb_dir;
+logic                    arb_valid;
+assign arb_data  = active ? stream_b_data_i  : stream_a_data_i;
+assign arb_dir   = active ? stream_b_dir_i   : stream_a_dir_i;
+assign arb_valid = active ? stream_b_valid_i : stream_a_valid_i;
+
+// Output construction
+assign comb_valid_o     = !fifo_empty;
+assign stream_a_ready_o = !fifo_full && (active == 1'b0);
+assign stream_b_ready_o = !fifo_full && (active == 1'b1);
+
+// Arbitration scheme
 generate
 if (ARB_SCHEME == "round_robin") begin
     assign next = !last || !stream_a_valid_i;
@@ -75,5 +83,24 @@ always_ff @(posedge clk_i, posedge rst_i) begin : p_arb
         end
     end
 end
+
+// FIFO
+nx_fifo #(
+      .DEPTH(2)
+    , .WIDTH(STREAM_WIDTH + 2)
+) fifo (
+      .clk_i(clk_i)
+    , .rst_i(rst_i)
+    // Write interface
+    , .wr_data_i({ arb_data, arb_dir })
+    , .wr_push_i(arb_valid && !fifo_full)
+    // Read interface
+    , .rd_data_o({ comb_data_o, comb_dir_o })
+    , .rd_pop_i (!fifo_empty && comb_ready_i)
+    // Status
+    , .level_o(          )
+    , .empty_o(fifo_empty)
+    , .full_o (fifo_full )
+);
 
 endmodule : nx_stream_combiner
