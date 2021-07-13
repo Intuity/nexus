@@ -13,13 +13,13 @@
 // limitations under the License.
 
 `include "nx_common.svh"
+`include "nx_constants.svh"
 
 // nx_stream_distributor
 // Distributes to multiple outbound message streams
 //
 module nx_stream_distributor #(
-      parameter STREAM_WIDTH = 32
-    , parameter SKID_BUFFERS = "no"
+    parameter STREAM_WIDTH = 32
 ) (
       input  logic                    clk_i
     , input  logic                    rst_i
@@ -54,131 +54,76 @@ module nx_stream_distributor #(
 // Constants and enumerations
 `include "nx_constants.svh"
 
-// Pickup broadcast flags
-logic broadcast;
-assign broadcast = dist_data_i[STREAM_WIDTH-1];
+// Use an ingress FIFO to ease timing
+logic [STREAM_WIDTH-1:0] ingress_data;
+logic [             1:0] ingress_dir;
+logic                    ingress_pop, ingress_empty, ingress_full;
 
-// Skid buffer signals
-logic [3:0][STREAM_WIDTH-1:0] skid_data;
-logic [3:0]                   skid_valid, skid_ready;
+assign dist_ready_o = !ingress_full;
 
-// Construct outputs - if not broadcasting, then allow rerouting...
-// - If NORTH absent route EAST
-// - If EAST  absent route SOUTH
-// - If SOUTH absent route WEST
-// - If WEST  absent route NORTH
-
-assign skid_data[0]  = dist_data_i;
-assign skid_valid[0] = dist_valid_i && (
-    (dist_dir_i == NX_DIRX_NORTH &&  north_present_i              ) ||
-    (dist_dir_i == NX_DIRX_WEST  && !west_present_i  && !broadcast)
+nx_fifo #(
+      .DEPTH(2)
+    , .WIDTH(STREAM_WIDTH + 2)
+) ingress_fifo (
+      .clk_i(clk_i)
+    , .rst_i(rst_i)
+    // Write interface
+    , .wr_data_i({ dist_data_i, dist_dir_i })
+    , .wr_push_i(dist_valid_i && !ingress_full)
+    // Read interface
+    , .rd_data_o({ ingress_data, ingress_dir })
+    , .rd_pop_i (ingress_pop)
+    // Status
+    , .level_o(             )
+    , .empty_o(ingress_empty)
+    , .full_o (ingress_full )
 );
 
-assign skid_data[1]   = dist_data_i;
-assign skid_valid[1]  = dist_valid_i && (
-    (dist_dir_i == NX_DIRX_EAST  &&  east_present_i               ) ||
-    (dist_dir_i == NX_DIRX_NORTH && !north_present_i && !broadcast)
-);
+// Outbound stream interfaces
+`DECLARE_DQ_ARRAY(STREAM_WIDTH, 4, ob_data,  clk_i, rst_i, {STREAM_WIDTH{1'b0}})
+`DECLARE_DQ_ARRAY(           1, 4, ob_valid, clk_i, rst_i, 1'b0)
 
-assign skid_data[2]  = dist_data_i;
-assign skid_valid[2] = dist_valid_i && (
-    (dist_dir_i == NX_DIRX_SOUTH &&  south_present_i              ) ||
-    (dist_dir_i == NX_DIRX_EAST  && !east_present_i  && !broadcast)
-);
+assign {
+    north_data_o, east_data_o, south_data_o, west_data_o
+} = { ob_data_q[0], ob_data_q[1], ob_data_q[2], ob_data_q[3] };
 
-assign skid_data[3]   = dist_data_i;
-assign skid_valid[3]  = dist_valid_i && (
-    (dist_dir_i == NX_DIRX_WEST  &&  west_present_i               ) ||
-    (dist_dir_i == NX_DIRX_SOUTH && !south_present_i && !broadcast)
-);
+assign {
+    north_valid_o, east_valid_o, south_valid_o, west_valid_o
+} = { ob_valid_q[0], ob_valid_q[1], ob_valid_q[2], ob_valid_q[3] };
 
-assign dist_ready_o = (
-     (dist_dir_i == NX_DIRX_NORTH) ? (skid_ready[0] && north_present_i || (skid_ready[1] || broadcast) && !north_present_i) :
-    ((dist_dir_i == NX_DIRX_EAST ) ? (skid_ready[1] && east_present_i  || (skid_ready[2] || broadcast) && !east_present_i ) :
-    ((dist_dir_i == NX_DIRX_SOUTH) ? (skid_ready[2] && south_present_i || (skid_ready[3] || broadcast) && !south_present_i) :
-                                     (skid_ready[3] && west_present_i  || (skid_ready[0] || broadcast) && !west_present_i )))
-);
+logic [3:0] ob_ready;
+assign ob_ready = { west_ready_i, south_ready_i, east_ready_i, north_ready_i };
 
+always_comb begin : p_distribute
+    int         i;
+    logic [1:0] remap_dir;
 
-// Skid buffers for each stream
-generate
-if (SKID_BUFFERS == "yes") begin
-    nx_stream_skid #(
-        .STREAM_WIDTH(STREAM_WIDTH)
-    ) skid_north (
-        .clk_i(clk_i)
-        , .rst_i(rst_i)
-        // Inbound stream
-        , .inbound_data_i (skid_data[0] )
-        , .inbound_valid_i(skid_valid[0])
-        , .inbound_ready_o(skid_ready[0])
-        // Outbound stream
-        , .outbound_data_o (north_data_o )
-        , .outbound_valid_o(north_valid_o)
-        , .outbound_ready_i(north_ready_i)
-    );
+    `INIT_D_ARRAY(ob_data);
+    `INIT_D_ARRAY(ob_valid);
 
-    nx_stream_skid #(
-        .STREAM_WIDTH(STREAM_WIDTH)
-    ) skid_east (
-        .clk_i(clk_i)
-        , .rst_i(rst_i)
-        // Inbound stream
-        , .inbound_data_i (skid_data[1] )
-        , .inbound_valid_i(skid_valid[1])
-        , .inbound_ready_o(skid_ready[1])
-        // Outbound stream
-        , .outbound_data_o (east_data_o )
-        , .outbound_valid_o(east_valid_o)
-        , .outbound_ready_i(east_ready_i)
-    );
+    // Always clear pop
+    ingress_pop = 1'b0;
 
-    nx_stream_skid #(
-        .STREAM_WIDTH(STREAM_WIDTH)
-    ) skid_south (
-        .clk_i(clk_i)
-        , .rst_i(rst_i)
-        // Inbound stream
-        , .inbound_data_i (skid_data[2] )
-        , .inbound_valid_i(skid_valid[2])
-        , .inbound_ready_o(skid_ready[2])
-        // Outbound stream
-        , .outbound_data_o (south_data_o )
-        , .outbound_valid_o(south_valid_o)
-        , .outbound_ready_i(south_ready_i)
-    );
+    // Clear any valids where the ready is high
+    for (i = 0; i < 4; i = (i + 1)) begin
+        if (ob_ready[i]) ob_valid[i] = 1'b0;
+    end
 
-    nx_stream_skid #(
-        .STREAM_WIDTH(STREAM_WIDTH)
-    ) skid_west (
-        .clk_i(clk_i)
-        , .rst_i(rst_i)
-        // Inbound stream
-        , .inbound_data_i (skid_data[3] )
-        , .inbound_valid_i(skid_valid[3])
-        , .inbound_ready_o(skid_ready[3])
-        // Outbound stream
-        , .outbound_data_o (west_data_o )
-        , .outbound_valid_o(west_valid_o)
-        , .outbound_ready_i(west_ready_i)
-    );
-end else begin
-    assign north_data_o  = skid_data[0];
-    assign north_valid_o = skid_valid[0];
-    assign skid_ready[0] = north_ready_i;
+    // Remap the direction based on output presence
+    case ({ ingress_dir, 1'b0 })
+        { NX_DIRX_NORTH, north_present_i }: remap_dir = NX_DIRX_EAST;
+        { NX_DIRX_EAST,  east_present_i  }: remap_dir = NX_DIRX_SOUTH;
+        { NX_DIRX_SOUTH, south_present_i }: remap_dir = NX_DIRX_WEST;
+        { NX_DIRX_WEST,  west_present_i  }: remap_dir = NX_DIRX_NORTH;
+        default                           : remap_dir = ingress_dir;
+    endcase
 
-    assign east_data_o  = skid_data[1];
-    assign east_valid_o = skid_valid[1];
-    assign skid_ready[1] = east_ready_i;
-
-    assign south_data_o  = skid_data[2];
-    assign south_valid_o = skid_valid[2];
-    assign skid_ready[2] = south_ready_i;
-
-    assign west_data_o  = skid_data[3];
-    assign west_valid_o = skid_valid[3];
-    assign skid_ready[3] = west_ready_i;
+    // Arbitrate the next output
+    if (!ingress_empty && !ob_valid[remap_dir]) begin
+        ob_data[remap_dir]  = ingress_data;
+        ob_valid[remap_dir] = 1'b1;
+        ingress_pop         = 1'b1;
+    end
 end
-endgenerate
 
 endmodule : nx_stream_distributor
