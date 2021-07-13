@@ -103,8 +103,7 @@ logic [             1:0] inbound_dir;
 logic                    inbound_valid, inbound_ready;
 
 nx_stream_arbiter #(
-      .STREAM_WIDTH(STREAM_WIDTH)
-    , .SKID_BUFFERS("no"        )
+    .STREAM_WIDTH(STREAM_WIDTH)
 ) inbound_arb (
       .clk_i(clk_i)
     , .rst_i(rst_i)
