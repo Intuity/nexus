@@ -13,6 +13,7 @@
 // limitations under the License.
 
 `include "nx_common.svh"
+`include "nx_constants.svh"
 
 // nx_node_core
 // Evaluates instruction sequence against input values and internal register
@@ -69,8 +70,9 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 // Internal state
 `DECLARE_DQ(1,            restart_req, clk_i, rst_i, 1'b0)
 `DECLARE_DQ(1,            fetch_idle,  clk_i, rst_i, 1'b1)
+`DECLARE_DQ(1,            decode_idle, clk_i, rst_i, 1'b1)
 `DECLARE_DQ(1,            exec_idle,   clk_i, rst_i, 1'b1)
-`DECLARE_DQ(2,            fetch_first, clk_i, rst_i, 2'd0)
+`DECLARE_DQ(3,            fetch_first, clk_i, rst_i, 2'd0)
 `DECLARE_DQ(INSTR_ADDR_W, pc,          clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
 `DECLARE_DQ(REGISTERS,    working,     clk_i, rst_i, {REGISTERS{1'b0}})
 `DECLARE_DQ(OUTPUTS,      outputs,     clk_i, rst_i, {OUTPUTS{1'b0}})
@@ -78,7 +80,7 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 
 // Construct outputs
 assign outputs_o    = outputs_q;
-assign idle_o       = fetch_idle_q && exec_idle_q;
+assign idle_o       = fetch_idle_q && decode_idle_q && exec_idle_q;
 assign instr_addr_o = pc_q;
 assign instr_rd_o   = !fetch_idle_q;
 
@@ -90,7 +92,7 @@ always_comb begin : p_fetch
     `INIT_D(pc);
 
     // Rotate fetch first as long as not stalled
-    if (!instr_stall_i) fetch_first = { fetch_first[0], 1'b0 };
+    if (!instr_stall_i) fetch_first = { fetch_first[1:0], 1'b0 };
 
     // If a trigger is seen, raise restart request
     if (trigger_i) restart_req = 1'b1;
@@ -113,14 +115,15 @@ always_comb begin : p_fetch
 end
 
 // Execution handling
+`DECLARE_DQT(nx_instruction_t, decoded, clk_i, rst_i, {$bits(nx_instruction_t){1'b0}})
+
 always_comb begin : p_execute
-    // Working variables
-    core_op_t                opcode;
-    logic [SOURCE_WIDTH-1:0] src_a, src_b;
-    logic                    src_ip_a, src_ip_b;
-    logic [REG_SRC_W-1:0   ] tgt_reg;
-    logic                    gen_out;
-    logic                    val_a, val_b, result;
+    // Working state
+    logic val_a, val_b, result;
+
+    // Decode state
+    `INIT_D(decode_idle);
+    `INIT_D(decoded);
 
     // Initialise state
     `INIT_D(exec_idle);
@@ -129,47 +132,50 @@ always_comb begin : p_execute
     `INIT_D(output_idx);
 
     // If this is a first fetch, reset output index
-    if (fetch_first_q[1]) output_idx = {OUTPUT_IDX_W{1'b0}};
+    if (fetch_first_q[2]) output_idx = {OUTPUT_IDX_W{1'b0}};
 
-    // If execute is active, and fetch not stalled, execute
-    if (!exec_idle && !instr_stall_i) begin
-        // Decode the operation
-        {
-            opcode,          // Operation [14:12]
-            src_a, src_ip_a, // Source A + is A input/!register [11:8]
-            src_b, src_ip_b, // Source B + is B input/!register [ 7:4]
-            tgt_reg,         // Target register
-            gen_out          // Generates output flag
-        } = instr_data_i;
+    // If fetch is not stalled
+    if (!instr_stall_i) begin
 
-        // Pickup the inputs
-        val_a = src_ip_a ? inputs_i[src_a] : working[src_a];
-        val_b = src_ip_b ? inputs_i[src_b] : working[src_b];
+        // Execute the previously decoded instruction
+        if (!exec_idle) begin
+            // Pickup the inputs
+            val_a = decoded.src_a_ip ? inputs_i[decoded.src_a] : working[decoded.src_a];
+            val_b = decoded.src_b_ip ? inputs_i[decoded.src_b] : working[decoded.src_b];
 
-        // Perform the operation
-        case (opcode)
-            OP_INVERT: result = ! val_a         ;
-            OP_AND   : result =   val_a & val_b ;
-            OP_NAND  : result = !(val_a & val_b);
-            OP_OR    : result =   val_a | val_b ;
-            OP_NOR   : result = !(val_a | val_b);
-            OP_XOR   : result =   val_a ^ val_b ;
-            OP_XNOR  : result = !(val_a ^ val_b);
-            default  : result = 1'b0;
-        endcase
+            // Perform the operation
+            case (decoded.opcode)
+                NX_OP_INVERT: result = ! val_a         ;
+                NX_OP_AND   : result =   val_a & val_b ;
+                NX_OP_NAND  : result = !(val_a & val_b);
+                NX_OP_OR    : result =   val_a | val_b ;
+                NX_OP_NOR   : result = !(val_a | val_b);
+                NX_OP_XOR   : result =   val_a ^ val_b ;
+                NX_OP_XNOR  : result = !(val_a ^ val_b);
+                default     : result = 1'b0;
+            endcase
 
-        // Store the result
-        working[tgt_reg] = result;
+            // Store the result
+            working[decoded.tgt_reg] = result;
 
-        // Generate an output if required
-        if (gen_out) begin
-            outputs[output_idx] = result;
-            output_idx          = output_idx + { {(OUTPUT_IDX_W-1){1'b0}}, 1'b1 };
+            // Generate an output if required
+            if (decoded.gen_out) begin
+                outputs[output_idx] = result;
+                output_idx          = output_idx + { {(OUTPUT_IDX_W-1){1'b0}}, 1'b1 };
+            end
         end
+
+        // Decode the next instruction returned from the RAM
+        if (!decode_idle) begin
+            decoded = instr_data_i[$bits(nx_instruction_t)-1:0];
+        end
+
+        // Propagate idle state
+        exec_idle   = decode_idle;
+        decode_idle = fetch_idle_q;
+
     end
 
-    // Copy the fetch state to inform the next execute cycle
-    if (!instr_stall_i) exec_idle = fetch_idle_q;
 end
 
 endmodule : nx_node_core
