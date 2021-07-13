@@ -29,6 +29,7 @@ async def absent_single_dir(dut, absent):
     intf_size = int(dut.dut.dut.STREAM_WIDTH)
 
     # Drop presence and force ready low for the absent interface
+    dut.info(f"Setting {['north', 'east', 'south', 'west'][absent]} absent")
     dut.present[absent] <= 0
     if   absent == 0: dut.north.intf.ready <= Force(0)
     elif absent == 1: dut.east.intf.ready  <= Force(0)
@@ -49,10 +50,9 @@ async def absent_single_dir(dut, absent):
         dut.dist.append((msg, dirx))
 
         # Queue up message on the expected output
-        if dirx != absent or ((msg >> (intf_size - 1)) & 0x1) == 0:
-            exp.append((msg, 0))
-            # Wait for the expected queue to drain
-            while exp: await RisingEdge(dut.clk)
+        exp.append((msg, 0))
+        # Wait for the expected queue to drain
+        while exp: await RisingEdge(dut.clk)
 
     # Wait for some time after
     await ClockCycles(dut.clk, 100)
@@ -108,8 +108,7 @@ async def absent_multi_dir(dut, backpressure, absent):
         dut.dist.append((msg, dirx))
 
         # Queue up message on the expected output
-        if dirx != absent or ((msg >> (intf_size - 1)) & 0x1) == 0:
-            exp.append((msg, 0))
+        exp.append((msg, 0))
 
     # Wait for the send queue to drain
     for exp, _ in exps:
