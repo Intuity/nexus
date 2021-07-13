@@ -15,6 +15,7 @@
 module testbench #(
       parameter STREAM_WIDTH = 32
     , parameter ARB_SCHEME   = "round_robin" // round_robin, prefer_a, prefer_b
+    , parameter EGRESS_FIFO  = "no"
 ) (
       input  logic                    rst
     // Inbound message streams
@@ -41,6 +42,7 @@ always #1 clk <= ~clk;
 nx_stream_combiner #(
       .STREAM_WIDTH(STREAM_WIDTH)
     , .ARB_SCHEME  (ARB_SCHEME  )
+    , .EGRESS_FIFO (EGRESS_FIFO )
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)
