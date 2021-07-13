@@ -104,7 +104,7 @@ logic                    inbound_valid, inbound_ready;
 
 nx_stream_arbiter #(
       .STREAM_WIDTH(STREAM_WIDTH)
-    , .SKID_BUFFERS("yes"       )
+    , .SKID_BUFFERS("no"        )
 ) inbound_arb (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -143,8 +143,7 @@ logic [             1:0] outbound_dir;
 logic                    outbound_valid, outbound_ready;
 
 nx_stream_distributor #(
-      .STREAM_WIDTH(STREAM_WIDTH)
-    , .SKID_BUFFERS("no"        )
+    .STREAM_WIDTH(STREAM_WIDTH)
 ) outbound_dist (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -315,6 +314,7 @@ nx_node_control #(
 nx_stream_combiner #(
       .STREAM_WIDTH(STREAM_WIDTH)
     , .ARB_SCHEME  ("prefer_a"  )
+    , .EGRESS_FIFO ("no"        )
 ) combiner (
       .clk_i(clk_i)
     , .rst_i(rst_i)
