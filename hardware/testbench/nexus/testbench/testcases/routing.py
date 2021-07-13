@@ -30,9 +30,8 @@ async def routing(dut):
     # Raise active
     dut.active_i <= 1
 
-    # Find the number of rows and columns
+    # Find the number of rows
     num_rows = int(dut.dut.dut.ROWS)
-    num_cols = int(dut.dut.dut.COLUMNS)
 
     for _ in range(1000):
         # Choose a random command type
