@@ -13,13 +13,13 @@
 // limitations under the License.
 
 `include "nx_common.svh"
+`include "nx_constants.svh"
 
 // nx_stream_arbiter
 // Arbitrates between multiple inbound message streams
 //
 module nx_stream_arbiter #(
-      parameter STREAM_WIDTH = 32
-    , parameter SKID_BUFFERS = "no"
+    parameter STREAM_WIDTH = 32
 ) (
       input  logic                    clk_i
     , input  logic                    rst_i
@@ -47,144 +47,80 @@ module nx_stream_arbiter #(
     , input  logic                    arb_ready_i
 );
 
-// Constants and enumerations
-`include "nx_constants.svh"
+// Arbitrated state
+`DECLARE_DQ(STREAM_WIDTH, arb_data,  clk_i, rst_i, {STREAM_WIDTH{1'b0}})
+`DECLARE_DQ(           1, arb_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ(           2, arb_next,  clk_i, rst_i, NX_DIRX_NORTH)
+`DECLARE_DQ(           2, arb_curr,  clk_i, rst_i, NX_DIRX_NORTH)
 
-// Internal state
-`DECLARE_DQ(2, choice, clk_i, rst_i, NX_DIRX_NORTH)
-`DECLARE_DQ(1, locked, clk_i, rst_i, 1'b0)
+// Connect outputs
+assign arb_data_o  = arb_data_q;
+assign arb_dir_o   = arb_curr_q;
+assign arb_valid_o = arb_valid_q;
 
-// Skid buffers for each stream
-logic [3:0][STREAM_WIDTH-1:0] skid_data;
-logic [3:0]                   skid_valid, skid_ready;
-
-generate
-if (SKID_BUFFERS == "yes") begin
-nx_stream_skid #(
-    .STREAM_WIDTH(STREAM_WIDTH)
-) skid_north (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Inbound stream
-    , .inbound_data_i (north_data_i )
-    , .inbound_valid_i(north_valid_i)
-    , .inbound_ready_o(north_ready_o)
-    // Outbound stream
-    , .outbound_data_o (skid_data[0] )
-    , .outbound_valid_o(skid_valid[0])
-    , .outbound_ready_i(skid_ready[0])
-);
-
-nx_stream_skid #(
-    .STREAM_WIDTH(STREAM_WIDTH)
-) skid_east (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Inbound stream
-    , .inbound_data_i (east_data_i )
-    , .inbound_valid_i(east_valid_i)
-    , .inbound_ready_o(east_ready_o)
-    // Outbound stream
-    , .outbound_data_o (skid_data[1] )
-    , .outbound_valid_o(skid_valid[1])
-    , .outbound_ready_i(skid_ready[1])
-);
-
-nx_stream_skid #(
-    .STREAM_WIDTH(STREAM_WIDTH)
-) skid_south (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Inbound stream
-    , .inbound_data_i (south_data_i )
-    , .inbound_valid_i(south_valid_i)
-    , .inbound_ready_o(south_ready_o)
-    // Outbound stream
-    , .outbound_data_o (skid_data[2] )
-    , .outbound_valid_o(skid_valid[2])
-    , .outbound_ready_i(skid_ready[2])
-);
-
-nx_stream_skid #(
-    .STREAM_WIDTH(STREAM_WIDTH)
-) skid_west (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Inbound stream
-    , .inbound_data_i (west_data_i )
-    , .inbound_valid_i(west_valid_i)
-    , .inbound_ready_o(west_ready_o)
-    // Outbound stream
-    , .outbound_data_o (skid_data[3] )
-    , .outbound_valid_o(skid_valid[3])
-    , .outbound_ready_i(skid_ready[3])
-);
-end else begin
-    assign skid_data[0]  = north_data_i;
-    assign skid_valid[0] = north_valid_i;
-    assign north_ready_o = skid_ready[0];
-
-    assign skid_data[1]  = east_data_i;
-    assign skid_valid[1] = east_valid_i;
-    assign east_ready_o  = skid_ready[1];
-
-    assign skid_data[2]  = south_data_i;
-    assign skid_valid[2] = south_valid_i;
-    assign south_ready_o = skid_ready[2];
-
-    assign skid_data[3]  = west_data_i;
-    assign skid_valid[3] = west_valid_i;
-    assign west_ready_o  = skid_ready[3];
-end
-endgenerate
-
-// Construct outputs
-assign arb_data_o = (
-     (choice_q == NX_DIRX_NORTH) ? skid_data[0] :
-    ((choice_q == NX_DIRX_EAST ) ? skid_data[1] :
-    ((choice_q == NX_DIRX_SOUTH) ? skid_data[2] :
-                                   skid_data[3]))
-);
-assign arb_valid_o = (
-     (choice_q == NX_DIRX_NORTH) ? skid_valid[0] :
-    ((choice_q == NX_DIRX_EAST ) ? skid_valid[1] :
-    ((choice_q == NX_DIRX_SOUTH) ? skid_valid[2] :
-                                   skid_valid[3]))
-);
-assign skid_ready[0] = arb_ready_i && (!locked || choice_q == NX_DIRX_NORTH);
-assign skid_ready[1] = arb_ready_i && (!locked || choice_q == NX_DIRX_EAST );
-assign skid_ready[2] = arb_ready_i && (!locked || choice_q == NX_DIRX_SOUTH);
-assign skid_ready[3] = arb_ready_i && (!locked || choice_q == NX_DIRX_WEST );
-assign arb_dir_o     = choice_q;
+assign north_ready_o = (arb_curr == NX_DIRX_NORTH) && (!arb_valid_q || arb_ready_i);
+assign east_ready_o  = (arb_curr == NX_DIRX_EAST ) && (!arb_valid_q || arb_ready_i);
+assign south_ready_o = (arb_curr == NX_DIRX_SOUTH) && (!arb_valid_q || arb_ready_i);
+assign west_ready_o  = (arb_curr == NX_DIRX_WEST ) && (!arb_valid_q || arb_ready_i);
 
 // Arbitration
 always_comb begin : p_arbitrate
-    // Temporary variables
     int   idx;
     logic found;
 
-    // Initialise
-    `INIT_D(choice);
-    `INIT_D(locked);
+    `INIT_D(arb_data);
+    `INIT_D(arb_valid);
+    `INIT_D(arb_next);
+    `INIT_D(arb_curr);
 
-    // Clear lock if READY is high
-    if (arb_ready_i) locked = 1'b0;
+    if (arb_ready_i) arb_valid = 1'b0;
 
-    // If not locked to a source, arbitrate using a round-robin
-    if (!locked) begin
-        found = 1'b0;
-        for (idx = 0; idx < 4; idx = (idx + 1)) begin
-            if (!found) begin
-                case (choice + idx[1:0] + 2'd1)
-                    NX_DIRX_NORTH: found = skid_valid[0];
-                    NX_DIRX_EAST : found = skid_valid[1];
-                    NX_DIRX_SOUTH: found = skid_valid[2];
-                    NX_DIRX_WEST : found = skid_valid[3];
-                endcase
-                if (found) choice = (choice + idx[1:0] + 2'd1);
+    // Perform the arbitration
+    if (!arb_valid) begin
+        arb_curr = arb_next;
+        case (arb_curr)
+            NX_DIRX_NORTH: begin
+                arb_data  = north_data_i;
+                arb_valid = north_valid_i;
             end
+            NX_DIRX_EAST: begin
+                arb_data  = east_data_i;
+                arb_valid = east_valid_i;
+            end
+            NX_DIRX_SOUTH: begin
+                arb_data  = south_data_i;
+                arb_valid = south_valid_i;
+            end
+            NX_DIRX_WEST: begin
+                arb_data  = west_data_i;
+                arb_valid = west_valid_i;
+            end
+        endcase
+    end
+
+    // Search for the next direction
+    found = 1'b0;
+    for (idx = 0; idx < 4; idx = (idx + 1)) begin
+        if (!found) begin
+            case ({ arb_curr + idx[1:0] + 2'd1, 1'b1 })
+                { NX_DIRX_NORTH, north_valid_i }: begin
+                    arb_next = NX_DIRX_NORTH;
+                    found    = 1'b1;
+                end
+                { NX_DIRX_EAST, east_valid_i }: begin
+                    arb_next = NX_DIRX_EAST;
+                    found    = 1'b1;
+                end
+                { NX_DIRX_SOUTH, south_valid_i }: begin
+                    arb_next = NX_DIRX_SOUTH;
+                    found    = 1'b1;
+                end
+                { NX_DIRX_WEST, west_valid_i }: begin
+                    arb_next = NX_DIRX_WEST;
+                    found    = 1'b1;
+                end
+            endcase
         end
-        locked = found;
     end
 end
 
