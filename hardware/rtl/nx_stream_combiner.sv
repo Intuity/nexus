@@ -18,6 +18,7 @@
 module nx_stream_combiner #(
       parameter STREAM_WIDTH = 32
     , parameter ARB_SCHEME   = "round_robin" // round_robin, prefer_a, prefer_b
+    , parameter EGRESS_FIFO  = "no"
 ) (
       input  logic                    clk_i
     , input  logic                    rst_i
@@ -53,11 +54,6 @@ assign arb_data  = active ? stream_b_data_i  : stream_a_data_i;
 assign arb_dir   = active ? stream_b_dir_i   : stream_a_dir_i;
 assign arb_valid = active ? stream_b_valid_i : stream_a_valid_i;
 
-// Output construction
-assign comb_valid_o     = !fifo_empty;
-assign stream_a_ready_o = !fifo_full && (active == 1'b0);
-assign stream_b_ready_o = !fifo_full && (active == 1'b1);
-
 // Arbitration scheme
 generate
 if (ARB_SCHEME == "round_robin") begin
@@ -84,23 +80,42 @@ always_ff @(posedge clk_i, posedge rst_i) begin : p_arb
     end
 end
 
-// FIFO
-nx_fifo #(
-      .DEPTH(2)
-    , .WIDTH(STREAM_WIDTH + 2)
-) fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Write interface
-    , .wr_data_i({ arb_data, arb_dir })
-    , .wr_push_i(arb_valid && !fifo_full)
-    // Read interface
-    , .rd_data_o({ comb_data_o, comb_dir_o })
-    , .rd_pop_i (!fifo_empty && comb_ready_i)
-    // Status
-    , .level_o(          )
-    , .empty_o(fifo_empty)
-    , .full_o (fifo_full )
-);
+// Optional egress FIFO
+generate
+if (EGRESS_FIFO == "yes") begin
+    // Instance FIFO
+    nx_fifo #(
+          .DEPTH(2)
+        , .WIDTH(STREAM_WIDTH + 2)
+    ) fifo (
+          .clk_i(clk_i)
+        , .rst_i(rst_i)
+        // Write interface
+        , .wr_data_i({ arb_data, arb_dir })
+        , .wr_push_i(arb_valid && !fifo_full)
+        // Read interface
+        , .rd_data_o({ comb_data_o, comb_dir_o })
+        , .rd_pop_i (!fifo_empty && comb_ready_i)
+        // Status
+        , .level_o(          )
+        , .empty_o(fifo_empty)
+        , .full_o (fifo_full )
+    );
+
+    // Drive outputs
+    assign comb_valid_o     = !fifo_empty;
+    assign stream_a_ready_o = !fifo_full && (active == 1'b0);
+    assign stream_b_ready_o = !fifo_full && (active == 1'b1);
+
+end else begin
+    // Passthrough without FIFO
+    assign comb_data_o      = arb_data;
+    assign comb_dir_o       = arb_dir;
+    assign comb_valid_o     = arb_valid;
+    assign stream_a_ready_o = comb_ready_i && (active == 1'b0);
+    assign stream_b_ready_o = comb_ready_i && (active == 1'b1);
+
+end
+endgenerate
 
 endmodule : nx_stream_combiner
