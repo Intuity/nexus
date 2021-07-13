@@ -42,6 +42,9 @@ async def map_outputs(dut):
     row_width   = max(dut.io.intf.tgt_row._range) - min(dut.io.intf.tgt_row._range) + 1
     col_width   = max(dut.io.intf.tgt_col._range) - min(dut.io.intf.tgt_col._range) + 1
 
+    # Check all outputs are inactive
+    assert dut.dut.dut.output_actv_q == 0
+
     # Map the outputs in order
     mapped = {}
     total  = 0
@@ -69,10 +72,13 @@ async def map_outputs(dut):
 
     # Check the mappings
     for output, targets in mapped.items():
+        # Check the output is active
+        assert dut.dut.dut.output_actv_q[output] == 1
         # Pickup the base address and count of this output
         output_base  = int(dut.dut.dut.output_base_q[output])
-        output_count = int(dut.dut.dut.output_num_q[output])
+        output_final = int(dut.dut.dut.output_final_q[output])
         # Check the correct number of outputs were loaded
+        output_count = output_final - output_base + 1
         assert output_count == len(targets), \
             f"Output {output} - expecting {len(targets)}, recorded {output_count}"
         # Check each output mapping
