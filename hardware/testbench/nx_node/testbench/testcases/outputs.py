@@ -63,11 +63,7 @@ async def map_outputs(dut):
     for output, targets in mapped.items():
         # Pickup the base address and final address of each output
         output_base  = int(dut.dut.dut.control.output_base_q[output])
-        output_final = (
-            int(dut.dut.dut.control.output_base_q[output+1])
-            if output < (num_outputs - 1) else
-            int(dut.dut.dut.control.output_max_q)
-        ) - 1
+        output_final = int(dut.dut.dut.control.output_final_q[output])
         # Check the correct number of outputs were loaded
         output_count = ((output_final - output_base) + 1)
         assert output_count == len(targets), \
