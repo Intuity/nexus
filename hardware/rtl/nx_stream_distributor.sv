@@ -51,79 +51,83 @@ module nx_stream_distributor #(
     , input  logic                    west_present_i
 );
 
-// Constants and enumerations
-`include "nx_constants.svh"
+// Bind outbound ports into arrays
+logic [3:0][STREAM_WIDTH-1:0] egress_data;
+logic [3:0]                   egress_ready, egress_present, egress_full, egress_empty;
 
-// Use an ingress FIFO to ease timing
-logic [STREAM_WIDTH-1:0] ingress_data;
-logic [             1:0] ingress_dir;
-logic                    ingress_pop, ingress_empty, ingress_full;
+assign { north_data_o, north_valid_o } = { egress_data[NX_DIRX_NORTH], !egress_empty[NX_DIRX_NORTH] };
+assign { east_data_o,  east_valid_o  } = { egress_data[NX_DIRX_EAST ], !egress_empty[NX_DIRX_EAST ] };
+assign { south_data_o, south_valid_o } = { egress_data[NX_DIRX_SOUTH], !egress_empty[NX_DIRX_SOUTH] };
+assign { west_data_o,  west_valid_o  } = { egress_data[NX_DIRX_WEST ], !egress_empty[NX_DIRX_WEST ] };
 
-assign dist_ready_o = !ingress_full;
+assign egress_ready[NX_DIRX_NORTH] = north_ready_i;
+assign egress_ready[NX_DIRX_EAST ] = east_ready_i;
+assign egress_ready[NX_DIRX_SOUTH] = south_ready_i;
+assign egress_ready[NX_DIRX_WEST ] = west_ready_i;
 
-nx_fifo #(
-      .DEPTH(2)
-    , .WIDTH(STREAM_WIDTH + 2)
-) ingress_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Write interface
-    , .wr_data_i({ dist_data_i, dist_dir_i })
-    , .wr_push_i(dist_valid_i && !ingress_full)
-    // Read interface
-    , .rd_data_o({ ingress_data, ingress_dir })
-    , .rd_pop_i (ingress_pop)
-    // Status
-    , .level_o(             )
-    , .empty_o(ingress_empty)
-    , .full_o (ingress_full )
-);
+assign egress_present[NX_DIRX_NORTH] = north_present_i;
+assign egress_present[NX_DIRX_EAST ] = east_present_i;
+assign egress_present[NX_DIRX_SOUTH] = south_present_i;
+assign egress_present[NX_DIRX_WEST ] = west_present_i;
 
-// Outbound stream interfaces
-`DECLARE_DQ_ARRAY(STREAM_WIDTH, 4, ob_data,  clk_i, rst_i, {STREAM_WIDTH{1'b0}})
-`DECLARE_DQ_ARRAY(           1, 4, ob_valid, clk_i, rst_i, 1'b0)
+generate
+genvar i, j;
+for (i = 0; i < 4; i = (i + 1)) begin
+    logic primary_active;
+    logic aliased_active;
 
-assign {
-    north_data_o, east_data_o, south_data_o, west_data_o
-} = { ob_data_q[0], ob_data_q[1], ob_data_q[2], ob_data_q[3] };
+    assign primary_active = (dist_dir_i == i) && egress_present[i];
 
-assign {
-    north_valid_o, east_valid_o, south_valid_o, west_valid_o
-} = { ob_valid_q[0], ob_valid_q[1], ob_valid_q[2], ob_valid_q[3] };
-
-logic [3:0] ob_ready;
-assign ob_ready = { west_ready_i, south_ready_i, east_ready_i, north_ready_i };
-
-always_comb begin : p_distribute
-    int         i;
-    logic [1:0] remap_dir;
-
-    `INIT_D_ARRAY(ob_data);
-    `INIT_D_ARRAY(ob_valid);
-
-    // Always clear pop
-    ingress_pop = 1'b0;
-
-    // Clear any valids where the ready is high
-    for (i = 0; i < 4; i = (i + 1)) begin
-        if (ob_ready[i]) ob_valid[i] = 1'b0;
+    if (i == NX_DIRX_NORTH) begin
+        assign aliased_active = (dist_dir_i == NX_DIRX_WEST) && !egress_present[NX_DIRX_WEST];
+    end else if (i == NX_DIRX_EAST ) begin
+        assign aliased_active = (dist_dir_i == NX_DIRX_NORTH) && !egress_present[NX_DIRX_NORTH];
+    end else if (i == NX_DIRX_SOUTH) begin
+        assign aliased_active = (dist_dir_i == NX_DIRX_EAST) && !egress_present[NX_DIRX_EAST];
+    end else if (i == NX_DIRX_WEST ) begin
+        assign aliased_active = (dist_dir_i == NX_DIRX_SOUTH) && !egress_present[NX_DIRX_SOUTH];
     end
 
-    // Remap the direction based on output presence
-    case ({ ingress_dir, 1'b0 })
-        { NX_DIRX_NORTH, north_present_i }: remap_dir = NX_DIRX_EAST;
-        { NX_DIRX_EAST,  east_present_i  }: remap_dir = NX_DIRX_SOUTH;
-        { NX_DIRX_SOUTH, south_present_i }: remap_dir = NX_DIRX_WEST;
-        { NX_DIRX_WEST,  west_present_i  }: remap_dir = NX_DIRX_NORTH;
-        default                           : remap_dir = ingress_dir;
-    endcase
-
-    // Arbitrate the next output
-    if (!ingress_empty && !ob_valid[remap_dir]) begin
-        ob_data[remap_dir]  = ingress_data;
-        ob_valid[remap_dir] = 1'b1;
-        ingress_pop         = 1'b1;
-    end
+    nx_fifo #(
+          .DEPTH(2)
+        , .WIDTH(STREAM_WIDTH)
+    ) egress_fifo (
+          .clk_i(clk_i)
+        , .rst_i(rst_i)
+        // Write interface
+        , .wr_data_i(dist_data_i)
+        , .wr_push_i(
+            dist_valid_i && !egress_full[i] && (primary_active || aliased_active)
+        )
+        // Read interface
+        , .rd_data_o(egress_data[i])
+        , .rd_pop_i (!egress_empty[i] && egress_ready[i])
+        // Status
+        , .level_o(               )
+        , .empty_o(egress_empty[i])
+        , .full_o (egress_full[i] )
+    );
 end
+endgenerate
+
+// Drive inbound stream ready
+assign dist_ready_o = (
+    (dist_dir_i == NX_DIRX_NORTH && (
+        (!egress_full[NX_DIRX_NORTH] &&  egress_present[NX_DIRX_NORTH]) ||
+        (!egress_full[NX_DIRX_EAST ] && !egress_present[NX_DIRX_NORTH])
+    )) ||
+    (dist_dir_i == NX_DIRX_EAST && (
+        (!egress_full[NX_DIRX_EAST ] &&  egress_present[NX_DIRX_EAST ]) ||
+        (!egress_full[NX_DIRX_SOUTH] && !egress_present[NX_DIRX_EAST ])
+    )) ||
+    (dist_dir_i == NX_DIRX_SOUTH && (
+        (!egress_full[NX_DIRX_SOUTH] &&  egress_present[NX_DIRX_SOUTH]) ||
+        (!egress_full[NX_DIRX_WEST ] && !egress_present[NX_DIRX_SOUTH])
+    )) ||
+    (dist_dir_i == NX_DIRX_WEST && (
+        (!egress_full[NX_DIRX_WEST ] &&  egress_present[NX_DIRX_WEST ]) ||
+        (!egress_full[NX_DIRX_NORTH] && !egress_present[NX_DIRX_WEST ])
+    ))
+);
 
 endmodule : nx_stream_distributor
