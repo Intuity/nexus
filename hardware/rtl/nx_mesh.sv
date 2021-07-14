@@ -53,7 +53,11 @@ localparam NODES = ROWS * COLUMNS;
 
 // Idle flag for every node
 logic [NODES-1:0] idle_flags;
-assign idle_o = &idle_flags;
+
+// AND all idle flags together to produce a mesh idle state
+`DECLARE_DQ(1, idle, clk_i, rst_i, 1'b0)
+assign idle   = &idle_flags;
+assign idle_o = idle_q;
 
 // Token grant and release for every node in every column
 logic [NODES-1:0] column_grant, column_release;
