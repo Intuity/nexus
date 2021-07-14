@@ -379,7 +379,7 @@ always_comb begin : p_output
     fifo_pop = loopback_valid;
 
     // Generate the next message
-    if (!msg_valid && !loopback_valid && token_held) begin
+    if (!msg_valid && !loopback_valid && token_held_q) begin
         // Build the message to send
         msg_data.header.row     = tgt_row;
         msg_data.header.column  = tgt_col;
