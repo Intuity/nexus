@@ -25,20 +25,20 @@ module nx_stream_combiner #(
     , input  logic rst_i
     // Inbound message streams
     // - A
-    , input  nx_message_t   stream_a_data_i
-    , input  nx_direction_t stream_a_dir_i
-    , input  logic          stream_a_valid_i
-    , output logic          stream_a_ready_o
+    , input  nx_message_t stream_a_data_i
+    , input  logic [1:0]  stream_a_dir_i
+    , input  logic        stream_a_valid_i
+    , output logic        stream_a_ready_o
     // - B
-    , input  nx_message_t   stream_b_data_i
-    , input  nx_direction_t stream_b_dir_i
-    , input  logic          stream_b_valid_i
-    , output logic          stream_b_ready_o
+    , input  nx_message_t stream_b_data_i
+    , input  logic [1:0]  stream_b_dir_i
+    , input  logic        stream_b_valid_i
+    , output logic        stream_b_ready_o
     // Outbound arbitrated message stream
-    , output nx_message_t   comb_data_o
-    , output nx_direction_t comb_dir_o
-    , output logic          comb_valid_o
-    , input  logic          comb_ready_i
+    , output nx_message_t comb_data_o
+    , output logic [1:0]  comb_dir_o
+    , output logic        comb_valid_o
+    , input  logic        comb_ready_i
 );
 
 // Arbitrated state
