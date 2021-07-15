@@ -89,7 +89,8 @@ module nx_node #(
 `DECLARE_DQ(1, idle, clk_i, rst_i, 1'b0)
 
 assign idle = (
-    core_idle && decode_idle && !inbound_valid && !outbound_valid && ctrl_idle
+    core_idle && decode_idle && !dcd_valid && !byp_valid && !outbound_valid &&
+    ctrl_idle
 );
 
 assign idle_o = idle_q;
@@ -98,15 +99,18 @@ assign idle_o = idle_q;
 // Arbiter
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] inbound_data;
-logic [             1:0] inbound_dir;
-logic                    inbound_valid, inbound_ready;
+logic [STREAM_WIDTH-1:0] dcd_data,  byp_data;
+logic                    dcd_valid, dcd_ready, byp_valid, byp_ready;
+logic [             1:0] byp_dir;
 
 nx_stream_arbiter #(
     .STREAM_WIDTH(STREAM_WIDTH)
 ) inbound_arb (
       .clk_i(clk_i)
     , .rst_i(rst_i)
+    // Control signals
+    , .node_row_i(node_row_i )
+    , .node_col_i(node_col_i )
     // Inbound message streams
     // - North
     , .north_data_i (ib_north_data_i )
@@ -124,11 +128,15 @@ nx_stream_arbiter #(
     , .west_data_i (ib_west_data_i )
     , .west_valid_i(ib_west_valid_i)
     , .west_ready_o(ib_west_ready_o)
-    // Outbound arbitrated message stream
-    , .arb_data_o (inbound_data )
-    , .arb_dir_o  (inbound_dir  )
-    , .arb_valid_o(inbound_valid)
-    , .arb_ready_i(inbound_ready)
+    // Outbound stream for this node
+    , .internal_data_o (dcd_data )
+    , .internal_valid_o(dcd_valid)
+    , .internal_ready_i(dcd_ready)
+    // Outbound stream for bypass
+    , .bypass_data_o (byp_data )
+    , .bypass_dir_o  (byp_dir  )
+    , .bypass_valid_o(byp_valid)
+    , .bypass_ready_i(byp_ready)
 );
 
 localparam MAX_IO = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS);
@@ -180,10 +188,6 @@ nx_stream_distributor #(
 
 logic decode_idle;
 
-logic [STREAM_WIDTH-1:0] bypass_data;
-logic [             1:0] bypass_dir;
-logic                    bypass_valid, bypass_ready;
-
 logic [$clog2(OUTPUTS)-1:0] map_idx;
 logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row;
 logic [ ADDR_COL_WIDTH-1:0] map_tgt_col;
@@ -208,19 +212,11 @@ nx_msg_decoder #(
       .clk_i(clk_i)
     , .rst_i(rst_i)
     // Control signals
-    , .idle_o    (decode_idle)
-    , .node_row_i(node_row_i )
-    , .node_col_i(node_col_i )
+    , .idle_o(decode_idle)
     // Inbound message stream
-    , .msg_data_i (inbound_data )
-    , .msg_dir_i  (inbound_dir  )
-    , .msg_valid_i(inbound_valid)
-    , .msg_ready_o(inbound_ready)
-    // Outbound bypass message stream
-    , .bypass_data_o (bypass_data )
-    , .bypass_dir_o  (bypass_dir  )
-    , .bypass_valid_o(bypass_valid)
-    , .bypass_ready_i(bypass_ready)
+    , .msg_data_i (dcd_data )
+    , .msg_valid_i(dcd_valid)
+    , .msg_ready_o(dcd_ready)
     // I/O mapping handling
     , .map_idx_o    (map_idx    ) // Output to configure
     , .map_tgt_row_o(map_tgt_row) // Target node's row
@@ -319,10 +315,10 @@ nx_stream_combiner #(
     , .rst_i(rst_i)
     // Inbound message streams
     // - A
-    , .stream_a_data_i (bypass_data )
-    , .stream_a_dir_i  (bypass_dir  )
-    , .stream_a_valid_i(bypass_valid)
-    , .stream_a_ready_o(bypass_ready)
+    , .stream_a_data_i (byp_data )
+    , .stream_a_dir_i  (byp_dir  )
+    , .stream_a_valid_i(byp_valid)
+    , .stream_a_ready_o(byp_ready)
     // - B
     , .stream_b_data_i (emit_data )
     , .stream_b_dir_i  (emit_dir  )
