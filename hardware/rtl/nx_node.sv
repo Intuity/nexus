@@ -104,7 +104,8 @@ logic                    dcd_valid, dcd_ready, byp_valid, byp_ready;
 logic [             1:0] byp_dir;
 
 nx_stream_arbiter #(
-    .STREAM_WIDTH(STREAM_WIDTH)
+      .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
+    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
 ) inbound_arb (
       .clk_i(clk_i)
     , .rst_i(rst_i)
