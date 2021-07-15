@@ -308,9 +308,7 @@ nx_node_control #(
 // -----------------------------------------------------------------------------
 
 nx_stream_combiner #(
-      .STREAM_WIDTH(STREAM_WIDTH)
-    , .ARB_SCHEME  ("prefer_a"  )
-    , .EGRESS_FIFO ("no"        )
+    .ARB_SCHEME  ("prefer_a"  )
 ) combiner (
       .clk_i(clk_i)
     , .rst_i(rst_i)
