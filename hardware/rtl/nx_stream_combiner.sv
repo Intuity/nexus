@@ -12,110 +12,99 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+`include "nx_common.svh"
+`include "nx_constants.svh"
+
 // nx_stream_combiner
 // Combines two directed streams, in different modes
 //
 module nx_stream_combiner #(
-      parameter STREAM_WIDTH = 32
-    , parameter ARB_SCHEME   = "round_robin" // round_robin, prefer_a, prefer_b
-    , parameter EGRESS_FIFO  = "no"
+    parameter ARB_SCHEME = "round_robin" // round_robin, prefer_a, prefer_b
 ) (
-      input  logic                    clk_i
-    , input  logic                    rst_i
+      input  logic clk_i
+    , input  logic rst_i
     // Inbound message streams
     // - A
-    , input  logic [STREAM_WIDTH-1:0] stream_a_data_i
-    , input  logic [             1:0] stream_a_dir_i
-    , input  logic                    stream_a_valid_i
-    , output logic                    stream_a_ready_o
+    , input  nx_message_t   stream_a_data_i
+    , input  nx_direction_t stream_a_dir_i
+    , input  logic          stream_a_valid_i
+    , output logic          stream_a_ready_o
     // - B
-    , input  logic [STREAM_WIDTH-1:0] stream_b_data_i
-    , input  logic [             1:0] stream_b_dir_i
-    , input  logic                    stream_b_valid_i
-    , output logic                    stream_b_ready_o
+    , input  nx_message_t   stream_b_data_i
+    , input  nx_direction_t stream_b_dir_i
+    , input  logic          stream_b_valid_i
+    , output logic          stream_b_ready_o
     // Outbound arbitrated message stream
-    , output logic [STREAM_WIDTH-1:0] comb_data_o
-    , output logic [             1:0] comb_dir_o
-    , output logic                    comb_valid_o
-    , input  logic                    comb_ready_i
+    , output nx_message_t   comb_data_o
+    , output nx_direction_t comb_dir_o
+    , output logic          comb_valid_o
+    , input  logic          comb_ready_i
 );
 
-// State
-logic active, next, last, lock;
+// Arbitrated state
+`DECLARE_DQT(nx_message_t, comb_data,  clk_i, rst_i, {$bits(nx_message_t){1'b0}})
+`DECLARE_DQ (           2, comb_dir,   clk_i, rst_i, NX_DIRX_NORTH)
+`DECLARE_DQ (           1, comb_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ (           1, comb_next,  clk_i, rst_i, 1'b0)
+`DECLARE_DQ (           1, comb_curr,  clk_i, rst_i, 1'b0)
 
-// FIFO signals
-logic fifo_empty, fifo_full;
+assign comb_data_o  = comb_data_q;
+assign comb_dir_o   = comb_dir_q;
+assign comb_valid_o = comb_valid_q;
+
+// Connect inbound ready signals
+assign stream_a_ready_o = (comb_curr == 1'b0) && (!comb_valid_q || comb_ready_i);
+assign stream_b_ready_o = (comb_curr == 1'b1) && (!comb_valid_q || comb_ready_i);
 
 // Arbitration
-logic [STREAM_WIDTH-1:0] arb_data;
-logic [             1:0] arb_dir;
-logic                    arb_valid;
-assign arb_data  = active ? stream_b_data_i  : stream_a_data_i;
-assign arb_dir   = active ? stream_b_dir_i   : stream_a_dir_i;
-assign arb_valid = active ? stream_b_valid_i : stream_a_valid_i;
+always_comb begin : p_arbitrate
+    int   idx;
+    logic search_start;
+    logic found;
 
-// Arbitration scheme
-generate
-if (ARB_SCHEME == "round_robin") begin
-    assign next = !last || !stream_a_valid_i;
-end else if (ARB_SCHEME == "prefer_a") begin
-    assign next = !stream_a_valid_i;
-end else if (ARB_SCHEME == "prefer_b") begin
-    assign next = stream_b_valid_i;
-end
-endgenerate
+    `INIT_D(comb_data);
+    `INIT_D(comb_dir);
+    `INIT_D(comb_valid);
+    `INIT_D(comb_next);
+    `INIT_D(comb_curr);
 
-// Sequential logic
-always_ff @(posedge clk_i, posedge rst_i) begin : p_arb
-    if (rst_i) begin
-        active <= 1'b0;
-        last   <= 1'b0;
-        lock   <= 1'b0;
-    end else begin
-        if (!lock || comb_ready_i) begin
-            last   <= active;
-            active <= next;
-            lock   <= next ? stream_b_valid_i : stream_a_valid_i;
+    if (comb_ready_i) comb_valid = 1'b0;
+
+    // Perform the arbitration
+    if (!comb_valid) begin
+        comb_curr = comb_next;
+        if (comb_curr) begin
+            comb_data  = stream_b_data_i;
+            comb_dir   = stream_b_dir_i;
+            comb_valid = stream_b_valid_i;
+        end else begin
+            comb_data  = stream_a_data_i;
+            comb_dir   = stream_a_dir_i;
+            comb_valid = stream_a_valid_i;
+        end
+    end
+
+    // Set the search start point
+    if      (ARB_SCHEME == "round_robin") search_start = comb_curr + 1'b1;
+    else if (ARB_SCHEME == "prefer_a"   ) search_start = 1'b0;
+    else if (ARB_SCHEME == "prefer_b"   ) search_start = 1'b1;
+
+    // Search for the next direction
+    found = 1'b0;
+    for (idx = 0; idx < 2; idx = (idx + 1)) begin
+        if (!found) begin
+            case ({ search_start + idx[0], 1'b1 })
+                { 1'b0, stream_a_valid_i }: begin
+                    comb_next = 1'b0;
+                    found     = 1'b1;
+                end
+                { 1'b1, stream_b_valid_i }: begin
+                    comb_next = 1'b1;
+                    found     = 1'b1;
+                end
+            endcase
         end
     end
 end
-
-// Optional egress FIFO
-generate
-if (EGRESS_FIFO == "yes") begin
-    // Instance FIFO
-    nx_fifo #(
-          .DEPTH(2)
-        , .WIDTH(STREAM_WIDTH + 2)
-    ) fifo (
-          .clk_i(clk_i)
-        , .rst_i(rst_i)
-        // Write interface
-        , .wr_data_i({ arb_data, arb_dir })
-        , .wr_push_i(arb_valid && !fifo_full)
-        // Read interface
-        , .rd_data_o({ comb_data_o, comb_dir_o })
-        , .rd_pop_i (!fifo_empty && comb_ready_i)
-        // Status
-        , .level_o(          )
-        , .empty_o(fifo_empty)
-        , .full_o (fifo_full )
-    );
-
-    // Drive outputs
-    assign comb_valid_o     = !fifo_empty;
-    assign stream_a_ready_o = !fifo_full && (active == 1'b0);
-    assign stream_b_ready_o = !fifo_full && (active == 1'b1);
-
-end else begin
-    // Passthrough without FIFO
-    assign comb_data_o      = arb_data;
-    assign comb_dir_o       = arb_dir;
-    assign comb_valid_o     = arb_valid;
-    assign stream_a_ready_o = comb_ready_i && (active == 1'b0);
-    assign stream_b_ready_o = comb_ready_i && (active == 1'b1);
-
-end
-endgenerate
 
 endmodule : nx_stream_combiner
