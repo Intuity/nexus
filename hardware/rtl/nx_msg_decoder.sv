@@ -31,19 +31,11 @@ module nx_msg_decoder #(
       input  logic clk_i
     , input  logic rst_i
     // Control signals
-    , output logic                      idle_o
-    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+    , output logic idle_o
     // Inbound message stream
-    , input  nx_message_t   msg_data_i
-    , input  nx_direction_t msg_dir_i
-    , input  logic          msg_valid_i
-    , output logic          msg_ready_o
-    // Outbound bypass message stream
-    , output nx_message_t   bypass_data_o
-    , output nx_direction_t bypass_dir_o
-    , output logic          bypass_valid_o
-    , input  logic          bypass_ready_i
+    , input  nx_message_t msg_data_i
+    , input  logic        msg_valid_i
+    , output logic        msg_ready_o
     // I/O mapping handling
     , output logic [$clog2(OUTPUTS)-1:0] map_idx_o     // Output to configure
     , output logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
@@ -62,29 +54,23 @@ module nx_msg_decoder #(
 );
 
 // Internal state
-`DECLARE_DQ (1,              fifo_pop,  clk_i, rst_i, 1'b0)
-`DECLARE_DQ (STREAM_WIDTH,   byp_data,  clk_i, rst_i, {STREAM_WIDTH{1'b0}})
-`DECLARE_DQT(nx_direction_t, byp_dir,   clk_i, rst_i, NX_DIRX_NORTH)
-`DECLARE_DQ (1,              byp_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ (1, fifo_pop,  clk_i, rst_i, 1'b0)
 
 // Construct outputs
-assign idle_o         = fifo_empty && !msg_valid_i && !byp_valid;
-assign bypass_data_o  = byp_data_q;
-assign bypass_dir_o   = byp_dir_q;
-assign bypass_valid_o = byp_valid_q;
+assign idle_o = fifo_empty && !msg_valid_i;
 
 // Inbound FIFO - buffer incoming messages ready for digestion
 logic                      fifo_empty, fifo_full;
 logic [STREAM_WIDTH+2-1:0] fifo_data;
 
 nx_fifo #(
-      .DEPTH(             4)
-    , .WIDTH(STREAM_WIDTH+2)
+      .DEPTH(           4)
+    , .WIDTH(STREAM_WIDTH)
 ) msg_fifo (
       .clk_i    (clk_i)
     , .rst_i    (rst_i)
     // Write interface
-    , .wr_data_i({msg_dir_i, msg_data_i}   )
+    , .wr_data_i(msg_data_i                )
     , .wr_push_i(msg_valid_i && msg_ready_o)
     // Read interface
     , .rd_data_o(fifo_data )
@@ -162,9 +148,6 @@ always_comb begin : p_decode
 
     // Initialise state
     `INIT_D(fifo_pop);
-    `INIT_D(byp_data);
-    `INIT_D(byp_dir);
-    `INIT_D(byp_valid);
     `INIT_D(map_valid);
     `INIT_D(signal_valid);
     `INIT_D(instr_valid);
@@ -174,33 +157,14 @@ always_comb begin : p_decode
     signal_valid = 1'b0;
     instr_valid  = 1'b0;
 
-    // If bypass data accepted, clear the valid
-    if (bypass_ready_i) byp_valid = 1'b0;
-
     // Decode the next entry in the FIFO
-    if (!byp_valid && !fifo_empty && !fifo_pop) begin
+    if (!fifo_empty && !fifo_pop) begin
         // Pop the FIFO as the data has been picked up
         fifo_pop = 1'b1;
 
-        // Is this message addressed to this node?
-        if (
-            message.header.row    == node_row_i &&
-            message.header.column == node_col_i
-        ) begin
-            instr_valid  = (message.header.command == NX_CMD_LOAD_INSTR);
-            map_valid    = (message.header.command == NX_CMD_MAP_OUTPUT);
-            signal_valid = (message.header.command == NX_CMD_SIG_STATE );
-
-        // Otherwise redirect the message
-        end else begin
-            byp_data  = message;
-            byp_valid = 1'b1;
-            if      (message.header.row    < node_row_i) byp_dir = NX_DIRX_NORTH;
-            else if (message.header.row    > node_row_i) byp_dir = NX_DIRX_SOUTH;
-            else if (message.header.column < node_col_i) byp_dir = NX_DIRX_WEST;
-            else if (message.header.column > node_col_i) byp_dir = NX_DIRX_EAST;
-
-        end
+        instr_valid  = (message.header.command == NX_CMD_LOAD_INSTR);
+        map_valid    = (message.header.command == NX_CMD_MAP_OUTPUT);
+        signal_valid = (message.header.command == NX_CMD_SIG_STATE );
 
     // If not doing anything, clear the pop flag
     end else begin
