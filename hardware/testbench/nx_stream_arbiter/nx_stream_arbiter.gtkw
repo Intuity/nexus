@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Thu Jun 24 11:17:27 2021
+[*] Thu Jul 15 18:02:44 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_arbiter/sim.lxt"
-[dumpfile_mtime] "Thu Jun 24 11:16:19 2021"
-[dumpfile_size] 74854
+[dumpfile_mtime] "Thu Jul 15 18:02:00 2021"
+[dumpfile_size] 141020
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_stream_arbiter/nx_stream_arbiter.gtkw"
 [timestart] 0
 [size] 1440 847
-[pos] 2046 -470
-*-20.062569 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-15.181880 83000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.dut.
 [sst_width] 193
-[signals_width] 225
+[signals_width] 368
 [sst_expanded] 1
 [sst_vpaned_height] 291
 @28
@@ -22,9 +22,15 @@ testbench.dut.rst_i[0]
 @200
 -
 @22
+testbench.dut.node_row_i[3:0]
+testbench.dut.node_col_i[3:0]
+@200
+-
+@22
 testbench.dut.north_data_i[31:0]
-@28
+@29
 testbench.dut.north_valid_i[0]
+@28
 testbench.dut.north_ready_o[0]
 @200
 -
@@ -50,23 +56,26 @@ testbench.dut.west_ready_o[0]
 @200
 -
 @22
-testbench.dut.arb_data_o[31:0]
+testbench.dut.internal_data_o[31:0]
 @28
-testbench.dut.arb_dir_o[1:0]
-testbench.dut.arb_valid_o[0]
-testbench.dut.arb_ready_i[0]
+testbench.dut.internal_valid_o[0]
+testbench.dut.internal_ready_i[0]
+@200
+-
+@22
+testbench.dut.bypass_data_o[31:0]
+@28
+testbench.dut.bypass_dir_o[1:0]
+testbench.dut.bypass_valid_o[0]
+testbench.dut.bypass_ready_i[0]
 @200
 -
 @28
-testbench.dut.choice[1:0]
-testbench.dut.locked[0]
-@200
--
-@28
-testbench.dut.skid_north.buffer_valid[0]
-testbench.dut.skid_east.buffer_valid[0]
-testbench.dut.skid_south.buffer_valid[0]
-@29
-testbench.dut.skid_west.buffer_valid[0]
+testbench.dut.arb_bypass_valid_q[0]
+testbench.dut.arb_bypass_valid[0]
+testbench.dut.east_match[0]
+testbench.dut.north_match[0]
+testbench.dut.south_match[0]
+testbench.dut.west_match[0]
 [pattern_trace] 1
 [pattern_trace] 0

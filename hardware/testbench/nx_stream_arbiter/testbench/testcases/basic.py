@@ -39,37 +39,57 @@ async def single_dir(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Get the width of the data
-    intf_size = max(dut.arb_io.data._range)-min(dut.arb_io.data._range)+1
+    # Set the node address to a random value
+    dut.node_row_i <= (row    := randint(1, 14))
+    dut.node_col_i <= (column := randint(1, 14))
 
-    for dirx, intf in enumerate((dut.north, dut.east, dut.south, dut.west)):
+    # Get the width of the data
+    intf_size = max(dut.int_io.data._range)-min(dut.int_io.data._range)+1
+
+    for intf in (dut.north, dut.east, dut.south, dut.west):
         # Drive a number of random messages from the north interface
-        msgs = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
+        msgs = [
+            (row    << 28) |
+            (column << 24) |
+            randint(0, (1 << (intf_size - 8)) - 1)
+            for _ in range(randint(50, 100))
+        ]
         for msg in msgs: intf.append(msg)
         dut.info(f"Generated {len(msgs)} messages")
 
         # Queue up the expected responses
-        dut.expected += [(x, dirx) for x in msgs]
+        dut.int_expected += [(x, 0) for x in msgs]
 
         # Wait for the expected queue to drain
-        while dut.expected: await RisingEdge(dut.clk)
+        while dut.int_expected: await RisingEdge(dut.clk)
 
 async def multi_dir(dut, backpressure):
     """ Queue up many messages onto different interfaces """
     dut.info("Resetting the DUT")
     await dut.reset()
 
+    # Set the node address to a random value
+    dut.node_row_i <= (row    := randint(1, 14))
+    dut.node_col_i <= (column := randint(1, 14))
+
     # Activate/deactivate backpressure
-    dut.arb.delays = backpressure
+    dut.int.delays = backpressure
+    dut.byp.delays = backpressure
 
     # Get the width of the data
-    intf_size = max(dut.arb_io.data._range)-min(dut.arb_io.data._range)+1
+    intf_size = max(dut.int_io.data._range)-min(dut.int_io.data._range)+1
+
+    # Function to generate messages
+    def gen_msg():
+        return [
+            (row    << 28) |
+            (column << 24) |
+            randint(0, (1 << (intf_size - 8)) - 1)
+            for _ in range(randint(50, 100))
+        ]
 
     # Queue up random messages onto the different drivers
-    north = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
-    east  = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
-    south = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
-    west  = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
+    north, east, south, west = gen_msg(), gen_msg(), gen_msg(), gen_msg()
 
     for msg in north: dut.north.append(msg)
     for msg in east : dut.east.append(msg)
@@ -81,10 +101,10 @@ async def multi_dir(dut, backpressure):
     while north or east or south or west:
         for idx in range(4):
             dirx = (idx + last + 1) % 4
-            if   dirx == 0 and north: dut.expected.append((north.pop(0), 0))
-            elif dirx == 1 and east : dut.expected.append((east.pop(0),  1))
-            elif dirx == 2 and south: dut.expected.append((south.pop(0), 2))
-            elif dirx == 3 and west : dut.expected.append((west.pop(0),  3))
+            if   dirx == 0 and north: dut.int_expected.append((north.pop(0), 0))
+            elif dirx == 1 and east : dut.int_expected.append((east.pop(0),  0))
+            elif dirx == 2 and south: dut.int_expected.append((south.pop(0), 0))
+            elif dirx == 3 and west : dut.int_expected.append((west.pop(0),  0))
         # Capture the last direction
         last = dirx
 

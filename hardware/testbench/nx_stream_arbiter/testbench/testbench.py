@@ -32,22 +32,26 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Wrap complex interfaces
-        self.north_io = StreamIO(self.dut, "north", IORole.RESPONDER)
-        self.east_io  = StreamIO(self.dut, "east",  IORole.RESPONDER)
-        self.south_io = StreamIO(self.dut, "south", IORole.RESPONDER)
-        self.west_io  = StreamIO(self.dut, "west",  IORole.RESPONDER)
-        self.arb_io   = StreamIO(self.dut, "arb",   IORole.INITIATOR)
+        self.north_io = StreamIO(self.dut, "north",    IORole.RESPONDER)
+        self.east_io  = StreamIO(self.dut, "east",     IORole.RESPONDER)
+        self.south_io = StreamIO(self.dut, "south",    IORole.RESPONDER)
+        self.west_io  = StreamIO(self.dut, "west",     IORole.RESPONDER)
+        self.int_io   = StreamIO(self.dut, "internal", IORole.INITIATOR)
+        self.byp_io   = StreamIO(self.dut, "bypass",   IORole.INITIATOR)
         # Setup drivers/monitors
         self.north = StreamInitiator(self, self.clk, self.rst, self.north_io)
         self.east  = StreamInitiator(self, self.clk, self.rst, self.east_io )
         self.south = StreamInitiator(self, self.clk, self.rst, self.south_io)
         self.west  = StreamInitiator(self, self.clk, self.rst, self.west_io )
-        self.arb   = StreamResponder(self, self.clk, self.rst, self.arb_io  )
+        self.int   = StreamResponder(self, self.clk, self.rst, self.int_io, name="internal")
+        self.byp   = StreamResponder(self, self.clk, self.rst, self.byp_io, name="bypass")
         # Create a queue for expected messages
-        self.expected = []
+        self.int_expected = []
+        self.byp_expected = []
         # Create a scoreboard
         self.scoreboard = Scoreboard(self, fail_immediately=False)
-        self.scoreboard.add_interface(self.arb, self.expected, reorder_depth=4)
+        self.scoreboard.add_interface(self.int, self.int_expected, reorder_depth=4)
+        self.scoreboard.add_interface(self.byp, self.byp_expected, reorder_depth=4)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
@@ -56,14 +60,18 @@ class Testbench(TestbenchBase):
         self.east_io.initialise(IORole.INITIATOR)
         self.south_io.initialise(IORole.INITIATOR)
         self.west_io.initialise(IORole.INITIATOR)
-        self.arb_io.initialise(IORole.RESPONDER)
+        self.int_io.initialise(IORole.RESPONDER)
+        self.byp_io.initialise(IORole.RESPONDER)
+        self.node_row_i <= 0
+        self.node_col_i <= 0
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.expected: await RisingEdge(tb.clk)
+            while tb.int_expected: await RisingEdge(tb.clk)
+            while tb.byp_expected: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)
