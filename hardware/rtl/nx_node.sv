@@ -30,7 +30,7 @@ module nx_node #(
     , parameter MAX_INSTRS      = 512
     , parameter OPCODE_WIDTH    =   3
     , parameter OP_STORE_LENGTH = 512
-    , parameter OP_STORE_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
+    , parameter OP_STORE_WIDTH  = 1 + ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
 ) (
       input  logic clk_i
     , input  logic rst_i
