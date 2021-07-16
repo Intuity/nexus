@@ -15,7 +15,7 @@
 module testbench #(
       parameter INSTR_WIDTH =  15 // Width of each instruction
     , parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
-    , parameter CTRL_WIDTH  =  12 // Width of each control entry
+    , parameter CTRL_WIDTH  =  13 // Width of each control entry
     , parameter MAX_CTRL    = 512 // Maximum number of control entries
 ) (
       input  logic rst
