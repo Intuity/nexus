@@ -20,7 +20,7 @@ module testbench #(
     , parameter INPUTS          =   8
     , parameter OUTPUTS         =   8
     , parameter OP_STORE_LENGTH = 256
-    , parameter OP_STORE_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
+    , parameter OP_STORE_WIDTH  = 1 + ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
 ) (
       input  logic rst
     // Node identity
