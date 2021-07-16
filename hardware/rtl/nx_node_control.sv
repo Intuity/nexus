@@ -27,7 +27,7 @@ module nx_node_control #(
     , parameter INPUTS          =   8 // Number of inputs to each node
     , parameter OUTPUTS         =   8 // Number of outputs from each node
     , parameter OP_STORE_LENGTH = 512 // Total number of output messages allowed
-    , parameter OP_STORE_WIDTH  = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
+    , parameter OP_STORE_WIDTH  = 1 + ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -253,7 +253,8 @@ always_comb begin : p_output_memory
         store_wr_en   = 1'b1;
         store_rd_en   = 1'b0;
         store_wr_data = {
-              map_tgt_row_i // Target row
+              (map_tgt_row_i == node_row_i && map_tgt_col_i == node_col_i) // Loopback?
+            , map_tgt_row_i // Target row
             , map_tgt_col_i // Target column
             , map_tgt_idx_i // Target input index
             , map_tgt_seq_i // Target input is sequential
@@ -346,6 +347,7 @@ assign idle_o = (
 );
 
 always_comb begin : p_output
+    logic                      tgt_lb;
     logic [ADDR_ROW_WIDTH-1:0] tgt_row;
     logic [ADDR_COL_WIDTH-1:0] tgt_col;
     logic [       INPUT_W-1:0] tgt_idx;
@@ -363,23 +365,22 @@ always_comb begin : p_output
     if (msg_ready_i) msg_valid = 1'b0;
 
     // Decode the fields from the RAM
-    { tgt_row, tgt_col, tgt_idx, tgt_seq } = msg_fifo_out;
+    { tgt_lb, tgt_row, tgt_col, tgt_idx, tgt_seq } = msg_fifo_out;
 
     // Handle internal updates
     loopback_index = tgt_idx;
     loopback_state = state_fifo_out;
     loopback_valid = (
-        !state_fifo_empty     && // Entries ready in state FIFO
-        !msg_fifo_empty       && // Entries ready in message FIFO
-        tgt_row == node_row_i && // Target row matches this node
-        tgt_col == node_col_i    // Target column matches this node
+        !state_fifo_empty && // Entries ready in state FIFO
+        !msg_fifo_empty   && // Entries ready in message FIFO
+        tgt_lb               // Loopback flag set (calculated when filling RAM)
     );
 
     // Pop FIFO if loopback used
     fifo_pop = loopback_valid;
 
     // Generate the next message
-    if (!msg_valid && !loopback_valid && token_held_q) begin
+    if (!msg_valid && !tgt_lb && token_held_q) begin
         // Build the message to send
         msg_data.header.row     = tgt_row;
         msg_data.header.column  = tgt_col;
