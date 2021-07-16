@@ -192,6 +192,7 @@ nx_fifo #(
 
 `DECLARE_DQ(OP_STORE_ADDR_W, send_address, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
 `DECLARE_DQ(OP_STORE_ADDR_W, send_final,   clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+`DECLARE_DQ(1,               send_pending, clk_i, rst_i, 1'b0)
 `DECLARE_DQ(1,               send_value,   clk_i, rst_i, 1'b0)
 
 assign store_addr_o    = store_addr_q;
@@ -234,6 +235,7 @@ always_comb begin : p_output_memory
     `INIT_D(store_rd_resp);
     `INIT_D(send_address);
     `INIT_D(send_final);
+    `INIT_D(send_pending);
     `INIT_D(send_value);
 
     // Pipeline store_rd_en -> store_rd_resp to align with data return
@@ -271,13 +273,15 @@ always_comb begin : p_output_memory
     // Otherwise handle output state generation
     end else if (!state_fifo_full) begin
         // Increment to the next address to fetch
-        if (send_address != send_final) begin
+        if (send_pending) begin
+            store_addr   = send_address;
             send_address = send_address + { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 };
             store_rd_en  = 1'b1;
 
         // Pick-up the next update request
         end else if (!queue_empty) begin
-            send_address = queued_base;
+            store_addr   = queued_base;
+            send_address = queued_base + { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 };
             send_final   = queued_final;
             send_value   = queued_state;
             store_rd_en  = 1'b1;
@@ -285,8 +289,8 @@ always_comb begin : p_output_memory
 
         end
 
-        // Form the memory request
-        store_addr = send_address;
+        // Check for further messages to send
+        send_pending = store_rd_en && (store_addr != send_final);
 
     end
 end
