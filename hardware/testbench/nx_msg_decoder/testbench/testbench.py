@@ -39,11 +39,9 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Wrap complex interfaces
-        self.msg_io    = StreamIO(self.dut, "msg",    IORole.RESPONDER)
-        self.bypass_io = StreamIO(self.dut, "bypass", IORole.INITIATOR)
+        self.msg_io = StreamIO(self.dut, "msg",    IORole.RESPONDER)
         # Setup drivers/monitors
-        self.msg    = StreamInitiator(self, self.clk, self.rst, self.msg_io)
-        self.bypass = StreamResponder(self, self.clk, self.rst, self.bypass_io)
+        self.msg = StreamInitiator(self, self.clk, self.rst, self.msg_io)
         self.instr_load = InstrStoreMonitor(
             self, self.clk, self.rst, InstrStoreIO(self.dut, "instr", IORole.INITIATOR),
         )
@@ -54,13 +52,11 @@ class Testbench(TestbenchBase):
             self, self.clk, self.rst, StateIO(self.dut, "signal", IORole.INITIATOR),
         )
         # Create queues for expected transactions
-        self.exp_bypass = []
-        self.exp_instr  = []
-        self.exp_io     = []
-        self.exp_state  = []
+        self.exp_instr = []
+        self.exp_io    = []
+        self.exp_state = []
         # Create a scoreboard
         self.scoreboard = Scoreboard(self) # , fail_immediately=False)
-        self.scoreboard.add_interface(self.bypass,     self.exp_bypass)
         self.scoreboard.add_interface(self.instr_load, self.exp_instr)
         self.scoreboard.add_interface(self.io_map,     self.exp_io)
         self.scoreboard.add_interface(self.state,      self.exp_state)
@@ -68,20 +64,16 @@ class Testbench(TestbenchBase):
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.node_col_i <= 0
-        self.node_row_i <= 0
         self.msg_io.initialise(IORole.INITIATOR)
-        self.bypass_io.initialise(IORole.RESPONDER)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.exp_bypass: await RisingEdge(tb.clk)
-            while tb.exp_instr : await RisingEdge(tb.clk)
-            while tb.exp_io    : await RisingEdge(tb.clk)
-            while tb.exp_state : await RisingEdge(tb.clk)
+            while tb.exp_instr: await RisingEdge(tb.clk)
+            while tb.exp_io   : await RisingEdge(tb.clk)
+            while tb.exp_state: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

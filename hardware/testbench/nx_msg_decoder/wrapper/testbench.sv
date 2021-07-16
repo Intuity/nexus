@@ -31,11 +31,6 @@ module testbench #(
     , input  nx_direction_t msg_dir_i
     , input  logic          msg_valid_i
     , output logic          msg_ready_o
-    // Outbound bypass message stream
-    , output nx_message_t   bypass_data_o
-    , output nx_direction_t bypass_dir_o
-    , output logic          bypass_valid_o
-    , input  logic          bypass_ready_i
     // I/O mapping handling
     , output logic [$clog2(OUTPUTS)-1:0] map_idx_o     // Output to configure
     , output logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row

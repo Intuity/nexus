@@ -29,52 +29,45 @@ async def messages(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.node_row_i <= row
-    dut.node_col_i <= col
-
     for _ in range(1000):
         # Choose a random direction
         dirx = choice(list(Direction))
 
         # Choose a random command type
-        command = choice(list(Command))
+        command = Command.CONTROL # choice(list(Command))
 
-        # Select a target row and column
-        tgt_row, tgt_col = row, col
-        if choice((True, False)):
-            tgt_row, tgt_col = randint(0, 15), randint(0, 15)
-
-        # Check if this message is targeted at the node
-        tgt_match = (tgt_row == row) and (tgt_col == col)
+        # Select a random target row and column (ignored by decoder)
+        tgt_row, tgt_col = randint(0, 15), randint(0, 15)
 
         # Generate a message
         msg = 0
         if command == Command.LOAD_INSTR:
             instr = randint(0, (1 << 15) - 1)
             msg   = build_load_instr(tgt_row, tgt_col, instr)
-            if tgt_match: dut.exp_instr.append(InstrStore(instr))
+            dut.exp_instr.append(InstrStore(instr))
         elif command == Command.OUTPUT:
             index   = randint(0,  7)
-            rem_row = randint(0, 15)
-            rem_col = randint(0, 15)
             rem_idx = randint(0,  7)
             is_seq  = choice((0, 1))
             msg     = build_map_output(
-                tgt_row, tgt_col, index, rem_row, rem_col, rem_idx, is_seq
+                tgt_row, tgt_col, index, tgt_row, tgt_col, rem_idx, is_seq
             )
-            if tgt_match:
-                dut.exp_io.append(IOMapping(
-                    index, rem_row, rem_col, rem_idx, is_seq
-                ))
+            dut.exp_io.append(IOMapping(
+                index, tgt_row, tgt_col, rem_idx, is_seq
+            ))
         elif command == Command.SIG_STATE:
             index  = randint(0, 7)
             is_seq = choice((0, 1))
             state  = choice((0, 1))
             msg    = build_sig_state(tgt_row, tgt_col, index, is_seq, state)
-            if tgt_match:
-                dut.exp_state.append(SignalState(index, is_seq, state))
+            dut.exp_state.append(SignalState(index, is_seq, state))
+        elif command == Command.CONTROL:
+            msg = (
+                (tgt_row << 28) |
+                (tgt_col << 24) |
+                (int(command) << 22) |
+                randint(0, (1 << 22) - 1)
+            )
 
         # Create a message
         dut.debug(
@@ -83,11 +76,3 @@ async def messages(dut):
 
         # Queue up the message
         dut.msg.append((msg, int(dirx)))
-
-        # If not matching this target, expect message to be routed elsewhere
-        if not tgt_match:
-            if   tgt_row < row: tgt_dirx = Direction.NORTH
-            elif tgt_row > row: tgt_dirx = Direction.SOUTH
-            elif tgt_col < col: tgt_dirx = Direction.WEST
-            elif tgt_col > col: tgt_dirx = Direction.EAST
-            dut.exp_bypass.append((msg, int(tgt_dirx)))
