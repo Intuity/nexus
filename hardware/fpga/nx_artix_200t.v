@@ -24,6 +24,8 @@ module nx_artix_200t #(
     , input  wire rstn
     // Status
     , output wire status_active
+    , output wire status_idle
+    , output wire status_trigger
     // Inbound AXI4-stream
     , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata
     , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tkeep
@@ -42,13 +44,6 @@ module nx_artix_200t #(
     , input  wire                       outbound_tready
 );
 
-// Internal state
-reg         active, active_q;
-wire [31:0] counter;
-
-// Status signals
-assign status_active = active_q;
-
 // Instance FIFO to support decode of inbound stream
 wire [AXI4_DATA_WIDTH-1:0] buff_ib_data;
 wire [AXI4_STRB_WIDTH-1:0] buff_ib_strobe;
@@ -62,7 +57,7 @@ assign inbound_tready = !ib_fifo_full;
 
 nx_fifo #(
       .DEPTH(2)
-    , .WIDTH(AXI4_DATA_WIDTH + AXI4_STRB_WIDTH + AXI4_ID_WIDTH)
+    , .WIDTH(AXI4_DATA_WIDTH + AXI4_STRB_WIDTH)
 ) ib_fifo (
       .clk_i( clk )
     , .rst_i(~rstn)
@@ -78,15 +73,23 @@ nx_fifo #(
     , .full_o (ib_fifo_full )
 );
 
-// Core inbound
-reg [31:0] core_ib_data,  core_ib_data_q;
-reg        core_ib_valid, core_ib_valid_q;
-wire       core_ib_ready;
+// Control inbound
+reg [30:0] ctrl_ib_data,  ctrl_ib_data_q;
+reg        ctrl_ib_valid, ctrl_ib_valid_q;
+wire       ctrl_ib_ready;
 
 // Control outbound
-reg [31:0] ctrl_ob_data,  ctrl_ob_data_q;
-reg        ctrl_ob_valid, ctrl_ob_valid_q;
-wire       ctrl_ob_ready;
+wire [30:0] ctrl_ob_data;
+wire        ctrl_ob_valid, ctrl_ob_ready;
+
+// Mesh inbound
+reg [30:0] mesh_ib_data,  mesh_ib_data_q;
+reg        mesh_ib_valid, mesh_ib_valid_q;
+wire       mesh_ib_ready;
+
+// Mesh outbound
+wire [30:0] mesh_ob_data;
+wire        mesh_ob_valid, mesh_ob_ready;
 
 // Inbound stream decode
 reg decode_high, decode_high_q;
@@ -96,48 +99,47 @@ always @(*) begin : p_decode
     reg [30:0] payload;
     reg [ 3:0] strobe;
 
-    active        = active_q;
-    core_ib_data  = core_ib_data_q;
-    core_ib_valid = core_ib_valid_q;
-    ctrl_ob_data  = ctrl_ob_data_q;
-    ctrl_ob_valid = ctrl_ob_valid_q;
-    decode_high   = decode_high_q;
+    // Initialise decode
+    decode_high = decode_high_q;
+
+    // Control inbound
+    ctrl_ib_data  = ctrl_ib_data_q;
+    ctrl_ib_valid = ctrl_ib_valid_q;
+
+    // Mesh inbound
+    mesh_ib_data  = mesh_ib_data_q;
+    mesh_ib_valid = mesh_ib_valid_q;
 
     // Always clear pop
     buff_ib_pop = 1'b0;
 
-    // If the core is ready, clear valid
-    if (core_ib_ready) core_ib_valid = 1'b0;
+    // If control is ready, clear valid
+    if (ctrl_ib_ready) ctrl_ib_valid = 1'b0;
 
-    // If the outbound stream is ready, clear valid
-    if (ctrl_ob_ready) ctrl_ob_valid = 1'b0;
+    // If mesh is ready, clear valid
+    if (mesh_ib_ready) mesh_ib_valid = 1'b0;
 
-    // If valid clear, attempt the next decode
-    if (!core_ib_valid && !ctrl_ob_valid) begin
+    // If both valid signals are clear, perform the next decode
+    if (!ctrl_ib_valid && !mesh_ib_valid) begin
         // If decode high is set, decode the upper 32-bits
         { is_ctrl, payload } = decode_high ? buff_ib_data[63:32] : buff_ib_data[31:0];
         strobe               = decode_high ? buff_ib_strobe[7:4] : buff_ib_strobe[3:0];
 
         // If stream is valid, perform an action
         if (buff_ib_valid && strobe == 4'hF) begin
-            // If is_ctrl, setup active and publish cycle count
-            if (is_ctrl) begin
-                active        = payload[0];
-                ctrl_ob_data  = { 1'b1, counter[30:0] };
-                ctrl_ob_valid = 1'b1;
+            // Provide payload to both control & mesh
+            ctrl_ib_data = payload;
+            mesh_ib_data = payload;
 
-            // If not set, redirect into the core
-            end else begin
-                core_ib_data  = { payload, 1'b0 };
-                core_ib_valid = 1'b1;
+            // Set the correct valid signal
+            ctrl_ib_valid =  is_ctrl;
+            mesh_ib_valid = !is_ctrl;
 
-            end
+            // If decode high or upper bytes are not populated, pop entry
+            buff_ib_pop = (decode_high == 1'b1) || (buff_ib_strobe[7:4] != 4'hF);
 
-            // If decode is high, pop
-            buff_ib_pop = decode_high || (buff_ib_strobe[7:4] == 4'h0);
-
-            // Alternate decode high
-            decode_high = ~decode_high;
+            // Alternate to decode high if upper bytes are populated
+            decode_high = (decode_high == 1'b0) && (buff_ib_strobe[7:4] == 4'hF);
 
         end else begin
             decode_high = 1'b0;
@@ -147,32 +149,26 @@ always @(*) begin : p_decode
     end
 end
 
-always @(posedge clk, negedge rstn) begin
+always @(posedge clk, negedge rstn) begin : p_decode_seq
     if (!rstn) begin
-        active_q        <=  1'b0;
         decode_high_q   <=  1'b0;
-        core_ib_data_q  <= 32'd0;
-        core_ib_valid_q <=  1'b0;
-        ctrl_ob_data_q  <= 32'd0;
-        ctrl_ob_valid_q <=  1'b0;
+        ctrl_ib_data_q  <= 31'd0;
+        ctrl_ib_valid_q <=  1'b0;
+        mesh_ib_data_q  <= 31'd0;
+        mesh_ib_valid_q <=  1'b0;
     end else begin
-        active_q        <= active;
         decode_high_q   <= decode_high;
-        core_ib_data_q  <= core_ib_data;
-        core_ib_valid_q <= core_ib_valid;
-        ctrl_ob_data_q  <= ctrl_ob_data;
-        ctrl_ob_valid_q <= ctrl_ob_valid;
+        ctrl_ib_data_q  <= ctrl_ib_data;
+        ctrl_ib_valid_q <= ctrl_ib_valid;
+        mesh_ib_data_q  <= mesh_ib_data;
+        mesh_ib_valid_q <= mesh_ib_valid;
     end
 end
 
-// Instance nexus
-wire [31:0] core_ob_data;
-wire        core_ob_valid, core_ob_ready;
-
+// Nexus instance
 nexus #(
       .ROWS          (  6)
     , .COLUMNS       (  6)
-    , .STREAM_WIDTH  ( 32)
     , .ADDR_ROW_WIDTH(  4)
     , .ADDR_COL_WIDTH(  4)
     , .COMMAND_WIDTH (  2)
@@ -182,54 +178,56 @@ nexus #(
     , .REGISTERS     (  8)
     , .MAX_INSTRS    (512)
     , .OPCODE_WIDTH  (  3)
-    , .COUNTER_WIDTH ( 32)
 ) core (
       .clk_i( clk )
     , .rst_i(~rstn)
-    // Control signals
-    , .active_i (active )
-    , .counter_o(counter)
-    // Inbound stream
-    , .inbound_data_i (core_ib_data )
-    , .inbound_valid_i(core_ib_valid)
-    , .inbound_ready_o(core_ib_ready)
-    // Outbound stream
-    , .outbound_data_o (core_ob_data )
-    , .outbound_valid_o(core_ob_valid)
-    , .outbound_ready_i(core_ob_ready)
+    // Status signals
+    , .status_active_o (status_active )
+    , .status_idle_o   (status_idle   )
+    , .status_trigger_o(status_trigger)
+    // Control message streams
+    // - Inbound
+    , .ctrl_ib_data_i (ctrl_ib_data )
+    , .ctrl_ib_valid_i(ctrl_ib_valid)
+    , .ctrl_ib_ready_o(ctrl_ib_ready)
+    // - Outbound
+    , .ctrl_ob_data_o (ctrl_ob_data )
+    , .ctrl_ob_valid_o(ctrl_ob_valid)
+    , .ctrl_ob_ready_i(ctrl_ob_ready)
+    // Mesh message streams
+    // - Inbound
+    , .mesh_ib_data_i (mesh_ib_data )
+    , .mesh_ib_valid_i(mesh_ib_valid)
+    , .mesh_ib_ready_o(mesh_ib_ready)
+    // - Outbound
+    , .mesh_ob_data_o (mesh_ob_data )
+    , .mesh_ob_valid_o(mesh_ob_valid)
+    , .mesh_ob_ready_i(mesh_ob_ready)
 );
 
-// Mux between the core and control output streams (control gets priority)
-assign ctrl_ob_ready = !ob_fifo_full;
-assign core_ob_ready = !ob_fifo_full && !ctrl_ob_valid_q;
-
-wire [31:0] ctrl_or_core_data;
-assign ctrl_or_core_data = {
-    ctrl_ob_valid_q,                       // Bit 31 indicates control/core
-    ctrl_ob_valid_q ? ctrl_ob_data_q[30:0] // Bits 30:0 carry payload
-                    : core_ob_data[30:0]
-};
-
 // Outbound FIFO
-wire [31:0] ob_fifo_data;
-wire                    ob_fifo_empty, ob_fifo_full;
+wire [63:0] ob_fifo_data;
+wire        ob_fifo_full, ob_fifo_empty;
 
-assign outbound_tdata = { 32'd0, ob_fifo_data };
-assign outbound_tstrb  = 8'h0F;
-assign outbound_tkeep  = 8'h0F;
+assign outbound_tdata  = { 1'b1, ob_fifo_data[62:32], 1'b0, ob_fifo_data[30:0] };
+assign outbound_tstrb  = { {4{ob_fifo_data[63]}}, {4{ob_fifo_data[31]}} };
+assign outbound_tkeep  = outbound_tstrb;
 assign outbound_tid    = {AXI4_ID_WIDTH{1'b0}};
 assign outbound_tlast  = 1'b1;
 assign outbound_tvalid = !ob_fifo_empty;
 
+assign ctrl_ob_ready = !ob_fifo_full;
+assign mesh_ob_ready = !ob_fifo_full;
+
 nx_fifo #(
-      .DEPTH(2)
-    , .WIDTH(32)
+      .DEPTH( 2)
+    , .WIDTH(64)
 ) ob_fifo (
       .clk_i( clk )
     , .rst_i(~rstn)
     // Write interface
-    , .wr_data_i({ ctrl_or_core_data })
-    , .wr_push_i(ctrl_ob_valid || core_ob_valid)
+    , .wr_data_i({ ctrl_ob_valid, ctrl_ob_data, mesh_ob_valid, mesh_ob_data })
+    , .wr_push_i((ctrl_ob_valid || mesh_ob_valid) && !ob_fifo_full)
     // Read interface
     , .rd_data_o(ob_fifo_data)
     , .rd_pop_i (!ob_fifo_empty && outbound_tready)
