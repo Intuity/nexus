@@ -18,42 +18,40 @@
 // nx_stream_distributor
 // Distributes to multiple outbound message streams
 //
-module nx_stream_distributor #(
-    parameter STREAM_WIDTH = 32
-) (
+module nx_stream_distributor (
       input  logic                    clk_i
     , input  logic                    rst_i
     // Inbound message stream
-    , input  logic [STREAM_WIDTH-1:0] dist_data_i
-    , input  logic [             1:0] dist_dir_i
-    , input  logic                    dist_valid_i
-    , output logic                    dist_ready_o
+    , input  nx_message_t   dist_data_i
+    , input  nx_direction_t dist_dir_i
+    , input  logic          dist_valid_i
+    , output logic          dist_ready_o
     // Outbound distributed message streams
     // - North
-    , output logic [STREAM_WIDTH-1:0] north_data_o
-    , output logic                    north_valid_o
-    , input  logic                    north_ready_i
-    , input  logic                    north_present_i
+    , output nx_message_t north_data_o
+    , output logic        north_valid_o
+    , input  logic        north_ready_i
+    , input  logic        north_present_i
     // - East
-    , output logic [STREAM_WIDTH-1:0] east_data_o
-    , output logic                    east_valid_o
-    , input  logic                    east_ready_i
-    , input  logic                    east_present_i
+    , output nx_message_t east_data_o
+    , output logic        east_valid_o
+    , input  logic        east_ready_i
+    , input  logic        east_present_i
     // - South
-    , output logic [STREAM_WIDTH-1:0] south_data_o
-    , output logic                    south_valid_o
-    , input  logic                    south_ready_i
-    , input  logic                    south_present_i
+    , output nx_message_t south_data_o
+    , output logic        south_valid_o
+    , input  logic        south_ready_i
+    , input  logic        south_present_i
     // - West
-    , output logic [STREAM_WIDTH-1:0] west_data_o
-    , output logic                    west_valid_o
-    , input  logic                    west_ready_i
-    , input  logic                    west_present_i
+    , output nx_message_t west_data_o
+    , output logic        west_valid_o
+    , input  logic        west_ready_i
+    , input  logic        west_present_i
 );
 
 // Bind outbound ports into arrays
-logic [3:0][STREAM_WIDTH-1:0] egress_data;
-logic [3:0]                   egress_ready, egress_present, egress_full, egress_empty;
+nx_message_t egress_data [3:0];
+logic [3:0] egress_ready, egress_present, egress_full, egress_empty;
 
 assign { north_data_o, north_valid_o } = { egress_data[NX_DIRX_NORTH], !egress_empty[NX_DIRX_NORTH] };
 assign { east_data_o,  east_valid_o  } = { egress_data[NX_DIRX_EAST ], !egress_empty[NX_DIRX_EAST ] };
@@ -90,7 +88,7 @@ for (i = 0; i < 4; i = (i + 1)) begin
 
     nx_fifo #(
           .DEPTH(2)
-        , .WIDTH(STREAM_WIDTH)
+        , .WIDTH($bits(nx_message_t))
     ) egress_fifo (
           .clk_i(clk_i)
         , .rst_i(rst_i)
