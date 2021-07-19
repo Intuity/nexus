@@ -20,8 +20,7 @@
 // marked with broadcast
 //
 module nx_msg_decoder #(
-      parameter STREAM_WIDTH   = 32 // Width of the stream interface
-    , parameter ADDR_ROW_WIDTH =  4 // Message row address field width
+      parameter ADDR_ROW_WIDTH =  4 // Message row address field width
     , parameter ADDR_COL_WIDTH =  4 // Message column address field width
     , parameter COMMAND_WIDTH  =  2 // Message command field width
     , parameter INSTR_WIDTH    = 15 // Width of each instruction
@@ -60,12 +59,12 @@ module nx_msg_decoder #(
 assign idle_o = fifo_empty && !msg_valid_i;
 
 // Inbound FIFO - buffer incoming messages ready for digestion
-logic                      fifo_empty, fifo_full;
-logic [STREAM_WIDTH+2-1:0] fifo_data;
+logic        fifo_empty, fifo_full;
+nx_message_t fifo_data;
 
 nx_fifo #(
-      .DEPTH(           4)
-    , .WIDTH(STREAM_WIDTH)
+      .DEPTH(                  4)
+    , .WIDTH($bits(nx_message_t))
 ) msg_fifo (
       .clk_i    (clk_i)
     , .rst_i    (rst_i)
@@ -131,7 +130,7 @@ assign signal_valid_o  = signal_valid_q;
 
 // - Extract instruction load from payload
 `DECLARE_DQ(INSTR_WIDTH, instr_data,  clk_i, rst_i, {INSTR_WIDTH{1'b0}})
-`DECLARE_DQ(           , instr_valid, clk_i, rst_i,                1'b0)
+`DECLARE_DQ(          1, instr_valid, clk_i, rst_i,                1'b0)
 
 nx_msg_load_instr_t msg_load_instr;
 assign msg_load_instr = message;
