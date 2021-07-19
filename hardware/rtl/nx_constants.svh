@@ -15,8 +15,11 @@
 `ifndef __NX_CONSTANTS_SVH__
 `define __NX_CONSTANTS_SVH__
 
+// NOTE: Message width is set to 31 as the MSB is used to route either into the
+//       control block or into the mesh
+
 // Interface sizes
-`define NX_MESSAGE_WIDTH     32 // Width of a message stream interface
+`define NX_MESSAGE_WIDTH     31 // Width of a message stream interface
 `define NX_DIRECTION_WIDTH    2 // Width of the message direction interface
 `define NX_INSTRUCTION_WIDTH 15 // Width an instruction
 `define NX_INPUT_WIDTH        3 // Width of input index
@@ -26,11 +29,18 @@
 `define NX_ROW_ADDR_WIDTH    4 // Row address width
 `define NX_COLUMN_ADDR_WIDTH 4 // Column address width
 `define NX_COMMAND_WIDTH     2 // Command encoding width
+`define NX_CTRL_CMD_WIDTH    3 // Control block command width
+`define NX_CTRL_PARAM_WIDTH  3 // Parameter selection width
 
 // Instruction Fields
 `define NX_INSTR_OPCODE_WIDTH 3 // Instruction encoded operation
 `define NX_INSTR_SOURCE_WIDTH 3 // Operation source width
 `define NX_INSTR_TARGET_WIDTH 3 // Operation target width
+
+// Identifiers
+`define NX_DEVICE_ID     24'h4E5853 // NXS
+`define NX_VERSION_MAJOR  8'd0
+`define NX_VERSION_MINOR  8'd1
 
 typedef enum logic [`NX_DIRECTION_WIDTH-1:0] {
     NX_DIRX_NORTH, // 0 - Arriving from/sending to the north
@@ -122,5 +132,61 @@ typedef struct packed {
         1:0
     ] _padding;
 } nx_msg_sig_state_t;
+
+typedef enum logic [`NX_CTRL_CMD_WIDTH-1:0] {
+      NX_CTRL_ID       // Read device identifier
+    , NX_CTRL_VERSION  // Read hardware version (major/minor)
+    , NX_CTRL_PARAM    // Read back different parameters
+    , NX_CTRL_ACTIVE   // Set the active status of the device
+    , NX_CTRL_STATUS   // Read back the current status
+    , NX_CTRL_CYCLES   // Read current cycle counter
+    , NX_CTRL_INTERVAL // Set number of cycles to run for
+} nx_ctrl_command_t;
+
+typedef enum logic [`NX_CTRL_PARAM_WIDTH-1:0] {
+      NX_PARAM_COUNTER_WIDTH  // Width of counters in the control block
+    , NX_PARAM_ROWS           // Number of rows in the mesh
+    , NX_PARAM_COLUMNS        // Number of columns in the mesh
+    , NX_PARAM_NODE_INPUTS    // Number of inputs per node
+    , NX_PARAM_NODE_OUTPUTS   // Number of outputs per node
+    , NX_PARAM_NODE_REGISTERS // Number of internal registers per node
+} nx_ctrl_param_t;
+
+typedef struct packed {
+    nx_ctrl_command_t command;
+    logic [
+        `NX_MESSAGE_WIDTH        -
+        $bits(nx_ctrl_command_t) -
+        1:0
+    ] payload;
+} nx_ctrl_req_t;
+
+typedef struct packed {
+    nx_ctrl_param_t param;
+    logic [
+        `NX_MESSAGE_WIDTH        - // Total message width
+        $bits(nx_ctrl_command_t) - // Control command field
+        $bits(nx_ctrl_param_t)   - // Parameter selection
+        1:0
+    ] _padding;
+} nx_ctrl_payload_param_t;
+
+typedef struct packed {
+    logic active;
+    logic [
+        `NX_MESSAGE_WIDTH        - // Total message width
+        $bits(nx_ctrl_command_t) - // Control command field
+        1                        - // Active field
+        1:0
+    ] _padding;
+} nx_ctrl_payload_active_t;
+
+typedef struct packed {
+    logic [`NX_MESSAGE_WIDTH-$bits(nx_ctrl_command_t)-1:0] interval;
+} nx_ctrl_payload_interval_t;
+
+typedef struct packed {
+    logic [`NX_MESSAGE_WIDTH-1:0] payload;
+} nx_ctrl_resp_t;
 
 `endif // __NX_CONSTANTS_SVH__
