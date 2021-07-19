@@ -206,7 +206,7 @@ nexus #(
 );
 
 // Outbound FIFO
-wire [32:0] ob_ctrl_fifo_data, ob_mesh_fifo_data;
+wire [30:0] ob_ctrl_fifo_data, ob_mesh_fifo_data;
 wire        ob_ctrl_fifo_full, ob_ctrl_fifo_empty, ob_mesh_fifo_full,
             ob_mesh_fifo_empty;
 
@@ -258,6 +258,5 @@ nx_fifo #(
     , .empty_o(ob_mesh_fifo_empty)
     , .full_o (ob_mesh_fifo_full )
 );
-
 
 endmodule : nx_artix_200t
