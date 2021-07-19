@@ -74,18 +74,56 @@ nx_fifo #(
 );
 
 // Control inbound
-reg [30:0] ctrl_ib_data,  ctrl_ib_data_q;
-reg        ctrl_ib_valid, ctrl_ib_valid_q;
-wire       ctrl_ib_ready;
+reg  [30:0] ctrl_ib_data;
+reg         ctrl_ib_valid;
+wire [30:0] ib_ctrl_fifo_data;
+wire        ib_ctrl_fifo_full, ib_ctrl_fifo_empty, ib_ctrl_fifo_ready;
+
+nx_fifo #(
+      .DEPTH( 2)
+    , .WIDTH(31)
+) ib_ctrl_fifo (
+      .clk_i( clk )
+    , .rst_i(~rstn)
+    // Write interface
+    , .wr_data_i(ctrl_ib_data                       )
+    , .wr_push_i(ctrl_ib_valid && !ib_ctrl_fifo_full)
+    // Read interface
+    , .rd_data_o(ib_ctrl_fifo_data)
+    , .rd_pop_i (!ib_ctrl_fifo_empty && ib_ctrl_fifo_ready)
+    // Status
+    , .level_o(                  )
+    , .empty_o(ib_ctrl_fifo_empty)
+    , .full_o (ib_ctrl_fifo_full )
+);
 
 // Control outbound
 wire [30:0] ctrl_ob_data;
 wire        ctrl_ob_valid, ctrl_ob_ready;
 
 // Mesh inbound
-reg [30:0] mesh_ib_data,  mesh_ib_data_q;
-reg        mesh_ib_valid, mesh_ib_valid_q;
-wire       mesh_ib_ready;
+reg  [30:0] mesh_ib_data;
+reg         mesh_ib_valid;
+wire [30:0] ib_mesh_fifo_data;
+wire        ib_mesh_fifo_full, ib_mesh_fifo_empty, ib_mesh_fifo_ready;
+
+nx_fifo #(
+      .DEPTH( 2)
+    , .WIDTH(31)
+) ib_mesh_fifo (
+      .clk_i( clk )
+    , .rst_i(~rstn)
+    // Write interface
+    , .wr_data_i(mesh_ib_data                       )
+    , .wr_push_i(mesh_ib_valid && !ib_mesh_fifo_full)
+    // Read interface
+    , .rd_data_o(ib_mesh_fifo_data)
+    , .rd_pop_i (!ib_mesh_fifo_empty && ib_mesh_fifo_ready)
+    // Status
+    , .level_o(                  )
+    , .empty_o(ib_mesh_fifo_empty)
+    , .full_o (ib_mesh_fifo_full )
+);
 
 // Mesh outbound
 wire [30:0] mesh_ob_data;
@@ -103,24 +141,18 @@ always @(*) begin : p_decode
     decode_high = decode_high_q;
 
     // Control inbound
-    ctrl_ib_data  = ctrl_ib_data_q;
-    ctrl_ib_valid = ctrl_ib_valid_q;
+    ctrl_ib_data  = 32'd0;
+    ctrl_ib_valid =  1'b0;
 
     // Mesh inbound
-    mesh_ib_data  = mesh_ib_data_q;
-    mesh_ib_valid = mesh_ib_valid_q;
+    mesh_ib_data  = 32'd0;
+    mesh_ib_valid =  1'b0;
 
     // Always clear pop
     buff_ib_pop = 1'b0;
 
-    // If control is ready, clear valid
-    if (ctrl_ib_ready) ctrl_ib_valid = 1'b0;
-
-    // If mesh is ready, clear valid
-    if (mesh_ib_ready) mesh_ib_valid = 1'b0;
-
     // If both valid signals are clear, perform the next decode
-    if (!ctrl_ib_valid && !mesh_ib_valid) begin
+    if (!ib_ctrl_fifo_full && !ib_mesh_fifo_full) begin
         // If decode high is set, decode the upper 32-bits
         { is_ctrl, payload } = decode_high ? buff_ib_data[63:32] : buff_ib_data[31:0];
         strobe               = decode_high ? buff_ib_strobe[7:4] : buff_ib_strobe[3:0];
@@ -151,17 +183,9 @@ end
 
 always @(posedge clk, negedge rstn) begin : p_decode_seq
     if (!rstn) begin
-        decode_high_q   <=  1'b0;
-        ctrl_ib_data_q  <= 31'd0;
-        ctrl_ib_valid_q <=  1'b0;
-        mesh_ib_data_q  <= 31'd0;
-        mesh_ib_valid_q <=  1'b0;
+        decode_high_q <=  1'b0;
     end else begin
-        decode_high_q   <= decode_high;
-        ctrl_ib_data_q  <= ctrl_ib_data;
-        ctrl_ib_valid_q <= ctrl_ib_valid;
-        mesh_ib_data_q  <= mesh_ib_data;
-        mesh_ib_valid_q <= mesh_ib_valid;
+        decode_high_q <= decode_high;
     end
 end
 
@@ -187,18 +211,18 @@ nexus #(
     , .status_trigger_o(status_trigger)
     // Control message streams
     // - Inbound
-    , .ctrl_ib_data_i (ctrl_ib_data )
-    , .ctrl_ib_valid_i(ctrl_ib_valid)
-    , .ctrl_ib_ready_o(ctrl_ib_ready)
+    , .ctrl_ib_data_i ( ib_ctrl_fifo_data )
+    , .ctrl_ib_valid_i(!ib_ctrl_fifo_empty)
+    , .ctrl_ib_ready_o( ib_ctrl_fifo_ready)
     // - Outbound
     , .ctrl_ob_data_o (ctrl_ob_data )
     , .ctrl_ob_valid_o(ctrl_ob_valid)
     , .ctrl_ob_ready_i(ctrl_ob_ready)
     // Mesh message streams
     // - Inbound
-    , .mesh_ib_data_i (mesh_ib_data )
-    , .mesh_ib_valid_i(mesh_ib_valid)
-    , .mesh_ib_ready_o(mesh_ib_ready)
+    , .mesh_ib_data_i ( ib_mesh_fifo_data )
+    , .mesh_ib_valid_i(!ib_mesh_fifo_empty)
+    , .mesh_ib_ready_o( ib_mesh_fifo_ready)
     // - Outbound
     , .mesh_ob_data_o (mesh_ob_data )
     , .mesh_ob_valid_o(mesh_ob_valid)
