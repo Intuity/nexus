@@ -19,8 +19,7 @@
 // tiled into a grid
 //
 module nx_node #(
-      parameter STREAM_WIDTH    =  32
-    , parameter ADDR_ROW_WIDTH  =   4
+      parameter ADDR_ROW_WIDTH  =   4
     , parameter ADDR_COL_WIDTH  =   4
     , parameter COMMAND_WIDTH   =   2
     , parameter INSTR_WIDTH     =  15
@@ -44,41 +43,41 @@ module nx_node #(
     , output logic token_release_o
     // Inbound interfaces
     // - North
-    , input  logic [STREAM_WIDTH-1:0] ib_north_data_i
-    , input  logic                    ib_north_valid_i
-    , output logic                    ib_north_ready_o
+    , input  nx_message_t ib_north_data_i
+    , input  logic        ib_north_valid_i
+    , output logic        ib_north_ready_o
     // - East
-    , input  logic [STREAM_WIDTH-1:0] ib_east_data_i
-    , input  logic                    ib_east_valid_i
-    , output logic                    ib_east_ready_o
+    , input  nx_message_t ib_east_data_i
+    , input  logic        ib_east_valid_i
+    , output logic        ib_east_ready_o
     // - South
-    , input  logic [STREAM_WIDTH-1:0] ib_south_data_i
-    , input  logic                    ib_south_valid_i
-    , output logic                    ib_south_ready_o
+    , input  nx_message_t ib_south_data_i
+    , input  logic        ib_south_valid_i
+    , output logic        ib_south_ready_o
     // - West
-    , input  logic [STREAM_WIDTH-1:0] ib_west_data_i
-    , input  logic                    ib_west_valid_i
-    , output logic                    ib_west_ready_o
+    , input  nx_message_t ib_west_data_i
+    , input  logic        ib_west_valid_i
+    , output logic        ib_west_ready_o
     // Outbound interfaces
     // - North
-    , output logic [STREAM_WIDTH-1:0] ob_north_data_o
-    , output logic                    ob_north_valid_o
-    , input  logic                    ob_north_ready_i
+    , output nx_message_t ob_north_data_o
+    , output logic        ob_north_valid_o
+    , input  logic        ob_north_ready_i
     , input  logic                    ob_north_present_i
     // - East
-    , output logic [STREAM_WIDTH-1:0] ob_east_data_o
-    , output logic                    ob_east_valid_o
-    , input  logic                    ob_east_ready_i
+    , output nx_message_t ob_east_data_o
+    , output logic        ob_east_valid_o
+    , input  logic        ob_east_ready_i
     , input  logic                    ob_east_present_i
     // - South
-    , output logic [STREAM_WIDTH-1:0] ob_south_data_o
-    , output logic                    ob_south_valid_o
-    , input  logic                    ob_south_ready_i
+    , output nx_message_t ob_south_data_o
+    , output logic        ob_south_valid_o
+    , input  logic        ob_south_ready_i
     , input  logic                    ob_south_present_i
     // - West
-    , output logic [STREAM_WIDTH-1:0] ob_west_data_o
-    , output logic                    ob_west_valid_o
-    , input  logic                    ob_west_ready_i
+    , output nx_message_t ob_west_data_o
+    , output logic        ob_west_valid_o
+    , input  logic        ob_west_ready_i
     , input  logic                    ob_west_present_i
 );
 
@@ -99,9 +98,9 @@ assign idle_o = idle_q;
 // Arbiter
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] dcd_data,  byp_data;
-logic                    dcd_valid, dcd_ready, byp_valid, byp_ready;
-logic [             1:0] byp_dir;
+nx_message_t   dcd_data,  byp_data;
+logic          dcd_valid, dcd_ready, byp_valid, byp_ready;
+nx_direction_t byp_dir;
 
 nx_stream_arbiter #(
       .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
@@ -146,13 +145,11 @@ localparam MAX_IO = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS);
 // Distributor
 // -----------------------------------------------------------------------------
 
-logic [STREAM_WIDTH-1:0] outbound_data;
-logic [             1:0] outbound_dir;
-logic                    outbound_valid, outbound_ready;
+nx_message_t   outbound_data;
+nx_direction_t outbound_dir;
+logic          outbound_valid, outbound_ready;
 
-nx_stream_distributor #(
-    .STREAM_WIDTH(STREAM_WIDTH)
-) outbound_dist (
+nx_stream_distributor outbound_dist (
       .clk_i(clk_i)
     , .rst_i(rst_i)
     // Inbound message stream
@@ -202,8 +199,7 @@ logic [INSTR_WIDTH-1:0] instr_data;
 logic                   instr_valid;
 
 nx_msg_decoder #(
-      .STREAM_WIDTH  (STREAM_WIDTH  )
-    , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
+      .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
     , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
     , .COMMAND_WIDTH (COMMAND_WIDTH )
     , .INSTR_WIDTH   (INSTR_WIDTH   )
@@ -241,9 +237,9 @@ nx_msg_decoder #(
 
 logic ctrl_idle;
 
-logic [STREAM_WIDTH-1:0] emit_data;
-logic [             1:0] emit_dir;
-logic                    emit_valid, emit_ready;
+nx_message_t   emit_data;
+nx_direction_t emit_dir;
+logic          emit_valid, emit_ready;
 
 logic               core_trigger;
 logic [ INPUTS-1:0] core_inputs;
@@ -254,8 +250,7 @@ logic [         OP_STORE_WIDTH-1:0] ctrl_wr_data, ctrl_rd_data;
 logic                               ctrl_wr_en, ctrl_rd_en;
 
 nx_node_control #(
-      .STREAM_WIDTH   (STREAM_WIDTH   )
-    , .ADDR_ROW_WIDTH (ADDR_ROW_WIDTH )
+      .ADDR_ROW_WIDTH (ADDR_ROW_WIDTH )
     , .ADDR_COL_WIDTH (ADDR_COL_WIDTH )
     , .COMMAND_WIDTH  (COMMAND_WIDTH  )
     , .INPUTS         (INPUTS         )
