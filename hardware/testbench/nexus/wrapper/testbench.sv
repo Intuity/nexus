@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+`include "nx_constants.svh"
+
 module testbench #(
       parameter ROWS           =   6
     , parameter COLUMNS        =   6
-    , parameter STREAM_WIDTH   =  32
     , parameter ADDR_ROW_WIDTH =   4
     , parameter ADDR_COL_WIDTH =   4
     , parameter COMMAND_WIDTH  =   2
@@ -25,20 +26,30 @@ module testbench #(
     , parameter REGISTERS      =   8
     , parameter MAX_INSTRS     = 512
     , parameter OPCODE_WIDTH   =   3
-    , parameter COUNTER_WIDTH  =  32
 ) (
       input  logic rst
-    // Control signals
-    , input  logic                     active_i
-    , output logic [COUNTER_WIDTH-1:0] counter_o
-    // Inbound stream
-    , input  logic [STREAM_WIDTH-1:0] inbound_data_i
-    , input  logic                    inbound_valid_i
-    , output logic                    inbound_ready_o
-    // Outbound stream
-    , output logic [STREAM_WIDTH-1:0] outbound_data_o
-    , output logic                    outbound_valid_o
-    , input  logic                    outbound_ready_i
+    // Status signals
+    , output logic status_active_o
+    , output logic status_idle_o
+    , output logic status_trigger_o
+    // Control message streams
+    // - Inbound
+    , input  nx_message_t ctrl_ib_data_i
+    , input  logic        ctrl_ib_valid_i
+    , output logic        ctrl_ib_ready_o
+    // - Outbound
+    , output nx_message_t ctrl_ob_data_o
+    , output logic        ctrl_ob_valid_o
+    , input  logic        ctrl_ob_ready_i
+    // Mesh message streams
+    // - Inbound
+    , input  nx_message_t mesh_ib_data_i
+    , input  logic        mesh_ib_valid_i
+    , output logic        mesh_ib_ready_o
+    // - Outbound
+    , output nx_message_t mesh_ob_data_o
+    , output logic        mesh_ob_valid_o
+    , input  logic        mesh_ob_ready_i
 );
 
 reg clk = 1'b0;
@@ -47,7 +58,6 @@ always #1 clk <= ~clk;
 nexus #(
       .ROWS          (ROWS          )
     , .COLUMNS       (COLUMNS       )
-    , .STREAM_WIDTH  (STREAM_WIDTH  )
     , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
     , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
     , .COMMAND_WIDTH (COMMAND_WIDTH )
@@ -57,21 +67,10 @@ nexus #(
     , .REGISTERS     (REGISTERS     )
     , .MAX_INSTRS    (MAX_INSTRS    )
     , .OPCODE_WIDTH  (OPCODE_WIDTH  )
-    , .COUNTER_WIDTH (COUNTER_WIDTH )
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)
-    // Control signals
-    , .active_i (active_i )
-    , .counter_o(counter_o)
-    // Inbound stream
-    , .inbound_data_i (inbound_data_i )
-    , .inbound_valid_i(inbound_valid_i)
-    , .inbound_ready_o(inbound_ready_o)
-    // Outbound stream
-    , .outbound_data_o (outbound_data_o )
-    , .outbound_valid_o(outbound_valid_o)
-    , .outbound_ready_i(outbound_ready_i)
+    , .*
 );
 
 // Debug probing signals

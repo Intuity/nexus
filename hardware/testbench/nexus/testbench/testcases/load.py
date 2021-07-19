@@ -39,13 +39,13 @@ async def load(dut):
         for col in range(num_cols):
             for _ in range(randint(10, 30)):
                 instr = randint(0, (1 << 15) - 1)
-                dut.inbound.append(build_load_instr(row, col, instr))
+                dut.mesh_inbound.append(build_load_instr(row, col, instr))
                 loaded[row][col].append(instr)
                 counter += 1
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {counter} loads")
-    await dut.inbound.idle()
+    await dut.mesh_inbound.idle()
 
     # Wait for the idle flag to go high
     if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)

@@ -37,26 +37,37 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Setup drivers/monitors
-        self.inbound = StreamInitiator(
+        self.ctrl_inbound = StreamInitiator(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "inbound", IORole.RESPONDER)
+            StreamIO(self.dut, "ctrl_ib", IORole.RESPONDER)
         )
-        self.outbound = StreamResponder(
+        self.ctrl_outbound = StreamResponder(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "outbound", IORole.INITIATOR),
+            StreamIO(self.dut, "ctrl_ob", IORole.INITIATOR),
+        )
+        self.mesh_inbound = StreamInitiator(
+            self, self.clk, self.rst,
+            StreamIO(self.dut, "mesh_ib", IORole.RESPONDER)
+        )
+        self.mesh_outbound = StreamResponder(
+            self, self.clk, self.rst,
+            StreamIO(self.dut, "mesh_ob", IORole.INITIATOR),
         )
         # Create expected outbound queues
-        self.expected = []
+        self.ctrl_expected = []
+        self.mesh_expected = []
         # Create a scoreboard
         self.scoreboard = Scoreboard(self, fail_immediately=False)
-        self.scoreboard.add_interface(self.outbound, self.expected, reorder_depth=100)
+        self.scoreboard.add_interface(self.ctrl_outbound, self.ctrl_expected, reorder_depth=100)
+        self.scoreboard.add_interface(self.mesh_outbound, self.mesh_expected, reorder_depth=100)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.inbound.intf.initialise(IORole.INITIATOR)
-        self.outbound.intf.initialise(IORole.RESPONDER)
-        self.active_i <= 0
+        self.ctrl_inbound.intf.initialise(IORole.INITIATOR)
+        self.ctrl_outbound.intf.initialise(IORole.RESPONDER)
+        self.mesh_inbound.intf.initialise(IORole.INITIATOR)
+        self.mesh_outbound.intf.initialise(IORole.RESPONDER)
 
     def start_node_monitors(self):
         """ Create monitor for every node in the mesh on request """
@@ -150,7 +161,8 @@ class testcase(cocotb.test):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.expected: await RisingEdge(tb.clk)
+            while tb.ctrl_expected: await RisingEdge(tb.clk)
+            while tb.mesh_expected: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

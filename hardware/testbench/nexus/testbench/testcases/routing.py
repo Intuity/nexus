@@ -15,6 +15,7 @@
 from random import choice, randint
 
 from nx_constants import Command
+from nx_control import build_set_active
 from nx_message import (build_load_instr, build_map_output, build_sig_state,
                         build_control)
 
@@ -27,8 +28,8 @@ async def routing(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Raise active
-    dut.active_i <= 1
+    # Set the mesh to be active
+    dut.ctrl_inbound.append(build_set_active(1))
 
     # Find the number of rows
     num_rows = int(dut.dut.dut.ROWS)
@@ -67,5 +68,5 @@ async def routing(dut):
         )
 
         # Queue up the message
-        dut.inbound.append(msg)
-        dut.expected.append((msg, 0))
+        dut.mesh_inbound.append(msg)
+        dut.mesh_expected.append((msg, 0))

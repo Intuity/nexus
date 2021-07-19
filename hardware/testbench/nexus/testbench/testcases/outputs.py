@@ -47,7 +47,7 @@ async def map_outputs(dut):
                     rem_col = randint(0, 15)
                     rem_idx = randint(0,  7)
                     is_seq  = choice((0, 1))
-                    dut.inbound.append(build_map_output(
+                    dut.mesh_inbound.append(build_map_output(
                         row, col, idx, rem_row, rem_col, rem_idx, is_seq
                     ))
                     mapped[row][col][-1].append((
@@ -56,7 +56,7 @@ async def map_outputs(dut):
 
     # Wait for the inbound driver to drain
     dut.info("Waiting for mappings to drain")
-    await dut.inbound.idle()
+    await dut.mesh_inbound.idle()
 
     # Wait for the idle flag to go high
     if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
