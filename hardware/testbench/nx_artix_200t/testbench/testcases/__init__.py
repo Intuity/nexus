@@ -13,5 +13,6 @@
 # limitations under the License.
 
 from .basic import *
+from .control import *
 from .load import *
 from .mission import *

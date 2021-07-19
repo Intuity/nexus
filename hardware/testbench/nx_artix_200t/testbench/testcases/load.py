@@ -42,8 +42,8 @@ async def load(dut):
             for _ in range(randint(10, 30)):
                 instr = randint(0, (1 << 15) - 1)
                 raw   = build_load_instr(row, col, instr)
-                shift = raw >> 1
-                to_send += bytearray([(shift >> (x * 8)) & 0xFF for x in range(4)])
+                dut.info(f"Loading {counter}: 0x{raw:08X}")
+                to_send += bytearray([(raw >> (x * 8)) & 0xFF for x in range(4)])
                 loaded[row][col].append(instr)
                 counter += 1
     dut.inbound.append(AXI4StreamTransaction(data=to_send))

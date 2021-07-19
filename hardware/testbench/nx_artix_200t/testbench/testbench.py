@@ -48,8 +48,19 @@ class Testbench(TestbenchBase):
         # Create expected outbound queues
         self.expected = []
         # Create a scoreboard
+        def compare(got):
+            exp = self.expected.pop(0)
+            return (
+                (got.data   == exp.data  ) and
+                (got.id     == exp.id    ) and
+                (got.dest   == exp.dest  ) and
+                (got.user   == exp.user  ) and
+                (got.wakeup == exp.wakeup)
+            )
         self.scoreboard = Scoreboard(self, fail_immediately=False)
-        self.scoreboard.add_interface(self.outbound, self.expected, reorder_depth=100)
+        self.scoreboard.add_interface(
+            self.outbound, self.expected, compare_fn=compare
+        )
 
     async def initialise(self):
         """ Initialise the DUT's I/O """

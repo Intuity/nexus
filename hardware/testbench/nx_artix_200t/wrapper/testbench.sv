@@ -18,6 +18,10 @@ module testbench #(
     , parameter AXI4_ID_WIDTH   =                   1
 ) (
       input  wire rst
+    // Status
+    , output wire status_active
+    , output wire status_idle
+    , output wire status_trigger
     // Inbound AXI4-stream
     , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata_i
     , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tkeep_i
@@ -46,6 +50,10 @@ nx_artix_200t #(
 ) dut (
       .clk ( clk)
     , .rstn(~rst)
+    // Status
+    , .status_active (status_active )
+    , .status_idle   (status_idle   )
+    , .status_trigger(status_trigger)
     // Inbound AXI4-stream
     , .inbound_tdata (inbound_tdata_i )
     , .inbound_tkeep (inbound_tkeep_i )

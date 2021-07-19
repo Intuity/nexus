@@ -1,24 +1,30 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sat Jul 10 14:31:10 2021
+[*] Mon Jul 19 12:42:59 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_artix_200t/sim.lxt"
-[dumpfile_mtime] "Sat Jul 10 14:28:53 2021"
-[dumpfile_size] 153681
+[dumpfile_mtime] "Mon Jul 19 12:41:30 2021"
+[dumpfile_size] 267056
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_artix_200t/nx_artix_200t.gtkw"
 [timestart] 0
-[size] 1469 1045
-[pos] -1 -446
-*-15.860672 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[size] 1733 1047
+[pos] -1 -1
+*-17.016129 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.dut.
 [sst_width] 193
 [signals_width] 219
 [sst_expanded] 1
-[sst_vpaned_height] 323
+[sst_vpaned_height] 413
 @28
 testbench.clk[0]
 testbench.rst[0]
+@200
+-
+@28
+testbench.dut.status_active[0]
+testbench.dut.status_idle[0]
+testbench.dut.status_trigger[0]
 @200
 -
 @800200
@@ -35,7 +41,6 @@ testbench.inbound_tlast_i[0]
 testbench.inbound_tstrb_i[7:0]
 @28
 testbench.inbound_tvalid_i[0]
-@29
 testbench.inbound_tready_o[0]
 @1000200
 -AXI4S Inbound
@@ -61,27 +66,92 @@ testbench.outbound_tready_i[0]
 @200
 -
 @800200
--CORE
-@28
-testbench.dut.core.active_i[0]
+-Control
 @22
-testbench.dut.core.counter_o[31:0]
+testbench.dut.core.ctrl_ib_data_i[30:0]
+@28
+testbench.dut.core.ctrl_ib_valid_i[0]
+testbench.dut.core.ctrl_ib_ready_o[0]
 @200
 -
 @22
-testbench.dut.core.inbound_data_i[31:0]
+testbench.dut.core.ctrl_ob_data_o[30:0]
 @28
-testbench.dut.core.inbound_valid_i[0]
-testbench.dut.core.inbound_ready_o[0]
-@200
--
-@22
-testbench.dut.core.outbound_data_o[31:0]
-@28
-testbench.dut.core.outbound_valid_o[0]
-testbench.dut.core.outbound_ready_i[0]
+testbench.dut.core.ctrl_ob_valid_o[0]
+testbench.dut.core.ctrl_ob_ready_i[0]
 @1000200
--CORE
+-Control
+@200
+-
+@800200
+-Mesh
+@800022
+testbench.dut.core.mesh_ib_data_i[30:0]
+@c00024
+#{tgt_row} (0)testbench.dut.core.mesh_ib_data_i[30:0] (1)testbench.dut.core.mesh_ib_data_i[30:0] (2)testbench.dut.core.mesh_ib_data_i[30:0] (3)testbench.dut.core.mesh_ib_data_i[30:0]
+@28
+(0)testbench.dut.core.mesh_ib_data_i[30:0]
+(1)testbench.dut.core.mesh_ib_data_i[30:0]
+(2)testbench.dut.core.mesh_ib_data_i[30:0]
+(3)testbench.dut.core.mesh_ib_data_i[30:0]
+@1401204
+-group_end
+@c00025
+#{tgt_col} (4)testbench.dut.core.mesh_ib_data_i[30:0] (5)testbench.dut.core.mesh_ib_data_i[30:0] (6)testbench.dut.core.mesh_ib_data_i[30:0] (7)testbench.dut.core.mesh_ib_data_i[30:0]
+@28
+(4)testbench.dut.core.mesh_ib_data_i[30:0]
+(5)testbench.dut.core.mesh_ib_data_i[30:0]
+(6)testbench.dut.core.mesh_ib_data_i[30:0]
+(7)testbench.dut.core.mesh_ib_data_i[30:0]
+@1401205
+-group_end
+@c00024
+#{command} (8)testbench.dut.core.mesh_ib_data_i[30:0] (9)testbench.dut.core.mesh_ib_data_i[30:0]
+@28
+(8)testbench.dut.core.mesh_ib_data_i[30:0]
+(9)testbench.dut.core.mesh_ib_data_i[30:0]
+@1401204
+-group_end
+@c00022
+#{payload} (10)testbench.dut.core.mesh_ib_data_i[30:0] (11)testbench.dut.core.mesh_ib_data_i[30:0] (12)testbench.dut.core.mesh_ib_data_i[30:0] (13)testbench.dut.core.mesh_ib_data_i[30:0] (14)testbench.dut.core.mesh_ib_data_i[30:0] (15)testbench.dut.core.mesh_ib_data_i[30:0] (16)testbench.dut.core.mesh_ib_data_i[30:0] (17)testbench.dut.core.mesh_ib_data_i[30:0] (18)testbench.dut.core.mesh_ib_data_i[30:0] (19)testbench.dut.core.mesh_ib_data_i[30:0] (20)testbench.dut.core.mesh_ib_data_i[30:0] (21)testbench.dut.core.mesh_ib_data_i[30:0] (22)testbench.dut.core.mesh_ib_data_i[30:0] (23)testbench.dut.core.mesh_ib_data_i[30:0] (24)testbench.dut.core.mesh_ib_data_i[30:0] (25)testbench.dut.core.mesh_ib_data_i[30:0] (26)testbench.dut.core.mesh_ib_data_i[30:0] (27)testbench.dut.core.mesh_ib_data_i[30:0] (28)testbench.dut.core.mesh_ib_data_i[30:0] (29)testbench.dut.core.mesh_ib_data_i[30:0] (30)testbench.dut.core.mesh_ib_data_i[30:0]
+@28
+(10)testbench.dut.core.mesh_ib_data_i[30:0]
+(11)testbench.dut.core.mesh_ib_data_i[30:0]
+(12)testbench.dut.core.mesh_ib_data_i[30:0]
+(13)testbench.dut.core.mesh_ib_data_i[30:0]
+(14)testbench.dut.core.mesh_ib_data_i[30:0]
+(15)testbench.dut.core.mesh_ib_data_i[30:0]
+(16)testbench.dut.core.mesh_ib_data_i[30:0]
+(17)testbench.dut.core.mesh_ib_data_i[30:0]
+(18)testbench.dut.core.mesh_ib_data_i[30:0]
+(19)testbench.dut.core.mesh_ib_data_i[30:0]
+(20)testbench.dut.core.mesh_ib_data_i[30:0]
+(21)testbench.dut.core.mesh_ib_data_i[30:0]
+(22)testbench.dut.core.mesh_ib_data_i[30:0]
+(23)testbench.dut.core.mesh_ib_data_i[30:0]
+(24)testbench.dut.core.mesh_ib_data_i[30:0]
+(25)testbench.dut.core.mesh_ib_data_i[30:0]
+(26)testbench.dut.core.mesh_ib_data_i[30:0]
+(27)testbench.dut.core.mesh_ib_data_i[30:0]
+(28)testbench.dut.core.mesh_ib_data_i[30:0]
+(29)testbench.dut.core.mesh_ib_data_i[30:0]
+(30)testbench.dut.core.mesh_ib_data_i[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.dut.core.mesh_ib_valid_i[0]
+testbench.dut.core.mesh_ib_ready_o[0]
+@200
+-
+@22
+testbench.dut.core.mesh_ob_data_o[30:0]
+@28
+testbench.dut.core.mesh_ob_valid_o[0]
+testbench.dut.core.mesh_ob_ready_i[0]
+@1000200
+-Mesh
 @200
 -
 [pattern_trace] 1
