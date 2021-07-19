@@ -80,7 +80,7 @@ async def set_active(dut):
     dut.info("Activating mesh")
     dut.inbound.append(build_set_active(1))
     await dut.inbound.idle()
-    await ClockCycles(dut.clk, 2)
+    await ClockCycles(dut.clk, 10)
 
     # Check trigger has fired once
     assert triggered == 1, f"Expected 1 trigger, got {triggered = }"
