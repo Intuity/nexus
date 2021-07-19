@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module testbench #(
-      parameter STREAM_WIDTH   = 32
+      parameter STREAM_WIDTH   = 31
     , parameter ADDR_ROW_WIDTH =  4
     , parameter ADDR_COL_WIDTH =  4
     , parameter COMMAND_WIDTH  =  2
@@ -52,8 +52,7 @@ reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_msg_decoder #(
-      .STREAM_WIDTH  (STREAM_WIDTH  )
-    , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
+      .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
     , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
     , .COMMAND_WIDTH (COMMAND_WIDTH )
     , .INSTR_WIDTH   (INSTR_WIDTH   )

@@ -34,7 +34,7 @@ async def messages(dut):
         dirx = choice(list(Direction))
 
         # Choose a random command type
-        command = Command.CONTROL # choice(list(Command))
+        command = choice(list(Command))
 
         # Select a random target row and column (ignored by decoder)
         tgt_row, tgt_col = randint(0, 15), randint(0, 15)
@@ -63,10 +63,10 @@ async def messages(dut):
             dut.exp_state.append(SignalState(index, is_seq, state))
         elif command == Command.CONTROL:
             msg = (
-                (tgt_row << 28) |
-                (tgt_col << 24) |
-                (int(command) << 22) |
-                randint(0, (1 << 22) - 1)
+                (tgt_row << 27) |
+                (tgt_col << 23) |
+                (int(command) << 21) |
+                randint(0, (1 << 21) - 1)
             )
 
         # Create a message
