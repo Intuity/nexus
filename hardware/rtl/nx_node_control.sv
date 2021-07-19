@@ -20,8 +20,7 @@
 // signal state updates.
 //
 module nx_node_control #(
-      parameter STREAM_WIDTH    =  32 // Message interface width
-    , parameter ADDR_ROW_WIDTH  =   4 // Row address bit width
+      parameter ADDR_ROW_WIDTH  =   4 // Row address bit width
     , parameter ADDR_COL_WIDTH  =   4 // Column address bit width
     , parameter COMMAND_WIDTH   =   2 // Command field bit width
     , parameter INPUTS          =   8 // Number of inputs to each node
