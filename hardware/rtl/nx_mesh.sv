@@ -13,6 +13,7 @@
 // limitations under the License.
 
 `include "nx_common.svh"
+`include "nx_constants.svh"
 
 // nx_mesh
 // Mesh of nodes with any number of rows or columns.
