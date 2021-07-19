@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module testbench #(
-      parameter STREAM_WIDTH = 32
+      parameter STREAM_WIDTH = 31
     , parameter SKID_BUFFERS = "yes"
 ) (
       input  logic                    rst
