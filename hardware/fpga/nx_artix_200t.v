@@ -206,35 +206,58 @@ nexus #(
 );
 
 // Outbound FIFO
-wire [63:0] ob_fifo_data;
-wire        ob_fifo_full, ob_fifo_empty;
+wire [32:0] ob_ctrl_fifo_data, ob_mesh_fifo_data;
+wire        ob_ctrl_fifo_full, ob_ctrl_fifo_empty, ob_mesh_fifo_full,
+            ob_mesh_fifo_empty;
 
-assign outbound_tdata  = { 1'b1, ob_fifo_data[62:32], 1'b0, ob_fifo_data[30:0] };
-assign outbound_tstrb  = { {4{ob_fifo_data[63]}}, {4{ob_fifo_data[31]}} };
+assign outbound_tdata  = {
+    !ob_ctrl_fifo_empty, ob_ctrl_fifo_data,
+    !ob_mesh_fifo_empty, ob_mesh_fifo_data
+};
+assign outbound_tstrb  = { {4{!ob_ctrl_fifo_empty}}, {4{!ob_mesh_fifo_empty}} };
 assign outbound_tkeep  = outbound_tstrb;
 assign outbound_tid    = {AXI4_ID_WIDTH{1'b0}};
 assign outbound_tlast  = 1'b1;
-assign outbound_tvalid = !ob_fifo_empty;
+assign outbound_tvalid = !ob_ctrl_fifo_empty || !ob_mesh_fifo_empty;
 
-assign ctrl_ob_ready = !ob_fifo_full;
-assign mesh_ob_ready = !ob_fifo_full;
+assign ctrl_ob_ready = !ob_ctrl_fifo_full;
+assign mesh_ob_ready = !ob_mesh_fifo_full;
 
 nx_fifo #(
       .DEPTH( 2)
-    , .WIDTH(64)
-) ob_fifo (
+    , .WIDTH(31)
+) ob_ctrl_fifo (
       .clk_i( clk )
     , .rst_i(~rstn)
     // Write interface
-    , .wr_data_i({ ctrl_ob_valid, ctrl_ob_data, mesh_ob_valid, mesh_ob_data })
-    , .wr_push_i((ctrl_ob_valid || mesh_ob_valid) && !ob_fifo_full)
+    , .wr_data_i(ctrl_ob_data)
+    , .wr_push_i(ctrl_ob_valid && !ob_ctrl_fifo_full)
     // Read interface
-    , .rd_data_o(ob_fifo_data)
-    , .rd_pop_i (!ob_fifo_empty && outbound_tready)
+    , .rd_data_o(ob_ctrl_fifo_data)
+    , .rd_pop_i (!ob_ctrl_fifo_empty && outbound_tready)
     // Status
-    , .level_o(             )
-    , .empty_o(ob_fifo_empty)
-    , .full_o (ob_fifo_full )
+    , .level_o(                  )
+    , .empty_o(ob_ctrl_fifo_empty)
+    , .full_o (ob_ctrl_fifo_full )
 );
+
+nx_fifo #(
+      .DEPTH( 2)
+    , .WIDTH(31)
+) ob_mesh_fifo (
+      .clk_i( clk )
+    , .rst_i(~rstn)
+    // Write interface
+    , .wr_data_i(mesh_ob_data                        )
+    , .wr_push_i(mesh_ob_valid && !ob_mesh_fifo_full)
+    // Read interface
+    , .rd_data_o(ob_mesh_fifo_data                     )
+    , .rd_pop_i (!ob_mesh_fifo_empty && outbound_tready)
+    // Status
+    , .level_o(                  )
+    , .empty_o(ob_mesh_fifo_empty)
+    , .full_o (ob_mesh_fifo_full )
+);
+
 
 endmodule : nx_artix_200t
