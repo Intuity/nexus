@@ -15,29 +15,29 @@
 from nx_constants import Command
 
 def payload_load_instr(instr):
-    return instr << 7
+    return instr << 6
 
 def payload_map_output(index, tgt_row, tgt_col, tgt_idx, tgt_seq):
-    payload  = index   << 19
-    payload |= tgt_row << 15
-    payload |= tgt_col << 11
-    payload |= tgt_idx <<  8
-    payload |= tgt_seq <<  7
+    payload  = index   << 18
+    payload |= tgt_row << 14
+    payload |= tgt_col << 10
+    payload |= tgt_idx <<  7
+    payload |= tgt_seq <<  6
     return payload
 
 def payload_sig_state(index, is_seq, state):
-    payload  = index  << 19
-    payload |= is_seq << 18
-    payload |= state  << 17
+    payload  = index  << 18
+    payload |= is_seq << 17
+    payload |= state  << 16
     return payload
 
 def build_message(command, payload, tgt_row, tgt_col, *args, **kwargs):
     # Build the message
-    msg  = tgt_row      << 28                             # [31:28] Target row
-    msg |= tgt_col      << 24                             # [27:24] Target column
-    msg |= int(command) << 22                             # [23:22] Command
-    if callable(payload): msg |= payload(*args, **kwargs) # [21: 0] Payload
-    else                : msg |= payload                  # [21: 0] Payload
+    msg  = tgt_row      << 27                             # [30:27] Target row
+    msg |= tgt_col      << 23                             # [26:23] Target column
+    msg |= int(command) << 21                             # [22:21] Command
+    if callable(payload): msg |= payload(*args, **kwargs) # [20: 0] Payload
+    else                : msg |= payload                  # [20: 0] Payload
     # Return the compiled message
     return msg
 

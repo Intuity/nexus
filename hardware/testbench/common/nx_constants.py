@@ -14,6 +14,10 @@
 
 from enum import IntEnum
 
+DEVICE_ID            = 0x4E5853
+DEVICE_VERSION_MAJOR = 0
+DEVICE_VERSION_MINOR = 1
+
 class Direction(IntEnum):
     """ Direction of receival/transmission """
     NORTH = 0
@@ -27,3 +31,22 @@ class Command(IntEnum):
     OUTPUT     = 1
     SIG_STATE  = 2
     CONTROL    = 3
+
+class ControlCommand(IntEnum):
+    """ Control block command type """
+    ID       = 0
+    VERSION  = 1
+    PARAM    = 2
+    ACTIVE   = 3
+    STATUS   = 4
+    CYCLES   = 5
+    INTERVAL = 6
+
+class ControlParameter(IntEnum):
+    """ Control block parameter type """
+    COUNTER_WIDTH  = 0
+    ROWS           = 1
+    COLUMNS        = 2
+    NODE_INPUTS    = 3
+    NODE_OUTPUTS   = 4
+    NODE_REGISTERS = 5
