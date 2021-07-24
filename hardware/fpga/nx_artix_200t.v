@@ -16,7 +16,7 @@
 // Nexus 7 instance for the Artix-7 XC7A200T
 //
 module nx_artix_200t #(
-    parameter AXI4_DATA_WIDTH = 64
+    parameter AXI4_DATA_WIDTH = 128
 ) (
       input  wire clk
     , input  wire rstn
