@@ -16,9 +16,7 @@
 // Nexus 7 instance for the Artix-7 XC7A200T
 //
 module nx_artix_200t #(
-      parameter AXI4_DATA_WIDTH =                  64
-    , parameter AXI4_STRB_WIDTH = AXI4_DATA_WIDTH / 8
-    , parameter AXI4_ID_WIDTH   =                   1
+    parameter AXI4_DATA_WIDTH = 64
 ) (
       input  wire clk
     , input  wire rstn
@@ -26,170 +24,98 @@ module nx_artix_200t #(
     , output wire status_active
     , output wire status_idle
     , output wire status_trigger
+    // Control AXI4-streams
+    // - Inbound
+    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_ctrl_tdata
+    , input  wire                       inbound_ctrl_tlast
+    , input  wire                       inbound_ctrl_tvalid
+    , output wire                       inbound_ctrl_tready
+    // - Outbound
+    , output wire [AXI4_DATA_WIDTH-1:0] outbound_ctrl_tdata
+    , output wire                       outbound_ctrl_tlast
+    , output wire                       outbound_ctrl_tvalid
+    , input  wire                       outbound_ctrl_tready
+    // Mesh AXI4-streams
+    // - Inbound
+    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_mesh_tdata
+    , input  wire                       inbound_mesh_tlast
+    , input  wire                       inbound_mesh_tvalid
+    , output wire                       inbound_mesh_tready
+    // - Outbound
+    , output wire [AXI4_DATA_WIDTH-1:0] outbound_mesh_tdata
+    , output wire                       outbound_mesh_tlast
+    , output wire                       outbound_mesh_tvalid
+    , input  wire                       outbound_mesh_tready
+);
+
+// =============================================================================
+// AXI4-Stream Bridge for Control
+// =============================================================================
+
+wire [30:0] nx_ctrl_ib_data, nx_ctrl_ob_data;
+wire        nx_ctrl_ib_valid, nx_ctrl_ib_ready, nx_ctrl_ob_valid, nx_ctrl_ob_ready;
+
+nx_axi4s_bridge #(
+    .AXI4_DATA_WIDTH(AXI4_DATA_WIDTH)
+) ctrl_bridge (
+      .clk_i( clk )
+    , .rst_i(~rstn)
     // Inbound AXI4-stream
-    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata
-    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tkeep
-    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tstrb
-    , input  wire [  AXI4_ID_WIDTH-1:0] inbound_tid
-    , input  wire                       inbound_tlast
-    , input  wire                       inbound_tvalid
-    , output wire                       inbound_tready
+    , .ib_axi4s_tdata_i (inbound_ctrl_tdata )
+    , .ib_axi4s_tlast_i (inbound_ctrl_tlast )
+    , .ib_axi4s_tvalid_i(inbound_ctrl_tvalid)
+    , .ib_axi4s_tready_o(inbound_ctrl_tready)
+    // Outbound Nexus message stream
+    , .ob_nx_data_o (nx_ctrl_ib_data )
+    , .ob_nx_valid_o(nx_ctrl_ib_valid)
+    , .ob_nx_ready_i(nx_ctrl_ib_ready)
+    // Inbound Nexus message stream
+    , .ib_nx_data_i (nx_ctrl_ob_data )
+    , .ib_nx_valid_i(nx_ctrl_ob_valid)
+    , .ib_nx_ready_o(nx_ctrl_ob_ready)
     // Outbound AXI4-stream
-    , output wire [AXI4_DATA_WIDTH-1:0] outbound_tdata
-    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tkeep
-    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tstrb
-    , output wire [  AXI4_ID_WIDTH-1:0] outbound_tid
-    , output wire                       outbound_tlast
-    , output wire                       outbound_tvalid
-    , input  wire                       outbound_tready
+    , .ob_axi4s_tdata_o (outbound_ctrl_tdata )
+    , .ob_axi4s_tlast_o (outbound_ctrl_tlast )
+    , .ob_axi4s_tvalid_o(outbound_ctrl_tvalid)
+    , .ob_axi4s_tready_i(outbound_ctrl_tready)
 );
 
-// Instance FIFO to support decode of inbound stream
-wire [AXI4_DATA_WIDTH-1:0] buff_ib_data;
-wire [AXI4_STRB_WIDTH-1:0] buff_ib_strobe;
-wire                       buff_ib_valid;
-reg                        buff_ib_pop;
+// =============================================================================
+// AXI4-Stream Bridge for Mesh
+// =============================================================================
 
-wire ib_fifo_full, ib_fifo_empty;
+wire [30:0] nx_mesh_ib_data, nx_mesh_ob_data;
+wire        nx_mesh_ib_valid, nx_mesh_ib_ready, nx_mesh_ob_valid, nx_mesh_ob_ready;
 
-assign buff_ib_valid  = !ib_fifo_empty;
-assign inbound_tready = !ib_fifo_full;
-
-nx_fifo #(
-      .DEPTH(2)
-    , .WIDTH(AXI4_DATA_WIDTH + AXI4_STRB_WIDTH)
-) ib_fifo (
+nx_axi4s_bridge #(
+    .AXI4_DATA_WIDTH(AXI4_DATA_WIDTH)
+) mesh_bridge (
       .clk_i( clk )
     , .rst_i(~rstn)
-    // Write interface
-    , .wr_data_i({ inbound_tdata, inbound_tkeep & inbound_tstrb })
-    , .wr_push_i(inbound_tvalid && !ib_fifo_full)
-    // Read interface
-    , .rd_data_o({ buff_ib_data, buff_ib_strobe })
-    , .rd_pop_i (buff_ib_pop)
-    // Status
-    , .level_o(             )
-    , .empty_o(ib_fifo_empty)
-    , .full_o (ib_fifo_full )
+    // Inbound AXI4-stream
+    , .ib_axi4s_tdata_i (inbound_mesh_tdata )
+    , .ib_axi4s_tlast_i (inbound_mesh_tlast )
+    , .ib_axi4s_tvalid_i(inbound_mesh_tvalid)
+    , .ib_axi4s_tready_o(inbound_mesh_tready)
+    // Outbound Nexus message stream
+    , .ob_nx_data_o (nx_mesh_ib_data )
+    , .ob_nx_valid_o(nx_mesh_ib_valid)
+    , .ob_nx_ready_i(nx_mesh_ib_ready)
+    // Inbound Nexus message stream
+    , .ib_nx_data_i (nx_mesh_ob_data )
+    , .ib_nx_valid_i(nx_mesh_ob_valid)
+    , .ib_nx_ready_o(nx_mesh_ob_ready)
+    // Outbound AXI4-stream
+    , .ob_axi4s_tdata_o (outbound_mesh_tdata )
+    , .ob_axi4s_tlast_o (outbound_mesh_tlast )
+    , .ob_axi4s_tvalid_o(outbound_mesh_tvalid)
+    , .ob_axi4s_tready_i(outbound_mesh_tready)
 );
 
-// Control inbound
-reg  [30:0] ctrl_ib_data;
-reg         ctrl_ib_valid;
-wire [30:0] ib_ctrl_fifo_data;
-wire        ib_ctrl_fifo_full, ib_ctrl_fifo_empty, ib_ctrl_fifo_ready;
+// =============================================================================
+// Nexus Instance
+// =============================================================================
 
-nx_fifo #(
-      .DEPTH( 2)
-    , .WIDTH(31)
-) ib_ctrl_fifo (
-      .clk_i( clk )
-    , .rst_i(~rstn)
-    // Write interface
-    , .wr_data_i(ctrl_ib_data                       )
-    , .wr_push_i(ctrl_ib_valid && !ib_ctrl_fifo_full)
-    // Read interface
-    , .rd_data_o(ib_ctrl_fifo_data)
-    , .rd_pop_i (!ib_ctrl_fifo_empty && ib_ctrl_fifo_ready)
-    // Status
-    , .level_o(                  )
-    , .empty_o(ib_ctrl_fifo_empty)
-    , .full_o (ib_ctrl_fifo_full )
-);
-
-// Control outbound
-wire [30:0] ctrl_ob_data;
-wire        ctrl_ob_valid, ctrl_ob_ready;
-
-// Mesh inbound
-reg  [30:0] mesh_ib_data;
-reg         mesh_ib_valid;
-wire [30:0] ib_mesh_fifo_data;
-wire        ib_mesh_fifo_full, ib_mesh_fifo_empty, ib_mesh_fifo_ready;
-
-nx_fifo #(
-      .DEPTH( 2)
-    , .WIDTH(31)
-) ib_mesh_fifo (
-      .clk_i( clk )
-    , .rst_i(~rstn)
-    // Write interface
-    , .wr_data_i(mesh_ib_data                       )
-    , .wr_push_i(mesh_ib_valid && !ib_mesh_fifo_full)
-    // Read interface
-    , .rd_data_o(ib_mesh_fifo_data)
-    , .rd_pop_i (!ib_mesh_fifo_empty && ib_mesh_fifo_ready)
-    // Status
-    , .level_o(                  )
-    , .empty_o(ib_mesh_fifo_empty)
-    , .full_o (ib_mesh_fifo_full )
-);
-
-// Mesh outbound
-wire [30:0] mesh_ob_data;
-wire        mesh_ob_valid, mesh_ob_ready;
-
-// Inbound stream decode
-reg decode_high, decode_high_q;
-
-always @(*) begin : p_decode
-    reg        is_ctrl;
-    reg [30:0] payload;
-    reg [ 3:0] strobe;
-
-    // Initialise decode
-    decode_high = decode_high_q;
-
-    // Control inbound
-    ctrl_ib_data  = 32'd0;
-    ctrl_ib_valid =  1'b0;
-
-    // Mesh inbound
-    mesh_ib_data  = 32'd0;
-    mesh_ib_valid =  1'b0;
-
-    // Always clear pop
-    buff_ib_pop = 1'b0;
-
-    // If both valid signals are clear, perform the next decode
-    if (!ib_ctrl_fifo_full && !ib_mesh_fifo_full) begin
-        // If decode high is set, decode the upper 32-bits
-        { is_ctrl, payload } = decode_high ? buff_ib_data[63:32] : buff_ib_data[31:0];
-        strobe               = decode_high ? buff_ib_strobe[7:4] : buff_ib_strobe[3:0];
-
-        // If stream is valid, perform an action
-        if (buff_ib_valid && strobe == 4'hF) begin
-            // Provide payload to both control & mesh
-            ctrl_ib_data = payload;
-            mesh_ib_data = payload;
-
-            // Set the correct valid signal
-            ctrl_ib_valid =  is_ctrl;
-            mesh_ib_valid = !is_ctrl;
-
-            // If decode high or upper bytes are not populated, pop entry
-            buff_ib_pop = (decode_high == 1'b1) || (buff_ib_strobe[7:4] != 4'hF);
-
-            // Alternate to decode high if upper bytes are populated
-            decode_high = (decode_high == 1'b0) && (buff_ib_strobe[7:4] == 4'hF);
-
-        end else begin
-            decode_high = 1'b0;
-
-        end
-
-    end
-end
-
-always @(posedge clk, negedge rstn) begin : p_decode_seq
-    if (!rstn) begin
-        decode_high_q <=  1'b0;
-    end else begin
-        decode_high_q <= decode_high;
-    end
-end
-
-// Nexus instance
 nexus #(
       .ROWS          (  6)
     , .COLUMNS       (  6)
@@ -211,76 +137,22 @@ nexus #(
     , .status_trigger_o(status_trigger)
     // Control message streams
     // - Inbound
-    , .ctrl_ib_data_i ( ib_ctrl_fifo_data )
-    , .ctrl_ib_valid_i(!ib_ctrl_fifo_empty)
-    , .ctrl_ib_ready_o( ib_ctrl_fifo_ready)
+    , .ctrl_ib_data_i (nx_ctrl_ib_data )
+    , .ctrl_ib_valid_i(nx_ctrl_ib_valid)
+    , .ctrl_ib_ready_o(nx_ctrl_ib_ready)
     // - Outbound
-    , .ctrl_ob_data_o (ctrl_ob_data )
-    , .ctrl_ob_valid_o(ctrl_ob_valid)
-    , .ctrl_ob_ready_i(ctrl_ob_ready)
+    , .ctrl_ob_data_o (nx_ctrl_ob_data )
+    , .ctrl_ob_valid_o(nx_ctrl_ob_valid)
+    , .ctrl_ob_ready_i(nx_ctrl_ob_ready)
     // Mesh message streams
     // - Inbound
-    , .mesh_ib_data_i ( ib_mesh_fifo_data )
-    , .mesh_ib_valid_i(!ib_mesh_fifo_empty)
-    , .mesh_ib_ready_o( ib_mesh_fifo_ready)
+    , .mesh_ib_data_i (nx_mesh_ib_data )
+    , .mesh_ib_valid_i(nx_mesh_ib_valid)
+    , .mesh_ib_ready_o(nx_mesh_ib_ready)
     // - Outbound
-    , .mesh_ob_data_o (mesh_ob_data )
-    , .mesh_ob_valid_o(mesh_ob_valid)
-    , .mesh_ob_ready_i(mesh_ob_ready)
-);
-
-// Outbound FIFO
-wire [30:0] ob_ctrl_fifo_data, ob_mesh_fifo_data;
-wire        ob_ctrl_fifo_full, ob_ctrl_fifo_empty, ob_mesh_fifo_full,
-            ob_mesh_fifo_empty;
-
-assign outbound_tdata  = {
-    !ob_ctrl_fifo_empty, ob_ctrl_fifo_data,
-    !ob_mesh_fifo_empty, ob_mesh_fifo_data
-};
-assign outbound_tstrb  = { {4{!ob_ctrl_fifo_empty}}, {4{!ob_mesh_fifo_empty}} };
-assign outbound_tkeep  = outbound_tstrb;
-assign outbound_tid    = {AXI4_ID_WIDTH{1'b0}};
-assign outbound_tlast  = 1'b1;
-assign outbound_tvalid = !ob_ctrl_fifo_empty || !ob_mesh_fifo_empty;
-
-assign ctrl_ob_ready = !ob_ctrl_fifo_full;
-assign mesh_ob_ready = !ob_mesh_fifo_full;
-
-nx_fifo #(
-      .DEPTH( 2)
-    , .WIDTH(31)
-) ob_ctrl_fifo (
-      .clk_i( clk )
-    , .rst_i(~rstn)
-    // Write interface
-    , .wr_data_i(ctrl_ob_data)
-    , .wr_push_i(ctrl_ob_valid && !ob_ctrl_fifo_full)
-    // Read interface
-    , .rd_data_o(ob_ctrl_fifo_data)
-    , .rd_pop_i (!ob_ctrl_fifo_empty && outbound_tready)
-    // Status
-    , .level_o(                  )
-    , .empty_o(ob_ctrl_fifo_empty)
-    , .full_o (ob_ctrl_fifo_full )
-);
-
-nx_fifo #(
-      .DEPTH( 2)
-    , .WIDTH(31)
-) ob_mesh_fifo (
-      .clk_i( clk )
-    , .rst_i(~rstn)
-    // Write interface
-    , .wr_data_i(mesh_ob_data                        )
-    , .wr_push_i(mesh_ob_valid && !ob_mesh_fifo_full)
-    // Read interface
-    , .rd_data_o(ob_mesh_fifo_data                     )
-    , .rd_pop_i (!ob_mesh_fifo_empty && outbound_tready)
-    // Status
-    , .level_o(                  )
-    , .empty_o(ob_mesh_fifo_empty)
-    , .full_o (ob_mesh_fifo_full )
+    , .mesh_ob_data_o (nx_mesh_ob_data )
+    , .mesh_ob_valid_o(nx_mesh_ob_valid)
+    , .mesh_ob_ready_i(nx_mesh_ob_ready)
 );
 
 endmodule : nx_artix_200t
