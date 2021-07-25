@@ -60,10 +60,10 @@ class AXI4StreamInitiator(Driver):
         for chunk, strobe in transaction.pack(num_bytes):
             # Setup compulsory fields
             self.intf.tdata  <= chunk
-            self.intf.tstrb  <= strobe
             self.intf.tvalid <= 1
             self.intf.tlast  <= 0 if all_bytes else 1
             # Setup optional fields
+            self.intf.set("tstrb"  , strobe)
             self.intf.set("tkeep"  , strobe)
             self.intf.set("tid"    , transaction.id)
             self.intf.set("tdest"  , transaction.dest)

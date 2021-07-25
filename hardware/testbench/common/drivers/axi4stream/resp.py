@@ -64,11 +64,11 @@ class AXI4StreamResponder(Monitor):
             # Capture a request
             if self.intf.tvalid == 1 and self.intf.tready == 1:
                 if not capture: capture = bytearray()
-                tstrb   = self.intf.tstrb
-                tkeep   = self.intf.tkeep if self.intf.has("tkeep") else tstrb
+                tstrb   = self.intf.get("tstrb", default=((1 << num_bytes) - 1))
+                tkeep   = int(self.intf.tkeep) if self.intf.has("tkeep") else tstrb
                 str_val = self.intf.tdata.value._str
                 for lane in range(num_bytes):
-                    if tstrb[lane] == 1 and tkeep[lane] == 1:
+                    if ((tstrb >> lane) & 0x1) != 0 and ((tkeep >> lane) & 0x1) != 0:
                         byte = str_val[(num_bytes-lane-1)*8:(num_bytes-lane-1)*8+8]
                         capture.append(int(byte, 2))
                 if self.intf.tlast == 1:
