@@ -37,36 +37,55 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Setup drivers/monitors
-        self.inbound = AXI4StreamInitiator(
+        self.ib_ctrl = AXI4StreamInitiator(
             self, self.clk, self.rst,
-            AXI4StreamIO(self.dut, "inbound", IORole.RESPONDER)
+            AXI4StreamIO(self.dut, "inbound_ctrl", IORole.RESPONDER)
         )
-        self.outbound = AXI4StreamResponder(
+        self.ob_ctrl = AXI4StreamResponder(
             self, self.clk, self.rst,
-            AXI4StreamIO(self.dut, "outbound", IORole.INITIATOR),
+            AXI4StreamIO(self.dut, "outbound_ctrl", IORole.INITIATOR),
+        )
+        self.ib_mesh = AXI4StreamInitiator(
+            self, self.clk, self.rst,
+            AXI4StreamIO(self.dut, "inbound_mesh", IORole.RESPONDER)
+        )
+        self.ob_mesh = AXI4StreamResponder(
+            self, self.clk, self.rst,
+            AXI4StreamIO(self.dut, "outbound_mesh", IORole.INITIATOR),
         )
         # Create expected outbound queues
-        self.expected = []
+        self.exp_ctrl = []
+        self.exp_mesh = []
         # Create a scoreboard
-        def compare(got):
-            exp = self.expected.pop(0)
-            return (
-                (got.data   == exp.data  ) and
-                (got.id     == exp.id    ) and
-                (got.dest   == exp.dest  ) and
-                (got.user   == exp.user  ) and
-                (got.wakeup == exp.wakeup)
-            )
+        def compare_ctrl(got):
+            exp = self.exp_ctrl.pop(0)
+            assert len(got.data) == len(exp.data), \
+                f"Length differs: {len(got.data) = }, {len(exp.data) = }"
+            for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
+                assert got_byte == exp_byte, \
+                    f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}"
+        def compare_mesh(got):
+            exp = self.exp_mesh.pop(0)
+            assert len(got.data) == len(exp.data), \
+                f"Length differs: {len(got.data) = }, {len(exp.data) = }"
+            for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
+                assert got_byte == exp_byte, \
+                    f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}"
         self.scoreboard = Scoreboard(self, fail_immediately=False)
         self.scoreboard.add_interface(
-            self.outbound, self.expected, compare_fn=compare
+            self.ob_ctrl, self.exp_ctrl, compare_fn=compare_ctrl
+        )
+        self.scoreboard.add_interface(
+            self.ob_mesh, self.exp_mesh, compare_fn=compare_mesh
         )
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.inbound.intf.initialise(IORole.INITIATOR)
-        self.outbound.intf.initialise(IORole.RESPONDER)
+        self.ib_ctrl.intf.initialise(IORole.INITIATOR)
+        self.ob_ctrl.intf.initialise(IORole.RESPONDER)
+        self.ib_mesh.intf.initialise(IORole.INITIATOR)
+        self.ob_mesh.intf.initialise(IORole.RESPONDER)
 
     def start_node_monitors(self):
         """ Create monitor for every node in the mesh on request """
@@ -160,7 +179,8 @@ class testcase(cocotb.test):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.expected: await RisingEdge(tb.clk)
+            while tb.exp_ctrl: await RisingEdge(tb.clk)
+            while tb.exp_mesh: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

@@ -13,40 +13,42 @@
 // limitations under the License.
 
 module testbench #(
-      parameter AXI4_DATA_WIDTH =                  64
-    , parameter AXI4_STRB_WIDTH = AXI4_DATA_WIDTH / 8
-    , parameter AXI4_ID_WIDTH   =                   1
+    parameter AXI4_DATA_WIDTH = 128
 ) (
       input  wire rst
     // Status
     , output wire status_active
     , output wire status_idle
     , output wire status_trigger
-    // Inbound AXI4-stream
-    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata_i
-    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tkeep_i
-    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_tstrb_i
-    , input  wire [  AXI4_ID_WIDTH-1:0] inbound_tid_i
-    , input  wire                       inbound_tlast_i
-    , input  wire                       inbound_tvalid_i
-    , output wire                       inbound_tready_o
-    // Outbound AXI4-stream
-    , output wire [AXI4_DATA_WIDTH-1:0] outbound_tdata_o
-    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tkeep_o
-    , output wire [AXI4_STRB_WIDTH-1:0] outbound_tstrb_o
-    , output wire [  AXI4_ID_WIDTH-1:0] outbound_tid_o
-    , output wire                       outbound_tlast_o
-    , output wire                       outbound_tvalid_o
-    , input  wire                       outbound_tready_i
+    // Control AXI4-streams
+    // - Inbound
+    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_ctrl_tdata_i
+    , input  wire                       inbound_ctrl_tlast_i
+    , input  wire                       inbound_ctrl_tvalid_i
+    , output wire                       inbound_ctrl_tready_o
+    // - Outbound
+    , output wire [AXI4_DATA_WIDTH-1:0] outbound_ctrl_tdata_o
+    , output wire                       outbound_ctrl_tlast_o
+    , output wire                       outbound_ctrl_tvalid_o
+    , input  wire                       outbound_ctrl_tready_i
+    // Mesh AXI4-streams
+    // - Inbound
+    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_mesh_tdata_i
+    , input  wire                       inbound_mesh_tlast_i
+    , input  wire                       inbound_mesh_tvalid_i
+    , output wire                       inbound_mesh_tready_o
+    // - Outbound
+    , output wire [AXI4_DATA_WIDTH-1:0] outbound_mesh_tdata_o
+    , output wire                       outbound_mesh_tlast_o
+    , output wire                       outbound_mesh_tvalid_o
+    , input  wire                       outbound_mesh_tready_i
 );
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_artix_200t #(
-      .AXI4_DATA_WIDTH(AXI4_DATA_WIDTH)
-    , .AXI4_STRB_WIDTH(AXI4_STRB_WIDTH)
-    , .AXI4_ID_WIDTH  (AXI4_ID_WIDTH  )
+    .AXI4_DATA_WIDTH(AXI4_DATA_WIDTH)
 ) dut (
       .clk ( clk)
     , .rstn(~rst)
@@ -54,22 +56,28 @@ nx_artix_200t #(
     , .status_active (status_active )
     , .status_idle   (status_idle   )
     , .status_trigger(status_trigger)
-    // Inbound AXI4-stream
-    , .inbound_tdata (inbound_tdata_i )
-    , .inbound_tkeep (inbound_tkeep_i )
-    , .inbound_tstrb (inbound_tstrb_i )
-    , .inbound_tid   (inbound_tid_i   )
-    , .inbound_tlast (inbound_tlast_i )
-    , .inbound_tvalid(inbound_tvalid_i)
-    , .inbound_tready(inbound_tready_o)
-    // Outbound AXI4-stream
-    , .outbound_tdata (outbound_tdata_o )
-    , .outbound_tkeep (outbound_tkeep_o )
-    , .outbound_tstrb (outbound_tstrb_o )
-    , .outbound_tid   (outbound_tid_o   )
-    , .outbound_tlast (outbound_tlast_o )
-    , .outbound_tvalid(outbound_tvalid_o)
-    , .outbound_tready(outbound_tready_i)
+    // Control AXI4-streams
+    // - Inbound
+    , .inbound_ctrl_tdata  (inbound_ctrl_tdata_i  )
+    , .inbound_ctrl_tlast  (inbound_ctrl_tlast_i  )
+    , .inbound_ctrl_tvalid (inbound_ctrl_tvalid_i )
+    , .inbound_ctrl_tready (inbound_ctrl_tready_o )
+    // - Outbound
+    , .outbound_ctrl_tdata (outbound_ctrl_tdata_o )
+    , .outbound_ctrl_tlast (outbound_ctrl_tlast_o )
+    , .outbound_ctrl_tvalid(outbound_ctrl_tvalid_o)
+    , .outbound_ctrl_tready(outbound_ctrl_tready_i)
+    // Mesh AXI4-streams
+    // - Inbound
+    , .inbound_mesh_tdata  (inbound_mesh_tdata_i  )
+    , .inbound_mesh_tlast  (inbound_mesh_tlast_i  )
+    , .inbound_mesh_tvalid (inbound_mesh_tvalid_i )
+    , .inbound_mesh_tready (inbound_mesh_tready_o )
+    // - Outbound
+    , .outbound_mesh_tdata (outbound_mesh_tdata_o )
+    , .outbound_mesh_tlast (outbound_mesh_tlast_o )
+    , .outbound_mesh_tvalid(outbound_mesh_tvalid_o)
+    , .outbound_mesh_tready(outbound_mesh_tready_i)
 );
 
 // Wave tracing

@@ -41,18 +41,18 @@ async def load(dut):
         for col in range(num_cols):
             for _ in range(randint(10, 30)):
                 instr = randint(0, (1 << 15) - 1)
-                raw   = build_load_instr(row, col, instr)
+                raw   = (1 << 31) | build_load_instr(row, col, instr)
                 to_send += bytearray([(raw >> (x * 8)) & 0xFF for x in range(4)])
                 loaded[row][col].append(instr)
                 counter += 1
-    dut.inbound.append(AXI4StreamTransaction(data=to_send))
+    dut.ib_mesh.append(AXI4StreamTransaction(data=to_send))
 
     # Wait for all data to be sent
     dut.info("Waiting for AXI4-stream to send all data")
-    while dut.inbound.intf.tvalid == 0: await RisingEdge(dut.clk)
-    while dut.inbound.intf.tvalid == 1 or dut.inbound.intf.tready == 0:
+    while dut.ib_mesh.intf.tvalid == 0: await RisingEdge(dut.clk)
+    while dut.ib_mesh.intf.tvalid == 1 or dut.ib_mesh.intf.tready == 0:
         await RisingEdge(dut.clk)
-    dut.info(f"Breaking out TVALID {int(dut.inbound.intf.tvalid)}, TREADY {int(dut.inbound.intf.tready)}")
+    dut.info(f"Breaking out TVALID {int(dut.ib_mesh.intf.tvalid)}, TREADY {int(dut.ib_mesh.intf.tready)}")
 
     # Wait for the idle flag to go high
     if dut.dut.dut.core.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.core.mesh.idle_o)
