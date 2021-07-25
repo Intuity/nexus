@@ -148,3 +148,6 @@ sim_build
 # VSCode
 .vscode
 
+# Driver
+nxlink/work
+

@@ -1,0 +1,8 @@
+[submodule "nxlink/thirdparty/cxxopts"]
+	path = nxlink/thirdparty/cxxopts
+	url = git@github.com:jarro2783/cxxopts.git
+	branch = master
+[submodule "nxlink/thirdparty/concurrentqueue"]
+	path = nxlink/thirdparty/concurrentqueue
+	url = git@github.com:cameron314/concurrentqueue.git
+	branch = master
