@@ -16,7 +16,8 @@
 // Nexus 7 instance for the Artix-7 XC7A200T
 //
 module nx_artix_200t #(
-    parameter AXI4_DATA_WIDTH = 128
+      parameter AXI4_DATA_WIDTH = 128
+    , parameter AXI4_STRB_WIDTH = AXI4_DATA_WIDTH / 8
 ) (
       input  wire clk
     , input  wire rstn
@@ -27,26 +28,33 @@ module nx_artix_200t #(
     // Control AXI4-streams
     // - Inbound
     , input  wire [AXI4_DATA_WIDTH-1:0] inbound_ctrl_tdata
+    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_ctrl_tkeep
     , input  wire                       inbound_ctrl_tlast
     , input  wire                       inbound_ctrl_tvalid
     , output wire                       inbound_ctrl_tready
     // - Outbound
     , output wire [AXI4_DATA_WIDTH-1:0] outbound_ctrl_tdata
+    , output wire [AXI4_STRB_WIDTH-1:0] outbound_ctrl_tkeep
     , output wire                       outbound_ctrl_tlast
     , output wire                       outbound_ctrl_tvalid
     , input  wire                       outbound_ctrl_tready
     // Mesh AXI4-streams
     // - Inbound
     , input  wire [AXI4_DATA_WIDTH-1:0] inbound_mesh_tdata
+    , input  wire [AXI4_STRB_WIDTH-1:0] inbound_mesh_tkeep
     , input  wire                       inbound_mesh_tlast
     , input  wire                       inbound_mesh_tvalid
     , output wire                       inbound_mesh_tready
     // - Outbound
     , output wire [AXI4_DATA_WIDTH-1:0] outbound_mesh_tdata
+    , output wire [AXI4_STRB_WIDTH-1:0] outbound_mesh_tkeep
     , output wire                       outbound_mesh_tlast
     , output wire                       outbound_mesh_tvalid
     , input  wire                       outbound_mesh_tready
 );
+
+assign outbound_ctrl_tkeep = {AXI4_STRB_WIDTH{1'b1}};
+assign outbound_mesh_tkeep = {AXI4_STRB_WIDTH{1'b1}};
 
 // =============================================================================
 // AXI4-Stream Bridge for Control
