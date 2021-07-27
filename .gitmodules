@@ -6,3 +6,7 @@
 	path = nxlink/thirdparty/concurrentqueue
 	url = git@github.com:cameron314/concurrentqueue.git
 	branch = master
+[submodule "nxlink/thirdparty/dma_ip_drivers"]
+	path = nxlink/thirdparty/dma_ip_drivers
+	url = https://github.com/Xilinx/dma_ip_drivers
+	branch = master
