@@ -21,8 +21,10 @@ CPP_INC_DIRS += ./thirdparty/cxxopts/include
 CPP_INC_DIRS += ./thirdparty/concurrentqueue
 
 # Compiler options
-CXX_OPTS += -std=c++11
+CXX_OPTS += -std=c++14
 CXX_OPTS += $(foreach d,$(CPP_INC_DIRS),-I $(d))
+CXX_OPTS += -pthread
+CXX_OPTS += -g3
 
 # Output
 WORK_DIR ?= work
@@ -59,3 +61,12 @@ $(MKDIRS):
 clean:
 	@echo "# Removing directories"
 	rm -rf $(MKDIRS)
+
+# Setup DMA IP drivers
+.PHONY: setup
+setup:
+	@echo "# Setting up DMA IP drivers"
+	sudo make -C thirdparty/dma_ip_drivers/XDMA/linux-kernel/xdma install -j
+	chmod +x thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests/load_driver.sh
+	cd thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests && sudo ./load_driver.sh
+	lspci | grep Xilinx

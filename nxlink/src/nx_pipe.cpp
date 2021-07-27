@@ -13,31 +13,41 @@
 // limitations under the License.
 
 #include <assert.h>
+#include <chrono>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/types.h>
 #include <termios.h>
+#include <thread>
 #include <unistd.h>
 
 #include "nx_pipe.hpp"
 
-// tx_to_device: Queue up an item to send to the device
+using namespace std::chrono_literals;
+
+#define NXPIPE_DEBUG(...)
+
+// tx_to_device
+// Queue up an item to send to the device
 //
 void Nexus::NXPipe::tx_to_device (uint32_t data)
 {
     m_tx_q.enqueue(data);
 }
 
-// rx_available: See if any items are present in the receive queue
+// rx_available
+// See if any items are present in the receive queue
 //
 bool Nexus::NXPipe::rx_available (void)
 {
     return m_rx_q.size_approx() > 0;
 }
 
-// rx_from_device: Dequeue an item received from the device
+// rx_from_device
+// Dequeue an item received from the device
 //
 uint32_t Nexus::NXPipe::rx_from_device (void)
 {
@@ -46,20 +56,21 @@ uint32_t Nexus::NXPipe::rx_from_device (void)
     return data;
 }
 
-// tx_process: Send queued up items to the device
+// tx_process
+// Send queued up items to the device
 //
 void Nexus::NXPipe::tx_process (void)
 {
-    // Open a file handle
-    int fh = open(m_h2c_path.c_str(), O_RDWR);
+    // Open a file handle (O_SYNC used to ensure flush between writes)
+    int fh = open(m_h2c_path.c_str(), O_RDWR | O_SYNC);
     if (fh < 0) {
         fprintf(stderr, "Failed to open H2C: %s -> %i\n", m_h2c_path.c_str(), fh);
         assert(!"Failed to open H2C handle");
         return;
     }
 
-    // Set the buffer size
-    uint32_t buffer_size = 1024;
+    // Set the buffer size (16-byte chunk is one AXI4-stream flit)
+    uint32_t buffer_size = 16;
 
     // Create a transmit buffer
     uint8_t * tx_buffer = NULL;
@@ -70,26 +81,20 @@ void Nexus::NXPipe::tx_process (void)
     // Send messages forever
     uint32_t * tx_slots = (uint32_t *)tx_buffer;
     uint32_t   slot     = 0;
-    uint32_t   max_slot = buffer_size / 32;
+    uint32_t   max_slot = buffer_size / 4;
+
     while (true) {
         // Dequeue the next item
         m_tx_q.wait_dequeue(tx_slots[slot]);
         // Set bit 31 to indicate this is an active slot
         tx_slots[slot] |= (1 << 31);
+        NXPIPE_DEBUG("Sending %3d: 0x%08x\n", slot, tx_slots[slot]);
         // Keep track of the slot
         slot += 1;
         // If the buffer is full or the queue is empty, send to the device!
         if (slot >= max_slot || (m_tx_q.size_approx() == 0)) {
-            // Seek to start of device
-            ssize_t rc;
-            rc = lseek(fh, 0, SEEK_SET);
-            if (rc != 0) {
-                fprintf(stderr, "tx_process: Seek to 0 failed - %li\n", rc);
-                assert(!"Failed to seek");
-                return;
-            }
-            // Write
-            rc = write(fh, tx_buffer, slot * 4);
+            // Write the entire 16 byte buffer to avoid uninitialised data
+            ssize_t rc = write(fh, tx_buffer, buffer_size);
             if (rc < 0) {
                 fprintf(stderr, "tx_process: Write failed - %li\n", rc);
                 assert(!"Write to device failed");
@@ -97,69 +102,43 @@ void Nexus::NXPipe::tx_process (void)
             }
             // Clear up
             slot = 0;
+            memset((void *)tx_buffer, 0, buffer_size);
         }
     }
 }
 
-// rx_process: Receive items from the device and queue them up
+// rx_process
+// Receive items from the device and queue them up
+//
 void Nexus::NXPipe::rx_process (void)
 {
     // Open a file handle
-    int fh = open(m_c2h_path.c_str(), O_RDWR);
+    int fh = open(m_c2h_path.c_str(), O_RDWR | O_SYNC);
     if (fh < 0) {
         fprintf(stderr, "Failed to open C2H: %s -> %i\n", m_c2h_path.c_str(), fh);
         assert(!"Failed to open C2H handle");
         return;
     }
 
-    // Setup a timeout on the device
-    struct termios termios;
-    tcgetattr(fh, &termios);
-    termios.c_lflag     &= ~ICANON; // Non-canonical mode
-    termios.c_cc[VTIME]  = 1;       // Timeout of 0.1 seconds
-    termios.c_cc[VMIN]   = 0;
-    tcsetattr(fh, TCSANOW, &termios);
-
-    // Set the buffer size
-    uint32_t buffer_size = 1024;
-
-    // Create a receive buffer
-    uint8_t * rx_buffer = NULL;
-    posix_memalign((void **)&rx_buffer, 4096, buffer_size + 4096);
-    assert(rx_buffer != NULL);
-    memset((void *)rx_buffer, 0, buffer_size);
-
-    // Continuously read in chunks of 64 bytes (up to 16 messages)
-    uint32_t * rx_slots = (uint32_t *)rx_buffer;
-    uint32_t   offset   = 0;
+    // Read chunk-by-chunk
     while (true) {
-        // Seek to the start of the device
-        ssize_t rc;
-        rc = lseek(fh, 0, SEEK_SET);
-        if (rc != 0) {
-            fprintf(stderr, "rx_process: Seek to 0 failed - %li\n", rc);
-            assert(!"Failed to seek");
-            return;
-        }
-        // Read the next message
-        rc = read(fh, &rx_buffer[offset], 64);
+        // Read the 16-byte chunk
+        uint32_t rx_slots[4];
+        memset((void *)rx_slots, 0, 16);
+        ssize_t rc = read(fh, (uint8_t *)rx_slots, 16);
         if (rc < 0) {
             fprintf(stderr, "rx_process: Read failed - %li\n", rc);
             assert(!"Read from device failed");
             return;
         }
         // Start digesting messages
-        uint32_t slot = 0;
-        while (rc >= 4) {
-            // Check if this slot if populated
-            if (rx_slots[slot] & 0x80000000) {
-                uint32_t masked = rx_slots[slot] & 0x7FFFFFFF;
-                m_rx_q.enqueue(masked);
-            }
-            // Keep track of the active slot
-            slot += 1;
+        for (uint32_t slot = 0; slot < 4; slot++) {
+            // Skip empty slots
+            if (!(rx_slots[slot] & 0x80000000)) continue;
+            NXPIPE_DEBUG("Receive %3d: 0x%08x\n", slot, rx_slots[slot]);
+            // Decode message
+            uint32_t masked = rx_slots[slot] & 0x7FFFFFFF;
+            m_rx_q.enqueue(masked);
         }
-        // Keep track of the remainder for the next receive
-        offset = rc - (slot * 4);
     }
 }

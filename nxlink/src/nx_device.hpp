@@ -37,8 +37,22 @@ namespace Nexus {
         // =====================================================================
         // Public Methods
         // =====================================================================
+
+        // Control plane
         bool            identify (void);
         nx_parameters_t read_parameters (void);
+        nx_status_t     read_status (void);
+        void            set_interval (uint32_t interval);
+        void            clear_interval (void);
+
+        // Mesh interface
+        void send_to_mesh (nx_message_t msg);
+        bool receive_from_mesh (nx_message_t & msg, bool blocking);
+
+        // Helper methods
+        void log_parameters (nx_parameters_t params);
+        void log_status (nx_status_t status);
+        void log_mesh_message (nx_message_t msg);
 
     private:
         // =====================================================================

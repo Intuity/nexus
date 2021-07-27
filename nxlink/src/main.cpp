@@ -55,17 +55,17 @@ int main (int argc, char * argv [])
     tmp << result["device"].as<std::string>() << "_c2h_"
         << result["ch_ctrl"].as<std::string>();
     std::string ctrl_c2h = std::string(tmp.str());
-    tmp.str();
+    tmp.str("");
     // - Mesh H2C
     tmp << result["device"].as<std::string>() << "_h2c_"
         << result["ch_mesh"].as<std::string>();
     std::string mesh_h2c = std::string(tmp.str());
-    tmp.str();
+    tmp.str("");
     // - Mesh H2C
     tmp << result["device"].as<std::string>() << "_c2h_"
         << result["ch_mesh"].as<std::string>();
     std::string mesh_c2h = std::string(tmp.str());
-    tmp.str();
+    tmp.str("");
 
     // Create pipes for control & mesh
     Nexus::NXPipe * ctrl_pipe = new Nexus::NXPipe(ctrl_h2c, ctrl_c2h);
@@ -73,20 +73,42 @@ int main (int argc, char * argv [])
 
     // Create a wrapper around the device
     Nexus::NXDevice * device = new Nexus::NXDevice(ctrl_pipe, mesh_pipe);
+
+    // Check the identity
     if (!device->identify()) {
         fprintf(stderr, "NXDevice reported a failed identity check\n");
         return 1;
     }
 
     // Read back the parameters
-    Nexus::nx_parameters_t params = device->read_parameters();
-    std::cout << "Device Parameters:" << std::endl;
-    std::cout << " - Counter Width : " << std::dec << params.counter_width  << std::endl;
-    std::cout << " - Mesh Rows     : " << std::dec << params.rows           << std::endl;
-    std::cout << " - Mesh Columns  : " << std::dec << params.columns        << std::endl;
-    std::cout << " - Node Inputs   : " << std::dec << params.node_inputs    << std::endl;
-    std::cout << " - Node Outputs  : " << std::dec << params.node_outputs   << std::endl;
-    std::cout << " - Node Registers: " << std::dec << params.node_registers << std::endl;
+    device->log_parameters(device->read_parameters());
+
+    // Read back the current status
+    device->log_status(device->read_status());
+
+    // Route a message through the mesh
+    Nexus::nx_message_t tx_msg;
+    tx_msg.header.row     = 10;
+    tx_msg.header.column  = 10;
+    tx_msg.header.command = Nexus::NX_CMD_NODE_CTRL;
+    tx_msg.payload        = 0x123456;
+    device->send_to_mesh(tx_msg);
+
+    // Receive a message from the mesh
+    Nexus::nx_message_t rx_msg;
+    memset(&rx_msg, 0, sizeof(Nexus::nx_message_t));
+    device->receive_from_mesh(rx_msg, true);
+    std::cout << "Received message from mesh" << std::endl;
+    device->log_mesh_message(rx_msg);
+
+    // Read back the current status
+    device->log_status(device->read_status());
+
+    // Set an interval
+    device->set_interval(10);
+    device->log_status(device->read_status());
+    device->clear_interval();
+    device->log_status(device->read_status());
 
     return 0;
 }
