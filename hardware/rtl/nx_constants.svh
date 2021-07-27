@@ -134,22 +134,23 @@ typedef struct packed {
 } nx_msg_sig_state_t;
 
 typedef enum logic [`NX_CTRL_CMD_WIDTH-1:0] {
-      NX_CTRL_ID       // Read device identifier
-    , NX_CTRL_VERSION  // Read hardware version (major/minor)
-    , NX_CTRL_PARAM    // Read back different parameters
-    , NX_CTRL_ACTIVE   // Set the active status of the device
-    , NX_CTRL_STATUS   // Read back the current status
-    , NX_CTRL_CYCLES   // Read current cycle counter
-    , NX_CTRL_INTERVAL // Set number of cycles to run for
+      NX_CTRL_ID       // 0: Read device identifier
+    , NX_CTRL_VERSION  // 1: Read hardware version (major/minor)
+    , NX_CTRL_PARAM    // 2: Read back different parameters
+    , NX_CTRL_ACTIVE   // 3: Set the active status of the device
+    , NX_CTRL_STATUS   // 4: Read back the current status
+    , NX_CTRL_CYCLES   // 5: Read current cycle counter
+    , NX_CTRL_INTERVAL // 6: Set number of cycles to run for
+    , NX_CTRL_RESET    // 7: Write 1 to trigger a soft reset of Nexus
 } nx_ctrl_command_t;
 
 typedef enum logic [`NX_CTRL_PARAM_WIDTH-1:0] {
-      NX_PARAM_COUNTER_WIDTH  // Width of counters in the control block
-    , NX_PARAM_ROWS           // Number of rows in the mesh
-    , NX_PARAM_COLUMNS        // Number of columns in the mesh
-    , NX_PARAM_NODE_INPUTS    // Number of inputs per node
-    , NX_PARAM_NODE_OUTPUTS   // Number of outputs per node
-    , NX_PARAM_NODE_REGISTERS // Number of internal registers per node
+      NX_PARAM_COUNTER_WIDTH  // 0: Width of counters in the control block
+    , NX_PARAM_ROWS           // 1: Number of rows in the mesh
+    , NX_PARAM_COLUMNS        // 2: Number of columns in the mesh
+    , NX_PARAM_NODE_INPUTS    // 3: Number of inputs per node
+    , NX_PARAM_NODE_OUTPUTS   // 4: Number of outputs per node
+    , NX_PARAM_NODE_REGISTERS // 5: Number of internal registers per node
 } nx_ctrl_param_t;
 
 typedef struct packed {

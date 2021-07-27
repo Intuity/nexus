@@ -56,6 +56,17 @@ module nexus #(
     , input  logic        mesh_ob_ready_i
 );
 
+
+// Instance the reset stretcher
+logic rst_soft, rst_internal;
+
+nx_reset reset_stretch (
+      .clk_i         (clk_i       )
+    , .rst_hard_i    (rst_i       )
+    , .rst_soft_i    (rst_soft    )
+    , .rst_internal_o(rst_internal)
+);
+
 // Instance the controller
 logic               ctrl_mesh_idle, ctrl_mesh_trigger;
 logic [COLUMNS-1:0] ctrl_token_grant, ctrl_token_release;
@@ -67,8 +78,8 @@ nx_control #(
     , .OUTPUTS  (OUTPUTS  )
     , .REGISTERS(REGISTERS)
 ) control (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
+      .clk_i(clk_i       )
+    , .rst_i(rst_internal)
     // Inbound message stream (from host)
     , .inbound_data_i (ctrl_ib_data_i )
     , .inbound_valid_i(ctrl_ib_valid_i)
@@ -77,6 +88,8 @@ nx_control #(
     , .outbound_data_o (ctrl_ob_data_o )
     , .outbound_valid_o(ctrl_ob_valid_o)
     , .outbound_ready_i(ctrl_ob_ready_i)
+    // Soft reset request
+    , .soft_reset_o(rst_soft)
     // Externally visible status
     , .status_active_o (status_active_o )
     , .status_idle_o   (status_idle_o   )
@@ -102,8 +115,8 @@ nx_mesh #(
     , .MAX_INSTRS    (MAX_INSTRS    )
     , .OPCODE_WIDTH  (OPCODE_WIDTH  )
 ) mesh (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
+      .clk_i(clk_i       )
+    , .rst_i(rst_internal)
     // Control signals
     , .idle_o   (ctrl_mesh_idle)
     , .trigger_i(ctrl_trigger  )

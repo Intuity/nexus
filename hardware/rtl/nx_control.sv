@@ -36,6 +36,8 @@ module nx_control #(
     , output nx_ctrl_resp_t outbound_data_o
     , output logic          outbound_valid_o
     , input  logic          outbound_ready_i
+    // Soft reset request
+    , output logic soft_reset_o
     // Externally visible status
     , output logic status_active_o  // High when the mesh is active
     , output logic status_idle_o    // High when the mesh goes idle
@@ -50,6 +52,7 @@ module nx_control #(
 localparam PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
 
 // Internal state
+`DECLARE_DQ (             1, soft_reset,     clk_i, rst_i,                          1'b0)
 `DECLARE_DQ (             1, active,         clk_i, rst_i,                          1'b0)
 `DECLARE_DQ (             1, trigger,        clk_i, rst_i,                          1'b0)
 `DECLARE_DQ (             1, seen_idle_low,  clk_i, rst_i,                          1'b0)
@@ -65,6 +68,8 @@ localparam PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
 // Connect outputs
 assign outbound_data_o  = send_data_q;
 assign outbound_valid_o = send_valid_q;
+
+assign soft_reset_o = soft_reset_q;
 
 assign status_active_o  = active_q;
 assign status_idle_o    = mesh_idle_i;
@@ -122,6 +127,7 @@ assign req_pld_interval = ib_fifo_data.payload;
 
 always_comb begin : p_decode
     // Internal state
+    `INIT_D(soft_reset);
     `INIT_D(active);
     `INIT_D(interval);
     `INIT_D(interval_count);
@@ -206,6 +212,10 @@ always_comb begin : p_decode
                 interval       = req_pld_interval.interval;
                 interval_count = {PYLD_WIDTH{1'b0}};
                 interval_set   = (req_pld_interval.interval != 0);
+            end
+            // Soft reset request
+            NX_CTRL_RESET: begin
+                soft_reset = ib_fifo_data.payload[0];
             end
             // Catch-all
             default: begin
