@@ -25,23 +25,28 @@ CXX_OPTS += -std=c++14
 CXX_OPTS += $(foreach d,$(CPP_INC_DIRS),-I $(d))
 CXX_OPTS += -pthread
 CXX_OPTS += -g3
+CXX_OPTS += -MMD -MP
 
 # Output
 WORK_DIR ?= work
 OBJ_DIR  ?= $(WORK_DIR)/obj
+DEPS_DIR ?= $(WORK_DIR)/deps
 EXE_NAME ?= nxlink
 EXE_PATH ?= $(WORK_DIR)/$(EXE_NAME)
 
-MKDIRS += $(WORK_DIR) $(OBJ_DIR)
+MKDIRS += $(WORK_DIR) $(OBJ_DIR) $(DEPS_DIR)
 
 # Build objects
 define DO_BUILD_OBJ
-$(OBJ_DIR)/%.o: $1/%.cpp | $(OBJ_DIR)
-	g++ $(CXX_OPTS) -o $$@ -c $$<
+$(OBJ_DIR)/%.o: $1/%.cpp | $(OBJ_DIR) $(DEPS_DIR)
+	g++ $(CXX_OPTS) -MT $$@ -MF $(DEPS_DIR)/$$(patsubst %.o,%.d,$$(notdir $$@)) -o $$@ -c $$<
 
 ALL_OBJ += $(patsubst $1/%.cpp,$(OBJ_DIR)/%.o,$(wildcard $1/*.cpp))
 endef
 $(foreach d,$(CPP_SRC_DIRS),$(eval $(call DO_BUILD_OBJ,$(d))))
+
+# Include all dependencies
+-include $(wildcard $(DEPS_DIR)/*.d)
 
 # Build executable
 $(EXE_PATH): $(ALL_OBJ) | $(WORK_DIR)
