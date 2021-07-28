@@ -36,10 +36,15 @@ EXE_PATH ?= $(WORK_DIR)/$(EXE_NAME)
 
 MKDIRS += $(WORK_DIR) $(OBJ_DIR) $(DEPS_DIR)
 
+# Miscellaneous
+QUIET  ?= yes
+PREFIX := $(if $(findstring yes,$(QUIET)),@,)
+
 # Build objects
 define DO_BUILD_OBJ
 $(OBJ_DIR)/%.o: $1/%.cpp | $(OBJ_DIR) $(DEPS_DIR)
-	g++ $(CXX_OPTS) -MT $$@ -MF $(DEPS_DIR)/$$(patsubst %.o,%.d,$$(notdir $$@)) -o $$@ -c $$<
+	@echo "# Compiling $$(notdir $$<)"
+	$(PREFIX)g++ $(CXX_OPTS) -MT $$@ -MF $(DEPS_DIR)/$$(patsubst %.o,%.d,$$(notdir $$@)) -o $$@ -c $$<
 
 ALL_OBJ += $(patsubst $1/%.cpp,$(OBJ_DIR)/%.o,$(wildcard $1/*.cpp))
 endef
@@ -51,7 +56,7 @@ $(foreach d,$(CPP_SRC_DIRS),$(eval $(call DO_BUILD_OBJ,$(d))))
 # Build executable
 $(EXE_PATH): $(ALL_OBJ) | $(WORK_DIR)
 	@echo "# Linking objects to form $(notdir $@)"
-	g++ $(CXX_OPTS) -o $@ $(ALL_OBJ)
+	$(PREFIX)g++ $(CXX_OPTS) -o $@ $(ALL_OBJ)
 
 .PHONY: build
 build: $(EXE_PATH)
@@ -59,19 +64,19 @@ build: $(EXE_PATH)
 # Create directory
 $(MKDIRS):
 	@echo "# Creating directory $@"
-	mkdir -p $@
+	$(PREFIX)mkdir -p $@
 
 # Clean
 .PHONY: clean
 clean:
 	@echo "# Removing directories"
-	rm -rf $(MKDIRS)
+	$(PREFIX)rm -rf $(MKDIRS)
 
 # Setup DMA IP drivers
 .PHONY: setup
 setup:
 	@echo "# Setting up DMA IP drivers"
-	sudo make -C thirdparty/dma_ip_drivers/XDMA/linux-kernel/xdma install -j
-	chmod +x thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests/load_driver.sh
-	cd thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests && sudo ./load_driver.sh
-	lspci | grep Xilinx
+	$(PREFIX)sudo make -C thirdparty/dma_ip_drivers/XDMA/linux-kernel/xdma install -j
+	$(PREFIX)chmod +x thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests/load_driver.sh
+	$(PREFIX)cd thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests && sudo ./load_driver.sh
+	$(PREFIX)lspci | grep Xilinx
