@@ -107,7 +107,7 @@ int main (int argc, char * argv [])
     // Set an interval
     device->set_interval(10);
     device->log_status(device->read_status());
-    device->clear_interval();
+    device->reset();
     device->log_status(device->read_status());
 
     return 0;

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <assert.h>
-#include <chrono>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,12 +20,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <termios.h>
-#include <thread>
 #include <unistd.h>
 
 #include "nx_pipe.hpp"
-
-using namespace std::chrono_literals;
 
 #define NXPIPE_DEBUG(...)
 

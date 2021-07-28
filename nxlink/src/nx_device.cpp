@@ -13,15 +13,20 @@
 // limitations under the License.
 
 #include <assert.h>
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include "nx_device.hpp"
 
+using namespace std::chrono_literals;
+
 // identify
 // Read back the device identifier and major/minor version, returns TRUE if all
-// values match expectation, FALSE if not
+// values match expectation, FALSE if not. If quiet is active, log message will
+// be suppressed.
 //
-bool Nexus::NXDevice::identify (void)
+bool Nexus::NXDevice::identify (bool quiet)
 {
     // Send a request for the device identifier
     m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_ID, 0));
@@ -32,10 +37,12 @@ bool Nexus::NXDevice::identify (void)
     // Receive device version
     nx_version_t version = nx_decode_version(m_ctrl_pipe->rx_from_device());
     // Log identifier and major/minor version
-    std::cout << "NXDevice::identify - ID: 0x" << std::hex << device_id
-                        << ", Version Major: " << std::dec << version.major
-                        << ", Version Minor: " << std::dec << version.minor
-                        << std::endl;
+    if (!quiet) {
+        std::cout << "NXDevice::identify - ID: 0x" << std::hex << device_id
+                            << ", Version Major: " << std::dec << version.major
+                            << ", Version Minor: " << std::dec << version.minor
+                            << std::endl;
+    }
     // Check against expected values
     return (
         (device_id     == NX_DEVICE_ID    ) &&
@@ -99,6 +106,22 @@ void Nexus::NXDevice::set_interval (uint32_t interval)
 void Nexus::NXDevice::clear_interval (void)
 {
     set_interval(0);
+}
+
+// reset
+// Send a soft reset request to the device, then wait until safe to resume
+//
+void Nexus::NXDevice::reset (void)
+{
+    // Send the reset request
+    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_RESET, 1));
+    // Wait for 100ms
+    std::this_thread::sleep_for(100ms);
+    // Check the identity of the device
+    assert(identify(true));
+    // Check that the reset status is expected
+    nx_status_t status = read_status();
+    assert(!status.active && status.first_tick && !status.interval_set);
 }
 
 // send_to_mesh

@@ -31,13 +31,14 @@ namespace Nexus {
     } nx_command_t;
 
     typedef enum {
-        NX_CTRL_ID,      // 0: Read device identifier
-        NX_CTRL_VERSION, // 1: Read hardware version (major/minor)
-        NX_CTRL_PARAM,   // 2: Read back different parameters
-        NX_CTRL_ACTIVE,  // 3: Set the active status of the device
-        NX_CTRL_STATUS,  // 4: Read back the current status
-        NX_CTRL_CYCLES,  // 5: Read current cycle counter
-        NX_CTRL_INTERVAL // 6: Set number of cycles to run for
+        NX_CTRL_ID,       // 0: Read device identifier
+        NX_CTRL_VERSION,  // 1: Read hardware version (major/minor)
+        NX_CTRL_PARAM,    // 2: Read back different parameters
+        NX_CTRL_ACTIVE,   // 3: Set the active status of the device
+        NX_CTRL_STATUS,   // 4: Read back the current status
+        NX_CTRL_CYCLES,   // 5: Read current cycle counter
+        NX_CTRL_INTERVAL, // 6: Set number of cycles to run for
+        NX_CTRL_RESET     // 7: Trigger a soft reset of Nexus
     } nx_ctrl_command_t;
 
     typedef enum {
