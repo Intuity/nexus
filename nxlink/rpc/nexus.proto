@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package NexusRPC;
+
+service NXService {
+    rpc Identify (google.protobuf.Empty) returns (NXIdentity) {}
+    rpc Reset (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+message NXIdentity {
+    uint32 device_id     = 1;
+    uint32 version_major = 2;
+    uint32 version_minor = 3;
+}

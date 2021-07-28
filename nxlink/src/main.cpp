@@ -14,8 +14,13 @@
 
 #include <cxxopts.hpp>
 
+#include <grpcpp/ext/proto_server_reflection_plugin.h>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
+
 #include "nx_device.hpp"
 #include "nx_pipe.hpp"
+#include "nx_remote.hpp"
 
 int main (int argc, char * argv [])
 {
@@ -80,6 +85,9 @@ int main (int argc, char * argv [])
         return 1;
     }
 
+    // Reset the device
+    device->reset();
+
     // Read back the parameters
     device->log_parameters(device->read_parameters());
 
@@ -109,6 +117,20 @@ int main (int argc, char * argv [])
     device->log_status(device->read_status());
     device->reset();
     device->log_status(device->read_status());
+
+    // Run gRPC server
+    std::string server_address("0.0.0.0:51234");
+
+    grpc::EnableDefaultHealthCheckService(true);
+    grpc::reflection::InitProtoReflectionServerBuilderPlugin();
+    grpc::ServerBuilder builder;
+    Nexus::NXRemote service;
+
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&service);
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    std::cout << "Server listening on " << server_address << std::endl;
+    server->Wait();
 
     return 0;
 }

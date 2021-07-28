@@ -193,7 +193,6 @@ namespace Nexus {
 
     inline nx_status_t nx_decode_status (uint32_t raw)
     {
-        printf("RAW STATUS: 0x%08x\n", raw);
         nx_status_t status = {
             .active        = ((raw >> 3) & 0x1) != 0,
             .seen_idle_low = ((raw >> 2) & 0x1) != 0,

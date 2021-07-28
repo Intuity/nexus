@@ -10,3 +10,7 @@
 	path = nxlink/thirdparty/dma_ip_drivers
 	url = https://github.com/Xilinx/dma_ip_drivers
 	branch = master
+[submodule "nxlink/thirdparty/grpc"]
+	path = nxlink/thirdparty/grpc
+	url = git@github.com:grpc/grpc.git
+	branch = master

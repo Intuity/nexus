@@ -122,11 +122,7 @@ void Nexus::NXPipe::rx_process (void)
         uint32_t rx_slots[4];
         memset((void *)rx_slots, 0, 16);
         ssize_t rc = read(fh, (uint8_t *)rx_slots, 16);
-        if (rc < 0) {
-            fprintf(stderr, "rx_process: Read failed - %li\n", rc);
-            assert(!"Read from device failed");
-            return;
-        }
+        if (rc < 0) continue;
         // Start digesting messages
         for (uint32_t slot = 0; slot < 4; slot++) {
             // Skip empty slots
