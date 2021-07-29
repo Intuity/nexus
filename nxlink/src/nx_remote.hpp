@@ -19,30 +19,66 @@
 
 #include "nexus.grpc.pb.h"
 
+#include "nx_device.hpp"
+
 namespace Nexus {
 
     class NXRemote final : public NexusRPC::NXService::Service
     {
+    public:
+
+        // =====================================================================
+        // Constructor
+        // =====================================================================
+
+        explicit NXRemote(NXDevice * device) : m_device(device) {}
+
+        // =====================================================================
+        // RPC Implementations
+        // =====================================================================
+
         grpc::Status Identify (
                   grpc::ServerContext     * ctx,
             const google::protobuf::Empty * request,
                   NexusRPC::NXIdentity    * response
-        ) override {
-            printf("Called Identify via RPC\n");
-            response->set_device_id(0x123456);
-            response->set_version_major(0);
-            response->set_version_minor(1);
-            return grpc::Status::OK;
-        }
+        ) override;
 
         grpc::Status Reset (
                   grpc::ServerContext     * ctx,
             const google::protobuf::Empty * request,
                   google::protobuf::Empty * response
-        ) override {
-            printf("Called Reset via RPC\n");
-            return grpc::Status::OK;
-        }
+        ) override;
+
+        grpc::Status Parameters (
+                  grpc::ServerContext     * ctx,
+            const google::protobuf::Empty * request,
+                  NexusRPC::NXParameters  * response
+        ) override;
+
+        grpc::Status Status (
+                  grpc::ServerContext     * ctx,
+            const google::protobuf::Empty * request,
+                  NexusRPC::NXStatus      * response
+        ) override;
+
+        grpc::Status SetInterval (
+                  grpc::ServerContext     * ctx,
+            const NexusRPC::NXInterval    * request,
+                  google::protobuf::Empty * response
+        ) override;
+
+        grpc::Status SetActive (
+                  grpc::ServerContext     * ctx,
+            const NexusRPC::NXActive      * request,
+                  google::protobuf::Empty * response
+        ) override;
+
+    private:
+        // =====================================================================
+        // Members
+        // =====================================================================
+
+        NXDevice * m_device;
 
     };
 

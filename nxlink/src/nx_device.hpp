@@ -39,12 +39,15 @@ namespace Nexus {
         // =====================================================================
 
         // Control plane
+        uint32_t        read_device_id (void);
+        nx_version_t    read_version (void);
         bool            identify (bool quiet=false);
         nx_parameters_t read_parameters (void);
         nx_status_t     read_status (void);
         void            set_interval (uint32_t interval);
         void            clear_interval (void);
         void            reset (void);
+        void            set_active (bool active);
 
         // Mesh interface
         void send_to_mesh (nx_message_t msg);

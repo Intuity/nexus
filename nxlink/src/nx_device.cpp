@@ -21,6 +21,28 @@
 
 using namespace std::chrono_literals;
 
+// read_device_id
+// Read back the unsigned 32-bit device identifier
+//
+uint32_t Nexus::NXDevice::read_device_id (void)
+{
+    // Send a request for the device identifier
+    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_ID, 0));
+    // Return the response
+    return m_ctrl_pipe->rx_from_device();
+}
+
+// read_version
+// Read back the version information from the device
+//
+Nexus::nx_version_t Nexus::NXDevice::read_version (void)
+{
+    // Send a request for the device version
+    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_VERSION, 0));
+    // Decode and return the response
+    return nx_decode_version(m_ctrl_pipe->rx_from_device());
+}
+
 // identify
 // Read back the device identifier and major/minor version, returns TRUE if all
 // values match expectation, FALSE if not. If quiet is active, log message will
@@ -28,14 +50,9 @@ using namespace std::chrono_literals;
 //
 bool Nexus::NXDevice::identify (bool quiet)
 {
-    // Send a request for the device identifier
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_ID, 0));
-    // Send a request for the device version
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_VERSION, 0));
-    // Receive device identifier
-    uint32_t device_id = m_ctrl_pipe->rx_from_device();
-    // Receive device version
-    nx_version_t version = nx_decode_version(m_ctrl_pipe->rx_from_device());
+    // Get ID and version
+    uint32_t     device_id = read_device_id();
+    nx_version_t version   = read_version();
     // Log identifier and major/minor version
     if (!quiet) {
         std::cout << "NXDevice::identify - ID: 0x" << std::hex << device_id
@@ -122,6 +139,13 @@ void Nexus::NXDevice::reset (void)
     // Check that the reset status is expected
     nx_status_t status = read_status();
     assert(!status.active && status.first_tick && !status.interval_set);
+}
+
+// set_active
+// Activate/deactivate the mesh - will start/pause the simulation
+void Nexus::NXDevice::set_active (bool active)
+{
+    m_ctrl_pipe->tx_to_device(nx_build_ctrl_set_active(active));
 }
 
 // send_to_mesh

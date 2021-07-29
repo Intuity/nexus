@@ -124,7 +124,7 @@ int main (int argc, char * argv [])
     grpc::EnableDefaultHealthCheckService(true);
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     grpc::ServerBuilder builder;
-    Nexus::NXRemote service;
+    Nexus::NXRemote service(device);
 
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);

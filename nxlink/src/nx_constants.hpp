@@ -69,6 +69,9 @@ namespace Nexus {
     // - Request parameters
     const uint32_t NX_CTRL_PLD_PARAM_OFFSET = 25;
     const uint32_t NX_CTRL_PLD_PARAM_MASK   = 0x7;
+    // - Active parameters
+    const uint32_t NX_CTRL_PLD_ACTIVE_OFFSET = 27;
+    const uint32_t NX_CTRL_PLD_ACTIVE_MASK   = 0x1;
 
     // Mesh message header offsets
     const uint32_t NX_MESH_HDR_ROW_OFFSET     = 27;
@@ -153,6 +156,13 @@ namespace Nexus {
         return nx_build_ctrl(
             NX_CTRL_INTERVAL,
             (interval & NX_CTRL_PAYLOAD_MASK) << NX_CTRL_PAYLOAD_OFFSET
+        );
+    }
+
+    inline uint32_t nx_build_ctrl_set_active (bool active)
+    {
+        return nx_build_ctrl(
+            NX_CTRL_ACTIVE, (active ? (1 << NX_CTRL_PLD_ACTIVE_OFFSET) : 0)
         );
     }
 
