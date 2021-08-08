@@ -68,7 +68,7 @@ nx_reset reset_stretch (
 );
 
 // Instance the controller
-logic               ctrl_mesh_idle, ctrl_mesh_trigger;
+logic               ctrl_mesh_idle, ctrl_trigger;
 logic [COLUMNS-1:0] ctrl_token_grant, ctrl_token_release;
 
 nx_control #(
@@ -96,7 +96,7 @@ nx_control #(
     , .status_trigger_o(status_trigger_o)
     // Interface to the mesh
     , .mesh_idle_i    (ctrl_mesh_idle    )
-    , .mesh_trigger_o (ctrl_mesh_trigger )
+    , .mesh_trigger_o (ctrl_trigger      )
     , .token_grant_o  (ctrl_token_grant  )
     , .token_release_i(ctrl_token_release)
 );
