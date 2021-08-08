@@ -51,3 +51,6 @@ def build_req_cycles(*args, **kwargs):
 
 def build_set_interval(*args, **kwargs):
     return build_message(ControlCommand.INTERVAL, payload_interval, *args, **kwargs)
+
+def build_soft_reset(*args, **kwargs):
+    return build_message(ControlCommand.SOFT_RESET, 1, *args, **kwargs)
