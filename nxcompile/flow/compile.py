@@ -18,7 +18,6 @@ from statistics import mean
 from ..models.constant import Constant
 from ..models.flop import Flop
 from ..models.gate import Gate, Operation
-from ..models.port import PortBit
 
 log = logging.getLogger("compiler.compile")
 
@@ -197,7 +196,7 @@ class Node:
         return {
             "OPCODE"   : Operation((op >> 12) & 0x7).name,
             "SOURCE A" : ("INPUT[" if is_in_a else "REG[") + str((op >>  9) & 0x7) + "]",
-            "SOURCE B" : ("INPUT[" if is_in_a else "REG[") + str((op >>  5) & 0x7) + "]",
+            "SOURCE B" : ("INPUT[" if is_in_b else "REG[") + str((op >>  5) & 0x7) + "]",
             "TGT REG"  : f"REG[{(op >>  1) & 0x7}]",
             "OUTPUT"   : "YES" if ((op >> 0) & 0x1) else "NO",
         }
@@ -263,65 +262,6 @@ class Node:
                     regs[reg_idx] = None
         # Return I/O mappings and the bytecode instruction stream
         return inputs, outputs, encoded
-
-    def compile_messages(self, outputs):
-        """ Compile messages to be emitted by this node
-
-        Args:
-            outputs: List of instructions that are mapped to outputs, position
-                     determines order messages are emitted.
-
-        Returns: Dictionary of output bit to target operation assignment.
-        """
-        messages = {}
-        for idx_out, op in enumerate(outputs):
-            # Skip unassigned outputs
-            if op == None: continue
-            # Create a message list for this output
-            messages[idx_out] = []
-            # Find the list of nodes messages need to be sent to
-            for tgt in op.targets:
-                if isinstance(tgt, State):
-                    for flop_tgt in tgt.targets:
-                        if isinstance(flop_tgt, Output):
-                            # Direct to the special output node
-                            messages[idx_out].append((flop_tgt, self.mesh.output))
-                        elif isinstance(flop_tgt, Instruction):
-                            messages[idx_out].append((flop_tgt, flop_tgt.node))
-                        else:
-                            raise Exception(f"Unsupported type: {flop_tgt}")
-                elif isinstance(tgt, Instruction) and tgt.node != self:
-                    messages[idx_out].append((tgt, tgt.node))
-            # Ensure that the list is unique
-            messages[idx_out] = list(set(messages[idx_out]))
-        return messages
-
-    def compile_handling(self, inputs, lookup):
-        """ Compile handling of received messages to construct inputs.
-
-        Args:
-            inputs: List of ordered inputs, these can be either a State (where a
-                    value passes through a flop) or an Instruction (where value
-                    is handed combinatorially between nodes).
-            lookup: Dictionary of I/O and operation compilation results from all
-                    nodes, used to resolve output positioning.
-        """
-        handling = {}
-        for idx_in, input in enumerate(inputs):
-            # Skip unassigned inputs
-            if input == None: continue
-            # Check input is either an Instruction (comb) or State (seq)
-            assert type(input) in (Instruction, State)
-            # Resolve source operation and node
-            flop_val = isinstance(input, State)
-            src_op   = input.source if flop_val else input
-            src_node = src_op.node
-            # Lookup positioning of the output
-            _, src_out, _ = lookup[src_node.position]
-            src_pos       = src_out.index(src_op)
-            # Construct the handling
-            handling[idx_in] = (src_node, src_pos, flop_val)
-        return handling
 
 class Mesh:
     """ Mesh of node models to suppport allocation and scheduling of operations """
@@ -429,17 +369,17 @@ class Mesh:
         print(f"Max: {max(values):.02f}, Min: {min(values):.02f}, Mean: {mean(values):.02f}")
         print("=" * 80)
 
-    def report_state(self, compiled_ops):
-        """ Produce a report on where state (flops) have been located.
+    def report_state(self, compiled_inputs):
+        """ Produce a report on where state (flops) has been located.
 
         Args:
-            compiled_ops: Dictionary of compiled operations for the whole mesh
+            compiled_inputs: Dictionary of compiled inputs for the whole mesh
 
         Returns: Keys are mesh position of the input, value is the flop
         """
         mapping = {}
         for node in self.all_nodes:
-            inputs, _, _ = compiled_ops[node.position]
+            inputs = compiled_inputs[node.position]
             for index, source in enumerate(inputs):
                 if not source or not isinstance(source, State): continue
                 mapping[
@@ -448,7 +388,7 @@ class Mesh:
         return mapping
 
     def report_outputs(self, compiled_msgs):
-        """ Produce a report on where outputs are generated.
+        """ Produce a report on where top-level boundary outputs are generated.
 
         Args:
             compiled_msgs: Dictionary of compiled messages for the whole mesh
@@ -457,7 +397,7 @@ class Mesh:
         """
         mapping = {}
         for node in self.all_nodes:
-            for index, messages in compiled_msgs[node.position].items():
+            for index, messages in enumerate(compiled_msgs[node.position]):
                 for target, tgt_node in messages:
                     if tgt_node != self.output: continue
                     mapping[
@@ -502,12 +442,12 @@ def compile(
             bit_map[item.input[0].id] = (state := State(item.input[0], None, []))
             if item.output:
                 assert item.output[0].id not in bit_map
-                bit_map[item.output[0].id]     = state
+                bit_map[item.output[0].id] = state
             if item.output_inv:
                 assert item.output_inv[0].id not in bit_map
-                bit_map[item.output_inv[0].id]     = state
+                bit_map[item.output_inv[0].id] = state
         else:
-            raise Exception(f"Unsupported child type: {sig}")
+            raise Exception(f"Unsupported child type: {item}")
     # Build boundary I/O
     for port in module.ports.values():
         assert port.is_input or port.is_output
@@ -621,28 +561,76 @@ def compile(
     mesh.show_utilisation("output")
     mesh.show_utilisation("slot")
     # Compile operations for every node
-    compiled_ops  = {}
+    compiled_inputs  = {}
+    compiled_outputs = {}
+    compiled_instrs  = {}
     for node in mesh.all_nodes:
-        compiled_ops[node.position] = node.compile_operations()
-    # Compile outbound messages for every node
+        (
+            compiled_inputs[node.position],
+            compiled_outputs[node.position],
+            compiled_instrs[node.position],
+        ) = node.compile_operations()
+    # Compile internal messages for every node (sequential & combinatorial)
     compiled_msgs = {}
-    for node in mesh.all_nodes:
-        _, outputs, _ = compiled_ops[node.position]
-        compiled_msgs[node.position] = node.compile_messages(outputs)
+    for (tgt_row, tgt_col), inputs in compiled_inputs.items():
+        for idx_input, input in enumerate(inputs):
+            # Skip unpopulated inputs
+            if not input: continue
+            # Detect if input is flopped
+            is_stateful = isinstance(input, State)
+            # Resolve the instruction driving the connection
+            true_source = input.source if is_stateful else input
+            # Get source row and column
+            src_row, src_col = true_source.node.position
+            # Get the output index for the source
+            src_idx = compiled_outputs[src_row, src_col].index(true_source)
+            # Ensure message storage exists for the source node
+            if (src_row, src_col) not in compiled_msgs:
+                compiled_msgs[src_row, src_col] = [[] for _ in range(node_outputs)]
+            # Append an internal message
+            compiled_msgs[src_row, src_col][src_idx].append((
+                tgt_row, tgt_col, idx_input, is_stateful
+            ))
+    # Build a report of where outputs are generated from, and insert messages
+    # TODO: Temporarily using 'fake' nodes to receive outputs, in the longer
+    #       term will separate 'internal' and 'external' messaging
+    output_counter = 0
+    output_drivers = {}
+    for port in module.outputs:
+        output_drivers[port.name] = []
+        for bit in port.bits:
+            driver           = bit_map[bit.driver.id]
+            is_stateful      = isinstance(driver, State)
+            src_row, src_col = driver.source.node.position
+            src_idx          = compiled_outputs[src_row, src_col].index(driver.source)
+            # Target an unused node input
+            node_offset  = output_counter // node_inputs
+            input_offset = output_counter % node_inputs
+            row_offset   = node_offset // columns
+            col_offset   = node_offset % columns
+            tgt_row      = rows + row_offset
+            # Record where this output will be sent to
+            output_drivers[port.name].append((
+                src_row, src_col, src_idx, tgt_row, col_offset, input_offset,
+                is_stateful
+            ))
+            # Ensure message storage exists for the source node
+            if (src_row, src_col) not in compiled_msgs:
+                compiled_msgs[src_row, src_col] = [[] for _ in range(node_outputs)]
+            # Setup a message for this output on the source node
+            compiled_msgs[src_row, src_col][src_idx].append((
+                tgt_row, col_offset, input_offset, is_stateful
+            ))
+            # Increment the output counter
+            output_counter += 1
     # Accumulate message statistics
-    msg_counts = [sum([len(y) for y in x.values()]) for x in compiled_msgs.values()]
+    msg_counts = [sum([len(y) for y in x]) for x in compiled_msgs.values()]
     log.info(f"Total messages {sum(msg_counts)}")
     log.info(f" - Max count: {max(msg_counts)}")
     log.info(f" - Min count: {min(msg_counts)}")
     log.info(f" - Avg count: {mean(msg_counts)}")
-    # Compile input handling for every node
-    compiled_hndl = {}
-    for node in mesh.all_nodes:
-        inputs, _, _ = compiled_ops[node.position]
-        compiled_hndl[node.position] = node.compile_handling(inputs, compiled_ops)
     # Return instruction sequences, input handling, output handling
     return (
-        compiled_ops, compiled_hndl, compiled_msgs,
-        mesh.report_state(compiled_ops),
-        mesh.report_outputs(compiled_msgs),
+        compiled_instrs, compiled_msgs, mesh.report_state(compiled_inputs),
+        output_drivers
     )
