@@ -19,8 +19,10 @@
 // Distributes to multiple outbound message streams
 //
 module nx_stream_distributor (
-      input  logic                    clk_i
-    , input  logic                    rst_i
+      input  logic clk_i
+    , input  logic rst_i
+    // Idle flag
+    , output logic idle_o
     // Inbound message stream
     , input  nx_message_t   dist_data_i
     , input  nx_direction_t dist_dir_i
@@ -127,5 +129,8 @@ assign dist_ready_o = (
         (!egress_full[NX_DIRX_NORTH] && !egress_present[NX_DIRX_WEST ])
     ))
 );
+
+// Detect idleness
+assign idle_o = (&egress_empty) && !dist_valid_i;
 
 endmodule : nx_stream_distributor

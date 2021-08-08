@@ -84,12 +84,13 @@ module nx_node #(
 // -----------------------------------------------------------------------------
 // Idle Control
 // -----------------------------------------------------------------------------
+logic core_idle, decode_idle, ctrl_idle, dist_idle;
 
 `DECLARE_DQ(1, idle, clk_i, rst_i, 1'b0)
 
 assign idle = (
-    core_idle && decode_idle && !dcd_valid && !byp_valid && !outbound_valid &&
-    ctrl_idle
+    core_idle && decode_idle && dist_idle && ctrl_idle &&
+    !dcd_valid && !byp_valid && !outbound_valid
 );
 
 assign idle_o = idle_q;
@@ -152,6 +153,8 @@ logic          outbound_valid, outbound_ready;
 nx_stream_distributor outbound_dist (
       .clk_i(clk_i)
     , .rst_i(rst_i)
+    // Idle flag
+    , .idle_o(dist_idle)
     // Inbound message stream
     , .dist_data_i (outbound_data )
     , .dist_dir_i  (outbound_dir  )
@@ -183,8 +186,6 @@ nx_stream_distributor outbound_dist (
 // -----------------------------------------------------------------------------
 // Decoder
 // -----------------------------------------------------------------------------
-
-logic decode_idle;
 
 logic [$clog2(OUTPUTS)-1:0] map_idx;
 logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row;
@@ -234,8 +235,6 @@ nx_msg_decoder #(
 // -----------------------------------------------------------------------------
 // Control
 // -----------------------------------------------------------------------------
-
-logic ctrl_idle;
 
 nx_message_t   emit_data;
 nx_direction_t emit_dir;
@@ -364,8 +363,6 @@ nx_node_store #(
 // -----------------------------------------------------------------------------
 // Logic Core
 // -----------------------------------------------------------------------------
-
-logic core_idle;
 
 nx_node_core #(
       .INPUTS      (INPUTS      )
