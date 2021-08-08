@@ -57,7 +57,7 @@ def main(listing, verilog, design):
     node_outputs = [
         [{} for _c in range(cfg_cols)] for _r in range(cfg_cols)
     ]
-    outputs = []
+    outputs = {}
     for node_data in model[Manager.DESIGN_NODES]:
         n_row = node_data[Manager.NODE_ROW]
         n_col = node_data[Manager.NODE_COLUMN]
@@ -70,17 +70,18 @@ def main(listing, verilog, design):
                 node_outputs[n_row][n_col][out_idx] = instr_idx
                 out_idx += 1
         # Load the node inputs
-        for mapping in node_data[Manager.NODE_IN_HNDL]:
-            src_row, src_col, src_pos, tgt_pos, state = (
-                mapping[Manager.IN_HNDL_SRC_ROW], mapping[Manager.IN_HNDL_SRC_COL],
-                mapping[Manager.IN_HNDL_SRC_POS], mapping[Manager.IN_HNDL_TGT_POS],
-                mapping[Manager.IN_HNDL_STATE],
-            )
-            node_inputs[n_row][n_col][tgt_pos] = (src_row, src_col, src_pos, state)
-    rgx_out = re.compile(r"R([0-9]+)C([0-9]+)I([0-9]+)")
-    for key, name in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS].items():
-        row, col, idx = rgx_out.match(key).groups()
-        outputs.append((int(row), int(col), int(idx), name))
+        for idx_output, msgs in enumerate(node_data[Manager.NODE_MSGS]):
+            for tgt_row, tgt_col, tgt_idx, tgt_seq in msgs:
+                # Skip entries talking to 'fake' nodes
+                if tgt_row >= cfg_rows: continue
+                # Link input -> output
+                node_inputs[tgt_row][tgt_col][tgt_idx] = (
+                    n_row, n_col, idx_output, tgt_seq
+                )
+    for name, bits in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS].items():
+        for idx_bit, (src_row, src_col, src_idx, _, _, _, is_seq) in enumerate(bits):
+            if not name in outputs: outputs[name] = {}
+            outputs[name][idx_bit] = (src_row, src_col, src_idx, is_seq)
     # Create a template lookup
     tmpl_lkp = TemplateLookup(directories=[Path(__file__).parent / "templates"])
     # Dump a text-based listing of all instructions

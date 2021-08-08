@@ -16,8 +16,8 @@ limitations under the License.
 module Top (
       input  wire clk
     , input  wire rst
-%for _, _, _, name in outputs:
-    , output wire ${verilog_safe(name)}
+%for name, bits in outputs.items():
+    , output wire [${len(bits)-1}:0] ${verilog_safe(name)}
 %endfor
 );
 
@@ -111,8 +111,17 @@ end
 // =============================================================================
 // Boundary Output Mapping
 // =============================================================================
-%for row, col, idx, name in outputs:
-assign ${verilog_safe(name)} = r${row}_c${col}_outputs[${idx}];
+%for name, bits in outputs.items():
+    %for idx, (src_row, src_col, src_idx, is_seq) in bits.items():
+        %if is_seq:
+reg ${verilog_safe(name)}_${idx}_q;
+always @(posedge clk, posedge rst) ${verilog_safe(name)}_${idx}_q <= rst ? 1'b0 : r${src_row}_c${src_col}_outputs[${src_idx}];
+assign ${verilog_safe(name)}[${idx}] = ${verilog_safe(name)}_${idx}_q;
+        %else:
+assign ${verilog_safe(name)}[${idx}] = r${src_row}_c${src_col}_outputs[${src_idx}];
+        %endif
+
+    %endfor
 %endfor
 
 endmodule
