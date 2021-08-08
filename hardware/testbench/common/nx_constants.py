@@ -34,13 +34,14 @@ class Command(IntEnum):
 
 class ControlCommand(IntEnum):
     """ Control block command type """
-    ID       = 0
-    VERSION  = 1
-    PARAM    = 2
-    ACTIVE   = 3
-    STATUS   = 4
-    CYCLES   = 5
-    INTERVAL = 6
+    ID         = 0
+    VERSION    = 1
+    PARAM      = 2
+    ACTIVE     = 3
+    STATUS     = 4
+    CYCLES     = 5
+    INTERVAL   = 6
+    SOFT_RESET = 7
 
 class ControlParameter(IntEnum):
     """ Control block parameter type """
