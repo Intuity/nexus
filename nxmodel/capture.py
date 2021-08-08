@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import simpy
 from vcd import VCDWriter
 
 from .base import Base
@@ -48,21 +47,21 @@ class Capture(Base):
         Args:
             vcd_path: The path to the VCD file to write
         """
-        def sig_name(row, col, pos):
-            key = f"R{row}C{col}I{pos}"
-            return self.lookup.get(key, key).replace("[", "_").replace("]", "_").replace(".", "_")
         with open(vcd_path, "w") as fh:
             with VCDWriter(fh, timescale="1 ns", date="today") as vcd:
                 # Record the cycle
                 cycle = vcd.register_var("tb", "cycle", "integer", size=32)
                 # Register all outputs
                 signals = {}
-                for row, col, pos in set(sum([
-                    list(x.keys()) for _, x, _, _ in self.snapshots
-                ], [])):
-                    signals[row, col, pos] = vcd.register_var(
-                        "tb.dut", sig_name(row, col, pos), "integer", size=1
-                    )
+                for port_name, bits in self.lookup.items():
+                    for idx_bit, (
+                        _src_row, _src_col, _src_idx, tgt_row, tgt_col, tgt_idx,
+                        _tgt_seq
+                    ) in [_ for _ in enumerate(bits)][::-1]:
+                        signals[tgt_row, tgt_col, tgt_idx] = vcd.register_var(
+                            "tb.dut", f"{port_name}[{idx_bit}]", "integer",
+                            size=1
+                        )
                 # Register all node I/Os
                 nodes = {}
                 for node in self.mesh.all_nodes:
@@ -109,7 +108,7 @@ class Capture(Base):
         snapshot = {}
         while self.received:
             item = self.received.pop(0)
-            snapshot[item.src_row, item.src_col, item.src_pos] = item.src_val
+            snapshot[item.row, item.col, item.index] = item.value
         # Snapshot all node inputs and outputs
         node_inputs, node_outputs = {}, {}
         for node in self.mesh.all_nodes:
@@ -133,7 +132,7 @@ class Capture(Base):
                         f"IN: {i_next:08b}, OC: {o_curr:08b} - Δ: {i_curr != i_next}"
                     )
         # Log and store snapshot
-        self.info(f"Captured {len(snapshot)} outputs from tick {self.ticks-1}")
+        self.debug(f"Captured {len(snapshot)} outputs from tick {self.ticks-1}")
         self.snapshots.append((self.env.now, snapshot, node_inputs, node_outputs))
 
     def capture(self):
@@ -150,5 +149,5 @@ class Capture(Base):
                 # Pop the next entry
                 msg = yield self.env.process(pipe.pop())
                 assert isinstance(msg, SignalState)
-                self.debug(f"Captured output message {len(self.received)}")
+                self.debug(f"Captured output: {msg}")
                 self.received.append(msg)

@@ -21,7 +21,7 @@ import simpy
 
 from .base import Base
 from .pipe import Pipe
-from .message import LoadInstruction, ConfigureInput, ConfigureOutput
+from .message import LoadInstruction, ConfigureOutput
 from .node import Instruction
 
 class Manager(Base):
@@ -43,25 +43,10 @@ class Manager(Base):
     CFG_ND_REGS    = "registers"
     CFG_ND_SLOTS   = "slots"
     # Per-node configuration
-    NODE_ROW      = "row"
-    NODE_COLUMN   = "column"
-    NODE_INSTRS   = "instructions"
-    NODE_IN_HNDL  = "in_handling"
-    NODE_OUT_HNDL = "out_handling"
-    # Node input handling
-    IN_HNDL_SRC_ROW = "source_row"
-    IN_HNDL_SRC_COL = "source_column"
-    IN_HNDL_SRC_POS = "source_bit"
-    IN_HNDL_TGT_POS = "target_bit"
-    IN_HNDL_STATE   = "is_state"
-    # Node output handling
-    OUT_HNDL_POS       = "position"
-    OUT_HNDL_TGT_A_ROW = "row_a"
-    OUT_HNDL_TGT_A_COL = "column_a"
-    OUT_HNDL_TGT_B_ROW = "row_b"
-    OUT_HNDL_TGT_B_COL = "column_b"
-    OUT_HNDL_BROADCAST = "broadcast"
-    OUT_HNDL_DECAY     = "decay"
+    NODE_ROW    = "row"
+    NODE_COLUMN = "column"
+    NODE_INSTRS = "instructions"
+    NODE_MSGS   = "messages"
     # Design reports
     DSG_REP_STATE   = "state"
     DSG_REP_OUTPUTS = "outputs"
@@ -129,35 +114,32 @@ class Manager(Base):
             # Get the row and column of the target node
             n_row = node_data[Manager.NODE_ROW]
             n_col = node_data[Manager.NODE_COLUMN]
+            # Pickup instructions and messages for each node
+            node_instrs = node_data[Manager.NODE_INSTRS]
+            node_msgs = node_data[Manager.NODE_MSGS]
+            self.debug(
+                f"Queueing {len(node_instrs)} instructions and "
+                f"{sum([len(x) for x in node_msgs])} output messages for "
+                f"{n_row}, {n_col}"
+            )
             # Load instructions into the node
-            for slot, raw_instr in enumerate(node_data[Manager.NODE_INSTRS]):
+            for raw_instr in node_instrs:
                 instr = Instruction(raw_instr)
                 self.queue.append(LoadInstruction(
-                    self.env, n_row, n_col, slot, instr
+                    self.env, n_row, n_col, instr
                 ))
                 self.loaded[n_row][n_col].append(instr)
-            # Setup input mappings for the node
-            for mapping in node_data[Manager.NODE_IN_HNDL]:
-                self.queue.append(ConfigureInput(
-                    self.env, n_row, n_col,
-                    mapping[Manager.IN_HNDL_SRC_ROW], mapping[Manager.IN_HNDL_SRC_COL],
-                    mapping[Manager.IN_HNDL_SRC_POS], mapping[Manager.IN_HNDL_TGT_POS],
-                    mapping[Manager.IN_HNDL_STATE],
-                ))
             # Setup output mappings for the node
-            for mapping in node_data[Manager.NODE_OUT_HNDL]:
-                self.debug(f"Queueing ({len(self.queue)}) output config for {n_row}, {n_col}")
-                self.queue.append(ConfigureOutput(
-                    self.env, n_row, n_col, mapping[Manager.OUT_HNDL_POS],
-                    (tgt_a_row := mapping.get(Manager.OUT_HNDL_TGT_A_ROW, 0)),
-                    (tgt_a_col := mapping.get(Manager.OUT_HNDL_TGT_A_COL, 0)),
-                    # NOTE: If B outputs don't exist, match A values, this will
-                    #       suppress a second message being emitted
-                    mapping.get(Manager.OUT_HNDL_TGT_B_ROW, tgt_a_row),
-                    mapping.get(Manager.OUT_HNDL_TGT_B_COL, tgt_a_col),
-                    mapping.get(Manager.OUT_HNDL_BROADCAST, False),
-                    mapping.get(Manager.OUT_HNDL_DECAY,     0),
-                ))
+            for idx_output, msgs in enumerate(node_msgs):
+                # Skip empty output slots
+                if not msgs: continue
+                # Debug logging
+                # Unpack and queue each message
+                for tgt_row, tgt_col, tgt_idx, tgt_seq in msgs:
+                    self.queue.append(ConfigureOutput(
+                        self.env, n_row, n_col, idx_output, tgt_row, tgt_col,
+                        tgt_idx, tgt_seq
+                    ))
         # Set input names
         rgx_pos = re.compile(r"^R([0-9]+)C([0-9]+)I([0-9]+)")
         if self.mesh:
@@ -171,7 +153,7 @@ class Manager(Base):
         self.info("Checking all instructions loaded correctly")
         for row, columns in enumerate(self.loaded):
             for col, instrs in enumerate(columns):
-                node_ops = self.mesh[row, col].ops
+                node_ops = self.mesh[row, col].instrs
                 assert len(node_ops) == len(instrs), \
                     f"{row:03d}.{col:03d} Different number of instructions G: " \
                     f"{len(node_ops)} != E: {len(instrs)}"
@@ -227,7 +209,7 @@ class Manager(Base):
             # NOTE: As cycles can be blocked by busy queues or busy nodes, the
             #       increment of cycle must be postponed.
             cycle += 1
-            self.info(f"Generating tick {cycle}")
+            if (cycle % 10) == 0: self.info(f"Generating tick {cycle}")
             # First notify any observers
             for observer in self.observer: observer()
             # Trigger event
@@ -250,6 +232,7 @@ class Manager(Base):
         print("#")
         print(f"# Simulated Cycles   : {self.cycles}")
         print(f"# Elapsed Clock Ticks: {clock_ticks}")
+        print(f"# Ticks Per Cycle    : {clock_ticks / self.cycles:0.02f}")
         print(f"# Elapsed Real Time  : {real_time:0.02f} seconds")
         print(f"# Cycles/second      : {self.cycles/real_time:0.02f}")
         print("#")

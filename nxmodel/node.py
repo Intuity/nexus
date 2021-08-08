@@ -13,13 +13,14 @@
 # limitations under the License.
 
 from enum import IntEnum
+from os import pipe
 from random import randint
 
 import simpy
 
 from .base import Base
 from .bitvector import BitVector
-from .message import LoadInstruction, ConfigureInput, ConfigureOutput, SignalState
+from .message import LoadInstruction, ConfigureOutput, SignalState
 from .pipe import Pipe
 
 class Direction(IntEnum):
@@ -141,7 +142,8 @@ class Node(Base):
         self.__next_inputs = [False] * inputs # For the next cycle
         self.__outputs     = [OutputState.LOW] * outputs
         self.__registers   = [False] * registers
-        self.__ops         = []
+        self.__instrs      = []
+        self.__output_msgs = [[] for _ in range(outputs)]
         # Setup phase
         self.__phase = Phase.SETUP
         # Create spaces for inbound pipes (4 -> one for each of N, E, S, W)
@@ -155,9 +157,6 @@ class Node(Base):
         # Setup run loop
         self.msg_loop  = self.env.process(self.handle_messages())
         self.exec_loop = self.env.process(self.execute())
-        # Input mappings
-        self.__input_map  = {}
-        self.__output_map = {}
         # Naming
         self.input_names = {}
         # Flags
@@ -169,7 +168,7 @@ class Node(Base):
     @property
     def column(self): return self.position[1]
     @property
-    def ops(self): return self.__ops[:]
+    def instrs(self): return self.__instrs[:]
     @property
     def input_state(self): return self.__inputs[:]
     @property
@@ -204,11 +203,12 @@ class Node(Base):
 
     def reset(self):
         """ Reset the state of the logic node """
-        self.__inputs    = [False] * len(self.__inputs)
-        self.__outputs   = [OutputState.LOW] * len(self.__outputs)
-        self.__registers = [False] * len(self.__registers)
-        self.__ops       = []
-        self.__phase     = Phase.SETUP
+        self.__inputs      = [False] * len(self.__inputs)
+        self.__outputs     = [OutputState.LOW] * len(self.__outputs)
+        self.__registers   = [False] * len(self.__registers)
+        self.__instrs      = []
+        self.__output_msgs = [[] for _ in range(len(self.__outputs))]
+        self.__phase       = Phase.SETUP
 
     def tick(self):
         """ Trigger an internal event when an simulated clock ticks """
@@ -227,132 +227,57 @@ class Node(Base):
             msg: The message object to digest
         """
         # Check this message is for this node?
-        assert msg.broadcast or (msg.tgt_row == self.row and msg.tgt_col == self.column)
+        assert msg.row == self.row and msg.col == self.column, "Bad routing"
         # Extract the message type
         msg_type = type(msg)
         # Load an instruction into a specified slot
         if msg_type == LoadInstruction:
-            assert msg.slot == len(self.__ops), "Instruction received out of order"
-            self.debug(f"Loading instruction slot {msg.slot}: {msg.instr}")
-            self.__ops.append(msg.instr)
-        # Configure input mapping to the node
-        elif msg_type == ConfigureInput:
-            assert msg.tgt_pos >= 0 and msg.tgt_pos < len(self.__inputs)
-            self.debug(
-                f"Mapping input {msg.tgt_pos} - R: {msg.src_row}, C: {msg.src_col}"
-                f" - O[{msg.src_pos}], S: {msg.state}"
-            )
-            self.__input_map[msg.tgt_pos] = (
-                msg.src_row, msg.src_col, msg.src_pos, msg.state
-            )
+            self.debug(f"Loading instruction: {msg.instr}")
+            self.__instrs.append(msg.instr)
         # Configure output mapping from the node
         elif msg_type == ConfigureOutput:
-            assert msg.out_pos >= 0 and msg.out_pos < len(self.__outputs)
+            assert msg.src_idx >= 0 and msg.src_idx < len(self.__outputs)
             self.debug(
-                f"Mapping output {msg.out_pos} - B: {msg.msg_as_bc}, D: "
-                f"{msg.bc_decay}, A: {msg.msg_a_row} {msg.msg_a_col}, B: "
-                f"{msg.msg_b_row} {msg.msg_b_col}"
+                f"Map output {msg.src_idx} -> R: {msg.tgt_row}, C: {msg.tgt_col}"
+                f", I: {msg.tgt_idx}, S: {msg.tgt_seq}"
             )
-            self.__output_map[msg.out_pos] = (
-                msg.msg_as_bc, msg.bc_decay,
-                msg.msg_a_row, msg.msg_a_col,
-                msg.msg_b_row, msg.msg_b_col,
-            )
+            self.__output_msgs[msg.src_idx].append(msg)
         # Handle updated signal state
         elif msg_type == SignalState:
-            handled      = False
-            restart_exec = False
-            for input_pos, (src_row, src_col, src_pos, state) in self.__input_map.items():
-                if (
-                    src_row == msg.src_row and
-                    src_col == msg.src_col and
-                    src_pos == msg.src_pos
-                ):
-                    # Mark this input has been handled
-                    handled = True
-                    # Log if signal value hasn't changed (suboptimal)
-                    # NOTE: Because the instruction loop can be restarted at any
-                    #       time, the interrupt may disrupt the sending of
-                    #       messages. This can mean that a state change is lost
-                    #       leading to a later message where the value appears
-                    #       to be repeated. Over the course of a whole tick this
-                    #       is still safe, and the correct value will propagate
-                    #       but repeated values may occur.
-                    did_change = (self.__next_inputs[input_pos] != msg.src_val)
-                    if not did_change: self.debug("No change in signal value")
-                    # Log change
-                    in_name = self.input_names.get(input_pos, "N/A")
-                    self.debug(
-                        f"{self.position} I[{input_pos}] ({in_name}) -> "
-                        f"{msg.src_val} (from {msg.source})"
-                    )
-                    # Always update the next tick's state
-                    self.__next_inputs[input_pos] = msg.src_val
-                    # If this is not a stateful input, request restart
-                    if did_change and not state:
-                        self.__inputs[input_pos] = msg.src_val
-                        restart_exec             = True
-            # If message wasn't handled, it must have been badly addressed
-            if not msg.broadcast and not handled:
-                raise Exception(
-                    f"[{self.position}] Failed to handle SignalState: {msg}"
-                )
-            # If a non-stateful input was detected, restart execution
-            if restart_exec: self.exec_loop.interrupt()
+            # Always update the next state
+            self.__next_inputs[msg.index] = msg.value
+            # Update current state if non-sequential, and restart execution
+            if not msg.is_seq:
+                self.__inputs[msg.index] = msg.value
+                self.exec_loop.interrupt()
         # Unknown message type
         else:
             raise Exception(
                 f"[{self.position}] Unknown message type {msg_type.__name__}"
             )
 
-    def dispatch(
-        self,
-        msg,
-        bc_dirs=[Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST],
-        bc_intx=True,
-    ):
+    def dispatch(self, msg):
         """ Dispatch a message through the correct pipe.
 
         Args:
-            msg    : The message to send
-            bc_dirs: Direction to broadcast a message in
-            bc_intx: Include the internal pipe in broadcast (default: True)
+            msg: The message to send
         """
         def do_dispatch(msg):
-            # Broadcast messages are sent on every outbound pipe
-            if msg.broadcast:
-                # Optionally send on the internal pipe (with no propagation)
-                if bc_intx:
-                    cp_msg       = msg.copy()
-                    cp_msg.decay = 0          # Do not propagate
-                    yield self.env.process(self.internal.push(cp_msg))
-                # Send on outbound pipes
-                for dirx in bc_dirs:
-                    # Check pipe has been connected
-                    if not self.outbound[int(dirx)]: continue
-                    # Copy message, decrease decay, track propagation
-                    cp_msg        = msg.copy()
-                    cp_msg.decay -= 1
-                    cp_msg.tracking.append((self, cp_msg))
-                    # Send message
-                    yield self.env.process(self.outbound[int(dirx)].push(cp_msg))
-            # Non-broadcast messages are directed towards their target
+            # Collect tracking information on the message to debug routing
+            msg.tracking.append((self, msg))
+            # Determine the pipe to send through
+            pipe_dir = None
+            if   msg.row < self.row   : pipe_dir = Direction.NORTH
+            elif msg.row > self.row   : pipe_dir = Direction.SOUTH
+            elif msg.col > self.column: pipe_dir = Direction.EAST
+            elif msg.col < self.column: pipe_dir = Direction.WEST
+            # Check pipe has been connected
+            if pipe_dir != None and not self.outbound[int(pipe_dir)]: return
+            # Queue up the message onto the pipe
+            if pipe_dir != None:
+                yield self.env.process(self.outbound[int(pipe_dir)].push(msg))
             else:
-                # Collect tracking information on the message to debug routing
-                msg.tracking.append((self, msg))
-                # Determine the pipe to send through
-                pipe_dir = None
-                if   msg.tgt_row < self.row   : pipe = pipe_dir = Direction.NORTH
-                elif msg.tgt_row > self.row   : pipe = pipe_dir = Direction.SOUTH
-                elif msg.tgt_col > self.column: pipe = pipe_dir = Direction.EAST
-                elif msg.tgt_col < self.column: pipe = pipe_dir = Direction.WEST
-                # Check pipe has been connected
-                if not self.outbound[int(pipe_dir)]: return
-                # Queue up the message onto the pipe
-                if pipe_dir != None:
-                    yield self.env.process(self.outbound[int(pipe_dir)].push(msg))
-                else:
-                    yield self.env.process(self.internal.push(msg))
+                yield self.env.process(self.internal.push(msg))
             # Decrement the dispatching counter
             yield self.env.timeout(1)
             self.__dispatching -= 1
@@ -394,19 +319,10 @@ class Node(Base):
                 f"{self.position} Seen message {type(msg).__name__}[{msg.id}] more than once"
             seen[type(msg).__name__].append(msg.id)
             # Is the message addressed to this node?
-            if msg.target == self.position or msg.broadcast:
+            if msg.target == self.position:
                 self.digest(msg)
             # Does this message need to be passed on
-            if msg.broadcast and msg.decay > 0:
-                # Decide which directions to broadcast (to avoid recirculating)
-                bc_dirs = {
-                    Direction.NORTH: [Direction.SOUTH, Direction.EAST, Direction.WEST],
-                    Direction.SOUTH: [Direction.NORTH, Direction.EAST, Direction.WEST],
-                    Direction.EAST : [Direction.WEST],
-                    Direction.WEST : [Direction.EAST],
-                }[last_pipe]
-                yield self.dispatch(msg, bc_dirs=bc_dirs, bc_intx=False)
-            elif not msg.broadcast and msg.target != self.position:
+            else:
                 yield self.dispatch(msg)
             # Clear the digesting flag
             self.__digesting = False
@@ -434,7 +350,7 @@ class Node(Base):
                 prev_inputs = self.__inputs[:]
                 # Start executing instructions
                 output_idx = 0
-                for op_idx, op in enumerate(self.__ops):
+                for op_idx, op in enumerate(self.__instrs):
                     # If this operation is empty, break out
                     if op == None: break
                     # Pickup each source value
@@ -453,30 +369,14 @@ class Node(Base):
                         #       dispatch and saving state
                         self.__outputs[output_idx] = OutputState.UNKNOWN
                         # Check output mapping exists
-                        assert output_idx in self.__output_map, \
+                        assert len(self.__output_msgs[output_idx]) > 0, \
                             f"Missing output {output_idx} from {self.position}"
-                        # Split out map components
-                        (
-                            do_bc, bc_decay, tgt_a_row, tgt_a_col, tgt_b_row,
-                            tgt_b_col,
-                        ) = self.__output_map[output_idx]
-                        # Handle broadcast messages
-                        if do_bc and bc_decay > 0:
+                        # Generate messages
+                        for cfg_out in self.__output_msgs[output_idx]:
                             yield self.dispatch(SignalState(
-                                self.env, 0, 0, True, bc_decay,
-                                self.row, self.column, output_idx, result,
+                                self.env, cfg_out.tgt_row, cfg_out.tgt_col,
+                                cfg_out.tgt_idx, result, cfg_out.tgt_seq
                             ))
-                        # Handle targeted messages
-                        elif not do_bc:
-                            yield self.dispatch(SignalState(
-                                self.env, tgt_a_row, tgt_a_col, False, 0,
-                                self.row, self.column, output_idx, result,
-                            ))
-                            if (tgt_b_row, tgt_b_col) != (tgt_a_row, tgt_a_col):
-                                yield self.dispatch(SignalState(
-                                    self.env, tgt_b_row, tgt_b_col, False, 0,
-                                    self.row, self.column, output_idx, result,
-                                ))
                         # Capture output value
                         # NOTE: This reduces duplicate values being sent
                         self.__outputs[output_idx] = out_state

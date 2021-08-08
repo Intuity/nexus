@@ -19,29 +19,23 @@ from .base import Base
 class Message(Base):
     """ Base class for a message """
 
-    def __init__(self, env, tgt_row, tgt_col, broadcast=False, decay=0):
+    def __init__(self, env, row, col):
         """ Initialise Message instance.
 
         Args:
-            env      : SimPy environment
-            tgt_row  : Target node's row
-            tgt_col  : Target node's column
-            broadcast: Whether to broadcast the message
-            decay    : How many steps to allow a broadcast message to propagate
+            env: SimPy environment
+            row: Message recipient node's row
+            col: Message recipient node's column
         """
         super().__init__(env)
-        assert isinstance(tgt_row, int) and tgt_row >= 0
-        assert isinstance(tgt_col, int) and tgt_col >= 0
-        assert broadcast in (True, False)
-        assert isinstance(decay, int) and decay >= 0
-        self.tgt_row   = tgt_row
-        self.tgt_col   = tgt_col
-        self.broadcast = broadcast
-        self.decay     = decay
-        self.tracking  = []
+        assert isinstance(row, int) and row >= 0
+        assert isinstance(col, int) and col >= 0
+        self.row      = row
+        self.col      = col
+        self.tracking = []
 
     @property
-    def target(self): return self.tgt_row, self.tgt_col
+    def target(self): return self.row, self.col
 
     def copy(self):
         copied          = copy.copy(self)
@@ -51,109 +45,70 @@ class Message(Base):
 class LoadInstruction(Message):
     """ Load an instruction into a core """
 
-    def __init__(self, env, tgt_row, tgt_col, slot, instr):
+    def __init__(self, env, row, col, instr):
         """ Initialise the message.
 
         Args:
-            env    : SimPy environment
-            tgt_row: Target node's row
-            tgt_col: Target node's column
-            slot   : What instruction to load
-            instr  : The instruction to load
+            env  : SimPy environment
+            row  : Message recipient node's row
+            col  : Message recipient node's column
+            instr: The instruction to load
         """
-        super().__init__(env, tgt_row, tgt_col)
-        self.slot  = slot
+        super().__init__(env, row, col)
         self.instr = instr
 
-class ConfigureInput(Message):
-    """ Configure an input mapping """
-
-    def __init__(
-        self, env, tgt_row, tgt_col, src_row, src_col, src_pos, tgt_pos, state,
-    ):
-        """ Initialise the message.
-
-        Args:
-            env    : SimPy environment
-            tgt_row: Target node's row
-            tgt_col: Target node's column
-            src_row: Source node's row
-            src_col: Source node's column
-            src_pos: Output position from the source node
-            tgt_pos: Input position to fill with the data
-            state  : Whether the input should be held until the next tick
-        """
-        super().__init__(env, tgt_row, tgt_col)
-        self.src_row = src_row
-        self.src_col = src_col
-        self.src_pos = src_pos
-        self.tgt_pos = tgt_pos
-        self.state   = state
 
 class ConfigureOutput(Message):
     """ Configure output messaging """
 
     def __init__(
-        self, env, tgt_row, tgt_col, out_pos, msg_a_row, msg_a_col, msg_b_row,
-        msg_b_col, msg_as_bc, bc_decay,
+        self, env, row, col, src_idx, tgt_row, tgt_col, tgt_idx, tgt_seq
     ):
         """ Initialise the message.
 
         Args:
-            env      : SimPy environment
-            tgt_row  : Target node's row
-            tgt_col  : Target node's column
-            out_pos  : Which output position to configure
-            msg_a_row: Output message target row A
-            msg_a_col: Output message target column A
-            msg_b_row: Output message target row B
-            msg_b_col: Output message target column B
-            msg_as_bc: Send message as a broadcast
-            bc_decay : When broadcasting, how many steps to propagate
+            env    : SimPy environment
+            row    : Message recipient node's row
+            col    : Message recipient node's column
+            src_idx: Output index to append a mapping for
+            tgt_row: Target node's row for signal state messages
+            tgt_col: Target node's column for signal state messages
+            tgt_idx: Target node's input index for signal state messages
+            tgt_seq: Whether the target node's input is sequential
         """
-        super().__init__(env, tgt_row, tgt_col)
-        self.out_pos   = out_pos
-        self.msg_a_row = msg_a_row
-        self.msg_a_col = msg_a_col
-        self.msg_b_row = msg_b_row
-        self.msg_b_col = msg_b_col
-        self.msg_as_bc = msg_as_bc
-        self.bc_decay  = bc_decay
+        super().__init__(env, row, col)
+        self.src_idx = src_idx
+        self.tgt_row = tgt_row
+        self.tgt_col = tgt_col
+        self.tgt_idx = tgt_idx
+        self.tgt_seq = tgt_seq
 
 class SignalState(Message):
     """ Carries a signal value change between nodes """
 
-    def __init__(
-        self, env, tgt_row, tgt_col, broadcast, decay,
-        src_row, src_col, src_pos, src_val,
-    ):
+    def __init__(self, env, row, col, index, value, is_seq):
         """ Initialise the message.
 
         Args:
-            env      : SimPy environment
-            tgt_row  : Target node's row
-            tgt_col  : Target node's column
-            broadcast: Whether to broadcast the message
-            decay    : How many steps to allow a broadcast message to propagate
-            src_row  : Source node's row
-            src_col  : Source node's column
-            src_pos  : Bit position from source
-            src_val  : Bit value being transmitted
+            env   : SimPy environment
+            row   : Message recipient node's row
+            col   : Message recipient node's column
+            index : Input index
+            value : Value carried
+            is_seq: Treat value as sequential
         """
-        super().__init__(env, tgt_row, tgt_col, broadcast, decay)
-        self.src_row = src_row
-        self.src_col = src_col
-        self.src_pos = src_pos
-        self.src_val = src_val
+        super().__init__(env, row, col)
+        self.index  = index
+        self.value  = value
+        self.is_seq = is_seq
 
     @property
     def source(self): return self.src_row, self.src_col
 
     def __repr__(self):
         return (
-            f"<SignalState - TR: {self.tgt_row}, TC: {self.tgt_col}, BC: "
-            f"{self.broadcast}, BD: {self.decay}, SR: {self.src_row}, SC: "
-            f"{self.src_col}, SP: {self.src_pos}, SV: {self.src_val}>"
+            f"<SignalState - R: {self.row}, C: {self.col}, I: {self.index}, "
+            f"V: {self.value}, SQ: {self.is_seq}>"
         )
 
     def __str__(self):
