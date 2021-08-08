@@ -56,7 +56,10 @@ module nx_msg_decoder #(
 `DECLARE_DQ (1, fifo_pop,  clk_i, rst_i, 1'b0)
 
 // Construct outputs
-assign idle_o = fifo_empty && !msg_valid_i;
+assign idle_o = (
+    fifo_empty && !msg_valid_i && !map_valid_o && !signal_valid_o &&
+    !instr_valid_o
+);
 
 // Inbound FIFO - buffer incoming messages ready for digestion
 logic        fifo_empty, fifo_full;
