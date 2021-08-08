@@ -346,7 +346,8 @@ nx_fifo #(
 
 assign idle_o = (
     queue_empty && state_fifo_empty && msg_fifo_empty && !msg_valid_q &&
-    !loopback_valid_q
+    !loopback_valid_q && !(|detect_xor) && !detect_valid && !store_rd_en &&
+    !input_trig_q && !update_valid
 );
 
 always_comb begin : p_output
