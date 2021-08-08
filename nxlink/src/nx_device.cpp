@@ -109,6 +109,18 @@ Nexus::nx_status_t Nexus::NXDevice::read_status (void)
     return nx_decode_status(m_ctrl_pipe->rx_from_device());
 }
 
+// read_cycles
+// Read the current cycle count of the device, returns uint32_t
+//
+uint32_t Nexus::NXDevice::read_cycles (void)
+{
+    // Request the status
+    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_CYCLES, 0));
+
+    // Decode the result
+    return m_ctrl_pipe->rx_from_device();
+}
+
 // set_interval
 // Setup the simulation interval (in clock cycles)
 //
@@ -154,6 +166,14 @@ void Nexus::NXDevice::set_active (bool active)
 void Nexus::NXDevice::send_to_mesh (Nexus::nx_message_t msg)
 {
     m_mesh_pipe->tx_to_device(nx_build_mesh(msg));
+}
+
+// send_to_mesh
+// Send a raw message into the mesh
+//
+void Nexus::NXDevice::send_to_mesh (uint32_t raw)
+{
+    m_mesh_pipe->tx_to_device(raw);
 }
 
 // receive_from_mesh

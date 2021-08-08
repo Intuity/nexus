@@ -37,40 +37,70 @@ namespace Nexus {
         // RPC Implementations
         // =====================================================================
 
-        grpc::Status Identify (
-                  grpc::ServerContext     * ctx,
-            const google::protobuf::Empty * request,
-                  NexusRPC::NXIdentity    * response
+        grpc::Status ControlGetIdentity (
+                  grpc::ServerContext         * ctx,
+            const google::protobuf::Empty     * request,
+                  NexusRPC::NXControlIdentity * response
         ) override;
 
-        grpc::Status Reset (
+        grpc::Status ControlSetReset (
                   grpc::ServerContext     * ctx,
             const google::protobuf::Empty * request,
                   google::protobuf::Empty * response
         ) override;
 
-        grpc::Status Parameters (
-                  grpc::ServerContext     * ctx,
-            const google::protobuf::Empty * request,
-                  NexusRPC::NXParameters  * response
+        grpc::Status ControlGetParameters (
+                  grpc::ServerContext           * ctx,
+            const google::protobuf::Empty       * request,
+                  NexusRPC::NXControlParameters * response
         ) override;
 
-        grpc::Status Status (
-                  grpc::ServerContext     * ctx,
-            const google::protobuf::Empty * request,
-                  NexusRPC::NXStatus      * response
+        grpc::Status ControlGetStatus (
+                  grpc::ServerContext       * ctx,
+            const google::protobuf::Empty   * request,
+                  NexusRPC::NXControlStatus * response
         ) override;
 
-        grpc::Status SetInterval (
-                  grpc::ServerContext     * ctx,
-            const NexusRPC::NXInterval    * request,
-                  google::protobuf::Empty * response
+        grpc::Status ControlGetCycles (
+                  grpc::ServerContext       * ctx,
+            const google::protobuf::Empty   * request,
+                  NexusRPC::NXControlCycles * response
         ) override;
 
-        grpc::Status SetActive (
-                  grpc::ServerContext     * ctx,
-            const NexusRPC::NXActive      * request,
-                  google::protobuf::Empty * response
+        grpc::Status ControlSetInterval (
+                  grpc::ServerContext         * ctx,
+            const NexusRPC::NXControlInterval * request,
+                  google::protobuf::Empty     * response
+        ) override;
+
+        grpc::Status ControlSetActive (
+                  grpc::ServerContext       * ctx,
+            const NexusRPC::NXControlActive * request,
+                  google::protobuf::Empty   * response
+        ) override;
+
+        grpc::Status MeshLoadInstruction (
+                  grpc::ServerContext             * ctx,
+            const NexusRPC::NXMeshLoadInstruction * request,
+                  google::protobuf::Empty         * response
+        ) override;
+
+        grpc::Status MeshMapOutput (
+                  grpc::ServerContext       * ctx,
+            const NexusRPC::NXMeshMapOutput * request,
+                  google::protobuf::Empty   * response
+        ) override;
+
+        grpc::Status MeshSetInput (
+                  grpc::ServerContext         * ctx,
+            const NexusRPC::NXMeshSignalState * request,
+                  google::protobuf::Empty     * response
+        ) override;
+
+        grpc::Status MeshGetOutputs (
+                  grpc::ServerContext                             * ctx,
+            const google::protobuf::Empty                         * request,
+                  grpc::ServerWriter<NexusRPC::NXMeshSignalState> * response
         ) override;
 
     private:

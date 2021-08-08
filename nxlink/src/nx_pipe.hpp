@@ -38,10 +38,7 @@ namespace Nexus {
             , m_rx_q     ()
             , m_tx_thread(&NXPipe::tx_process, this)
             , m_rx_thread(&NXPipe::rx_process, this)
-        {
-            std::cout << "NXPipe - H2C: << " << h2c_path << ", C2H: " << c2h_path
-                      << std::endl;
-        }
+        { }
 
         // =====================================================================
         // Public Methods

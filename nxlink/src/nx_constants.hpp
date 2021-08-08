@@ -84,7 +84,27 @@ namespace Nexus {
     // Mesh message payload offsets
     const uint32_t NX_MESH_PAYLOAD_OFFSET = 0;
     const uint32_t NX_MESH_PAYLOAD_MASK   = (1 << NX_MESH_HDR_COMMAND_OFFSET) - 1;
-
+    // - Instruction load parameters
+    const uint32_t NX_MESH_PLD_LD_INSTR_OFFSET = 6;
+    const uint32_t NX_MESH_PLD_LD_INSTR_MASK   = 0x7FFF;
+    // - Map output parameters
+    const uint32_t NX_MESH_PLD_MAP_OUT_IDX_OFFSET = 18;
+    const uint32_t NX_MESH_PLD_MAP_OUT_IDX_MASK   = 0x7;
+    const uint32_t NX_MESH_PLD_MAP_OUT_ROW_OFFSET = 14;
+    const uint32_t NX_MESH_PLD_MAP_OUT_ROW_MASK   = 0xF;
+    const uint32_t NX_MESH_PLD_MAP_OUT_COL_OFFSET = 10;
+    const uint32_t NX_MESH_PLD_MAP_OUT_COL_MASK   = 0xF;
+    const uint32_t NX_MESH_PLD_MAP_OUT_TIX_OFFSET = 7;
+    const uint32_t NX_MESH_PLD_MAP_OUT_TIX_MASK   = 0x7;
+    const uint32_t NX_MESH_PLD_MAP_OUT_SEQ_OFFSET = 6;
+    const uint32_t NX_MESH_PLD_MAP_OUT_SEQ_MASK   = 0x1;
+    // - Signal state parameters
+    const uint32_t NX_MESH_PLD_SIG_STATE_IDX_OFFSET = 18;
+    const uint32_t NX_MESH_PLD_SIG_STATE_IDX_MASK   = 0x7;
+    const uint32_t NX_MESH_PLD_SIG_STATE_SEQ_OFFSET = 17;
+    const uint32_t NX_MESH_PLD_SIG_STATE_SEQ_MASK   = 0x1;
+    const uint32_t NX_MESH_PLD_SIG_STATE_VAL_OFFSET = 16;
+    const uint32_t NX_MESH_PLD_SIG_STATE_VAL_MASK   = 0x1;
 
     // =========================================================================
     // Data Structures
@@ -121,6 +141,20 @@ namespace Nexus {
         nx_msg_header_t header;
         uint32_t        payload;
     } nx_message_t;
+
+    typedef struct {
+        uint32_t index;
+        uint32_t target_row;
+        uint32_t target_column;
+        uint32_t target_index;
+        bool     target_sequential;
+    } nx_output_map_t;
+
+    typedef struct {
+        uint32_t index;
+        bool     sequential;
+        bool     value;
+    } nx_signal_state_t;
 
     // =========================================================================
     // Message Encoding Functions
@@ -188,6 +222,39 @@ namespace Nexus {
         );
     }
 
+    inline uint32_t nx_build_mesh_load_instruction (
+        uint32_t row, uint32_t col, uint32_t encoded
+    ) {
+        return (
+            nx_build_mesh_header(row, col, NX_CMD_LOAD_INSTR) |
+            ((encoded & NX_MESH_PLD_LD_INSTR_MASK) << NX_MESH_PLD_LD_INSTR_OFFSET)
+        );
+    }
+
+    inline uint32_t nx_build_mesh_map_output (
+        uint32_t row, uint32_t col, nx_output_map_t mapping
+    ) {
+        return (
+            nx_build_mesh_header(row, col, NX_CMD_MAP_OUTPUT) |
+            ((mapping.index             & NX_MESH_PLD_MAP_OUT_IDX_MASK) << NX_MESH_PLD_MAP_OUT_IDX_OFFSET) |
+            ((mapping.target_row        & NX_MESH_PLD_MAP_OUT_ROW_MASK) << NX_MESH_PLD_MAP_OUT_ROW_OFFSET) |
+            ((mapping.target_column     & NX_MESH_PLD_MAP_OUT_COL_MASK) << NX_MESH_PLD_MAP_OUT_COL_OFFSET) |
+            ((mapping.target_index      & NX_MESH_PLD_MAP_OUT_TIX_MASK) << NX_MESH_PLD_MAP_OUT_TIX_OFFSET) |
+            ((mapping.target_sequential ? 1 : 0                       ) << NX_MESH_PLD_MAP_OUT_SEQ_OFFSET)
+        );
+    }
+
+    inline uint32_t nx_build_mesh_signal_state (
+        uint32_t row, uint32_t col, nx_signal_state_t state
+    ) {
+        return (
+            nx_build_mesh_header(row, col, NX_CMD_SIG_STATE) |
+            ((state.index      & NX_MESH_PLD_SIG_STATE_IDX_MASK) << NX_MESH_PLD_SIG_STATE_IDX_OFFSET) |
+            ((state.sequential ? 1 : 0                         ) << NX_MESH_PLD_SIG_STATE_SEQ_OFFSET) |
+            ((state.value      ? 1 : 0                         ) << NX_MESH_PLD_SIG_STATE_VAL_OFFSET)
+        );
+    }
+
     // =========================================================================
     // Message Decoding Functions
     // =========================================================================
@@ -224,6 +291,16 @@ namespace Nexus {
             .payload = ((raw >> NX_MESH_PAYLOAD_OFFSET) & NX_MESH_PAYLOAD_MASK)
         };
         return message;
+    }
+
+    inline nx_signal_state_t nx_decode_mesh_signal_state (nx_message_t msg)
+    {
+        nx_signal_state_t state = {
+            .index      = ((msg.payload >> NX_MESH_PLD_SIG_STATE_IDX_OFFSET) & NX_MESH_PLD_SIG_STATE_IDX_MASK),
+            .sequential = ((msg.payload >> NX_MESH_PLD_SIG_STATE_SEQ_OFFSET) & NX_MESH_PLD_SIG_STATE_SEQ_MASK),
+            .value      = ((msg.payload >> NX_MESH_PLD_SIG_STATE_VAL_OFFSET) & NX_MESH_PLD_SIG_STATE_VAL_MASK)
+        };
+        return state;
     }
 
 }

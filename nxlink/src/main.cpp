@@ -94,30 +94,6 @@ int main (int argc, char * argv [])
     // Read back the current status
     device->log_status(device->read_status());
 
-    // Route a message through the mesh
-    Nexus::nx_message_t tx_msg;
-    tx_msg.header.row     = 10;
-    tx_msg.header.column  = 10;
-    tx_msg.header.command = Nexus::NX_CMD_NODE_CTRL;
-    tx_msg.payload        = 0x123456;
-    device->send_to_mesh(tx_msg);
-
-    // Receive a message from the mesh
-    Nexus::nx_message_t rx_msg;
-    memset(&rx_msg, 0, sizeof(Nexus::nx_message_t));
-    device->receive_from_mesh(rx_msg, true);
-    std::cout << "Received message from mesh" << std::endl;
-    device->log_mesh_message(rx_msg);
-
-    // Read back the current status
-    device->log_status(device->read_status());
-
-    // Set an interval
-    device->set_interval(10);
-    device->log_status(device->read_status());
-    device->reset();
-    device->log_status(device->read_status());
-
     // Run gRPC server
     std::string server_address("0.0.0.0:51234");
 

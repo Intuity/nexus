@@ -44,6 +44,7 @@ namespace Nexus {
         bool            identify (bool quiet=false);
         nx_parameters_t read_parameters (void);
         nx_status_t     read_status (void);
+        uint32_t        read_cycles (void);
         void            set_interval (uint32_t interval);
         void            clear_interval (void);
         void            reset (void);
@@ -51,6 +52,7 @@ namespace Nexus {
 
         // Mesh interface
         void send_to_mesh (nx_message_t msg);
+        void send_to_mesh (uint32_t raw);
         bool receive_from_mesh (nx_message_t & msg, bool blocking);
 
         // Helper methods

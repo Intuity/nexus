@@ -19,21 +19,29 @@ import "google/protobuf/empty.proto";
 package NexusRPC;
 
 service NXService {
-    rpc Identify (google.protobuf.Empty) returns (NXIdentity) {}
-    rpc Reset (google.protobuf.Empty) returns (google.protobuf.Empty) {}
-    rpc Parameters (google.protobuf.Empty) returns (NXParameters) {}
-    rpc Status (google.protobuf.Empty) returns (NXStatus) {}
-    rpc SetInterval (NXInterval) returns (google.protobuf.Empty) {}
-    rpc SetActive (NXActive) returns (google.protobuf.Empty) {}
+    // Control interface
+    rpc ControlGetIdentity (google.protobuf.Empty) returns (NXControlIdentity) {}
+    rpc ControlSetReset (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc ControlGetParameters (google.protobuf.Empty) returns (NXControlParameters) {}
+    rpc ControlGetStatus (google.protobuf.Empty) returns (NXControlStatus) {}
+    rpc ControlGetCycles (google.protobuf.Empty) returns (NXControlCycles) {}
+    rpc ControlSetInterval (NXControlInterval) returns (google.protobuf.Empty) {}
+    rpc ControlSetActive (NXControlActive) returns (google.protobuf.Empty) {}
+
+    // Mesh interface
+    rpc MeshLoadInstruction (NXMeshLoadInstruction) returns (google.protobuf.Empty) {}
+    rpc MeshMapOutput (NXMeshMapOutput) returns (google.protobuf.Empty) {}
+    rpc MeshSetInput (NXMeshSignalState) returns (google.protobuf.Empty) {}
+    rpc MeshGetOutputs (google.protobuf.Empty) returns (stream NXMeshSignalState) {}
 }
 
-message NXIdentity {
+message NXControlIdentity {
     uint32 device_id     = 1;
     uint32 version_major = 2;
     uint32 version_minor = 3;
 }
 
-message NXParameters {
+message NXControlParameters {
     uint32 counter_width  = 1;
     uint32 rows           = 2;
     uint32 columns        = 3;
@@ -42,17 +50,45 @@ message NXParameters {
     uint32 node_registers = 6;
 }
 
-message NXStatus {
+message NXControlStatus {
     bool active        = 1;
     bool seen_idle_low = 2;
     bool first_tick    = 3;
     bool interval_set  = 4;
 }
 
-message NXInterval {
+message NXControlInterval {
     uint32 interval = 1;
 }
 
-message NXActive {
+message NXControlActive {
     bool active = 1;
+}
+
+message NXControlCycles {
+    uint32 cycles = 1;
+}
+
+message NXMeshLoadInstruction {
+    uint32 row     = 1;
+    uint32 column  = 2;
+    uint32 encoded = 3;
+}
+
+message NXMeshMapOutput {
+    uint32 row               = 1;
+    uint32 column            = 2;
+    uint32 index             = 3;
+    uint32 target_row        = 4;
+    uint32 target_column     = 5;
+    uint32 target_index      = 6;
+    uint32 target_sequential = 7;
+}
+
+message NXMeshSignalState {
+    uint32 row        = 1;
+    uint32 column     = 2;
+    uint32 index      = 3;
+    uint32 value      = 4;
+    uint32 sequential = 5;
 }

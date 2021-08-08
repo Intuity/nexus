@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Set default rule
+.PHONY: all
+all: build
+
 # Third-party libraries
 ROOT_CXXOPTS          ?= ./thirdparty/cxxopts
 ROOT_CONCURRENT_QUEUE ?= ./thirdparty/concurrentqueue

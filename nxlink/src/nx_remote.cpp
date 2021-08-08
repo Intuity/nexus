@@ -16,15 +16,15 @@
 
 #define NX_REM_DBG(...) printf(__VA_ARGS__);
 
-// Identify
+// ControlGetIdentity
 // Return the device ID and version information on request
 //
-grpc::Status Nexus::NXRemote::Identify (
-          grpc::ServerContext     * ctx,
-    const google::protobuf::Empty * request,
-          NexusRPC::NXIdentity    * response
+grpc::Status Nexus::NXRemote::ControlGetIdentity (
+          grpc::ServerContext         * ctx,
+    const google::protobuf::Empty     * request,
+          NexusRPC::NXControlIdentity * response
 ) {
-    NX_REM_DBG("Received Identity request\n");
+    NX_REM_DBG("Received identity request\n");
     response->set_device_id(m_device->read_device_id());
     nx_version_t version = m_device->read_version();
     response->set_version_major(version.major);
@@ -32,28 +32,28 @@ grpc::Status Nexus::NXRemote::Identify (
     return grpc::Status::OK;
 }
 
-// Reset
+// ControlSetReset
 // Trigger the device reset upon request
 //
-grpc::Status Nexus::NXRemote::Reset (
+grpc::Status Nexus::NXRemote::ControlSetReset (
           grpc::ServerContext     * ctx,
     const google::protobuf::Empty * request,
           google::protobuf::Empty * response
 ) {
-    NX_REM_DBG("Received Reset request\n");
+    NX_REM_DBG("Received reset request\n");
     m_device->reset();
     return grpc::Status::OK;
 }
 
-// Parameters
+// ControlGetParameters
 // Read back all of the parameters from the device
 //
-grpc::Status Nexus::NXRemote::Parameters (
-          grpc::ServerContext     * ctx,
-    const google::protobuf::Empty * request,
-          NexusRPC::NXParameters  * response
+grpc::Status Nexus::NXRemote::ControlGetParameters (
+          grpc::ServerContext           * ctx,
+    const google::protobuf::Empty       * request,
+          NexusRPC::NXControlParameters * response
 ) {
-    NX_REM_DBG("Received Parameters request\n");
+    NX_REM_DBG("Received parameters request\n");
     nx_parameters_t params = m_device->read_parameters();
     response->set_counter_width(params.counter_width);
     response->set_rows(params.rows);
@@ -64,15 +64,15 @@ grpc::Status Nexus::NXRemote::Parameters (
     return grpc::Status::OK;
 }
 
-// Status
+// ControlGetStatus
 // Read back the device's current status
 //
-grpc::Status Nexus::NXRemote::Status (
-          grpc::ServerContext     * ctx,
-    const google::protobuf::Empty * request,
-          NexusRPC::NXStatus      * response
+grpc::Status Nexus::NXRemote::ControlGetStatus (
+          grpc::ServerContext       * ctx,
+    const google::protobuf::Empty   * request,
+          NexusRPC::NXControlStatus * response
 ) {
-    NX_REM_DBG("Received Status request\n");
+    NX_REM_DBG("Received status request\n");
     nx_status_t status = m_device->read_status();
     response->set_active(status.active);
     response->set_seen_idle_low(status.seen_idle_low);
@@ -81,26 +81,119 @@ grpc::Status Nexus::NXRemote::Status (
     return grpc::Status::OK;
 }
 
-// SetInterval
+// ControlGetCycles
+// Read back the device's current status
+//
+grpc::Status Nexus::NXRemote::ControlGetCycles (
+          grpc::ServerContext       * ctx,
+    const google::protobuf::Empty   * request,
+          NexusRPC::NXControlCycles * response
+) {
+    NX_REM_DBG("Received cycles request\n");
+    response->set_cycles(m_device->read_cycles());
+    return grpc::Status::OK;
+}
+
+// ControlSetInterval
 // Set the interval in terms of clock cycles
 //
-grpc::Status Nexus::NXRemote::SetInterval (
-          grpc::ServerContext     * ctx,
-    const NexusRPC::NXInterval    * request,
-          google::protobuf::Empty * response
+grpc::Status Nexus::NXRemote::ControlSetInterval (
+          grpc::ServerContext         * ctx,
+    const NexusRPC::NXControlInterval * request,
+          google::protobuf::Empty     * response
 ) {
     m_device->set_interval(request->interval());
     return grpc::Status::OK;
 }
 
-// SetActive
+// ControlSetActive
 // Enable/disable the mesh
 //
-grpc::Status Nexus::NXRemote::SetActive (
-          grpc::ServerContext     * ctx,
-    const NexusRPC::NXActive      * request,
-          google::protobuf::Empty * response
+grpc::Status Nexus::NXRemote::ControlSetActive (
+          grpc::ServerContext       * ctx,
+    const NexusRPC::NXControlActive * request,
+          google::protobuf::Empty   * response
 ) {
     m_device->set_active(request->active());
+    return grpc::Status::OK;
+}
+
+// MeshLoadInstruction
+// Load an instruction into a node in the mesh
+//
+grpc::Status Nexus::NXRemote::MeshLoadInstruction (
+          grpc::ServerContext             * ctx,
+    const NexusRPC::NXMeshLoadInstruction * request,
+          google::protobuf::Empty         * response
+) {
+    m_device->send_to_mesh(nx_build_mesh_load_instruction(
+        request->row(), request->column(), request->encoded()
+    ));
+    return grpc::Status::OK;
+}
+
+// MeshMapOutput
+// Submit a node output mapping message into the mesh
+//
+grpc::Status Nexus::NXRemote::MeshMapOutput (
+          grpc::ServerContext       * ctx,
+    const NexusRPC::NXMeshMapOutput * request,
+          google::protobuf::Empty   * response
+) {
+    nx_output_map_t mapping = {
+        .index             = request->index(),
+        .target_row        = request->target_row(),
+        .target_column     = request->target_column(),
+        .target_index      = request->target_index(),
+        .target_sequential = request->target_sequential()
+    };
+    m_device->send_to_mesh(nx_build_mesh_map_output(
+        request->row(), request->column(), mapping
+    ));
+    return grpc::Status::OK;
+}
+
+// MeshSetInput
+// Submit a signal state update into the mesh
+//
+grpc::Status Nexus::NXRemote::MeshSetInput (
+          grpc::ServerContext         * ctx,
+    const NexusRPC::NXMeshSignalState * request,
+          google::protobuf::Empty     * response
+) {
+    nx_signal_state_t state = {
+        .index      = request->index(),
+        .sequential = request->sequential(),
+        .value      = request->value()
+    };
+    m_device->send_to_mesh(nx_build_mesh_signal_state(
+        request->row(), request->column(), state
+    ));
+    return grpc::Status::OK;
+}
+
+// MeshGetOutputs
+// Stream signal state output messages to the remote system
+//
+grpc::Status Nexus::NXRemote::MeshGetOutputs (
+          grpc::ServerContext                             * ctx,
+    const google::protobuf::Empty                         * request,
+          grpc::ServerWriter<NexusRPC::NXMeshSignalState> * response
+) {
+    while (true) {
+        nx_message_t msg;
+        if (m_device->receive_from_mesh(msg, true)) {
+            if (msg.header.command != NX_CMD_SIG_STATE) continue;
+            NexusRPC::NXMeshSignalState * state = new NexusRPC::NXMeshSignalState();
+            nx_signal_state_t decoded = nx_decode_mesh_signal_state(msg);
+            state->set_row(msg.header.row);
+            state->set_column(msg.header.column);
+            state->set_index(decoded.index);
+            state->set_value(decoded.value);
+            state->set_sequential(decoded.sequential);
+            response->Write(*state);
+            delete state;
+        }
+    }
     return grpc::Status::OK;
 }
