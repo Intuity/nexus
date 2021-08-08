@@ -143,8 +143,9 @@ always_comb begin : p_decode
 
     // If interval elapsed, deactivate automatically
     if (interval_set && interval_count == interval) begin
-        active       = 1'b0;
-        interval_set = 1'b0;
+        active         = 1'b0;
+        interval_set   = 1'b0;
+        interval_count = {PYLD_WIDTH{1'b0}};
     end
 
     // Increment interval counter on trigger high
