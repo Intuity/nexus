@@ -22,8 +22,9 @@ ROOT_CONCURRENT_QUEUE ?= ./thirdparty/concurrentqueue
 ROOT_GRPC             ?= ./thirdparty/grpc
 
 # Required tools
-PROTOC      ?= $(ROOT_GRPC)/third_party/protobuf/src/protoc
-GRPC_PLUGIN ?= $(ROOT_GRPC)/cmake/build/grpc_cpp_plugin
+PROTOC         ?= $(ROOT_GRPC)/third_party/protobuf/src/protoc
+GRPC_CPP_PLUGIN ?= $(ROOT_GRPC)/cmake/build/grpc_cpp_plugin
+GRPC_PY_PLUGIN  ?= $(ROOT_GRPC)/cmake/build/grpc_python_plugin
 
 # Source directories
 # - Protobuf
@@ -105,8 +106,11 @@ $(PROTO_DIR)/proto.d: $(PROTO_SRCS) | $(PROTO_DIR)
 	 --cpp_out=$(PROTO_DIR) \
 	 $(PROTO_SRCS)
 	$(PREFIX)$(PROTOC) $(foreach d,$(PROTO_INC_DIRS),--proto_path=$(d)) \
+	 --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN) \
+	 --plugin=protoc-gen-grpc_python=$(GRPC_PY_PLUGIN) \
 	 --grpc_out=$(PROTO_DIR) \
-	 --plugin=protoc-gen-grpc=$(GRPC_PLUGIN) \
+	 --python_out=$(PROTO_DIR) \
+	 --grpc_python_out=$(PROTO_DIR) \
 	 $(PROTO_SRCS)
 	$(PREFIX)touch $@
 
