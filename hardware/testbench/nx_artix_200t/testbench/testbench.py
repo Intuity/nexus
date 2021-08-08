@@ -58,12 +58,16 @@ class Testbench(TestbenchBase):
         self.exp_mesh = []
         # Create a scoreboard
         def compare_ctrl(got):
-            exp = self.exp_ctrl.pop(0)
-            assert len(got.data) == len(exp.data), \
-                f"Length differs: {len(got.data) = }, {len(exp.data) = }"
+            exp    = self.exp_ctrl.pop(0)
+            all_ok = True
+            if len(got.data) != len(exp.data):
+                self.error(f"Length differs: {len(got.data) = }, {len(exp.data) = }")
+                all_ok = False
             for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
-                assert got_byte == exp_byte, \
-                    f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}"
+                if got_byte != exp_byte:
+                    self.error(f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}")
+                    all_ok = False
+            assert all_ok, "Comparison error occurred"
         def compare_mesh(got):
             exp = self.exp_mesh.pop(0)
             assert len(got.data) == len(exp.data), \
@@ -184,3 +188,14 @@ class testcase(cocotb.test):
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)
+
+def _create_test(func, name, docs, mod, *args, **kwargs):
+    """ Custom factory function support """
+    async def _my_test(dut): await func(dut, *args, **kwargs)
+    _my_test.__name__     = name
+    _my_test.__qualname__ = name
+    _my_test.__doc__      = docs
+    _my_test.__module__   = mod.__name__
+    return testcase()(_my_test)
+
+cocotb.regression._create_test = _create_test
