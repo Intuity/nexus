@@ -12,21 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from math import ceil
+
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 import simpy
 
 from drivers.axi4stream.common import AXI4StreamTransaction
 from nx_constants import Command
+from nx_control import build_set_active
 from nx_message import build_load_instr, build_map_output
 from nxmodel.base import Base
 from nxmodel.capture import Capture
 from nxmodel.manager import Manager
 from nxmodel.mesh import Mesh
-from nxmodel.message import ConfigureInput, ConfigureOutput, LoadInstruction
+from nxmodel.message import ConfigureOutput, LoadInstruction
 from nxmodel.node import Direction
 from nxmodel.pipe import Pipe
 
 from ..testbench import testcase
+
+def to_bytes(data, bits):
+    return bytearray([((data >> (x * 8)) & 0xFF) for x in range(int(ceil(bits / 8)))])
 
 @testcase()
 async def mission_mode(dut):
@@ -41,7 +47,7 @@ async def mission_mode(dut):
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
     # Disable scoreboarding of output
-    dut.outbound._callbacks = []
+    dut.ob_mesh._callbacks = []
 
     # Setup an instance of nxmodel to match the design
     env = simpy.Environment()
@@ -70,63 +76,44 @@ async def mission_mode(dut):
     mngr.add_observer(cap.tick)
 
     # Push all of the queued messages into the design
-    linked, seq_in, bc_out, slots = {}, {}, {}, {}
+    linked, seq_in = {}, {}
     to_send = bytearray()
     for msg in mngr.queue:
-        common = (1 if msg.broadcast else 0, msg.tgt_row, msg.tgt_col, msg.decay)
-        # Message to send
         raw = []
-        # Attempt to translate the message
-        if isinstance(msg, ConfigureInput):
-            raw.append(build_map_input(
-                *common, msg.tgt_pos, 1 if msg.state else 0, msg.src_row,
-                msg.src_col, msg.src_pos,
+        if isinstance(msg, ConfigureOutput):
+            raw.append(build_map_output(
+                msg.row, msg.col, msg.src_idx,
+                msg.tgt_row, msg.tgt_col, msg.tgt_idx, msg.tgt_seq
             ))
-            # Use input mappings to build up a picture of the links
-            src_key = msg.src_row, msg.src_col, msg.src_pos
-            tgt_key = msg.tgt_row, msg.tgt_col, msg.tgt_pos
+            # Setup source if not already tracked
+            src_key = msg.row, msg.col, msg.src_idx
             if src_key not in linked: linked[src_key] = []
+            # Add a target entry
+            tgt_key = msg.tgt_row, msg.tgt_col, msg.tgt_idx
             linked[src_key].append(tgt_key)
-            # Mark if this input is sequential
-            seq_in[tgt_key] = msg.state
-        elif isinstance(msg, ConfigureOutput):
-            if msg.msg_as_bc:
-                raw.append(build_map_output(
-                    *common, msg.out_pos, 0, 1, (msg.bc_decay >> 4) & 0xF,
-                    (msg.bc_decay >> 0) & 0xF,
-                ))
-            else:
-                raw.append(build_map_output(
-                    *common, msg.out_pos, 0, 0, msg.msg_a_row, msg.msg_a_col
-                ))
-                raw.append(build_map_output(
-                    *common, msg.out_pos, 1, 0, msg.msg_b_row, msg.msg_b_col
-                ))
-            # Use output messages to mark broadcasts
-            src_key = msg.tgt_row, msg.tgt_col, msg.out_pos
-            bc_out[src_key] = msg.msg_as_bc
-            if not msg.msg_as_bc:
-                slots[src_key] = (
-                    (msg.msg_a_row, msg.msg_a_col),
-                    (msg.msg_b_row, msg.msg_b_col),
-                )
+            # Track sequential inputs
+            assert tgt_key not in seq_in, f"Clash for target: {tgt_key}"
+            seq_in[tgt_key] = msg.tgt_seq
         elif isinstance(msg, LoadInstruction):
-            raw.append(build_load_instr(*common, 0, msg.instr.raw))
+            raw.append(build_load_instr(msg.row, msg.col, msg.instr.raw))
         else:
             raise Exception(f"Unexpected message {msg}")
         # Convert to bytes
-        for entry in raw:
-            to_send += bytearray([(entry >> (x * 8)) & 0xFF for x in range(4)])
+        for entry in raw: to_send += to_bytes((1 << 31) | entry, 32)
 
     # Create a single AXI4-Stream transaction to send all configuratioj
-    dut.inbound.append(AXI4StreamTransaction(data=to_send))
+    dut.ib_mesh.append(AXI4StreamTransaction(data=to_send))
 
     # Wait for all data to be sent
     dut.info("Waiting for AXI4-stream to send all data")
-    await dut.inbound.idle()
+    await dut.ib_mesh.idle()
 
     # Wait for the idle flag to go high
-    if dut.dut.dut.core.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.core.mesh.idle_o)
+    dut.info("Waiting for idle to rise")
+    while True:
+        await RisingEdge(dut.dut.dut.core.mesh.idle_o)
+        await RisingEdge(dut.clk)
+        if dut.dut.dut.core.mesh.idle_o == 1: break
 
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)
@@ -145,31 +132,28 @@ async def mission_mode(dut):
         for col in range(num_cols):
             rtl_node = dut.nodes[row][col].entity
             mdl_node = mesh.nodes[row][col]
-            core_0   = int(rtl_node.instr_store.core_0_populated_o)
-            core_1   = int(rtl_node.instr_store.core_1_populated_o)
-            assert core_0 == len(mdl_node.ops), \
-                f"{row}, {col}: Expected {len(mdl_node.ops)}, got {core_0}"
-            assert core_1 == 0, \
-                f"{row}, {col}: Expected 0, got {core_1}"
+            i_count  = int(rtl_node.store.instr_count_o)
+            assert i_count == len(mdl_node.instrs), \
+                f"{row}, {col}: Expected {len(mdl_node.instrs)}, got {i_count}"
             # Check the loaded instructions
-            dut.info(f"Checking {len(mdl_node.ops)} instructions for {row}, {col}")
-            for idx, instr in enumerate(mdl_node.ops):
-                got = int(rtl_node.instr_store.ram.memory[idx])
+            dut.info(f"Checking {len(mdl_node.instrs)} instructions for {row}, {col}")
+            for idx, instr in enumerate(mdl_node.instrs):
+                got = int(rtl_node.store.ram.memory[idx])
                 assert instr.raw == got, \
                     f"Instruction {idx} - {hex(instr.raw)=}, {hex(got)=}"
 
     # Raise active and let nexus tick
-    # - Bit 31 indicates this is a control plane message (not for the mesh)
-    # - Bit  0 controls active/inactive status
     dut.info("Enabling nexus")
-    dut.inbound.append(AXI4StreamTransaction(data=[0x01, 0x00, 0x00, 0x80]))
+    dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
+        (1 << 31) | build_set_active(1), 32
+    )))
 
     # Wait for all data to be sent
     dut.info("Waiting for AXI4-stream to send all data")
-    await dut.inbound.idle()
+    await dut.ib_ctrl.idle()
 
     # Print out how many nodes are blocked
-    rtl_outputs = {}
+    rtl_outputs, mdl_outputs = {}, {}
     for cycle in range(256):
         # Run the model for one tick
         dut.info("Running model until tick")
@@ -178,7 +162,11 @@ async def mission_mode(dut):
 
         # Wait for activity
         dut.info("Waiting for idle to fall")
-        if dut.dut.dut.core.mesh.idle_o == 1: await FallingEdge(dut.dut.dut.core.mesh.idle_o)
+        if dut.dut.dut.core.mesh.idle_o == 1:
+            while True:
+                await FallingEdge(dut.dut.dut.core.mesh.idle_o)
+                await RisingEdge(dut.clk)
+                if dut.dut.dut.core.mesh.idle_o == 0: break
 
         # Wait for idle (ensuring it is synchronous)
         dut.info("Waiting for idle to rise")
@@ -193,7 +181,7 @@ async def mission_mode(dut):
                 ctrl = node.entity.control
                 i_curr = int(ctrl.input_curr_q)
                 i_next = int(ctrl.input_next_q)
-                o_curr = int(ctrl.output_last_q)
+                o_curr = int(ctrl.detect_last_q)
                 dut.info(
                     f"[{cycle:04d}] {row:2d}, {col:2d} - IC: {i_curr:08b}, "
                     f"IN: {i_next:08b}, OC: {o_curr:08b} - Δ: {i_curr != i_next}"
@@ -204,19 +192,19 @@ async def mission_mode(dut):
         io_match = 0
         for (src_row, src_col, src_pos), entries in linked.items():
             src_node = dut.nodes[src_row][src_col]
-            src_out  = int(src_node.entity.control.output_last_q[src_pos])
+            src_out  = int(src_node.entity.control.detect_last_q[src_pos])
             for tgt_row, tgt_col, tgt_pos in entries:
+                # Skip out-of-range rows (temporarily used for top-level outputs)
+                if tgt_row >= num_rows: continue
+                # Lookup the target node
                 tgt_node = dut.nodes[tgt_row][tgt_col]
                 tgt_in   = int(tgt_node.entity.control.input_next_q[tgt_pos])
                 if src_out != tgt_in:
-                    is_bc_out = bc_out[src_row, src_col, src_pos]
                     is_seq_in = seq_in[tgt_row, tgt_col, tgt_pos]
-                    slots_out = slots.get((src_row, src_col, src_pos), None)
                     dut.error(
                         f"I/O Mismatch: {src_row}, {src_col} O[{src_pos}] -> "
                         f"{tgt_row}, {tgt_col} I[{tgt_pos}]: {src_out=}, "
-                        f"{tgt_in=} - BC: {is_bc_out}, Seq: {is_seq_in}, "
-                        f"Slots: {slots_out}"
+                        f"{tgt_in=} - Seq: {is_seq_in}"
                     )
                     io_error += 1
                 else:
@@ -232,7 +220,7 @@ async def mission_mode(dut):
                 ctrl       = rtl_node.entity.control
                 rtl_i_curr = int(ctrl.input_curr_q)
                 rtl_i_next = int(ctrl.input_next_q)
-                rtl_o_curr = int(ctrl.output_last_q)
+                rtl_o_curr = int(ctrl.detect_last_q)
                 # Get the model state
                 mdl_node   = mesh.nodes[row][col]
                 mdl_i_curr = sum([(y << x) for x, y in enumerate(mdl_node.input_state)])
@@ -252,26 +240,47 @@ async def mission_mode(dut):
         assert mm_i_next == 0, f"Detected {mm_i_next} next input mismatches"
         assert mm_o_curr == 0, f"Detected {mm_o_curr} current output mismatches"
 
-        # Build up a final output state for RTL
-        while dut.outbound._recvQ:
-            tran = dut.outbound._recvQ.pop()
-            for msg, _ in tran.pack(4):
-                is_ctrl = (msg >> 31) & 0x1
-                if is_ctrl:
-                    payload = msg & ((1 << 31) - 1)
-                    dut.info(f"Got control message: 0x{payload:08X}")
-                else:
-                    command = (msg >> 21) & 0x3
-                    if command == int(Command.SIG_STATE):
-                        rtl_row = (msg >> 17) & 0xF
-                        rtl_col = (msg >> 13) & 0xF
-                        rtl_idx = (msg >> 10) & 0x7
-                        rtl_val = (msg >>  9) & 0x1
-                        rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val
+        # Wait for outbound AXI stream to go idle
+        dut.info("Waiting for AXI stream to go idle")
+        while dut.ob_mesh.intf.tvalid == 1: await RisingEdge(dut.clk)
 
-        # Capture and check against the model's output state
-        cap.snapshot()
+        # Build up a final output state for RTL
+        # NOTE: Receive queue must be reversed in order to accumulate correctly
+        ob_trans = []
+        while dut.ob_mesh._recvQ: ob_trans.append(dut.ob_mesh._recvQ.pop())
+        for tran in ob_trans[::-1]:
+            for msg, _ in tran.pack(4):
+                # Skip unpopulated entries
+                if ((msg >> 31) & 0x1) == 0: continue
+                # Decode target row and column, and the command
+                rtl_row = (msg >> 27) & 0xF
+                rtl_col = (msg >> 23) & 0xF
+                command = (msg >> 21) & 0x3
+                # Capture signal state
+                if command == int(Command.SIG_STATE):
+                    rtl_idx = (msg >> 18) & 0x7
+                    rtl_val = (msg >> 16) & 0x1
+                    rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val
+
+        # Capture model outputs
         for key, mdl_val in cap.snapshots[-1][1].items():
-            assert key in rtl_outputs, f"Missing output {key=}"
-            assert mdl_val == rtl_outputs[key], \
-                f"Output {key} differs {mdl_val=}, {rtl_val=}"
+            mdl_outputs[key] = mdl_val
+
+        # Cross-check
+        # NOTE: Missing model outputs could just be because of different settling
+        #       behaviour - so just assume they are still at zero
+        errors = 0
+        for key in set(list(mdl_outputs.keys()) + list(rtl_outputs.keys())):
+            # Check RTL output exists
+            if key not in rtl_outputs:
+                dut.error(f"Missing RTL output {key=}")
+                errors += 1
+                continue
+            # Compare RTL and model value
+            rtl_val = rtl_outputs[key]
+            mdl_val = (1 if mdl_outputs.get(key, 0) else 0)
+            if rtl_val != mdl_val:
+                dut.error(f"Output {key} mismatch {rtl_val=}, {mdl_val=}")
+                errors += 1
+                continue
+        assert errors == 0, f"{errors} errors were detected in outputs"
