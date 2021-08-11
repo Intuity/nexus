@@ -131,7 +131,7 @@ async def mission_mode(dut):
     dut.ctrl_inbound.append(build_set_active(1))
 
     # Print out how many nodes are blocked
-    rtl_outputs = {}
+    rtl_outputs, mdl_outputs = {}, {}
     for cycle in range(256):
         # Run the model for one tick
         dut.info("Running model until tick")
@@ -215,19 +215,40 @@ async def mission_mode(dut):
         assert mm_o_curr == 0, f"Detected {mm_o_curr} current output mismatches"
 
         # Build up a final output state for RTL
+        # NOTE: Receive queue must be reversed in order to accumulate correctly
+        ob_trans = []
         while dut.mesh_outbound._recvQ:
-            msg, _  = dut.mesh_outbound._recvQ.pop()
+            ob_trans.append(dut.mesh_outbound._recvQ.pop())
+        for msg, _ in ob_trans[::-1]:
+            # Decode target row and column, and the command
+            rtl_row = (msg >> 27) & 0xF
+            rtl_col = (msg >> 23) & 0xF
             command = (msg >> 21) & 0x3
+            # Capture signal state
             if command == int(Command.SIG_STATE):
-                rtl_row = (msg >> 17) & 0xF
-                rtl_col = (msg >> 13) & 0xF
-                rtl_idx = (msg >> 10) & 0x7
-                rtl_val = (msg >>  9) & 0x1
+                rtl_idx = (msg >> 18) & 0x7
+                rtl_val = (msg >> 16) & 0x1
                 rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val
 
-        # Capture and check against the model's output state
-        cap.snapshot()
+        # Capture model outputs
         for key, mdl_val in cap.snapshots[-1][1].items():
-            assert key in rtl_outputs, f"Missing output {key=}"
-            assert mdl_val == rtl_outputs[key], \
-                f"Output {key} differs {mdl_val=}, {rtl_val=}"
+            mdl_outputs[key] = mdl_val
+
+        # Cross-check
+        # NOTE: Missing model outputs could just be because of different settling
+        #       behaviour - so just assume they are still at zero
+        errors = 0
+        for key in set(list(mdl_outputs.keys()) + list(rtl_outputs.keys())):
+            # Check RTL output exists
+            if key not in rtl_outputs:
+                dut.error(f"Missing RTL output {key=}")
+                errors += 1
+                continue
+            # Compare RTL and model value
+            rtl_val = rtl_outputs[key]
+            mdl_val = (1 if mdl_outputs.get(key, 0) else 0)
+            if rtl_val != mdl_val:
+                dut.error(f"Output {key} mismatch {rtl_val=}, {mdl_val=}")
+                errors += 1
+                continue
+        assert errors == 0, f"{errors} errors were detected in outputs"
