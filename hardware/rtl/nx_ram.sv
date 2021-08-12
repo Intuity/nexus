@@ -38,7 +38,7 @@ module nx_ram #(
     , output logic [   DATA_WIDTH-1:0] rd_data_b_o
 );
 
-`ifdef sim_icarus
+`ifdef sim_icarus_blah
 
 reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 
@@ -118,7 +118,7 @@ RAMB36E1 #(
     , .INJECTSBITERR(1'b0)
     // Port A
     , .CLKARDCLK    (clk_a_i)
-    , .ADDRARDADDR  ({ {(16-ADDRESS_WIDTH){1'b0}}, addr_a_i })
+    , .ADDRARDADDR  ({ {(10-ADDRESS_WIDTH){1'b0}}, addr_a_i, 5'd0 })
     , .ENARDEN      (en_a_i)
     , .REGCEAREGCE  (1'b0)
     , .RSTRAMARSTRAM(1'b0)
@@ -130,7 +130,7 @@ RAMB36E1 #(
     , .DOPADOP      (read_data[0][35:32])
     // Port B
     , .CLKBWRCLK  (clk_b_i)
-    , .ADDRBWRADDR({ {(16-ADDRESS_WIDTH){1'b0}}, addr_b_i })
+    , .ADDRBWRADDR({ {(10-ADDRESS_WIDTH){1'b0}}, addr_b_i, 5'd0 })
     , .ENBWREN    (en_b_i)
     , .REGCEB     (1'b0)
     , .RSTRAMB    (1'b0)
