@@ -38,7 +38,7 @@ module nx_ram #(
     , output logic [   DATA_WIDTH-1:0] rd_data_b_o
 );
 
-`ifdef sim_icarus_blah
+`ifdef sim_icarus
 
 reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 
