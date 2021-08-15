@@ -20,6 +20,13 @@ all: run_all
 SUB_MAKEFILES := $(foreach f,$(wildcard ./*/Makefile),$(notdir $(patsubst %/,%,$(dir $(f)))))
 
 # Define pre-run rule
+.PHONY: __pre_run_generic
+__pre_run_generic:
+	@echo "# =================================================================="
+	@echo "# Preparing to run across $(words $(SUB_MAKEFILES)) units"
+	@echo "# =================================================================="
+	@echo ""
+
 .PHONY: __pre_run
 __pre_run:
 	@echo "# =================================================================="
@@ -30,22 +37,26 @@ __pre_run:
 # Setup dispatch per sub-dir
 define DO_SUB_DIR
 # $(1) - Test directory name
-.PHONY: $(subst _,,$(1))%
-$(subst _,,$(1))%: | __pre_run
-	@echo "# Running $$@ for subfolder $(subst _,,$(1))"
-	@make -C $(1) $$(patsubst $(subst _,,$(1))%,%,$$@)
-.PHONY: $(1)
-$(1):
+.PHONY: __$(subst _,,$(1))_%
+__$(subst _,,$(1))_%:
+	@echo "# Running $$(patsubst __$(subst _,,$(1))_%,%,$$@) for subfolder $(1)"
+	@make -C $(1) $$(patsubst __$(subst _,,$(1))_%,%,$$@)
+.PHONY: __$(1)
+__$(1):
 	@echo "# Running subfolder $(1)"
 	@make -C $(1)
-SUB_GENERIC_TARGETS  += $(1)
-SUB_WILDCARD_TARGETS += $(subst _,,$(1))%
+SUB_GENERIC_TARGETS  += __$(1)
+SUB_WILDCARD_TARGETS += __$(subst _,,$(1))_%
 endef
 $(foreach t,$(SUB_MAKEFILES),$(eval $(call DO_SUB_DIR,$(t))))
 
 # Empty command
 .PHONY: run_all
-run_all: $(SUB_GENERIC_TARGETS)
+run_all: $(SUB_GENERIC_TARGETS) | __pre_run_generic
+	@echo ""
+	@echo "# =================================================================="
+	@echo "# Finished running across $(words $(SUB_MAKEFILES)) units"
+	@echo "# =================================================================="
 
 # Dispatch any command to all sub-Makefiles
 %: $(SUB_WILDCARD_TARGETS) | __pre_run
