@@ -13,30 +13,30 @@
 # limitations under the License.
 
 # Detect all test areas
-TESTS := $(foreach f,$(wildcard ./*/Makefile),$(notdir $(patsubst %/,%,$(dir $(f)))))
+SUB_MAKEFILES := $(foreach f,$(wildcard ./*/Makefile),$(notdir $(patsubst %/,%,$(dir $(f)))))
 
 # Define pre-run rule
 .PHONY: __pre_run
 __pre_run:
 	@echo "# =================================================================="
-	@echo "# Preparing to run '$(MAKECMDGOALS)' across $(words $(TESTS)) tests"
+	@echo "# Preparing to run '$(MAKECMDGOALS)' across $(words $(SUB_MAKEFILES)) units"
 	@echo "# =================================================================="
 	@echo ""
 
 # Setup dispatch per sub-dir
 define DO_SUB_DIR
 # $(1) - Test directory name
-.PHONY: $(1)_% | __pre_run
-$(1)_%:
-	@echo "# Running $$@ for test $(1)"
-	@make -C $(1) $$(patsubst $(1)_%,%,$$@)
-TEST_TARGETS += $(1)_%
+.PHONY: $(subst _,,$(1))_% | __pre_run
+$(subst _,,$(1))_%:
+	@echo "# Running $$@ for test $(subst _,,$(1))"
+	@make -C $(1) $$(patsubst $(subst _,,$(1))_%,%,$$@)
+SUB_TARGETS += $(subst _,,$(1))_%
 endef
-$(foreach t,$(TESTS),$(eval $(call DO_SUB_DIR,$(t))))
+$(foreach t,$(SUB_MAKEFILES),$(eval $(call DO_SUB_DIR,$(t))))
 
-# Dispatch any command to all tests
-%: $(TEST_TARGETS) | __pre_run
+# Dispatch any command to all sub-Makefiles
+%: $(SUB_TARGETS) | __pre_run
 	@echo ""
 	@echo "# =================================================================="
-	@echo "# Finished running '$@' across $(words $(TESTS)) tests"
+	@echo "# Finished running '$@' across $(words $(SUB_MAKEFILES)) units"
 	@echo "# =================================================================="

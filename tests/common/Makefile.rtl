@@ -25,8 +25,6 @@ RTL_SRC_DIRS += $(abspath ./rtl)
 RTL_SRC_EXTS ?= .v .sv
 RTL_SRCS     += $(foreach x,$(RTL_SRC_EXTS),$(foreach d,$(RTL_SRC_DIRS),$(wildcard $(d)/*$(x))))
 
-$(info RTL_SRCS=$(RTL_SRCS))
-
 ifeq ($(DESIGN_TOP),)
   $(info ERROR: No DESIGN_TOP specified)
   $(error 1)
