@@ -439,7 +439,7 @@ def compile(
             bit_map[item.id] = terms[str(item)] = Instruction(item, [], [], None)
         elif isinstance(item, Flop):
             assert item.input[0].id not in bit_map
-            bit_map[item.input[0].id] = (state := State(item.input[0], None, []))
+            bit_map[item.input[0].id] = state = State(item.input[0], None, [])
             if item.output:
                 assert item.output[0].id not in bit_map
                 bit_map[item.output[0].id] = state

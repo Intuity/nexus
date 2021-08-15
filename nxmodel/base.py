@@ -38,7 +38,7 @@ class Base:
     def issue_id(cls, inst):
         type_str = type(inst).__name__
         if type_str not in Base.ID: Base.ID[type_str] = 0
-        Base.ID[type_str] = (issued := Base.ID[type_str]) + 1
+        Base.ID[type_str] = issued = Base.ID[type_str]) + 1
         return issued
 
     @classmethod
@@ -56,7 +56,8 @@ class Base:
         Base.LOG.setLevel(verbosity)
         Base.LOG.addHandler(stream)
         if log_path:
-            Base.LOG.addHandler(fh := logging.FileHandler(log_path, "w"))
+            fh = logging.FileHandler(log_path, "w")
+            Base.LOG.addHandler(fh)
             fh.setFormatter(formatter)
 
     # Logging aliases

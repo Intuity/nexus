@@ -88,7 +88,7 @@ def export(
         model[DESIGN_NODES].append(node)
 
     # Insert the state mapping
-    model[DESIGN_REPORTS][DSG_REP_STATE] = (state_report := {})
+    model[DESIGN_REPORTS][DSG_REP_STATE] = state_report = {}
     for (row, col, idx), flop in state_map.items():
         state_report[f"R{row}C{col}I{idx}"] = str(flop.output[0])
 

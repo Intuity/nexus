@@ -357,7 +357,7 @@ class Node(Base):
                     val_a = self.__inputs[op.source_a] if op.is_input_a else self.__registers[op.source_a]
                     val_b = self.__inputs[op.source_b] if op.is_input_b else self.__registers[op.source_b]
                     # Perform the operation
-                    self.__registers[op.target] = (result := Operation.evaluate(op.op, val_a, val_b))
+                    self.__registers[op.target] = result = Operation.evaluate(op.op, val_a, val_b)
                     # Debug log
                     self.debug(f"Executing op {op_idx}: {op} - A: {val_a}, B: {val_b}, R: {result}")
                     # Map result to an output state
