@@ -1,10 +1,10 @@
 [submodule "nxlink/thirdparty/cxxopts"]
 	path = nxlink/thirdparty/cxxopts
-	url = git@github.com:jarro2783/cxxopts.git
+	url = https://github.com/jarro2783/cxxopts.git
 	branch = master
 [submodule "nxlink/thirdparty/concurrentqueue"]
 	path = nxlink/thirdparty/concurrentqueue
-	url = git@github.com:cameron314/concurrentqueue.git
+	url = https://github.com/cameron314/concurrentqueue.git
 	branch = master
 [submodule "nxlink/thirdparty/dma_ip_drivers"]
 	path = nxlink/thirdparty/dma_ip_drivers
@@ -12,5 +12,5 @@
 	branch = master
 [submodule "nxlink/thirdparty/grpc"]
 	path = nxlink/thirdparty/grpc
-	url = git@github.com:grpc/grpc.git
+	url = https://github.com/grpc/grpc.git
 	branch = master
