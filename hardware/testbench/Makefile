@@ -16,6 +16,13 @@
 .PHONY: all
 all: run_all
 
+# Options
+IGNORE_FAILURE ?= no
+
+ifeq ($(IGNORE_FAILURE),yes)
+  CMD_SUFFIX := || true
+endif
+
 # Detect all test areas
 SUB_MAKEFILES := $(foreach f,$(wildcard ./*/Makefile),$(notdir $(patsubst %/,%,$(dir $(f)))))
 
@@ -40,11 +47,11 @@ define DO_SUB_DIR
 .PHONY: __$(subst _,,$(1))_%
 __$(subst _,,$(1))_%:
 	@echo "# Running $$(patsubst __$(subst _,,$(1))_%,%,$$@) for subfolder $(1)"
-	@make -C $(1) $$(patsubst __$(subst _,,$(1))_%,%,$$@)
+	@make -C $(1) $$(patsubst __$(subst _,,$(1))_%,%,$$@) $(CMD_SUFFIX)
 .PHONY: __$(1)
 __$(1):
 	@echo "# Running subfolder $(1)"
-	@make -C $(1)
+	@make -C $(1) $(CMD_SUFFIX)
 SUB_GENERIC_TARGETS  += __$(1)
 SUB_WILDCARD_TARGETS += __$(subst _,,$(1))_%
 endef
