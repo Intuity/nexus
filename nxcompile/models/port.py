@@ -60,6 +60,7 @@ class PortBit:
 
     @driver.setter
     def driver(self, drv):
+        if drv == self.__driver: return
         if self.__driver: raise Exception("Driver has already been set")
         assert isinstance(drv, PortBit) or isinstance(drv, Gate)
         self.__driver = drv
