@@ -87,10 +87,10 @@ async def map_outputs(dut):
                     ram_col  = (ram_data >> 1 + input_width) & 0xF
                     ram_row  = (ram_data >> 1 + input_width + col_width) & 0xF
                     assert ram_seq == tgt_seq, \
-                        f"R{row}C{col}O{output} - {ram_seq = }, {tgt_seq = }"
+                        f"R{row}C{col}O{output} - RAM: {ram_seq}, TGT: {tgt_seq}"
                     assert ram_idx == tgt_idx, \
-                        f"R{row}C{col}O{output} - {ram_idx = }, {tgt_idx = }"
+                        f"R{row}C{col}O{output} - RAM: {ram_idx}, TGT: {tgt_idx}"
                     assert ram_col == tgt_col, \
-                        f"R{row}C{col}O{output} - {ram_col = }, {tgt_col = }"
+                        f"R{row}C{col}O{output} - RAM: {ram_col}, TGT: {tgt_col}"
                     assert ram_row == tgt_row, \
-                        f"R{row}C{col}O{output} - {ram_row = }, {tgt_row = }"
+                        f"R{row}C{col}O{output} - RAM: {ram_row}, TGT: {tgt_row}"

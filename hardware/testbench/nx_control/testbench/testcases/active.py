@@ -83,7 +83,7 @@ async def set_active(dut):
     await ClockCycles(dut.clk, 10)
 
     # Check trigger has fired once
-    assert triggered == 1, f"Expected 1 trigger, got {triggered = }"
+    assert triggered == 1, f"Expected 1 trigger, got {triggered}"
 
     # Request the active state
     dut.info("Checking active state")
@@ -111,7 +111,7 @@ async def set_active(dut):
 
     # Check the number of triggers
     assert triggered == (1 + num_cycles), \
-        f"Expecting {1 + num_cycles} triggers, got {triggered = }"
+        f"Expecting {1 + num_cycles} triggers, got {triggered}"
 
     # Request the active state
     dut.info("Checking active state")

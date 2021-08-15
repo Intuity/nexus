@@ -98,7 +98,7 @@ async def multi_dir(dut, backpressure):
             if   msg_b: dut.expected.append(msg_b.pop(0))
             elif msg_a: dut.expected.append(msg_a.pop(0))
         else:
-            raise Exception(f"Unknown arbitration scheme: {arb_scheme = }")
+            raise Exception(f"Unknown arbitration scheme: {arb_scheme}")
         # Capture the last selection
         if active != None: last = active
 

@@ -61,7 +61,7 @@ class Testbench(TestbenchBase):
             exp    = self.exp_ctrl.pop(0)
             all_ok = True
             if len(got.data) != len(exp.data):
-                self.error(f"Length differs: {len(got.data) = }, {len(exp.data) = }")
+                self.error(f"Length differs - G: {len(got.data)}, E: {len(exp.data)}")
                 all_ok = False
             for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
                 if got_byte != exp_byte:
@@ -71,7 +71,7 @@ class Testbench(TestbenchBase):
         def compare_mesh(got):
             exp = self.exp_mesh.pop(0)
             assert len(got.data) == len(exp.data), \
-                f"Length differs: {len(got.data) = }, {len(exp.data) = }"
+                f"Length differs - G: {len(got.data)}, E: {len(exp.data)}"
             for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
                 assert got_byte == exp_byte, \
                     f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}"

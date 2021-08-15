@@ -67,7 +67,7 @@ async def routing(dut):
         elif command == Command.CONTROL:
             msg = build_control(tgt_row, tgt_col, randint(0, (1 << 21) - 1))
         else:
-            raise Exception(f"Unsupported {command = }")
+            raise Exception(f"Unsupported command {command}")
 
         # Create a message
         dut.debug(

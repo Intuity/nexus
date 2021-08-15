@@ -124,7 +124,7 @@ async def mission_mode(dut):
             for idx, instr in enumerate(mdl_node.instrs):
                 got = int(rtl_node.store.ram.memory[idx])
                 assert instr.raw == got, \
-                    f"Instruction {idx} - {hex(instr.raw)=}, {hex(got)=}"
+                    f"Instruction {idx} - R: {hex(instr.raw)}, G: {hex(got)}"
 
     # Raise active and let nexus tick
     dut.info("Enabling nexus")
@@ -177,8 +177,8 @@ async def mission_mode(dut):
                     is_seq_in = seq_in[tgt_row, tgt_col, tgt_pos]
                     dut.error(
                         f"I/O Mismatch: {src_row}, {src_col} O[{src_pos}] -> "
-                        f"{tgt_row}, {tgt_col} I[{tgt_pos}]: {src_out=}, "
-                        f"{tgt_in=} - Seq: {is_seq_in}"
+                        f"{tgt_row}, {tgt_col} I[{tgt_pos}]: SRC: {src_out}, "
+                        f"TGT: {tgt_in} - Seq: {is_seq_in}"
                     )
                     io_error += 1
                 else:
@@ -202,13 +202,13 @@ async def mission_mode(dut):
                 mdl_o_curr = sum([(y << x) for x, y in enumerate(mdl_node.output_state)])
                 # Compare
                 if rtl_i_curr != mdl_i_curr:
-                    dut.error(f"{row}, {col} - {rtl_i_curr=:08b}, {mdl_i_curr=:08b}")
+                    dut.error(f"{row}, {col} - RTL: {rtl_i_curr:08b}, MDL: {mdl_i_curr:08b}")
                     mm_i_curr += 1
                 if rtl_i_next != mdl_i_next:
-                    dut.error(f"{row}, {col} - {rtl_i_next=:08b}, {mdl_i_next=:08b}")
+                    dut.error(f"{row}, {col} - RTL: {rtl_i_next:08b}, MDL: {mdl_i_next:08b}")
                     mm_i_next += 1
                 if rtl_o_curr != mdl_o_curr:
-                    dut.error(f"{row}, {col} - {rtl_o_curr=:08b}, {mdl_o_curr=:08b}")
+                    dut.error(f"{row}, {col} - RTL: {rtl_o_curr:08b}, MDL: {mdl_o_curr:08b}")
                     mm_o_curr += 1
         assert mm_i_curr == 0, f"Detected {mm_i_curr} current input mismatches"
         assert mm_i_next == 0, f"Detected {mm_i_next} next input mismatches"
@@ -241,14 +241,14 @@ async def mission_mode(dut):
         for key in set(list(mdl_outputs.keys()) + list(rtl_outputs.keys())):
             # Check RTL output exists
             if key not in rtl_outputs:
-                dut.error(f"Missing RTL output {key=}")
+                dut.error(f"Missing RTL output {key}")
                 errors += 1
                 continue
             # Compare RTL and model value
             rtl_val = rtl_outputs[key]
             mdl_val = (1 if mdl_outputs.get(key, 0) else 0)
             if rtl_val != mdl_val:
-                dut.error(f"Output {key} mismatch {rtl_val=}, {mdl_val=}")
+                dut.error(f"Output {key} mismatch RTL: {rtl_val}, MDL: {mdl_val}")
                 errors += 1
                 continue
         assert errors == 0, f"{errors} errors were detected in outputs"
