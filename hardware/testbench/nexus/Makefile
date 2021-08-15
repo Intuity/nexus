@@ -15,5 +15,8 @@
 # Common bench support
 include ../common/Makefile
 
+# Set a higher than normal timeout
+TIMEOUT ?= 30m
+
 # CocoTB bench support
 include $(shell cocotb-config --makefiles)/Makefile.sim
