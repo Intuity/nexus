@@ -28,6 +28,8 @@ module testbench #(
     , output nx_ctrl_resp_t outbound_data_o
     , output logic          outbound_valid_o
     , input  logic          outbound_ready_i
+    // Soft reset request
+    , output logic soft_reset_o
     // Externally visible status
     , output logic status_active_o  // High when the mesh is active
     , output logic status_idle_o    // High when the mesh goes idle
