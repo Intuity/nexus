@@ -38,7 +38,8 @@ class Base:
     def issue_id(cls, inst):
         type_str = type(inst).__name__
         if type_str not in Base.ID: Base.ID[type_str] = 0
-        Base.ID[type_str] = issued = Base.ID[type_str]) + 1
+        issued = Base.ID[type_str]
+        Base.ID[type_str] = issued + 1
         return issued
 
     @classmethod
