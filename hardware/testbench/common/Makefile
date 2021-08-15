@@ -35,7 +35,6 @@ TB_TOP ?= testbench
 # Runtime controls
 BENCHNAME ?= $(notdir $(abspath .))
 QUIET     ?= yes
-TIMEOUT   ?= 10m
 SIM_WAVES ?= sim.lxt
 SIM_LOG   ?= sim.log
 EN_WAVES  ?= no
@@ -53,10 +52,9 @@ ifeq ($(TRACE_RAM),yes)
 endif
 
 # Tool paths
-IVERILOG    ?= $(shell which iverilog)
-VVP         ?= $(shell which vvp)
-GTKWAVE     ?= /Applications/gtkwave.app/Contents/Resources/bin/gtkwave
-TIMEOUT_CMD ?= timeout $(TIMEOUT)
+IVERILOG ?= $(shell which iverilog)
+VVP      ?= $(shell which vvp)
+GTKWAVE  ?= /Applications/gtkwave.app/Contents/Resources/bin/gtkwave
 
 # Wave viewer variables
 GTKW_CFG ?= $(wildcard $(BENCHNAME).gtkw)
@@ -92,7 +90,7 @@ run: results.xml
 
 .PHONY: view
 view:
-	$(PREFIX)$(TIMEOUT_CMD)$(GTKWAVE) $(SIM_WAVES) $(wildcard $(GTKW_CFG)) &
+	$(PREFIX)$(GTKWAVE) $(SIM_WAVES) $(wildcard $(GTKW_CFG)) &
 
 .PHONY: clean
 clean::
