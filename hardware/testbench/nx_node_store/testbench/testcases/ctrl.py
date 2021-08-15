@@ -34,9 +34,11 @@ async def ctrl_memory(dut):
     # Randomly write entries to the control store
     state = {}
     for _ in range(randint(500, 1000)):
+        wr_addr = randint(0, num_ctrl-1)
+        wr_data = randint(0, (1 << ctrl_width) - 1)
         dut.ctrl.append(MemoryTransaction(
-            addr   =(wr_addr := randint(0, num_ctrl-1)),
-            wr_data=(wr_data := randint(0, (1 << ctrl_width) - 1)),
+            addr   =randint(0, num_ctrl-1),
+            wr_data=randint(0, (1 << ctrl_width) - 1),
             wr_en  =1,
         ))
         state[wr_addr] = wr_data

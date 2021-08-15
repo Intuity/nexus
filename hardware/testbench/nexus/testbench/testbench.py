@@ -76,12 +76,13 @@ class Testbench(TestbenchBase):
         # Create a monitor for every node in the mesh
         self.nodes = []
         for row in range(int(self.dut.dut.ROWS)):
-            self.nodes.append(entries := [])
+            entries = []
             for col in range(int(self.dut.dut.COLUMNS)):
                 entries.append(NodeMonitor(
                     self.dut.dut.mesh.g_rows[row].g_columns[col].node,
                     self.clk, self.rst, name=f"row_{row}_col_{col}"
                 ))
+            self.nodes.append(entries)
 
     def plot_mesh_state(self, path):
         """ Plot the state of the mesh using NetworkX.

@@ -40,8 +40,10 @@ async def single_dir(dut):
     await dut.reset()
 
     # Set the node address to a random value
-    dut.node_row_i <= (row    := randint(1, 14))
-    dut.node_col_i <= (column := randint(1, 14))
+    row    = randint(1, 14)
+    column = randint(1, 14)
+    dut.node_row_i <= row
+    dut.node_col_i <= column
 
     # Get the width of the data
     intf_size = max(dut.int_io.data._range)-min(dut.int_io.data._range)+1
@@ -69,8 +71,10 @@ async def multi_dir(dut, backpressure):
     await dut.reset()
 
     # Set the node address to a random value
-    dut.node_row_i <= (row    := randint(1, 14))
-    dut.node_col_i <= (column := randint(1, 14))
+    row    = randint(1, 14)
+    column = randint(1, 14)
+    dut.node_row_i <= row
+    dut.node_col_i <= column
 
     # Activate/deactivate backpressure
     dut.int.delays = backpressure
