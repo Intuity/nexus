@@ -49,10 +49,10 @@ async def single_dir(dut):
     intf_size = max(dut.int_io.data._range)-min(dut.int_io.data._range)+1
 
     for intf in (dut.north, dut.east, dut.south, dut.west):
-        # Drive a number of random messages from the north interface
+        # Drive a number of random messages from the selected interface
         msgs = [
-            (row    << 28) |
-            (column << 24) |
+            (row    << 27) |
+            (column << 23) |
             randint(0, (1 << (intf_size - 8)) - 1)
             for _ in range(randint(50, 100))
         ]
@@ -86,8 +86,8 @@ async def multi_dir(dut, backpressure):
     # Function to generate messages
     def gen_msg():
         return [
-            (row    << 28) |
-            (column << 24) |
+            (row    << 27) |
+            (column << 23) |
             randint(0, (1 << (intf_size - 8)) - 1)
             for _ in range(randint(50, 100))
         ]

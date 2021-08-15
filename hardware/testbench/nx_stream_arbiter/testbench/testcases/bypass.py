@@ -38,7 +38,7 @@ async def bypass(dut, backpressure):
     def gen_msg():
         return [
             (
-                (row << 28) | (column << 24)
+                (row << 27) | (column << 23)
                 if choice((0, 1)) else
                 randint(0, (1 << 8) - 1)
             ) |
@@ -65,8 +65,8 @@ async def bypass(dut, backpressure):
             elif dirx == 2 and south: data = south.pop(0)
             elif dirx == 3 and west : data = west.pop(0)
             if not data: continue
-            tgt_row = (data >> 28) & 0xF
-            tgt_col = (data >> 24) & 0xF
+            tgt_row = (data >> 27) & 0xF
+            tgt_col = (data >> 23) & 0xF
             match   = (tgt_row == row) and (tgt_col == column)
             if match:
                 dut.int_expected.append((data, 0))
