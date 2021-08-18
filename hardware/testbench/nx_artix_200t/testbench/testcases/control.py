@@ -49,7 +49,7 @@ async def control(dut, backpressure):
         # - Counter Width
         (
             build_req_param(int(ControlParameter.COUNTER_WIDTH)),
-            int(dut.dut.dut.core.control.PYLD_WIDTH)
+            int(dut.dut.dut.core.control.TX_PYLD_WIDTH)
         ),
         # - Rows
         (
