@@ -22,7 +22,6 @@
 module nx_node_control #(
       parameter ADDR_ROW_WIDTH  =   4 // Row address bit width
     , parameter ADDR_COL_WIDTH  =   4 // Column address bit width
-    , parameter COMMAND_WIDTH   =   2 // Command field bit width
     , parameter INPUTS          =   8 // Number of inputs to each node
     , parameter OUTPUTS         =   8 // Number of outputs from each node
     , parameter OP_STORE_LENGTH = 512 // Total number of output messages allowed
@@ -87,7 +86,7 @@ localparam OUTPUT_W        = $clog2(OUTPUTS);
 `DECLARE_DQ(      OUTPUTS,                  output_actv,  clk_i, rst_i, {OUTPUTS{1'b0}})
 `DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_base,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
 `DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_final, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(      OP_STORE_ADDR_W,          output_next,  clk_i, rst_i, {(OP_STORE_ADDR_W+1){1'b0}})
+`DECLARE_DQ(      OP_STORE_ADDR_W,          output_next,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
 
 `DECLARE_DQ(INPUT_W, loopback_index, clk_i, rst_i, {INPUT_W{1'b0}})
 `DECLARE_DQ(1,       loopback_state, clk_i, rst_i, 1'b0)
@@ -154,7 +153,7 @@ always_comb begin : p_detect_xor
     end
 
     // If detect_xor cleared, take the next snapshot
-    if (!detect_xor) begin
+    if (!(|detect_xor)) begin
         detect_xor  = core_outputs_i ^ detect_last;
         detect_last = core_outputs_i;
     end
@@ -221,8 +220,6 @@ nx_fifo #(
 );
 
 always_comb begin : p_output_memory
-    int i;
-
     `INIT_D(output_actv);
     `INIT_D_ARRAY(output_base);
     `INIT_D_ARRAY(output_final);
@@ -267,7 +264,7 @@ always_comb begin : p_output_memory
         // Mark this output as active
         output_actv[map_idx_i] = 1'b1;
         // Increment next pointer
-        output_next = output_next + { {OP_STORE_ADDR_W{1'b0}}, 1'b1 };
+        output_next = output_next + 'd1;
 
     // Otherwise handle output state generation
     end else if (!state_fifo_full) begin

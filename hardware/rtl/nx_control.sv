@@ -49,7 +49,8 @@ module nx_control #(
     , input  logic [COLUMNS-1:0] token_release_i // Per-column token return
 );
 
-localparam PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
+localparam RX_PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
+localparam TX_PYLD_WIDTH = `NX_MESSAGE_WIDTH;
 
 // Internal state
 `DECLARE_DQ (             1, soft_reset,     clk_i, rst_i,                          1'b0)
@@ -57,9 +58,9 @@ localparam PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
 `DECLARE_DQ (             1, trigger,        clk_i, rst_i,                          1'b0)
 `DECLARE_DQ (             1, seen_idle_low,  clk_i, rst_i,                          1'b0)
 `DECLARE_DQ (             1, first_tick,     clk_i, rst_i,                          1'b1)
-`DECLARE_DQ (    PYLD_WIDTH, cycle,          clk_i, rst_i,            {PYLD_WIDTH{1'b0}})
-`DECLARE_DQ (    PYLD_WIDTH, interval,       clk_i, rst_i,            {PYLD_WIDTH{1'b0}})
-`DECLARE_DQ (    PYLD_WIDTH, interval_count, clk_i, rst_i,            {PYLD_WIDTH{1'b0}})
+`DECLARE_DQ ( TX_PYLD_WIDTH, cycle,          clk_i, rst_i,         {TX_PYLD_WIDTH{1'b0}})
+`DECLARE_DQ ( RX_PYLD_WIDTH, interval,       clk_i, rst_i,         {RX_PYLD_WIDTH{1'b0}})
+`DECLARE_DQ ( RX_PYLD_WIDTH, interval_count, clk_i, rst_i,         {RX_PYLD_WIDTH{1'b0}})
 `DECLARE_DQ (             1, interval_set,   clk_i, rst_i,                          1'b0)
 `DECLARE_DQ (       COLUMNS, token_grant,    clk_i, rst_i,               {COLUMNS{1'b0}})
 `DECLARE_DQT(nx_ctrl_resp_t, send_data,      clk_i, rst_i, {$bits(nx_ctrl_resp_t){1'b0}})
@@ -88,7 +89,7 @@ assign seen_idle_low = trigger ? 1'b0 : (seen_idle_low_q || !mesh_idle_i);
 assign first_tick = first_tick_q && !trigger;
 
 // Count active cycles
-assign cycle = trigger ? (cycle_q + { {(PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle_q;
+assign cycle = trigger ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle_q;
 
 // Generate token grant signal
 assign token_grant = (trigger && first_tick_q) ? {COLUMNS{1'b1}} : token_release_i;
@@ -141,16 +142,15 @@ always_comb begin : p_decode
     // Clear valid if accepted
     if (outbound_ready_i) send_valid = 1'b0;
 
-    // If interval elapsed, deactivate automatically
+    // On counter elapse, deactivate automatically & clear counter for next run
     if (interval_set && interval_count == interval) begin
         active         = 1'b0;
-        interval_set   = 1'b0;
-        interval_count = {PYLD_WIDTH{1'b0}};
+        interval_count = 'd0;
     end
 
     // Increment interval counter on trigger high
     if (trigger_q) begin
-        interval_count = interval_count + { {(PYLD_WIDTH-1){1'b0}}, 1'b1 };
+        interval_count = interval_count + 'd1;
     end
 
     // Handle an incoming message
@@ -175,19 +175,19 @@ always_comb begin : p_decode
             NX_CTRL_PARAM: begin
                 case (req_pld_param.param)
                     NX_PARAM_COUNTER_WIDTH:
-                        send_data = PYLD_WIDTH[PYLD_WIDTH-1:0];
+                        send_data = TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0];
                     NX_PARAM_ROWS:
-                        send_data = ROWS[PYLD_WIDTH-1:0];
+                        send_data = ROWS[TX_PYLD_WIDTH-1:0];
                     NX_PARAM_COLUMNS:
-                        send_data = COLUMNS[PYLD_WIDTH-1:0];
+                        send_data = COLUMNS[TX_PYLD_WIDTH-1:0];
                     NX_PARAM_NODE_INPUTS:
-                        send_data = INPUTS[PYLD_WIDTH-1:0];
+                        send_data = INPUTS[TX_PYLD_WIDTH-1:0];
                     NX_PARAM_NODE_OUTPUTS:
-                        send_data = OUTPUTS[PYLD_WIDTH-1:0];
+                        send_data = OUTPUTS[TX_PYLD_WIDTH-1:0];
                     NX_PARAM_NODE_REGISTERS:
-                        send_data = REGISTERS[PYLD_WIDTH-1:0];
+                        send_data = REGISTERS[TX_PYLD_WIDTH-1:0];
                     default:
-                        send_data = {PYLD_WIDTH{1'b0}};
+                        send_data = {TX_PYLD_WIDTH{1'b0}};
                 endcase
                 send_valid = 1'b1;
             end
@@ -199,7 +199,7 @@ always_comb begin : p_decode
             NX_CTRL_STATUS: begin
                 send_valid = 1'b1;
                 send_data  = {
-                    {(PYLD_WIDTH-4){1'b0}}, active_q, seen_idle_low_q,
+                    {(TX_PYLD_WIDTH-4){1'b0}}, active_q, seen_idle_low_q,
                     first_tick_q, interval_set_q
                 };
             end
@@ -211,7 +211,7 @@ always_comb begin : p_decode
             // Set/clear the interval (number of cycles to run for)
             NX_CTRL_INTERVAL: begin
                 interval       = req_pld_interval.interval;
-                interval_count = {PYLD_WIDTH{1'b0}};
+                interval_count = 'd0;
                 interval_set   = (req_pld_interval.interval != 0);
             end
             // Soft reset request

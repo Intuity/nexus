@@ -38,7 +38,7 @@ module nx_ram #(
     , output logic [   DATA_WIDTH-1:0] rd_data_b_o
 );
 
-`ifdef sim_icarus
+`ifdef USE_RAM_MODEL
 
 reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 
@@ -69,6 +69,18 @@ always_ff @(posedge clk_b_i, posedge rst_b_i) begin : ff_read_b
         end
     end
 end
+
+// Aliases for VCD tracing
+`ifdef sim_icarus
+    `ifdef TRACE_RAM
+generate
+    genvar idx;
+    for (idx = 0; idx < DEPTH; idx = (idx + 1)) begin
+        wire [DATA_WIDTH-1:0] memory_alias = memory[idx];
+    end
+endgenerate
+    `endif
+`endif // sim_icarus
 
 `else
 
@@ -143,17 +155,5 @@ RAMB36E1 #(
 );
 
 `endif
-
-// Aliases for VCD tracing
-`ifdef sim_icarus
-    `ifdef TRACE_RAM
-generate
-    genvar idx;
-    for (idx = 0; idx < DEPTH; idx = (idx + 1)) begin
-        wire [DATA_WIDTH-1:0] memory_alias = memory[idx];
-    end
-endgenerate
-    `endif
-`endif // sim_icarus
 
 endmodule

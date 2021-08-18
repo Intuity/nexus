@@ -22,7 +22,6 @@
 module nx_msg_decoder #(
       parameter ADDR_ROW_WIDTH =  4 // Message row address field width
     , parameter ADDR_COL_WIDTH =  4 // Message column address field width
-    , parameter COMMAND_WIDTH  =  2 // Message command field width
     , parameter INSTR_WIDTH    = 15 // Width of each instruction
     , parameter INPUTS         =  8 // Number of inputs
     , parameter OUTPUTS        =  8 // Number of outputs
@@ -145,9 +144,6 @@ assign instr_valid_o = instr_valid_q;
 
 // Decode and routing
 always_comb begin : p_decode
-    // Working variables
-    int idx;
-
     // Initialise state
     `INIT_D(fifo_pop);
     `INIT_D(map_valid);

@@ -62,20 +62,12 @@ always @(posedge clk_i, posedge rst_i) begin : p_handle
     end else begin
         // Pop from FIFO if not empty
         if (rd_pop_i && !empty_o) begin
-            rd_ptr <= (
-                ((rd_ptr + PTR_STEP) >= DEPTH)
-                    ? (rd_ptr + PTR_STEP - DEPTH)
-                    : (rd_ptr + PTR_STEP)
-            );
+            rd_ptr <= ((rd_ptr + 'd1) == DEPTH[PTR_W-1:0]) ? 'd0 : (rd_ptr + 'd1);
         end
         // Push to FIFO if not full, or top entry just popped
         if (wr_push_i && (!truly_full || rd_pop_i)) begin
             data[wr_ptr] <= wr_data_i;
-            wr_ptr       <= (
-                ((wr_ptr + PTR_STEP) >= DEPTH)
-                    ? (wr_ptr + PTR_STEP - DEPTH)
-                    : (wr_ptr + PTR_STEP)
-            );
+            wr_ptr <= ((wr_ptr + 'd1) == DEPTH[PTR_W-1:0]) ? 'd0 : (wr_ptr + 'd1);
         end
         // Update the level
         if (wr_push_i && !rd_pop_i && !truly_full)

@@ -46,9 +46,6 @@ module nx_node_core #(
 // Parameters
 localparam INSTR_ADDR_W = $clog2(MAX_INSTRS);
 localparam OUTPUT_IDX_W = $clog2(OUTPUTS);
-localparam REG_SRC_W    = $clog2(REGISTERS);
-localparam INPUT_SRC_W  = $clog2(REGISTERS);
-localparam SOURCE_WIDTH = (REG_SRC_W > INPUT_SRC_W) ? REG_SRC_W : INPUT_SRC_W;
 
 typedef enum logic [1:0] {
       IDLE
@@ -72,7 +69,7 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 `DECLARE_DQ(1,            fetch_idle,  clk_i, rst_i, 1'b1)
 `DECLARE_DQ(1,            decode_idle, clk_i, rst_i, 1'b1)
 `DECLARE_DQ(1,            exec_idle,   clk_i, rst_i, 1'b1)
-`DECLARE_DQ(3,            fetch_first, clk_i, rst_i, 2'd0)
+`DECLARE_DQ(3,            fetch_first, clk_i, rst_i, 3'd0)
 `DECLARE_DQ(INSTR_ADDR_W, pc,          clk_i, rst_i, {INSTR_ADDR_W{1'b0}})
 `DECLARE_DQ(REGISTERS,    working,     clk_i, rst_i, {REGISTERS{1'b0}})
 `DECLARE_DQ(OUTPUTS,      outputs,     clk_i, rst_i, {OUTPUTS{1'b0}})
@@ -120,6 +117,7 @@ end
 always_comb begin : p_execute
     // Working state
     logic val_a, val_b, result;
+    { val_a, val_b, result }  = 'd0;
 
     // Decode state
     `INIT_D(decode_idle);

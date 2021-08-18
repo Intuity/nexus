@@ -23,7 +23,6 @@ module nx_mesh #(
     , parameter COLUMNS        =   3
     , parameter ADDR_ROW_WIDTH =   4
     , parameter ADDR_COL_WIDTH =   4
-    , parameter COMMAND_WIDTH  =   2
     , parameter INSTR_WIDTH    =  15
     , parameter INPUTS         =   8
     , parameter OUTPUTS        =   8
@@ -202,7 +201,6 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         nx_node #(
               .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
             , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-            , .COMMAND_WIDTH (COMMAND_WIDTH )
             , .INSTR_WIDTH   (INSTR_WIDTH   )
             , .INPUTS        (INPUTS        )
             , .OUTPUTS       (OUTPUTS       )

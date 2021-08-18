@@ -71,8 +71,7 @@ assign egress_present[NX_DIRX_SOUTH] = south_present_i;
 assign egress_present[NX_DIRX_WEST ] = west_present_i;
 
 generate
-genvar i, j;
-for (i = 0; i < 4; i = (i + 1)) begin
+for (genvar i = 0; i < 4; i = (i + 1)) begin
     logic primary_active;
     logic aliased_active;
 

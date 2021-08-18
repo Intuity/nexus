@@ -21,7 +21,6 @@
 module nx_node #(
       parameter ADDR_ROW_WIDTH  =   4
     , parameter ADDR_COL_WIDTH  =   4
-    , parameter COMMAND_WIDTH   =   2
     , parameter INSTR_WIDTH     =  15
     , parameter INPUTS          =   8
     , parameter OUTPUTS         =   8
@@ -140,8 +139,6 @@ nx_stream_arbiter #(
     , .bypass_ready_i(byp_ready)
 );
 
-localparam MAX_IO = ((INPUTS > OUTPUTS) ? INPUTS : OUTPUTS);
-
 // -----------------------------------------------------------------------------
 // Distributor
 // -----------------------------------------------------------------------------
@@ -202,7 +199,6 @@ logic                   instr_valid;
 nx_msg_decoder #(
       .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
     , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-    , .COMMAND_WIDTH (COMMAND_WIDTH )
     , .INSTR_WIDTH   (INSTR_WIDTH   )
     , .INPUTS        (INPUTS        )
     , .OUTPUTS       (OUTPUTS       )
@@ -251,7 +247,6 @@ logic                               ctrl_wr_en, ctrl_rd_en;
 nx_node_control #(
       .ADDR_ROW_WIDTH (ADDR_ROW_WIDTH )
     , .ADDR_COL_WIDTH (ADDR_COL_WIDTH )
-    , .COMMAND_WIDTH  (COMMAND_WIDTH  )
     , .INPUTS         (INPUTS         )
     , .OUTPUTS        (OUTPUTS        )
     , .OP_STORE_LENGTH(OP_STORE_LENGTH)

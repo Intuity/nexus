@@ -24,12 +24,15 @@ module nx_reset #(
     , output logic rst_internal_o
 );
 
-assign rst_combined = (rst_hard_i || rst_soft_i);
-
+logic                    rst_combined;
 logic [RESET_LENGTH-1:0] extended_q;
 logic                    result_q;
 
+// Drive reset output from the extended reset signal
 assign rst_internal_o = result_q;
+
+// Combine soft and hard reset requests
+assign rst_combined = (rst_hard_i || rst_soft_i);
 
 always_ff @(posedge clk_i, posedge rst_combined) begin : p_reset
     if (rst_combined) begin
