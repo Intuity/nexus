@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Force use of bash for evaluation
+SHELL := /bin/bash
+
 # Get the directory of this Makefile
 HW_COMMON_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
