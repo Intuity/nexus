@@ -15,6 +15,12 @@
 #ifndef __NX_DEVICE_HPP__
 #define __NX_DEVICE_HPP__
 
+#include <thread>
+#include <map>
+#include <tuple>
+
+#include <blockingconcurrentqueue.h>
+
 #include "nx_pipe.hpp"
 #include "nx_constants.hpp"
 
@@ -27,11 +33,34 @@ namespace Nexus {
     {
     public:
         // =====================================================================
+        // Constants
+        // =====================================================================
+        typedef struct nx_bit_addr {
+            uint32_t row;
+            uint32_t column;
+            uint32_t index;
+            bool operator == (const nx_bit_addr & other) const {
+                return (
+                    std::tie(row, column, index) ==
+                    std::tie(other.row, other.column, other.index)
+                );
+            }
+            bool operator < (const nx_bit_addr & other) const {
+                return (
+                    std::tie(row, column, index) <
+                    std::tie(other.row, other.column, other.index)
+                );
+            }
+        } nx_bit_addr_t;
+
+        // =====================================================================
         // Constructor
         // =====================================================================
         NXDevice(NXPipe * ctrl_pipe, NXPipe * mesh_pipe)
-            : m_ctrl_pipe(ctrl_pipe)
-            , m_mesh_pipe(mesh_pipe)
+            : m_ctrl_pipe(ctrl_pipe                    )
+            , m_mesh_pipe(mesh_pipe                    )
+            , m_received (                             )
+            , m_rx_thread(&NXDevice::monitor_mesh, this)
         { }
 
         // =====================================================================
@@ -51,9 +80,11 @@ namespace Nexus {
         void            set_active (bool active);
 
         // Mesh interface
-        void send_to_mesh (nx_message_t msg);
-        void send_to_mesh (uint32_t raw);
-        bool receive_from_mesh (nx_message_t & msg, bool blocking);
+        void     send_to_mesh (nx_message_t msg);
+        void     send_to_mesh (uint32_t raw);
+        bool     receive_from_mesh (nx_message_t & msg, bool blocking);
+        void     monitor_mesh (void);
+        uint64_t get_output_state (void);
 
         // Helper methods
         void log_parameters (nx_parameters_t params);
@@ -70,6 +101,12 @@ namespace Nexus {
         // =====================================================================
         NXPipe * m_ctrl_pipe;
         NXPipe * m_mesh_pipe;
+
+        std::thread m_rx_thread;
+
+        moodycamel::BlockingConcurrentQueue<nx_message_t> m_received;
+
+        std::map<nx_bit_addr_t, uint32_t> m_mesh_state;
 
     };
 

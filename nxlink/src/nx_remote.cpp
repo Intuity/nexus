@@ -14,7 +14,7 @@
 
 #include "nx_remote.hpp"
 
-#define NX_REM_DBG(...) printf(__VA_ARGS__);
+#define NX_REM_DBG(...) // printf(__VA_ARGS__)
 
 // ControlGetIdentity
 // Return the device ID and version information on request
@@ -102,6 +102,7 @@ grpc::Status Nexus::NXRemote::ControlSetInterval (
     const NexusRPC::NXControlInterval * request,
           google::protobuf::Empty     * response
 ) {
+    NX_REM_DBG("Setting interval to %u\n", request->interval());
     m_device->set_interval(request->interval());
     return grpc::Status::OK;
 }
@@ -114,6 +115,7 @@ grpc::Status Nexus::NXRemote::ControlSetActive (
     const NexusRPC::NXControlActive * request,
           google::protobuf::Empty   * response
 ) {
+    NX_REM_DBG("Setting active to %u\n", request->active());
     m_device->set_active(request->active());
     return grpc::Status::OK;
 }
@@ -126,6 +128,10 @@ grpc::Status Nexus::NXRemote::MeshLoadInstruction (
     const NexusRPC::NXMeshLoadInstruction * request,
           google::protobuf::Empty         * response
 ) {
+    NX_REM_DBG(
+        "Received mesh load instruction - R: %u, C: %u, I: 0x%08x\n",
+        request->row(), request->column(), request->encoded()
+    );
     m_device->send_to_mesh(nx_build_mesh_load_instruction(
         request->row(), request->column(), request->encoded()
     ));
@@ -147,6 +153,12 @@ grpc::Status Nexus::NXRemote::MeshMapOutput (
         .target_index      = request->target_index(),
         .target_sequential = request->target_sequential()
     };
+    NX_REM_DBG(
+        "Received mesh map output - R: %u, C: %u, I: %u TR: %u, TC: %u, TI: %u,"
+        " TS: %u\n", request->row(), request->column(), mapping.index,
+        mapping.target_row, mapping.target_column, mapping.target_index,
+        mapping.target_sequential
+    );
     m_device->send_to_mesh(nx_build_mesh_map_output(
         request->row(), request->column(), mapping
     ));
@@ -172,28 +184,14 @@ grpc::Status Nexus::NXRemote::MeshSetInput (
     return grpc::Status::OK;
 }
 
-// MeshGetOutputs
-// Stream signal state output messages to the remote system
+// MeshGetOutputState
+// Get the current output state
 //
-grpc::Status Nexus::NXRemote::MeshGetOutputs (
-          grpc::ServerContext                             * ctx,
-    const google::protobuf::Empty                         * request,
-          grpc::ServerWriter<NexusRPC::NXMeshSignalState> * response
+grpc::Status Nexus::NXRemote::MeshGetOutputState (
+          grpc::ServerContext         * ctx,
+    const google::protobuf::Empty     * request,
+          NexusRPC::NXMeshOutputState * response
 ) {
-    while (true) {
-        nx_message_t msg;
-        if (m_device->receive_from_mesh(msg, true)) {
-            if (msg.header.command != NX_CMD_SIG_STATE) continue;
-            NexusRPC::NXMeshSignalState * state = new NexusRPC::NXMeshSignalState();
-            nx_signal_state_t decoded = nx_decode_mesh_signal_state(msg);
-            state->set_row(msg.header.row);
-            state->set_column(msg.header.column);
-            state->set_index(decoded.index);
-            state->set_value(decoded.value);
-            state->set_sequential(decoded.sequential);
-            response->Write(*state);
-            delete state;
-        }
-    }
+    response->set_state(m_device->get_output_state());
     return grpc::Status::OK;
 }

@@ -151,6 +151,8 @@ void Nexus::NXDevice::reset (void)
     // Check that the reset status is expected
     nx_status_t status = read_status();
     assert(!status.active && status.first_tick && !status.interval_set);
+    // Empty the mesh state map
+    m_mesh_state.clear();
 }
 
 // set_active
@@ -185,11 +187,59 @@ bool Nexus::NXDevice::receive_from_mesh (
     Nexus::nx_message_t & msg, bool blocking
 ) {
     // If nothing available to dequeue, return false
-    if (!m_mesh_pipe->rx_available() && !blocking) return false;
-    // Otherwise decode
-    msg = nx_decode_mesh(m_mesh_pipe->rx_from_device());
+    if (!blocking && m_received.size_approx() == 0) return false;
+    // Otherwise pop the next entry
+    m_received.wait_dequeue(msg);
     // Return true to indicate a successful receive
     return true;
+}
+
+// monitor_mesh
+// Continuously consume data from the mesh, tracking the state of the device
+//
+void Nexus::NXDevice::monitor_mesh (void)
+{
+    nx_message_t msg;
+    while (true) {
+        // Receive the next message from the mesh
+        msg = nx_decode_mesh(m_mesh_pipe->rx_from_device());
+        // Decode appropriately
+        switch (msg.header.command) {
+            case NX_CMD_SIG_STATE: {
+                nx_signal_state_t state = nx_decode_mesh_signal_state(msg);
+                nx_bit_addr_t bit = {
+                    .row    = msg.header.row,
+                    .column = msg.header.column,
+                    .index  = state.index
+                };
+                m_mesh_state[bit] = state.value;
+            }
+            default: {
+                m_received.enqueue(msg);
+            }
+        }
+    }
+}
+
+// get_output_state
+// Read back the full state of the output
+//
+uint64_t Nexus::NXDevice::get_output_state (void)
+{
+    nx_parameters_t params = read_parameters();
+    std::map<nx_bit_addr_t, uint32_t>::iterator it;
+    uint64_t vector = 0;
+    for (it = m_mesh_state.begin(); it != m_mesh_state.end(); it++) {
+        nx_bit_addr_t bit = it->first;
+        uint32_t      val = it->second;
+        uint32_t offset = (
+            ((bit.row - params.rows) * params.columns * params.node_inputs) +
+            (bit.column * params.node_inputs) +
+            bit.index
+        );
+        vector |= val << offset;
+    }
+    return vector;
 }
 
 // log_parameters

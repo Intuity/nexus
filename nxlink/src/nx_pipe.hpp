@@ -15,9 +15,10 @@
 #ifndef __NX_PIPE_HPP__
 #define __NX_PIPE_HPP__
 
-#include <blockingconcurrentqueue.h>
 #include <thread>
 #include <iostream>
+
+#include <blockingconcurrentqueue.h>
 
 namespace Nexus {
 

@@ -32,7 +32,7 @@ service NXService {
     rpc MeshLoadInstruction (NXMeshLoadInstruction) returns (google.protobuf.Empty) {}
     rpc MeshMapOutput (NXMeshMapOutput) returns (google.protobuf.Empty) {}
     rpc MeshSetInput (NXMeshSignalState) returns (google.protobuf.Empty) {}
-    rpc MeshGetOutputs (google.protobuf.Empty) returns (stream NXMeshSignalState) {}
+    rpc MeshGetOutputState (google.protobuf.Empty) returns (NXMeshOutputState) {}
 }
 
 message NXControlIdentity {
@@ -91,4 +91,8 @@ message NXMeshSignalState {
     uint32 index      = 3;
     uint32 value      = 4;
     uint32 sequential = 5;
+}
+
+message NXMeshOutputState {
+    uint64 state = 1;
 }

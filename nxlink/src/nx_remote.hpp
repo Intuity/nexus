@@ -97,10 +97,10 @@ namespace Nexus {
                   google::protobuf::Empty     * response
         ) override;
 
-        grpc::Status MeshGetOutputs (
-                  grpc::ServerContext                             * ctx,
-            const google::protobuf::Empty                         * request,
-                  grpc::ServerWriter<NexusRPC::NXMeshSignalState> * response
+        grpc::Status MeshGetOutputState (
+                  grpc::ServerContext         * ctx,
+            const google::protobuf::Empty     * request,
+                  NexusRPC::NXMeshOutputState * response
         ) override;
 
     private:

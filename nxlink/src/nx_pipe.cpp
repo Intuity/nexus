@@ -24,7 +24,7 @@
 
 #include "nx_pipe.hpp"
 
-#define NXPIPE_DEBUG(...)
+#define NXPIPE_DEBUG(...) // printf(__VA_ARGS__)
 
 // tx_to_device
 // Queue up an item to send to the device
