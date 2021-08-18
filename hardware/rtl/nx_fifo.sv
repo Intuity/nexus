@@ -87,4 +87,4 @@ generate
 endgenerate
 `endif // sim_icarus
 
-endmodule
+endmodule : nx_fifo
