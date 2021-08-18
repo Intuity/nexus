@@ -31,7 +31,7 @@ LINT_OPTS += $(LINT_CFG)
 LINT_OPTS += $(SRC_FILES)
 LINT_OPTS += --top $(LINT_TOP)
 
-LINT_SFX ?= $(if $(LINT_RPT),2>&1 | tee $(LINT_RPT))
+LINT_SFX ?= $(if $(LINT_RPT),2>&1 | tee $(LINT_RPT); exit $${PIPESTATUS[0]})
 
 # ==============================================================================
 # Rules
