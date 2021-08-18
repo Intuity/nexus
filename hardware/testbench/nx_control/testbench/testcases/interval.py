@@ -104,11 +104,21 @@ async def set_interval(dut):
     # Request the state
     dut.info("Checking state")
     dut.inbound.append(build_req_status())
-    dut.expected.append((status(0, 1, 0, 0), 0))
+    dut.expected.append((status(0, 1, 0, 1), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the updated cycle count
     dut.info("Checking updated cycle count")
     dut.inbound.append(build_req_cycles())
     dut.expected.append((cycles, 0))
+    while dut.expected: await RisingEdge(dut.clk)
+
+    # Setup an interval
+    dut.info("Clearing the interval")
+    dut.inbound.append(build_set_interval(0))
+
+    # Request the state
+    dut.info("Checking state")
+    dut.inbound.append(build_req_status())
+    dut.expected.append((status(0, 1, 0, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)

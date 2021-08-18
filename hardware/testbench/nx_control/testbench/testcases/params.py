@@ -27,12 +27,12 @@ async def read_params(dut):
 
     # Create a lookup between parameter and the true value
     lookup = {
-        ControlParameter.COUNTER_WIDTH : int(dut.dut.dut.PYLD_WIDTH),
-        ControlParameter.ROWS          : int(dut.dut.dut.ROWS      ),
-        ControlParameter.COLUMNS       : int(dut.dut.dut.COLUMNS   ),
-        ControlParameter.NODE_INPUTS   : int(dut.dut.dut.INPUTS    ),
-        ControlParameter.NODE_OUTPUTS  : int(dut.dut.dut.OUTPUTS   ),
-        ControlParameter.NODE_REGISTERS: int(dut.dut.dut.REGISTERS ),
+        ControlParameter.COUNTER_WIDTH : int(dut.dut.dut.TX_PYLD_WIDTH),
+        ControlParameter.ROWS          : int(dut.dut.dut.ROWS         ),
+        ControlParameter.COLUMNS       : int(dut.dut.dut.COLUMNS      ),
+        ControlParameter.NODE_INPUTS   : int(dut.dut.dut.INPUTS       ),
+        ControlParameter.NODE_OUTPUTS  : int(dut.dut.dut.OUTPUTS      ),
+        ControlParameter.NODE_REGISTERS: int(dut.dut.dut.REGISTERS    ),
     }
 
     # Request all parameters in a random order
