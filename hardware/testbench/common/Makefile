@@ -15,46 +15,26 @@
 # Get the directory of this Makefile
 COMMON_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-# Helpers
-SPACE ?=
-SPACE := $(SPACE) $(SPACE)
+# Add testbench as a source directory
+SRC_DIRS += ./
 
-# Input files
-SRC_DIRS  += ../../rtl ./
-SRC_EXTS  ?= .sv .v
-HDR_EXTS  ?= .svh .vh
-SRC_FILES ?= $(foreach d,$(SRC_DIRS),$(foreach x,$(SRC_EXTS),$(abspath $(wildcard $(d)/*$(x)))))
-HDR_FILES ?= $(foreach d,$(SRC_DIRS),$(foreach x,$(HDR_EXTS),$(abspath $(wildcard $(d)/*$(x)))))
-
-# Defined constants
-DEFINES +=
+# Include hardware common support
+include $(COMMON_DIR)/../../common/Makefile
 
 # Design variables
 TB_TOP ?= testbench
 
 # Runtime controls
 BENCHNAME ?= $(notdir $(abspath .))
-QUIET     ?= yes
 SIM_WAVES ?= sim.lxt
 SIM_LOG   ?= sim.log
 EN_WAVES  ?= no
 TRACE_RAM ?= no
 EN_TRACE  ?= no
 
-ifeq ($(QUIET),yes)
-  PREFIX := @
-else
-  PREFIX :=
-endif
-
 ifeq ($(TRACE_RAM),yes)
   DEFINES += TRACE_RAM
 endif
-
-# Tool paths
-IVERILOG ?= $(shell which iverilog)
-VVP      ?= $(shell which vvp)
-GTKWAVE  ?= /Applications/gtkwave.app/Contents/Resources/bin/gtkwave
 
 # Wave viewer variables
 GTKW_CFG ?= $(wildcard $(BENCHNAME).gtkw)
@@ -68,8 +48,6 @@ TOPLEVEL        ?= testbench
 MODULE          ?= entrypoint
 COMPILE_ARGS    += $(addprefix -I ,$(abspath $(SRC_DIRS)))
 COMPILE_ARGS    += $(addprefix -D ,$(DEFINES))
-
-export IVERILOG_DUMPER=lxt
 
 ifneq ($(EN_WAVES),no)
   PLUSARGS += +WAVE_FILE=$(SIM_WAVES)
