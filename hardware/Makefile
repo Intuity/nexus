@@ -49,6 +49,24 @@ SV2V_OPTS += $(addprefix -I,$(SRC_DIRS))
 SV2V_OPTS += $(addprefix -D,$(filter-out USE_RAM_MODEL,$(DEFINES)))
 SV2V_OPTS += $(SRC_FILES)
 
+# Construct arguments to Vivado synthesis
+VVD_TCL_PATH ?= $(WORK_DIR)/vivado.tcl
+
+VVD_RD_OPTS += -sv
+VVD_RD_OPTS += { $(SRC_FILES) }
+
+VVD_SYN_OPTS += -top $(DESIGN_TOP)
+VVD_SYN_OPTS += -part xc7a200tfbg484-3
+VVD_SYN_OPTS += -mode out_of_context
+VVD_SYN_OPTS += -include_dirs { $(SRC_DIRS) }
+
+VVD_RPT_OPTS += -file vvd_util.rpt
+
+VVD_NTL_OPTS += -cell $(DESIGN_TOP)
+VVD_NTL_OPTS += -mode design
+VVD_NTL_OPTS += -force
+VVD_NTL_OPTS += $(DESIGN_TOP)_vvd_nl.v
+
 # ==============================================================================
 # Rules
 # ==============================================================================
@@ -72,6 +90,17 @@ $(SV2V_OUT): | $(WORK_DIR)
 
 include ../tests/common/Makefile.synth
 synth: $(SV2V_OUT)
+
+.PHONY: vivado
+vivado: | $(WORK_DIR)
+	@echo "# Creating Vivado TCL file"
+	$(PREFIX)echo "read_verilog $(VVD_RD_OPTS);" > $(VVD_TCL_PATH)
+	$(PREFIX)echo "synth_design $(VVD_SYN_OPTS);" >> $(VVD_TCL_PATH)
+	$(PREFIX)echo "report_utilization $(VVD_RPT_OPTS)" >> $(VVD_TCL_PATH)
+	$(PREFIX)echo "write_verilog $(VVD_NTL_OPTS)" >> $(VVD_TCL_PATH)
+	$(PREFIX)echo ""
+	@echo "# Running Vivado synthesis"
+	$(PREFIX)cd $(WORK_DIR) && vivado -mode batch -source $(notdir $(VVD_TCL_PATH))
 
 .PHONY: clean
 clean:
