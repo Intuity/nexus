@@ -16,10 +16,13 @@
 # Output Variables
 # ==============================================================================
 
-SYN_WORK_DIR    ?= work
-SYN_SCRIPT_PATH ?= $(SYN_WORK_DIR)/yosys.do
-SYN_LOG_PATH    ?= $(SYN_WORK_DIR)/yosys.log
-SYN_OUTPUT_JSON ?= $(DESIGN_TOP).json
+SYN_FULL           ?= no
+SYN_WORK_DIR       ?= work
+SYN_SCRIPT_PATH    ?= $(SYN_WORK_DIR)/yosys.do
+SYN_LOG_PATH       ?= $(SYN_WORK_DIR)/yosys.log
+SYN_OUTPUT_JSON    ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP).json
+SYN_OUTPUT_NETLIST ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP)_nl.v
+SYN_OUTPUT_RPT     ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP).rpt
 
 MAKE_DIRS += $(SYN_WORK_DIR)
 
@@ -54,6 +57,14 @@ endif
 	$(PRECMD)echo "opt;" >> $@
 	$(PRECMD)echo "log --> Writing out design to JSON $(SYN_OUTPUT_JSON);" >> $@
 	$(PRECMD)echo "write_json -aig $(SYN_OUTPUT_JSON);" >> $@
+ifeq ($(SYN_FULL),yes)
+	$(PRECMD)echo "log --> Perform Xilinx synthesis;" >> $@
+	$(PRECMD)echo "synth_xilinx -top $(DESIGN_TOP) -family xc7;" >> $@
+	$(PRECMD)echo "log --> Reporting statistics;" >> $@
+	$(PRECMD)echo "tee -o $(SYN_OUTPUT_RPT) stat -tech xilinx;" >> $@
+	$(PRECMD)echo "log --> Writing netlist to $(SYN_OUTPUT_NETLIST);" >> $@
+	$(PRECMD)echo "write_verilog $(SYN_OUTPUT_NETLIST);" >> $@
+endif
 
 # ==============================================================================
 # Synthesis Step

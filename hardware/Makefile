@@ -18,9 +18,22 @@ include ./common/Makefile
 # Options
 # ==============================================================================
 
+# Working directory
+WORK_DIR ?= work
+
+# Lint configuration
 LINT_TOP ?= nexus
 LINT_CFG ?= ./common/lint.cfg
-LINT_RPT ?=
+LINT_RPT ?= $(WORK_DIR)/lint.rpt
+
+# SV2V configuration
+SV2V_OUT ?= $(WORK_DIR)/nexus.v
+
+# Construct arguments to synthesis
+DESIGN_TOP   ?= nexus
+RTL_SRC_DIRS ?= $(WORK_DIR)
+RTL_SRCS     ?= $(SV2V_OUT)
+SYN_FULL     ?= yes
 
 # Construct arguments to Verilator lint
 LINT_OPTS += --lint-only
@@ -31,23 +44,42 @@ LINT_OPTS += $(LINT_CFG)
 LINT_OPTS += $(SRC_FILES)
 LINT_OPTS += --top $(LINT_TOP)
 
-LINT_SFX ?= $(if $(LINT_RPT),2>&1 | tee $(LINT_RPT); exit $${PIPESTATUS[0]})
+# Construct arguments to SV2V
+SV2V_OPTS += $(addprefix -I,$(SRC_DIRS))
+SV2V_OPTS += $(addprefix -D,$(filter-out USE_RAM_MODEL,$(DEFINES)))
+SV2V_OPTS += $(SRC_FILES)
 
 # ==============================================================================
 # Rules
 # ==============================================================================
 
 .PHONY: lint
-lint:
+lint: | $(WORK_DIR)
 	@echo "# Running Verilator lint"
-	$(PREFIX)verilator $(LINT_OPTS) $(LINT_SFX)
+	$(PREFIX)verilator $(LINT_OPTS) 2>&1 | tee $(LINT_RPT); exit $${PIPESTATUS[0]}
 
 .PHONY: regress
 regress:
 	@echo "# Launching regression"
 	$(PREFIX)make -C testbench -j$(MAKE_J) run_all
 
+.PHONY: sv2v
+sv2v: $(SV2V_OUT)
+
+$(SV2V_OUT): | $(WORK_DIR)
+	@echo "# Running SV2V conversion"
+	$(PREFIX)sv2v $(SV2V_OPTS) --write $(SV2V_OUT)
+
+include ../tests/common/Makefile.synth
+synth: $(SV2V_OUT)
+
 .PHONY: clean
 clean:
+	@echo "# Removing work directory"
+	$(PREFIX)rm -rf $(WORK_DIR)
 	@echo "# Cleaning all build areas"
 	$(PREFIX)make -C testbench -j$(MAKE_J) clean
+
+$(WORK_DIR):
+	@echo "# Creating directory $@"
+	$(PREFIX)mkdir -p $@
