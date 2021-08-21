@@ -31,9 +31,10 @@ SV2V_OUT ?= $(WORK_DIR)/nexus.v
 
 # Construct arguments to synthesis
 DESIGN_TOP   ?= nexus
-RTL_SRC_DIRS ?= $(WORK_DIR)
-RTL_SRCS     ?= $(SV2V_OUT)
-SYN_FULL     ?= yes
+SYN_DEFINES  := $(filter-out USE_RAM_MODEL,$(DEFINES))
+YOS_TCL_PATH ?= $(WORK_DIR)/yosys.tcl
+VVD_TCL_PATH ?= $(WORK_DIR)/vivado.tcl
+VVD_TGT_PART ?= xc7a200tfbg484-3
 
 # Construct arguments to Verilator lint
 LINT_OPTS += --lint-only
@@ -46,26 +47,8 @@ LINT_OPTS += --top $(LINT_TOP)
 
 # Construct arguments to SV2V
 SV2V_OPTS += $(addprefix -I,$(SRC_DIRS))
-SV2V_OPTS += $(addprefix -D,$(filter-out USE_RAM_MODEL,$(DEFINES)))
+SV2V_OPTS += $(addprefix -D,$(SYN_DEFINES))
 SV2V_OPTS += $(SRC_FILES)
-
-# Construct arguments to Vivado synthesis
-VVD_TCL_PATH ?= $(WORK_DIR)/vivado.tcl
-
-VVD_RD_OPTS += -sv
-VVD_RD_OPTS += { $(SRC_FILES) }
-
-VVD_SYN_OPTS += -top $(DESIGN_TOP)
-VVD_SYN_OPTS += -part xc7a200tfbg484-3
-VVD_SYN_OPTS += -mode out_of_context
-VVD_SYN_OPTS += -include_dirs { $(SRC_DIRS) }
-
-VVD_RPT_OPTS += -file vvd_util.rpt
-
-VVD_NTL_OPTS += -cell $(DESIGN_TOP)
-VVD_NTL_OPTS += -mode design
-VVD_NTL_OPTS += -force
-VVD_NTL_OPTS += $(DESIGN_TOP)_vvd_nl.v
 
 # ==============================================================================
 # Rules
@@ -88,17 +71,35 @@ $(SV2V_OUT): | $(WORK_DIR)
 	@echo "# Running SV2V conversion"
 	$(PREFIX)sv2v $(SV2V_OPTS) --write $(SV2V_OUT)
 
-include ../tests/common/Makefile.synth
-synth: $(SV2V_OUT)
+.PHONY: syn_yosys
+syn_yosys: $(SV2V_OUT) | $(WORK_DIR)
+	@echo "# Creating Yosys TCL file"
+	$(PREFIX)echo "read -sv $(abspath $<);" > $(YOS_TCL_PATH)
+	$(PREFIX)echo "synth_xilinx -top $(DESIGN_TOP) -family xc7;" >> $(YOS_TCL_PATH)
+	$(PREFIX)echo "tee -o yosys_$(DESIGN_TOP).rpt stat -tech xilinx;" >> $(YOS_TCL_PATH)
+	$(PREFIX)echo "write_verilog yosys_$(DESIGN_TOP).v" >> $(YOS_TCL_PATH)
+	@echo "# Running Yosys synthesis"
+	$(PREFIX)cd $(WORK_DIR) && yosys -Q -l yosys_$(DESIGN_TOP).log -s $(notdir $(YOS_TCL_PATH))
+	@echo "# Extracting total cell count"
+	$(PREFIX)awk 'match($$0, /\s+Number of cells:\s+([0-9]+)/, arr) {a=arr[1]} END{print a}' \
+	    $(WORK_DIR)/yosys_$(DESIGN_TOP).rpt >> $(WORK_DIR)/yosys_cell_count_$(DESIGN_TOP).txt
 
-.PHONY: vivado
-vivado: | $(WORK_DIR)
+.PHONY: syn_vivado
+syn_vivado: | $(WORK_DIR)
 	@echo "# Creating Vivado TCL file"
-	$(PREFIX)echo "read_verilog $(VVD_RD_OPTS);" > $(VVD_TCL_PATH)
-	$(PREFIX)echo "synth_design $(VVD_SYN_OPTS);" >> $(VVD_TCL_PATH)
-	$(PREFIX)echo "report_utilization $(VVD_RPT_OPTS)" >> $(VVD_TCL_PATH)
-	$(PREFIX)echo "write_verilog $(VVD_NTL_OPTS)" >> $(VVD_TCL_PATH)
-	$(PREFIX)echo ""
+	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_TCL_PATH)
+	$(PREFIX)echo "synth_design \
+	    -top $(DESIGN_TOP) \
+	    -part $(VVD_TGT_PART) \
+	    -mode out_of_context \
+	    -include_dirs { $(SRC_DIRS) } \
+	$(addprefix -verilog_define ,$(SYN_DEFINES));" >> $(VVD_TCL_PATH)
+	$(PREFIX)echo "report_utilization -file vivado_$(DESIGN_TOP).rpt" >> $(VVD_TCL_PATH)
+	$(PREFIX)echo "write_verilog \
+	    -cell $(DESIGN_TOP) \
+	    -mode design \
+	    -force \
+	    vivado_$(DESIGN_TOP).v" >> $(VVD_TCL_PATH)
 	@echo "# Running Vivado synthesis"
 	$(PREFIX)cd $(WORK_DIR) && vivado -mode batch -source $(notdir $(VVD_TCL_PATH))
 
