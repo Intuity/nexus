@@ -5,7 +5,7 @@ Nexus is made up of small compute nodes which each model a fraction of the simul
 Figure 1 shows a high-level abstraction of this architecture - in this example 9 nodes are shown that make up just a section of a much larger mesh. Each node is connected to its nearest neighbours to the north, east, south, and west - with every link being bidirectional. Messaging routing is built right into each node, reusing a lot of the same logic used to detect messages addressed to the node itself.
 
 ![High-level view of the mesh](./images/arch/mesh.png)
-<center>Figure 1: High-level view of the mesh</center>
+<p align="center">Figure 1: High-level view of the mesh</p>
 
 The mesh can also exchange messages with a host system, allowing software to program the device, and monitor and provide stimulus to the simulation as it runs. To minimise resource usage and provide scope for future expandability, host communication shares the same fabric used to communicate between nodes.
 
@@ -22,7 +22,7 @@ When the mesh is quiescent (i.e. `IDLE` is high) this means that all computation
  * Combinatorially: in which case the input values for both the current and next cycle are updated, and execution of the target node's computation is restarted.
 
 ![Top-level of Nexus](./images/arch/nexus_top.png)
-<center>Figure 2: Top-level of Nexus</center>
+<p align="center">Figure 2: Top-level of Nexus</p>
 
 Each node in the mesh needs to be configurable by the host; capable of decoding, enacting, and emitting messages; and able to route traffic intended for other nodes through to the correct egress port. Figure 3 displays an architectural model of the node, it shows:
 
@@ -38,7 +38,7 @@ Each node in the mesh needs to be configurable by the host; capable of decoding,
    * A message encoder generating messages detailing every output value update, which are sent to other nodes in the mesh.
 
 ![Nexus Core Level](./images/arch/nexus_core.png)
-<center>Figure 3: Architectural representation of the node</center>
+<p align="center">Figure 3: Architectural representation of the node</p>
 
 Figure 4 shows a more detailed view of the implementation of each node:
 
@@ -55,4 +55,4 @@ Figure 4 shows a more detailed view of the implementation of each node:
 The message and control infrastructure within each node dominates the resource usage. By comparison the logical core (`nx_node_core`) only makes up a small fraction of the required LUTs and other resources. However the infrastructure around the logical node is very capable and extensible, and so it should be possible to increase the compute capability without radical changes to the infrastructure, and hopefully improve this ratio.
 
 ![Core Implementation Details](./images/arch/nexus_core_imp.png)
-<center>Figure 4: Implementation details of the node</center>
+<p align="center">Figure 4: Implementation details of the node</p>
