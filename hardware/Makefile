@@ -80,9 +80,9 @@ syn_yosys: $(SV2V_OUT) | $(WORK_DIR)
 	$(PREFIX)echo "write_verilog yosys_$(DESIGN_TOP).v" >> $(YOS_TCL_PATH)
 	@echo "# Running Yosys synthesis"
 	$(PREFIX)cd $(WORK_DIR) && yosys -Q -l yosys_$(DESIGN_TOP).log -s $(notdir $(YOS_TCL_PATH))
-	@echo "# Extracting total cell count"
-	$(PREFIX)awk 'match($$0, /\s+Number of cells:\s+([0-9]+)/, arr) {a=arr[1]} END{print a}' \
-	    $(WORK_DIR)/yosys_$(DESIGN_TOP).rpt >> $(WORK_DIR)/yosys_cell_count_$(DESIGN_TOP).txt
+	@echo "# Extracting total cell counts"
+	$(PREFIX)python3 common/parse_yosys_rpt.py $(WORK_DIR)/yosys_$(DESIGN_TOP).rpt \
+	    $(WORK_DIR)/yosys_$(DESIGN_TOP).csv
 
 .PHONY: syn_vivado
 syn_vivado: | $(WORK_DIR)
