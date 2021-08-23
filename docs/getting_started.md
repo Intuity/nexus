@@ -1,3 +1,9 @@
+<p align="center">
+    <img src="./images/logo_small.png">
+</p>
+
+---
+
 # Getting Started
 This section will walk through the steps of setting up a suitable build environment for Nexus, compiling an example design, and running it on the model and RTL.
 

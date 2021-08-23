@@ -1,3 +1,9 @@
+<p align="center">
+    <img src="./images/logo_small.png">
+</p>
+
+---
+
 # Technology Stack
 The mesh itself is a relatively simple machine, and is intrinsically linked to a custom compiler to make it behave in a sensible fashion. The compiler in turn relies on [yosys](https://github.com/YosysHQ/yosys) to perform the transformation from RTL into a generic cell mapped design.
 

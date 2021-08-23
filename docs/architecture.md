@@ -1,3 +1,9 @@
+<p align="center">
+    <img src="./images/logo_small.png">
+</p>
+
+---
+
 # Architecture
 
 Nexus is made up of small compute nodes which each model a fraction of the simulated circuit. To reach the capacity required to simulate a useful amount of logic, a large number of compute nodes are connected together to form a mesh. Messages emitted by nodes can be routed through the mesh to target any other node in the device, or to communicate with the host system.
