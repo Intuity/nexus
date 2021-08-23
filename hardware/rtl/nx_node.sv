@@ -62,22 +62,22 @@ module nx_node #(
     , output nx_message_t ob_north_data_o
     , output logic        ob_north_valid_o
     , input  logic        ob_north_ready_i
-    , input  logic                    ob_north_present_i
+    , input  logic        ob_north_present_i
     // - East
     , output nx_message_t ob_east_data_o
     , output logic        ob_east_valid_o
     , input  logic        ob_east_ready_i
-    , input  logic                    ob_east_present_i
+    , input  logic        ob_east_present_i
     // - South
     , output nx_message_t ob_south_data_o
     , output logic        ob_south_valid_o
     , input  logic        ob_south_ready_i
-    , input  logic                    ob_south_present_i
+    , input  logic        ob_south_present_i
     // - West
     , output nx_message_t ob_west_data_o
     , output logic        ob_west_valid_o
     , input  logic        ob_west_ready_i
-    , input  logic                    ob_west_present_i
+    , input  logic        ob_west_present_i
 );
 
 // -----------------------------------------------------------------------------
