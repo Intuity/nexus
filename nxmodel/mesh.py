@@ -34,6 +34,7 @@ class Mesh(Base):
         super().__init__(env)
         # Ensure node parameters are a dictionary (to allow expansion)
         nd_prms = nd_prms if isinstance(nd_prms, dict) else {}
+        self.info(f"Creating mesh with parameters: {nd_prms}")
         # Create all of the nodes
         self.nodes = [
             [Node(env, r, c, **nd_prms) for c in range(columns)] for r in range(rows)

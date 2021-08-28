@@ -87,20 +87,20 @@ class Instruction:
     def randomise(cls):
         while True:
             try:
-                return Instruction(randint(0, (1 << 15) - 1))
-            except Exception:
+                return Instruction(randint(0, (1 << 21) - 1))
+            except ValueError:
                 continue
 
     @classmethod
     def decode(cls, encoded):
-        bv = BitVector(encoded, 15)
+        bv = BitVector(encoded, 21)
         return (
-            Operation(bv[14:12]), # opcode
-                      bv[11: 9] , # Source A
-                      bv[ 8: 8] , # Is input/is not register A
-                      bv[ 7: 5] , # Source B
-                      bv[ 4: 4] , # Is input/is not register B
-                      bv[ 3: 1] , # Target register
+            Operation(bv[20:18]), # opcode
+                      bv[17:13] , # Source A
+                      bv[12:12] , # Is input/is not register A
+                      bv[11: 7] , # Source B
+                      bv[ 6: 6] , # Is input/is not register B
+                      bv[ 5: 1] , # Target register
                       bv[ 0: 0] , # Generates output
         )
 

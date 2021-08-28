@@ -30,9 +30,9 @@ from .pipe import Pipe
 @click.option("-r", "--rows", type=int, default=8, help="Rows in the mesh")
 @click.option("-c", "--cols", type=int, default=8, help="Columns in the mesh")
 # Node configuration
-@click.option("--node-inputs",    type=int, default=8,  help="Inputs per node")
-@click.option("--node-outputs",   type=int, default=8,  help="Outputs per node")
-@click.option("--node-registers", type=int, default=8,  help="Working registers")
+@click.option("--node-inputs",    type=int, default=32, help="Inputs per node")
+@click.option("--node-outputs",   type=int, default=32, help="Outputs per node")
+@click.option("--node-registers", type=int, default= 8, help="Working registers")
 # Verbosity controls
 @click.option("--quiet", count=True, help="Only show warning & error messages")
 @click.option("--debug", count=True, help="Enable debug messages")
