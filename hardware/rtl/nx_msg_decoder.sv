@@ -96,14 +96,11 @@ assign message = fifo_data;
 `DECLARE_DQ(              1, map_tgt_seq, clk_i, rst_i,                    1'b0)
 `DECLARE_DQ(              1, map_valid,   clk_i, rst_i,                    1'b0)
 
-nx_msg_map_output_t msg_map_out;
-assign msg_map_out = message;
-
-assign map_idx     = msg_map_out.source_index;
-assign map_tgt_row = msg_map_out.target_row;
-assign map_tgt_col = msg_map_out.target_column;
-assign map_tgt_idx = msg_map_out.target_index;
-assign map_tgt_seq = msg_map_out.target_is_seq;
+assign map_idx     = message.map_output.source_index;
+assign map_tgt_row = message.map_output.target_row;
+assign map_tgt_col = message.map_output.target_column;
+assign map_tgt_idx = message.map_output.target_index;
+assign map_tgt_seq = message.map_output.target_is_seq;
 
 assign map_idx_o     = map_idx_q;
 assign map_tgt_row_o = map_tgt_row_q;
@@ -118,12 +115,9 @@ assign map_valid_o   = map_valid_q;
 `DECLARE_DQ(1,              signal_state,  clk_i, rst_i,                   1'b0)
 `DECLARE_DQ(1,              signal_valid,  clk_i, rst_i,                   1'b0)
 
-nx_msg_sig_state_t msg_sig_state;
-assign msg_sig_state = message;
-
-assign signal_index  = msg_sig_state.target_index;
-assign signal_is_seq = msg_sig_state.target_is_seq;
-assign signal_state  = msg_sig_state.state;
+assign signal_index  = message.sig_state.target_index;
+assign signal_is_seq = message.sig_state.target_is_seq;
+assign signal_state  = message.sig_state.state;
 
 assign signal_index_o  = signal_index_q;
 assign signal_is_seq_o = signal_is_seq_q;
@@ -134,10 +128,7 @@ assign signal_valid_o  = signal_valid_q;
 `DECLARE_DQ(INSTR_WIDTH, instr_data,  clk_i, rst_i, {INSTR_WIDTH{1'b0}})
 `DECLARE_DQ(          1, instr_valid, clk_i, rst_i,                1'b0)
 
-nx_msg_load_instr_t msg_load_instr;
-assign msg_load_instr = message;
-
-assign instr_data = msg_load_instr.instruction;
+assign instr_data = message.load_instr.instruction;
 
 assign instr_data_o  = instr_data_q;
 assign instr_valid_o = instr_valid_q;
@@ -160,9 +151,9 @@ always_comb begin : p_decode
         // Pop the FIFO as the data has been picked up
         fifo_pop = 1'b1;
 
-        instr_valid  = (message.header.command == NX_CMD_LOAD_INSTR);
-        map_valid    = (message.header.command == NX_CMD_MAP_OUTPUT);
-        signal_valid = (message.header.command == NX_CMD_SIG_STATE );
+        instr_valid  = (message.raw.header.command == NX_CMD_LOAD_INSTR);
+        map_valid    = (message.raw.header.command == NX_CMD_MAP_OUTPUT);
+        signal_valid = (message.raw.header.command == NX_CMD_SIG_STATE );
 
     // If not doing anything, clear the pop flag
     end else begin

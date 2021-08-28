@@ -29,13 +29,13 @@ module nx_control #(
       input  logic clk_i
     , input  logic rst_i
     // Inbound message stream (from host)
-    , input  nx_ctrl_req_t inbound_data_i
+    , input  nx_ctrl_msg_t inbound_data_i
     , input  logic         inbound_valid_i
     , output logic         inbound_ready_o
     // Outbound message stream (to host)
-    , output nx_ctrl_resp_t outbound_data_o
-    , output logic          outbound_valid_o
-    , input  logic          outbound_ready_i
+    , output nx_ctrl_msg_resp_t outbound_data_o
+    , output logic              outbound_valid_o
+    , input  logic              outbound_ready_i
     // Soft reset request
     , output logic soft_reset_o
     // Externally visible status
@@ -53,18 +53,18 @@ localparam RX_PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
 localparam TX_PYLD_WIDTH = `NX_MESSAGE_WIDTH;
 
 // Internal state
-`DECLARE_DQ (             1, soft_reset,     clk_i, rst_i,                          1'b0)
-`DECLARE_DQ (             1, active,         clk_i, rst_i,                          1'b0)
-`DECLARE_DQ (             1, trigger,        clk_i, rst_i,                          1'b0)
-`DECLARE_DQ (             1, seen_idle_low,  clk_i, rst_i,                          1'b0)
-`DECLARE_DQ (             1, first_tick,     clk_i, rst_i,                          1'b1)
-`DECLARE_DQ ( TX_PYLD_WIDTH, cycle,          clk_i, rst_i,         {TX_PYLD_WIDTH{1'b0}})
-`DECLARE_DQ ( RX_PYLD_WIDTH, interval,       clk_i, rst_i,         {RX_PYLD_WIDTH{1'b0}})
-`DECLARE_DQ ( RX_PYLD_WIDTH, interval_count, clk_i, rst_i,         {RX_PYLD_WIDTH{1'b0}})
-`DECLARE_DQ (             1, interval_set,   clk_i, rst_i,                          1'b0)
-`DECLARE_DQ (       COLUMNS, token_grant,    clk_i, rst_i,               {COLUMNS{1'b0}})
-`DECLARE_DQT(nx_ctrl_resp_t, send_data,      clk_i, rst_i, {$bits(nx_ctrl_resp_t){1'b0}})
-`DECLARE_DQ (             1, send_valid,     clk_i, rst_i,                          1'b0)
+`DECLARE_DQ (                 1, soft_reset,     clk_i, rst_i,                              1'b0)
+`DECLARE_DQ (                 1, active,         clk_i, rst_i,                              1'b0)
+`DECLARE_DQ (                 1, trigger,        clk_i, rst_i,                              1'b0)
+`DECLARE_DQ (                 1, seen_idle_low,  clk_i, rst_i,                              1'b0)
+`DECLARE_DQ (                 1, first_tick,     clk_i, rst_i,                              1'b1)
+`DECLARE_DQ (     TX_PYLD_WIDTH, cycle,          clk_i, rst_i,             {TX_PYLD_WIDTH{1'b0}})
+`DECLARE_DQ (     RX_PYLD_WIDTH, interval,       clk_i, rst_i,             {RX_PYLD_WIDTH{1'b0}})
+`DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, clk_i, rst_i,             {RX_PYLD_WIDTH{1'b0}})
+`DECLARE_DQ (                 1, interval_set,   clk_i, rst_i,                              1'b0)
+`DECLARE_DQ (           COLUMNS, token_grant,    clk_i, rst_i,                   {COLUMNS{1'b0}})
+`DECLARE_DQT(nx_ctrl_msg_resp_t, send_data,      clk_i, rst_i, {$bits(nx_ctrl_msg_resp_t){1'b0}})
+`DECLARE_DQ (                 1, send_valid,     clk_i, rst_i,                              1'b0)
 
 // Connect outputs
 assign outbound_data_o  = send_data_q;
@@ -95,7 +95,7 @@ assign cycle = trigger ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle
 assign token_grant = (trigger && first_tick_q) ? {COLUMNS{1'b1}} : token_release_i;
 
 // Inbound message FIFO
-nx_ctrl_req_t ib_fifo_data;
+nx_ctrl_msg_t ib_fifo_data;
 logic         ib_fifo_empty, ib_fifo_full, ib_fifo_pop;
 
 assign inbound_ready_o = !ib_fifo_full;
@@ -119,13 +119,6 @@ nx_fifo #(
 );
 
 // Inbound stream decoder
-nx_ctrl_payload_param_t    req_pld_param;
-nx_ctrl_payload_active_t   req_pld_active;
-nx_ctrl_payload_interval_t req_pld_interval;
-assign req_pld_param    = ib_fifo_data.payload;
-assign req_pld_active   = ib_fifo_data.payload;
-assign req_pld_interval = ib_fifo_data.payload;
-
 always_comb begin : p_decode
     // Internal state
     `INIT_D(soft_reset);
@@ -156,7 +149,7 @@ always_comb begin : p_decode
     // Handle an incoming message
     if (!send_valid && !ib_fifo_empty) begin
         // Decode command
-        case (ib_fifo_data.command)
+        case (ib_fifo_data.raw.command)
             // Respond with the device identifier (NXS)
             NX_CTRL_ID: begin
                 send_valid = 1'b1;
@@ -173,7 +166,7 @@ always_comb begin : p_decode
             end
             // Respond with the different parameters of the mesh
             NX_CTRL_PARAM: begin
-                case (req_pld_param.param)
+                case (ib_fifo_data.param.param)
                     NX_PARAM_COUNTER_WIDTH:
                         send_data = TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0];
                     NX_PARAM_ROWS:
@@ -193,7 +186,7 @@ always_comb begin : p_decode
             end
             // Set/clear the active switch for the mesh
             NX_CTRL_ACTIVE: begin
-                active = req_pld_active.active;
+                active = ib_fifo_data.active.active;
             end
             // Read back various status flags
             NX_CTRL_STATUS: begin
@@ -210,13 +203,13 @@ always_comb begin : p_decode
             end
             // Set/clear the interval (number of cycles to run for)
             NX_CTRL_INTERVAL: begin
-                interval       = req_pld_interval.interval;
+                interval       = ib_fifo_data.interval.interval;
                 interval_count = 'd0;
-                interval_set   = (req_pld_interval.interval != 0);
+                interval_set   = (ib_fifo_data.interval.interval != 0);
             end
             // Soft reset request
             NX_CTRL_RESET: begin
-                soft_reset = ib_fifo_data.payload[0];
+                soft_reset = ib_fifo_data.raw.payload[0];
             end
             // Catch-all
             default: begin

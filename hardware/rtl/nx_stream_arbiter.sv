@@ -65,10 +65,22 @@ module nx_stream_arbiter #(
 // Detect matches from each data stream
 logic north_match, east_match, south_match, west_match;
 
-assign north_match = (north_data_i.header.row == node_row_i && north_data_i.header.column == node_col_i);
-assign east_match  = (east_data_i.header.row  == node_row_i && east_data_i.header.column  == node_col_i);
-assign south_match = (south_data_i.header.row == node_row_i && south_data_i.header.column == node_col_i);
-assign west_match  = (west_data_i.header.row  == node_row_i && west_data_i.header.column  == node_col_i);
+assign north_match = (
+    (north_data_i.raw.header.row    == node_row_i) &&
+    (north_data_i.raw.header.column == node_col_i)
+);
+assign east_match  = (
+    (east_data_i.raw.header.row     == node_row_i) &&
+    (east_data_i.raw.header.column  == node_col_i)
+);
+assign south_match = (
+    (south_data_i.raw.header.row    == node_row_i) &&
+    (south_data_i.raw.header.column == node_col_i)
+);
+assign west_match  = (
+    (west_data_i.raw.header.row     == node_row_i) &&
+    (west_data_i.raw.header.column  == node_col_i)
+);
 
 // Connect internal output
 assign internal_data_o  = arb_data_q;
@@ -78,10 +90,10 @@ assign internal_valid_o = arb_internal_valid_q;
 assign bypass_data_o  = arb_data_q;
 assign bypass_valid_o = arb_bypass_valid_q;
 assign bypass_dir_o   = (
-    (arb_data_q.header.row    > node_row_i) ? NX_DIRX_SOUTH : (
-    (arb_data_q.header.row    < node_row_i) ? NX_DIRX_NORTH : (
-    (arb_data_q.header.column > node_col_i) ? NX_DIRX_EAST  : (
-                                              NX_DIRX_WEST    )))
+    (arb_data_q.raw.header.row    > node_row_i) ? NX_DIRX_SOUTH : (
+    (arb_data_q.raw.header.row    < node_row_i) ? NX_DIRX_NORTH : (
+    (arb_data_q.raw.header.column > node_col_i) ? NX_DIRX_EAST  : (
+                                                  NX_DIRX_WEST    )))
 );
 
 // Connect inbound ready signals
