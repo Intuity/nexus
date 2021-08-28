@@ -105,7 +105,7 @@ celerybeat.pid
 .env
 .venv
 env/
-venv/
+venv*/
 ENV/
 env.bak/
 venv.bak/
@@ -140,6 +140,7 @@ tests/*/work
 *.log
 *.vvp
 hardware/testbench/*/*.png
+hardware/work
 
 # CocoTB
 *.xml
