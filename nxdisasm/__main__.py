@@ -14,7 +14,6 @@
 
 import json
 from pathlib import Path
-import re
 
 import click
 from mako.lookup import TemplateLookup
