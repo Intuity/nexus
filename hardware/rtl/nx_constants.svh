@@ -105,12 +105,6 @@ typedef struct packed {
 typedef struct packed {
     nx_msg_header_t  header;
     nx_instruction_t instruction;
-    logic [
-        `NX_MESSAGE_WIDTH       -
-        $bits(nx_msg_header_t)  -
-        $bits(nx_instruction_t) -
-        1:0
-    ] _padding;
 } nx_msg_load_instr_t;
 
 typedef struct packed {

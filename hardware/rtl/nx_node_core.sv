@@ -45,11 +45,9 @@ module nx_node_core #(
 
 // Parameters
 localparam INSTR_ADDR_W    = $clog2(MAX_INSTRS);
-localparam REGISTER_IDX_W  = $clog2(REGISTERS);
+localparam INPUT_IDX_W     = $clog2(INPUTS);
 localparam OUTPUT_IDX_W    = $clog2(OUTPUTS);
-localparam MAX_IR_COUNT    = (INPUTS  > REGISTERS) ? INPUTS : REGISTERS;
-localparam INPUT_REPEAT    = MAX_IR_COUNT / INPUTS;
-localparam REGISTER_REPEAT = MAX_IR_COUNT / REGISTERS;
+localparam REGISTER_IDX_W  = $clog2(REGISTERS);
 
 typedef enum logic [1:0] {
       IDLE
@@ -78,11 +76,6 @@ typedef enum logic [OPCODE_WIDTH-1:0] {
 `DECLARE_DQ(REGISTERS,    working,     clk_i, rst_i, {REGISTERS{1'b0}})
 `DECLARE_DQ(OUTPUTS,      outputs,     clk_i, rst_i, {OUTPUTS{1'b0}})
 `DECLARE_DQ(OUTPUT_IDX_W, output_idx,  clk_i, rst_i, {OUTPUT_IDX_W{1'b0}})
-
-// Create expanded versions of signals
-logic [MAX_IR_COUNT-1:0] exp_inputs, exp_working;
-assign exp_inputs  = {INPUT_REPEAT{inputs_i}};
-assign exp_working = {REGISTER_REPEAT{working}};
 
 // Construct outputs
 assign outputs_o    = outputs_q;
@@ -148,12 +141,12 @@ always_comb begin : p_execute
         if (!exec_idle) begin
             // Pickup the inputs
             val_a = (
-                decoded.src_a_ip ? exp_inputs[decoded.src_a]
-                                 : exp_working[decoded.src_a]
+                decoded.src_a_ip ? inputs_i[decoded.src_a[INPUT_IDX_W-1:0]]
+                                 : working[decoded.src_a[REGISTER_IDX_W-1:0]]
             );
             val_b = (
-                decoded.src_b_ip ? exp_inputs[decoded.src_b]
-                                 : exp_working[decoded.src_b]
+                decoded.src_b_ip ? inputs_i[decoded.src_b[INPUT_IDX_W-1:0]]
+                                 : working[decoded.src_b[REGISTER_IDX_W-1:0]]
             );
 
             // Perform the operation

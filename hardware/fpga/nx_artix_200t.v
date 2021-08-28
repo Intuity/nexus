@@ -129,7 +129,6 @@ nexus #(
     , .COLUMNS       (  6)
     , .ADDR_ROW_WIDTH(  4)
     , .ADDR_COL_WIDTH(  4)
-    , .COMMAND_WIDTH (  2)
     , .INSTR_WIDTH   ( 21)
     , .INPUTS        ( 32)
     , .OUTPUTS       ( 32)
