@@ -180,24 +180,24 @@ class Node:
         assert len(sources) <= 2
         sources += [(0, 0)] * (2 - len(sources)) if len(sources) < 2 else []
         return (
-            ((int(op.op.op) & 0x7         ) << 12) | # [14:12] - OPCODE
-            ((sources[0][1] & 0x7         ) <<  9) | # [11: 9] - SOURCE A
-            ((1 if sources[0][0] else 0   ) <<  8) | # [ 8: 8] - INPUT/!REG A
-            ((sources[1][1] & 0x7         ) <<  5) | # [ 7: 5] - SOURCE B
-            ((1 if sources[1][0] else 0   ) <<  4) | # [ 4: 4] - INPUT/!REG B
-            ((tgt_reg & 0x7               ) <<  1) | # [ 3: 1] - TARGET
+            ((int(op.op.op) & 0x7         ) << 18) | # [20:18] - OPCODE
+            ((sources[0][1] & 0x1F        ) << 13) | # [17:13] - SOURCE A
+            ((1 if sources[0][0] else 0   ) << 12) | # [12:12] - INPUT/!REG A
+            ((sources[1][1] & 0x1F        ) <<  7) | # [11: 7] - SOURCE B
+            ((1 if sources[1][0] else 0   ) <<  6) | # [ 6: 6] - INPUT/!REG B
+            ((tgt_reg & 0x1F              ) <<  1) | # [ 5: 1] - TARGET
             ((1 if (output != None) else 0) <<  0)   # [ 0: 0] - OUTPUT
         )
 
     def decode(self, op):
         assert isinstance(op, int)
-        is_in_a = (op >>  8) & 0x1
-        is_in_b = (op >>  4) & 0x1
+        is_in_a = (op >> 12) & 0x1
+        is_in_b = (op >>  6) & 0x1
         return {
             "OPCODE"   : Operation((op >> 12) & 0x7).name,
-            "SOURCE A" : ("INPUT[" if is_in_a else "REG[") + str((op >>  9) & 0x7) + "]",
-            "SOURCE B" : ("INPUT[" if is_in_b else "REG[") + str((op >>  5) & 0x7) + "]",
-            "TGT REG"  : f"REG[{(op >>  1) & 0x7}]",
+            "SOURCE A" : ("INPUT[" if is_in_a else "REG[") + str((op >> 13) & 0x1F) + "]",
+            "SOURCE B" : ("INPUT[" if is_in_b else "REG[") + str((op >>  7) & 0x1F) + "]",
+            "TGT REG"  : f"REG[{(op >>  1) & 0x1F}]",
             "OUTPUT"   : "YES" if ((op >> 0) & 0x1) else "NO",
         }
 
@@ -207,11 +207,35 @@ class Node:
         Returns: Tuple of input allocation map, output allocation map, bytecode
                  encoded operations
         """
+        # Sort all of the operations based on dependencies
+        unordered = self.ops[:]
+        ordered   = []
+        while unordered:
+            for op in unordered:
+                satisified = True
+                for src in op.sources:
+                    satisified &= (
+                        # It must be an instruction to affect order and...
+                        (not isinstance(src, Instruction)) or
+                        # ...it must be an instruction of this node...
+                        (src not in self.ops             ) or
+                        # ...it must be pending placement
+                        (src in ordered                  )
+                    )
+                    # If not satisfied, move on
+                    if not satisified: break
+                # If satisfied, place this operation
+                if satisified:
+                    ordered.append(op)
+                    unordered.remove(op)
+                    break
+        assert len(unordered) == 0, f"Failed to order {len(unordered)} ops"
+        # Allocate input, output, and register usage
         regs    = [None] * self.__num_registers
         inputs  = [None] * self.__num_inputs
         outputs = [None] * self.__num_outputs
         encoded = []
-        for op_idx, op in enumerate(self.ops):
+        for op_idx, op in enumerate(ordered):
             # If no free registers, raise an exception
             if None not in regs:
                 raise Exception(f"Run out of registers in node {self.position}")
@@ -229,20 +253,25 @@ class Node:
                 # If this is a constant, ignore it
                 if isinstance(src, Constant): continue
                 # If this is an internal instruction, raise an error
-                if isinstance(src, Instruction) and src in self.ops:
+                if isinstance(src, Instruction) and src in ordered:
                     raise Exception(
-                        f"Failed to locate registered op in node {self.position}"
+                        f"{self.position} - {op_idx}/{len(ordered)}: Could not"
+                        f" locate source '{src.op.id}' for '{op.op.id}'"
                     )
                 # Otherwise, allocate the first free slot
                 if None not in inputs:
                     raise Exception(f"Run out of inputs in node {self.position}")
                 use_input = inputs.index(None)
-                log.debug(f"N: {self.position}, O: {op_idx} -> IN[{use_input}]")
+                log.debug(
+                    f"{self.position} - {op_idx}/{len(ordered)}: IN[{use_input}]"
+                )
                 inputs[use_input] = src
                 op_sources.append((True, inputs.index(src)))
             # Use the first free register as temporary storage
             use_reg = regs.index(None)
-            log.debug(f"N: {self.position}, O: {op_idx} -> REG[{use_reg}]")
+            log.debug(
+                f"{self.position} - {op_idx}/{len(ordered)}: REG[{use_reg}]"
+            )
             regs[use_reg] = op
             # Does this operation generate any outputs?
             use_output = None
@@ -250,15 +279,20 @@ class Node:
                 if None not in outputs:
                     raise Exception(f"Run out of outputs in node {self.position}")
                 use_output = outputs.index(None)
-                log.debug(f"N: {self.position}, O: {op_idx} -> OUT[{use_output}]")
+                log.debug(
+                    f"{self.position} - {op_idx}/{len(ordered)}: OUT[{use_output}]"
+                )
                 outputs[use_output] = op
             # Encode the instruction
             encoded.append(self.encode(op, op_sources, use_reg, use_output))
             # Check for any registers that have freed up
-            required = sum([x.sources for x in self.ops[op_idx+1:]], [])
+            required = sum([x.sources for x in ordered[op_idx+1:]], [])
             for reg_idx, reg in enumerate(regs):
                 if reg and reg not in required:
-                    log.debug(f"N: {self.position} releasing REG[{reg_idx}]")
+                    log.debug(
+                        f"{self.position} - {op_idx}/{len(ordered)}: evicting "
+                        f"{reg.op.id} from REG[{reg_idx}]"
+                    )
                     regs[reg_idx] = None
         # Return I/O mappings and the bytecode instruction stream
         return inputs, outputs, encoded
@@ -408,7 +442,7 @@ class Mesh:
 def compile(
     module,
     rows=4, columns=4,
-    node_inputs=8, node_outputs=8, node_registers=8, node_slots=16,
+    node_inputs=32, node_outputs=32, node_registers=8, node_slots=512,
 ):
     """
     Manage the compilation process - converting the logical model of the design
