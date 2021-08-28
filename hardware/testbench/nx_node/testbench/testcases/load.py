@@ -39,7 +39,7 @@ async def load(dut):
     # Load a random number of instructions
     loaded = []
     for _ in range(randint(10, 500)):
-        instr = randint(0, (1 << 15) - 1)
+        instr = randint(0, (1 << 21) - 1)
         inbound.append(build_load_instr(row, col, instr))
         loaded.append(instr)
 

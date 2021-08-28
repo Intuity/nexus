@@ -34,35 +34,47 @@ async def execute(dut):
         return memory[address].raw
     dut.instr_store.resp_cb = get_data
 
-    for _ in range(10):
+    for idx in range(10):
+        dut.info(f"Iteration {idx}")
+
         # Clear memory
+        dut.info("Clearing simulated memory")
         while memory: memory.pop()
 
         # Generate a bunch of random instructions
         gen_outputs = 0
         actv_regs   = 0
-        for _ in range(randint(50, 100)):
+        dut.info("Generating randomised instructions")
+        for instr_idx in range(randint(50, 100)):
+            dut.info(f"Generating instruction {instr_idx}")
             while True:
+                dut.info("Call randomise")
                 instr = Instruction.randomise()
+                dut.info("Randomise returned")
                 # If instruction uses a register, ensure it's been initialised
-                if not instr.is_input_a and ((actv_regs >> instr.source_a) & 0x1) == 0:
+                if not instr.is_input_a and ((actv_regs >> (instr.source_a % 8)) & 0x1) == 0:
+                    dut.info("Input A not initialised")
                     continue
-                if not instr.is_input_b and ((actv_regs >> instr.source_b) & 0x1) == 0:
+                if not instr.is_input_b and ((actv_regs >> (instr.source_b % 8)) & 0x1) == 0:
+                    dut.info("Input B not initialised")
                     continue
                 # This one is good
                 break
             # Append to the memory
+            dut.info("Appending to memory")
             memory.append(instr)
             # Mark a register as active
-            actv_regs |= 1 << instr.target
+            dut.info("Marking active register")
+            actv_regs |= 1 << (instr.target % 8)
             # Mark an output as consumed
+            dut.info("Marking output as consumed")
             if memory[-1].is_output:
                 gen_outputs += 1
                 if gen_outputs >= 8: break
         dut.info(f"Generated {len(memory)} random instructions")
 
         # Generate a random starting point & setup I/O
-        inputs = randint(0, (1 << 8) - 1)
+        inputs = randint(0, (1 << 32) - 1)
         dut.info(f"Setting input vector to {inputs:08b}")
         dut.inputs_i    <= inputs
         dut.populated_i <= len(memory)
@@ -99,15 +111,15 @@ async def execute(dut):
             val_a = (
                 ((inputs >> instr.source_a) & 0x1)
                 if instr.is_input_a else
-                working[instr.source_a]
+                working[instr.source_a % 8]
             )
             val_b = (
                 ((inputs >> instr.source_b) & 0x1)
                 if instr.is_input_b else
-                working[instr.source_b]
+                working[instr.source_b % 8]
             )
-            working[instr.target] = int(Operation.evaluate(instr.op, val_a, val_b))
-            if instr.is_output: outputs.append(working[instr.target])
+            working[instr.target % 8] = int(Operation.evaluate(instr.op, val_a, val_b))
+            if instr.is_output: outputs.append(working[instr.target % 8])
         dut.info(f"Executed {len(memory)} instructions -> {len(outputs)} outputs")
 
         # Compare and contrast result

@@ -15,20 +15,20 @@
 from nx_constants import Command
 
 def payload_load_instr(instr):
-    return instr << 6
+    return (instr & ((1 << 21) - 1)) << 0
 
 def payload_map_output(index, tgt_row, tgt_col, tgt_idx, tgt_seq):
-    payload  = index   << 18
-    payload |= tgt_row << 14
-    payload |= tgt_col << 10
-    payload |= tgt_idx <<  7
-    payload |= tgt_seq <<  6
+    payload  = index   << 16
+    payload |= tgt_row << 12
+    payload |= tgt_col <<  8
+    payload |= tgt_idx <<  3
+    payload |= tgt_seq <<  2
     return payload
 
 def payload_sig_state(index, is_seq, state):
-    payload  = index  << 18
-    payload |= is_seq << 17
-    payload |= state  << 16
+    payload  = index  << 16
+    payload |= is_seq << 15
+    payload |= state  << 14
     return payload
 
 def build_message(command, payload, tgt_row, tgt_col, *args, **kwargs):

@@ -38,6 +38,9 @@ async def mission_mode(dut):
     # Determine parameters
     num_rows = int(dut.dut.dut.ROWS)
     num_cols = int(dut.dut.dut.COLUMNS)
+    nd_ips   = int(dut.dut.dut.INPUTS)
+    nd_ops   = int(dut.dut.dut.OUTPUTS)
+    nd_regs  = int(dut.dut.dut.REGISTERS)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
     # Disable scoreboarding of output
@@ -47,9 +50,7 @@ async def mission_mode(dut):
     env = simpy.Environment()
     Base.setup_log(env, "INFO")
     mesh = Mesh(env, num_rows, num_cols, nd_prms={
-        "inputs"   : int(dut.dut.dut.INPUTS),
-        "outputs"  : int(dut.dut.dut.OUTPUTS),
-        "registers": int(dut.dut.dut.REGISTERS),
+        "inputs": nd_ips, "outputs": nd_ops, "registers": nd_regs,
     })
 
     # Create a manager and load the design
@@ -157,8 +158,9 @@ async def mission_mode(dut):
                 i_next = int(ctrl.input_next_q)
                 o_curr = int(ctrl.detect_last_q)
                 dut.info(
-                    f"[{cycle:04d}] {row:2d}, {col:2d} - IC: {i_curr:08b}, "
-                    f"IN: {i_next:08b}, OC: {o_curr:08b} - Δ: {i_curr != i_next}"
+                    f"[{cycle:04d}] {row:2d}, {col:2d} - IC: {i_curr:0{nd_ips}b}, "
+                    f"IN: {i_next:0{nd_ips}b}, OC: {o_curr:0{nd_ops}b} - Δ: "
+                    f"{i_curr != i_next}"
                 )
 
         # Check for I/O consistency
@@ -202,13 +204,22 @@ async def mission_mode(dut):
                 mdl_o_curr = sum([(y << x) for x, y in enumerate(mdl_node.output_state)])
                 # Compare
                 if rtl_i_curr != mdl_i_curr:
-                    dut.error(f"{row}, {col} - RTL: {rtl_i_curr:08b}, MDL: {mdl_i_curr:08b}")
+                    dut.error(
+                        f"{row}, {col} - RTL: {rtl_i_curr:0{nd_ips}b}, "
+                        f"MDL: {mdl_i_curr:0{nd_ips}b}"
+                    )
                     mm_i_curr += 1
                 if rtl_i_next != mdl_i_next:
-                    dut.error(f"{row}, {col} - RTL: {rtl_i_next:08b}, MDL: {mdl_i_next:08b}")
+                    dut.error(
+                        f"{row}, {col} - RTL: {rtl_i_next:0{nd_ips}b}, "
+                        f"MDL: {mdl_i_next:0{nd_ips}b}"
+                    )
                     mm_i_next += 1
                 if rtl_o_curr != mdl_o_curr:
-                    dut.error(f"{row}, {col} - RTL: {rtl_o_curr:08b}, MDL: {mdl_o_curr:08b}")
+                    dut.error(
+                        f"{row}, {col} - RTL: {rtl_o_curr:0{nd_ips}b}, "
+                        f"MDL: {mdl_o_curr:0{nd_ips}b}"
+                    )
                     mm_o_curr += 1
         assert mm_i_curr == 0, f"Detected {mm_i_curr} current input mismatches"
         assert mm_i_next == 0, f"Detected {mm_i_next} next input mismatches"
@@ -226,8 +237,8 @@ async def mission_mode(dut):
             command = (msg >> 21) & 0x3
             # Capture signal state
             if command == int(Command.SIG_STATE):
-                rtl_idx = (msg >> 18) & 0x7
-                rtl_val = (msg >> 16) & 0x1
+                rtl_idx = (msg >> 16) & 0x1F
+                rtl_val = (msg >> 14) & 0x01
                 rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val
 
         # Capture model outputs
@@ -235,17 +246,11 @@ async def mission_mode(dut):
             mdl_outputs[key] = mdl_val
 
         # Cross-check
-        # NOTE: Missing model outputs could just be because of different settling
-        #       behaviour - so just assume they are still at zero
+        # NOTE: Missing RTL/model outputs could just be because of different
+        #       settling behaviour - so just assume they are still at zero
         errors = 0
         for key in set(list(mdl_outputs.keys()) + list(rtl_outputs.keys())):
-            # Check RTL output exists
-            if key not in rtl_outputs:
-                dut.error(f"Missing RTL output {key}")
-                errors += 1
-                continue
-            # Compare RTL and model value
-            rtl_val = rtl_outputs[key]
+            rtl_val = rtl_outputs.get(key, 0)
             mdl_val = (1 if mdl_outputs.get(key, 0) else 0)
             if rtl_val != mdl_val:
                 dut.error(f"Output {key} mismatch RTL: {rtl_val}, MDL: {mdl_val}")

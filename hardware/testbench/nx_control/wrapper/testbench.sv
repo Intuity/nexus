@@ -21,13 +21,13 @@ module testbench #(
 ) (
       input  logic rst
     // Inbound message stream (from host)
-    , input  nx_ctrl_req_t inbound_data_i
+    , input  nx_ctrl_msg_t inbound_data_i
     , input  logic         inbound_valid_i
     , output logic         inbound_ready_o
     // Outbound message stream (to host)
-    , output nx_ctrl_resp_t outbound_data_o
-    , output logic          outbound_valid_o
-    , input  logic          outbound_ready_i
+    , output nx_ctrl_msg_resp_t outbound_data_o
+    , output logic              outbound_valid_o
+    , input  logic              outbound_ready_i
     // Soft reset request
     , output logic soft_reset_o
     // Externally visible status

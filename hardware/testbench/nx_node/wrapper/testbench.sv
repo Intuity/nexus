@@ -17,9 +17,9 @@ module testbench #(
     , parameter ADDR_ROW_WIDTH =   4
     , parameter ADDR_COL_WIDTH =   4
     , parameter COMMAND_WIDTH  =   2
-    , parameter INSTR_WIDTH    =  15
-    , parameter INPUTS         =   8
-    , parameter OUTPUTS        =   8
+    , parameter INSTR_WIDTH    =  21
+    , parameter INPUTS         =  32
+    , parameter OUTPUTS        =  32
     , parameter REGISTERS      =   8
     , parameter MAX_INSTRS     = 512
     , parameter OPCODE_WIDTH   =   3

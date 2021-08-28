@@ -16,7 +16,7 @@ from enum import IntEnum
 
 DEVICE_ID            = 0x4E5853
 DEVICE_VERSION_MAJOR = 0
-DEVICE_VERSION_MINOR = 1
+DEVICE_VERSION_MINOR = 3
 
 class Direction(IntEnum):
     """ Direction of receival/transmission """

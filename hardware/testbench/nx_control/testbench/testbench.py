@@ -41,7 +41,7 @@ class Testbench(TestbenchBase):
         # Create queues for expected transactions
         self.expected = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self) # , fail_immediately=False)
+        self.scoreboard = Scoreboard(self, fail_immediately=False)
         self.scoreboard.add_interface(self.outbound, self.expected)
 
     async def initialise(self):

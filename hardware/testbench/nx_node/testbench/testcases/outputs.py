@@ -37,16 +37,18 @@ async def map_outputs(dut):
     num_inputs  = int(dut.dut.dut.INPUTS)
     input_width = int(ceil(log2(num_inputs)))
     col_width   = int(dut.dut.dut.ADDR_COL_WIDTH)
+    row_width   = int(dut.dut.dut.ADDR_ROW_WIDTH)
 
     # Map the outputs in order
     mapped  = {}
     inbound = choice(dut.inbound)
     for idx in range(num_outputs):
         mapped[idx] = []
+        # Setup up between 1 and 8 messages per output
         for _ in range(randint(1, 8)):
-            tgt_row = randint(0, 15)
-            tgt_col = randint(0, 15)
-            tgt_idx = randint(0,  7)
+            tgt_row = randint(0, (1 << row_width  ) - 1)
+            tgt_col = randint(0, (1 << col_width  ) - 1)
+            tgt_idx = randint(0, (1 << input_width) - 1)
             is_seq  = choice((0, 1))
             inbound.append(build_map_output(
                 row, col, idx, tgt_row, tgt_col, tgt_idx, is_seq,
@@ -72,9 +74,9 @@ async def map_outputs(dut):
         for idx, (tgt_row, tgt_col, tgt_idx, tgt_seq) in enumerate(targets):
             ram_data = int(dut.dut.dut.store.ram.memory[512 + output_base + idx])
             ram_seq  = (ram_data >> (0                          )) & 0x1
-            ram_idx  = (ram_data >> (1                          )) & 0x7
-            ram_col  = (ram_data >> (1 + input_width            )) & 0xF
-            ram_row  = (ram_data >> (1 + input_width + col_width)) & 0xF
+            ram_idx  = (ram_data >> (1                          )) & ((1 << input_width) - 1)
+            ram_col  = (ram_data >> (1 + input_width            )) & ((1 << col_width  ) - 1)
+            ram_row  = (ram_data >> (1 + input_width + col_width)) & ((1 << row_width  ) - 1)
             assert tgt_row == ram_row, \
                 f"Output {output}[{idx}] - row exp: {tgt_row}, got: {ram_row}"
             assert tgt_col == ram_col, \
