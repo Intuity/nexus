@@ -50,7 +50,6 @@ import NXConstants::*;
 `DECLARE_DQ (             1, comb_curr,  clk_i, rst_i, 1'b0)
 
 assign comb_data_o  = comb_data_q;
-assign comb_dir_o   = comb_dir_q;
 assign comb_valid_o = comb_valid_q;
 
 // Connect inbound ready signals
@@ -106,6 +105,20 @@ always_comb begin : p_arbitrate
             endcase
         end
     end
+end
+
+// Type conversion
+// NOTE: This is a workaround for converting from comb_dir_q (logic [1:0]) to
+//       comb_dir_o (an enumerated type). Icarus Verilog lacks support for
+//       proper type casting, and Vivado complains for direct assignments.
+//
+always_comb begin : p_convert
+    case (comb_dir_q)
+        2'b00: comb_dir_o = DIRECTION_NORTH;
+        2'b01: comb_dir_o = DIRECTION_EAST;
+        2'b10: comb_dir_o = DIRECTION_SOUTH;
+        2'b11: comb_dir_o = DIRECTION_WEST;
+    endcase
 end
 
 endmodule : nx_stream_combiner
