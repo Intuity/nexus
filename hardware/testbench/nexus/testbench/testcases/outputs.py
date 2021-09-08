@@ -17,7 +17,7 @@ from random import choice, randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nx_message import build_map_output
+from nxconstants import NodeCommand, NodeMapOutput
 
 from ..testbench import testcase
 
@@ -43,13 +43,20 @@ async def map_outputs(dut):
             for idx in range(num_outputs):
                 mapped[row][col].append([])
                 for _ in range(randint(1, 8)):
-                    rem_row = randint(0, 15)
-                    rem_col = randint(0, 15)
-                    rem_idx = randint(0,  7)
-                    is_seq  = choice((0, 1))
-                    dut.mesh_inbound.append(build_map_output(
-                        row, col, idx, rem_row, rem_col, rem_idx, is_seq
-                    ))
+                    rem_row            = randint(0, 15)
+                    rem_col            = randint(0, 15)
+                    rem_idx            = randint(0,  7)
+                    is_seq             = choice((0, 1))
+                    msg                = NodeMapOutput()
+                    msg.header.row     = row
+                    msg.header.column  = col
+                    msg.header.command = NodeCommand.MAP_OUTPUT
+                    msg.source_index   = idx
+                    msg.target_row     = rem_row
+                    msg.target_column  = rem_col
+                    msg.target_index   = rem_idx
+                    msg.target_is_seq  = is_seq
+                    dut.mesh_inbound.append(msg.pack())
                     mapped[row][col][-1].append((
                         rem_row, rem_col, rem_idx, is_seq
                     ))

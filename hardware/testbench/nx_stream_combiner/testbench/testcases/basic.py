@@ -17,7 +17,7 @@ from random import randint, choice
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nx_constants import Direction
+from nxconstants import Direction
 
 from ..testbench import testcase
 

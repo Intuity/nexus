@@ -14,9 +14,7 @@
 
 from random import choice, randint
 
-from nx_constants import Command, Direction
-from nx_message import (build_load_instr, build_map_output, build_sig_state,
-                        build_control)
+from nxconstants import NodeRaw, NodeCommand, Direction
 
 from ..testbench import testcase
 
@@ -36,15 +34,15 @@ async def routing(dut):
     for _ in range(1000):
         # Choose a random command type
         command = choice((
-            Command.LOAD_INSTR, Command.OUTPUT, Command.SIG_STATE,
-            Command.CONTROL,
+            NodeCommand.LOAD_INSTR, NodeCommand.MAP_OUTPUT,
+            NodeCommand.SIG_STATE,  NodeCommand.NODE_CTRL,
         ))
 
         # Select a target row and column
         # NOTE: When using SIG_STATE, always direct it to another node to avoid
         #       it triggering an output
         tgt_row, tgt_col = row, col
-        if command == Command.SIG_STATE or choice((0, 1)):
+        if command == NodeCommand.SIG_STATE or choice((0, 1)):
             while tgt_row == row and tgt_col == col:
                 tgt_row, tgt_col = randint(0, 15), randint(0, 15)
 
@@ -52,30 +50,19 @@ async def routing(dut):
         tgt_match = (tgt_row == row) and (tgt_col == col)
 
         # Generate a message
-        msg = 0
-        if command == Command.LOAD_INSTR:
-            msg = build_load_instr(tgt_row, tgt_col, randint(0, (1 << 15) - 1))
-        elif command == Command.OUTPUT:
-            msg = build_map_output(
-                tgt_row, tgt_col, randint(0, 7), randint(0,  15), randint(0, 15),
-                randint(0, 7), choice((0, 1)),
-            )
-        elif command == Command.SIG_STATE:
-            msg = build_sig_state(
-                tgt_row, tgt_col, randint(0, 7), choice((0, 1)), choice((0, 1)),
-            )
-        elif command == Command.CONTROL:
-            msg = build_control(tgt_row, tgt_col, randint(0, (1 << 21) - 1))
-        else:
-            raise Exception(f"Unsupported command {command}")
+        msg                = NodeRaw()
+        msg.header.row     = tgt_row
+        msg.header.column  = tgt_col
+        msg.header.command = command
+        msg.payload        = randint(0, (1 << 21) - 1)
 
         # Create a message
         dut.debug(
-            f"MSG - R: {tgt_row}, C: {tgt_col}, CMD: {command} -> 0x{msg:08X}"
+            f"MSG - R: {tgt_row}, C: {tgt_col}, CMD: {command} -> 0x{msg.pack():08X}"
         )
 
         # Queue up the message
-        choice(dut.inbound).append(msg)
+        choice(dut.inbound).append(msg.pack())
 
         # If not matching this target, expect message to be routed elsewhere
         if not tgt_match:
@@ -83,4 +70,4 @@ async def routing(dut):
             elif tgt_row > row: tgt_dirx = Direction.SOUTH
             elif tgt_col < col: tgt_dirx = Direction.WEST
             elif tgt_col > col: tgt_dirx = Direction.EAST
-            dut.expected[int(tgt_dirx)].append((msg, 0))
+            dut.expected[int(tgt_dirx)].append((msg.pack(), 0))

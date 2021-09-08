@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from hardware.testbench.common.nx_control import build_set_interval
 from math import ceil
 from random import random, randint
 
@@ -20,10 +19,9 @@ from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.axi4stream.common import AXI4StreamTransaction
-from nx_constants import (ControlParameter, DEVICE_ID, DEVICE_VERSION_MAJOR,
-                          DEVICE_VERSION_MINOR)
-from nx_control import (build_req_id, build_req_version, build_req_param,
-                        build_req_status, build_set_interval, build_soft_reset)
+import nxconstants
+from nxconstants import (ControlCommand, ControlReadParam, ControlSetActive,
+                         ControlRaw, ControlParam)
 
 from ..testbench import testcase
 
@@ -42,43 +40,47 @@ async def control(dut, backpressure):
     # Build requests and expected responses
     req_resp = [
         # Device ID
-        (build_req_id(), DEVICE_ID),
+        (ControlRaw(command=ControlCommand.ID).pack(), nxconstants.HW_DEV_ID),
         # Version
-        (build_req_version(), (DEVICE_VERSION_MAJOR << 8) | DEVICE_VERSION_MINOR),
+        (
+            ControlRaw(command=ControlCommand.VERSION).pack(),
+            (nxconstants.HW_VER_MAJOR << 8) | nxconstants.HW_VER_MINOR
+        ),
         # Parameters
         # - Counter Width
         (
-            build_req_param(int(ControlParameter.COUNTER_WIDTH)),
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COUNTER_WIDTH).pack(),
             int(dut.dut.dut.core.control.TX_PYLD_WIDTH)
         ),
         # - Rows
         (
-            build_req_param(int(ControlParameter.ROWS)),
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.ROWS).pack(),
             int(dut.dut.dut.core.control.ROWS)
         ),
         # - Columns
         (
-            build_req_param(int(ControlParameter.COLUMNS)),
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COLUMNS).pack(),
             int(dut.dut.dut.core.control.COLUMNS)
         ),
         # - Node_inputs
         (
-            build_req_param(int(ControlParameter.NODE_INPUTS)),
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_INPUTS).pack(),
             int(dut.dut.dut.core.control.INPUTS)
         ),
         # - Node_outputs
         (
-            build_req_param(int(ControlParameter.NODE_OUTPUTS)),
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_OUTPUTS).pack(),
             int(dut.dut.dut.core.control.OUTPUTS)
         ),
         # - Node_registers
         (
-            build_req_param(int(ControlParameter.NODE_REGISTERS)),
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_REGISTERS).pack(),
             int(dut.dut.dut.core.control.REGISTERS)
         ),
         # Device status
         (
-            build_req_status(), (
+            ControlRaw(command=ControlCommand.STATUS).pack(),
+            (
                 (0 << 3) | # ACTIVE       =0 -> inactive
                 (1 << 2) | # SEEN_IDLE_LOW=1 -> idle has been observed low
                 (1 << 1) | # FIRST_TICK   =1 -> fresh from reset
@@ -120,12 +122,12 @@ async def soft_reset(dut):
     # Set the interval to a non-zero value
     interval = randint(1, 1000)
     dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | build_set_interval(interval), 32
+        (1 << 31) | ControlRaw(command=ControlCommand.INTERVAL, payload=interval).pack(), 32
     )))
 
     # Read back the status to check an interval has been set
     dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | build_req_status(), 32
+        (1 << 31) | ControlRaw(command=ControlCommand.STATUS).pack(), 32
     )))
     dut.exp_ctrl.append(AXI4StreamTransaction(data=to_bytes(
         (1 << 31) | (
@@ -142,7 +144,7 @@ async def soft_reset(dut):
 
     # Trigger a soft reset
     dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | build_soft_reset(), 32
+        (1 << 31) | ControlRaw(command=ControlCommand.RESET, payload=1).pack(), 32
     )))
 
     dut.info("Waiting for internal reset to rise")
@@ -152,7 +154,7 @@ async def soft_reset(dut):
 
     # Read back the status to check an interval has been cleared
     dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | build_req_status(), 32
+        (1 << 31) | ControlRaw(command=ControlCommand.STATUS).pack(), 32
     )))
     dut.exp_ctrl.append(AXI4StreamTransaction(data=to_bytes(
         (1 << 31) | (

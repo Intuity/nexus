@@ -16,7 +16,8 @@ from random import choice, randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nx_message import build_load_instr
+import nxconstants
+from nxconstants import Instruction, Operation, NodeLoadInstr, NodeCommand
 
 from ..testbench import testcase
 
@@ -39,9 +40,19 @@ async def load(dut):
     # Load a random number of instructions
     loaded = []
     for _ in range(randint(10, 500)):
-        instr = randint(0, (1 << 21) - 1)
-        inbound.append(build_load_instr(row, col, instr))
-        loaded.append(instr)
+        msg = NodeLoadInstr()
+        msg.header.row     = row
+        msg.header.column  = col
+        msg.header.command = NodeCommand.LOAD_INSTR
+        msg.instr.opcode   = choice(list(Operation))
+        msg.instr.src_a    = randint(0, nxconstants.MAX_NODE_IOR_COUNT-1)
+        msg.instr.src_a_ip = choice((0, 1))
+        msg.instr.src_b    = randint(0, nxconstants.MAX_NODE_IOR_COUNT-1)
+        msg.instr.src_b_ip = choice((0, 1))
+        msg.instr.tgt_reg  = randint(0, nxconstants.MAX_NODE_REGISTERS-1)
+        msg.instr.gen_out  = choice((0, 1))
+        inbound.append(msg.pack())
+        loaded.append(msg.instr.pack())
 
     # Wait for all inbound drivers to drain
     dut.info(f"Waiting for {len(loaded)} loads")

@@ -16,8 +16,6 @@ from random import choice, randint
 
 from cocotb.triggers import ClockCycles
 
-from nx_constants import Direction
-
 from ..testbench import testcase
 
 @testcase()

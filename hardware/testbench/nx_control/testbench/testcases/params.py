@@ -14,8 +14,7 @@
 
 from random import random
 
-from nx_constants import ControlParameter
-from nx_control import build_req_param
+from nxconstants import ControlCommand, ControlReadParam, ControlParam
 
 from ..testbench import testcase
 
@@ -27,16 +26,16 @@ async def read_params(dut):
 
     # Create a lookup between parameter and the true value
     lookup = {
-        ControlParameter.COUNTER_WIDTH : int(dut.dut.dut.TX_PYLD_WIDTH),
-        ControlParameter.ROWS          : int(dut.dut.dut.ROWS         ),
-        ControlParameter.COLUMNS       : int(dut.dut.dut.COLUMNS      ),
-        ControlParameter.NODE_INPUTS   : int(dut.dut.dut.INPUTS       ),
-        ControlParameter.NODE_OUTPUTS  : int(dut.dut.dut.OUTPUTS      ),
-        ControlParameter.NODE_REGISTERS: int(dut.dut.dut.REGISTERS    ),
+        ControlParam.COUNTER_WIDTH : int(dut.dut.dut.TX_PYLD_WIDTH),
+        ControlParam.ROWS          : int(dut.dut.dut.ROWS         ),
+        ControlParam.COLUMNS       : int(dut.dut.dut.COLUMNS      ),
+        ControlParam.NODE_INPUTS   : int(dut.dut.dut.INPUTS       ),
+        ControlParam.NODE_OUTPUTS  : int(dut.dut.dut.OUTPUTS      ),
+        ControlParam.NODE_REGISTERS: int(dut.dut.dut.REGISTERS    ),
     }
 
     # Request all parameters in a random order
-    for param in sorted(list(ControlParameter), key=lambda _: random()):
-        dut.info(f"Requesting parameter {ControlParameter(param).name}")
-        dut.inbound.append(build_req_param(int(param)))
+    for param in sorted(list(ControlParam), key=lambda _: random()):
+        dut.info(f"Requesting parameter {ControlParam(param).name}")
+        dut.inbound.append(ControlReadParam(command=ControlCommand.PARAM, param=param).pack())
         dut.expected.append((lookup[param], 0))

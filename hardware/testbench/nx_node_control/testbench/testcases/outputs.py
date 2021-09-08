@@ -19,8 +19,7 @@ import cocotb
 from cocotb.triggers import ClockCycles, Event, RisingEdge
 
 from drivers.map_io.common import IOMapping
-from nx_constants import Direction
-from nx_message import build_sig_state
+from nxconstants import Direction, NodeCommand, NodeSigState
 
 from ..testbench import testcase
 
@@ -169,13 +168,21 @@ async def output_drive(dut):
             if curr_state[idx] == last_state[idx]: continue
             # Generate expected messages
             for tgt_row, tgt_col, tgt_idx, tgt_seq in targets:
-                msg = build_sig_state(
-                    tgt_row, tgt_col, tgt_idx, tgt_seq, curr_state[idx]
-                )
-                if   tgt_row < row: dut.exp_msg.append((msg, int(Direction.NORTH)))
-                elif tgt_row > row: dut.exp_msg.append((msg, int(Direction.SOUTH)))
-                elif tgt_col < col: dut.exp_msg.append((msg, int(Direction.WEST )))
-                elif tgt_col > col: dut.exp_msg.append((msg, int(Direction.EAST )))
+                msg = NodeSigState()
+                msg.header.row     = tgt_row
+                msg.header.column  = tgt_col
+                msg.header.command = NodeCommand.SIG_STATE
+                msg.index          = tgt_idx
+                msg.is_seq         = tgt_seq
+                msg.state          = curr_state[idx]
+                if tgt_row < row:
+                    dut.exp_msg.append((msg.pack(), int(Direction.NORTH)))
+                elif tgt_row > row:
+                    dut.exp_msg.append((msg.pack(), int(Direction.SOUTH)))
+                elif tgt_col < col:
+                    dut.exp_msg.append((msg.pack(), int(Direction.WEST )))
+                elif tgt_col > col:
+                    dut.exp_msg.append((msg.pack(), int(Direction.EAST )))
         # Drive the new state
         dut.outputs <= sum([(y << x) for x, y in enumerate(curr_state)])
         # Keep track of the last state

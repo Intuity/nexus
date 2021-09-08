@@ -17,7 +17,7 @@ from random import choice, randint, random
 
 from cocotb.triggers import RisingEdge
 
-from nx_message import build_map_output
+from nxconstants import NodeMapOutput, NodeCommand
 
 from ..testbench import testcase
 
@@ -46,14 +46,20 @@ async def map_outputs(dut):
         mapped[idx] = []
         # Setup up between 1 and 8 messages per output
         for _ in range(randint(1, 8)):
-            tgt_row = randint(0, (1 << row_width  ) - 1)
-            tgt_col = randint(0, (1 << col_width  ) - 1)
-            tgt_idx = randint(0, (1 << input_width) - 1)
-            is_seq  = choice((0, 1))
-            inbound.append(build_map_output(
-                row, col, idx, tgt_row, tgt_col, tgt_idx, is_seq,
+            msg                = NodeMapOutput()
+            msg.header.row     = row
+            msg.header.column  = col
+            msg.header.command = NodeCommand.MAP_OUTPUT
+            msg.source_index   = idx
+            msg.target_row     = randint(0, (1 << row_width  ) - 1)
+            msg.target_column  = randint(0, (1 << col_width  ) - 1)
+            msg.target_index   = randint(0, (1 << input_width) - 1)
+            msg.target_is_seq  = choice((0, 1))
+            inbound.append(msg.pack())
+            mapped[idx].append((
+                msg.target_row, msg.target_column, msg.target_index,
+                msg.target_is_seq,
             ))
-            mapped[idx].append((tgt_row, tgt_col, tgt_idx, is_seq))
 
     # Wait for all inbound drivers to drain
     for ib in dut.inbound: await ib.idle()

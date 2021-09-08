@@ -17,7 +17,7 @@ from random import randint
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nx_control import build_req_status, build_set_active, build_req_cycles
+from nxconstants import ControlCommand, ControlRaw, ControlSetActive
 
 from ..testbench import testcase
 
@@ -46,13 +46,13 @@ async def set_active(dut):
 
     # Request the initial state
     dut.info("Checking initial state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 0, 1, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the initial cycle count
     dut.info("Checking initial cycle count")
-    dut.inbound.append(build_req_cycles())
+    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
     dut.expected.append((0, 0))
     while dut.expected: await RisingEdge(dut.clk)
 
@@ -72,13 +72,13 @@ async def set_active(dut):
 
     # Request the updated state
     dut.info("Checking updated state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 1, 1, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Set the mesh to be active
     dut.info("Activating mesh")
-    dut.inbound.append(build_set_active(1))
+    dut.inbound.append(ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack())
     await dut.inbound.idle()
     await ClockCycles(dut.clk, 10)
 
@@ -87,13 +87,13 @@ async def set_active(dut):
 
     # Request the active state
     dut.info("Checking active state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(1, 0, 0, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the first cycle count
     dut.info("Checking first cycle count")
-    dut.inbound.append(build_req_cycles())
+    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
     dut.expected.append((1, 0))
     while dut.expected: await RisingEdge(dut.clk)
 
@@ -115,12 +115,12 @@ async def set_active(dut):
 
     # Request the active state
     dut.info("Checking active state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(1, 0, 0, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the updated cycle count
     dut.info("Checking updated cycle count")
-    dut.inbound.append(build_req_cycles())
+    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
     dut.expected.append((1 + num_cycles, 0))
     while dut.expected: await RisingEdge(dut.clk)

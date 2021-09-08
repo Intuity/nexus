@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
+from random import randint
 
-from nx_constants import Command
-from nx_control import build_set_active
-from nx_message import (build_load_instr, build_map_output, build_sig_state,
-                        build_control)
+from nxconstants import NodeMessage
 
 from ..testbench import testcase
 
@@ -28,45 +25,30 @@ async def routing(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Set the mesh to be active
-    dut.ctrl_inbound.append(build_set_active(1))
-
     # Find the number of rows
     num_rows = int(dut.dut.dut.ROWS)
+    num_cols = int(dut.dut.dut.COLUMNS)
 
     for _ in range(1000):
-        # Choose a random command type
-        command = choice((
-            Command.LOAD_INSTR, Command.OUTPUT, Command.SIG_STATE,
-            Command.CONTROL,
-        ))
+        # Keep randomising until it becomes a legal message
+        msg = NodeMessage()
+        while True:
+            try:
+                msg.unpack(randint(0, (1 << 31) - 1))
+                break
+            except Exception:
+                continue
 
-        # Route all the way through the fabric
-        tgt_row, tgt_col = num_rows, 0
-
-        # Generate a message
-        msg = 0
-        if command == Command.LOAD_INSTR:
-            msg = build_load_instr(tgt_row, tgt_col, randint(0, (1 << 15) - 1))
-        elif command == Command.OUTPUT:
-            msg = build_map_output(
-                tgt_row, tgt_col, randint(0, 7), randint(0,  15), randint(0, 15),
-                randint(0, 7), choice((0, 1)),
-            )
-        elif command == Command.SIG_STATE:
-            msg = build_sig_state(
-                tgt_row, tgt_col, randint(0, 7), choice((0, 1)), choice((0, 1)),
-            )
-        elif command == Command.CONTROL:
-            msg = build_control(tgt_row, tgt_col, randint(0, (1 << 21) - 1))
-        else:
-            raise Exception(f"Unsupported command {command}")
+        # Set target outside of the fabric
+        msg.raw.header.row    = num_rows
+        msg.raw.header.column = randint(0, num_cols-1)
 
         # Create a message
         dut.debug(
-            f"MSG - R: {tgt_row}, C: {tgt_col}, CMD: {command} -> 0x{msg:08X}"
+            f"MSG - R: {msg.raw.header.row}, C: {msg.raw.header.column}, "
+            f"CMD: {msg.raw.header.command} -> 0x{msg.pack():08X}"
         )
 
         # Queue up the message
-        dut.mesh_inbound.append(msg)
-        dut.mesh_expected.append((msg, 0))
+        dut.mesh_inbound.append(msg.pack())
+        dut.mesh_expected.append((msg.pack(), 0))

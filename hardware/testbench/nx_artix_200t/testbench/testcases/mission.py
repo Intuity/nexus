@@ -18,9 +18,8 @@ from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 import simpy
 
 from drivers.axi4stream.common import AXI4StreamTransaction
-from nx_constants import Command
-from nx_control import build_set_active
-from nx_message import build_load_instr, build_map_output
+from nxconstants import (ControlCommand, ControlSetActive, NodeCommand,
+                         NodeLoadInstr, NodeMapOutput)
 from nxmodel.base import Base
 from nxmodel.capture import Capture
 from nxmodel.manager import Manager
@@ -82,10 +81,16 @@ async def mission_mode(dut):
     for msg in mngr.queue:
         raw = []
         if isinstance(msg, ConfigureOutput):
-            raw.append(build_map_output(
-                msg.row, msg.col, msg.src_idx,
-                msg.tgt_row, msg.tgt_col, msg.tgt_idx, msg.tgt_seq
-            ))
+            map_msg                = NodeMapOutput()
+            map_msg.header.row     = msg.row
+            map_msg.header.column  = msg.col
+            map_msg.header.command = NodeCommand.MAP_OUTPUT
+            map_msg.source_index   = msg.src_idx
+            map_msg.target_row     = msg.tgt_row
+            map_msg.target_column  = msg.tgt_col
+            map_msg.target_index   = msg.tgt_idx
+            map_msg.target_is_seq  = (1 if msg.tgt_seq else 0)
+            raw.append(map_msg.pack())
             # Setup source if not already tracked
             src_key = msg.row, msg.col, msg.src_idx
             if src_key not in linked: linked[src_key] = []
@@ -96,7 +101,11 @@ async def mission_mode(dut):
             assert tgt_key not in seq_in, f"Clash for target: {tgt_key}"
             seq_in[tgt_key] = msg.tgt_seq
         elif isinstance(msg, LoadInstruction):
-            raw.append(build_load_instr(msg.row, msg.col, msg.instr.raw))
+            instr_msg                = NodeLoadInstr(instr=msg.instr.raw)
+            instr_msg.header.row     = msg.row
+            instr_msg.header.column  = msg.col
+            instr_msg.header.command = NodeCommand.LOAD_INSTR
+            raw.append(instr_msg.pack())
         else:
             raise Exception(f"Unexpected message {msg}")
         # Convert to bytes
@@ -146,7 +155,8 @@ async def mission_mode(dut):
     # Raise active and let nexus tick
     dut.info("Enabling nexus")
     dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | build_set_active(1), 32
+        (1 << 31) | ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack(),
+        32
     )))
 
     # Wait for all data to be sent
@@ -268,7 +278,7 @@ async def mission_mode(dut):
                 rtl_col = (msg >> 23) & 0xF
                 command = (msg >> 21) & 0x3
                 # Capture signal state
-                if command == int(Command.SIG_STATE):
+                if command == int(NodeCommand.SIG_STATE):
                     rtl_idx = (msg >> 16) & 0x1F
                     rtl_val = (msg >> 14) & 0x01
                     rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val

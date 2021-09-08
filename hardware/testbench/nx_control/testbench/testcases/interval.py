@@ -17,8 +17,7 @@ from random import randint
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nx_control import (build_req_status, build_set_active, build_req_cycles,
-                        build_set_interval)
+from nxconstants import ControlCommand, ControlRaw, ControlSetActive
 
 from ..testbench import testcase
 
@@ -50,13 +49,13 @@ async def set_interval(dut):
 
     # Request the initial state
     dut.info("Checking initial state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 0, 1, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the initial cycle count
     dut.info("Checking initial cycle count")
-    dut.inbound.append(build_req_cycles())
+    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
     dut.expected.append((0, 0))
     while dut.expected: await RisingEdge(dut.clk)
 
@@ -76,24 +75,24 @@ async def set_interval(dut):
 
     # Request the updated state
     dut.info("Checking updated state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 1, 1, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Setup an interval
     dut.info("Setting an interval")
     cycles = randint(10, 20)
-    dut.inbound.append(build_set_interval(cycles))
+    dut.inbound.append(ControlRaw(command=ControlCommand.INTERVAL, payload=cycles).pack())
 
     # Request the updated state
     dut.info("Checking updated state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 1, 1, 1), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Set the mesh to be active
     dut.info("Activating mesh")
-    dut.inbound.append(build_set_active(1))
+    dut.inbound.append(ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack())
     await dut.inbound.idle()
 
     # Wait until active signal clears
@@ -103,22 +102,22 @@ async def set_interval(dut):
 
     # Request the state
     dut.info("Checking state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 1, 0, 1), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the updated cycle count
     dut.info("Checking updated cycle count")
-    dut.inbound.append(build_req_cycles())
+    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
     dut.expected.append((cycles, 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Setup an interval
     dut.info("Clearing the interval")
-    dut.inbound.append(build_set_interval(0))
+    dut.inbound.append(ControlRaw(command=ControlCommand.INTERVAL, payload=0).pack())
 
     # Request the state
     dut.info("Checking state")
-    dut.inbound.append(build_req_status())
+    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
     dut.expected.append((status(0, 1, 0, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)

@@ -17,7 +17,7 @@ from random import choice, randint
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.axi4stream.common import AXI4StreamTransaction
-from nx_message import build_load_instr
+from nxconstants import NodeCommand, NodeLoadInstr
 
 from ..testbench import testcase
 
@@ -40,10 +40,14 @@ async def load(dut):
     for row in range(num_rows):
         for col in range(num_cols):
             for _ in range(randint(10, 30)):
-                instr = randint(0, (1 << 15) - 1)
-                raw   = (1 << 31) | build_load_instr(row, col, instr)
+                msg                = NodeLoadInstr()
+                msg.header.row     = row
+                msg.header.column  = col
+                msg.header.command = NodeCommand.LOAD_INSTR
+                msg.instr          = randint(0, (1 << 21) - 1)
+                raw   = (1 << 31) | msg.pack()
                 to_send += bytearray([(raw >> (x * 8)) & 0xFF for x in range(4)])
-                loaded[row][col].append(instr)
+                loaded[row][col].append(msg.instr.pack())
                 counter += 1
     dut.ib_mesh.append(AXI4StreamTransaction(data=to_send))
 

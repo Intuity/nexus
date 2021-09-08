@@ -20,8 +20,7 @@ from ..testbench import testcase
 from drivers.map_io.common import IOMapping
 from drivers.state.common import SignalState
 
-from nx_constants import Command, Direction
-from nx_message import build_load_instr, build_map_output, build_sig_state
+from nxconstants import Direction, NodeCommand, NodeMessage
 
 @testcase()
 async def messages(dut):
@@ -34,55 +33,53 @@ async def messages(dut):
         dirx = choice(list(Direction))
 
         # Choose a random command type
-        command = choice(list(Command))
+        command = choice(list(NodeCommand))
 
-        # Select a random target row and column (ignored by decoder)
-        tgt_row, tgt_col = randint(0, 15), randint(0, 15)
+        # Randomise message contents until legal
+        msg = NodeMessage()
+        while True:
+            try:
+                msg.unpack(randint(0, (1 << 31) - 1))
+                break
+            except Exception:
+                continue
+
+        # Setup the correct command
+        msg.raw.header.command = command
 
         # Generate a message
-        msg = 0
-        if command == Command.LOAD_INSTR:
-            instr = randint(0, (1 << 15) - 1)
-            msg   = build_load_instr(tgt_row, tgt_col, instr)
-            dut.debug(f"MSG {msg_idx:03d}: Loading instruction 0x{instr:08X}")
-            dut.exp_instr.append(InstrStore(instr))
-        elif command == Command.OUTPUT:
-            index   = randint(0,  7)
-            rem_idx = randint(0,  7)
-            is_seq  = choice((0, 1))
-            msg     = build_map_output(
-                tgt_row, tgt_col, index, tgt_row, tgt_col, rem_idx, is_seq
-            )
+        if command == NodeCommand.LOAD_INSTR:
             dut.debug(
-                f"MSG {msg_idx:03d}: Map output - TR: {tgt_row}, TC: {tgt_col}, "
-                f"LI: {index}, RI: {rem_idx}, SEQ: {is_seq}"
+                f"MSG {msg_idx:03d}: Loading instruction 0x{msg.load_instr.instr.pack():08X}"
+            )
+            dut.exp_instr.append(InstrStore(msg.load_instr.instr.pack()))
+        elif command == NodeCommand.MAP_OUTPUT:
+            dut.debug(
+                f"MSG {msg_idx:03d}: Map output - TR: {msg.map_output.target_row}, "
+                f"TC: {msg.map_output.target_column}, LI: {msg.map_output.source_index}, "
+                f"RI: {msg.map_output.target_index}, SEQ: {msg.map_output.target_is_seq}"
             )
             dut.exp_io.append(IOMapping(
-                index, tgt_row, tgt_col, rem_idx, is_seq
+                msg.map_output.source_index, msg.map_output.target_row,
+                msg.map_output.target_column, msg.map_output.target_index,
+                msg.map_output.target_is_seq
             ))
-        elif command == Command.SIG_STATE:
-            index  = randint(0, 7)
-            is_seq = choice((0, 1))
-            state  = choice((0, 1))
-            msg    = build_sig_state(tgt_row, tgt_col, index, is_seq, state)
+        elif command == NodeCommand.SIG_STATE:
             dut.debug(
-                f"MSG {msg_idx:03d}: Signal state - TR: {tgt_row}, TC: {tgt_col}, "
-                f"I: {index}, SEQ: {is_seq}, STATE: {state}"
+                f"MSG {msg_idx:03d}: I: {msg.sig_state.index}, "
+                f"SEQ: {msg.sig_state.is_seq}, STATE: {msg.sig_state.state}"
             )
-            dut.exp_state.append(SignalState(index, is_seq, state))
-        elif command == Command.CONTROL:
-            msg = (
-                (tgt_row << 27) |
-                (tgt_col << 23) |
-                (int(command) << 21) |
-                randint(0, (1 << 21) - 1)
-            )
-            dut.debug(f"MSG {msg_idx:03d}: Sending control 0x{msg:08X}")
+            dut.exp_state.append(SignalState(
+                msg.sig_state.index, msg.sig_state.is_seq, msg.sig_state.state
+            ))
+        elif command == NodeCommand.NODE_CTRL:
+            dut.debug(f"MSG {msg_idx:03d}: Sending control 0x{msg.raw.payload:08X}")
 
         # Create a message
         dut.debug(
-            f"MSG - R: {tgt_row}, C: {tgt_col}, CMD: {command} -> 0x{msg:08X}"
+            f"MSG - R: {msg.raw.header.row}, C: {msg.raw.header.column}, "
+            f"CMD: {command}  -> 0x{msg.pack():08X}"
         )
 
         # Queue up the message
-        dut.msg.append((msg, int(dirx)))
+        dut.msg.append((msg.pack(), int(dirx)))

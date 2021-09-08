@@ -61,6 +61,7 @@ endif
 PYTHON_PATHS += $(COMMON_DIR)
 PYTHON_PATHS += $(abspath .)
 PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../..)
+PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../common/work)
 export PYTHONPATH := $(subst $(SPACE),:,$(PYTHON_PATHS)):$(PYTHONPATH)
 
 .PHONY: run results.xml
