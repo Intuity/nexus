@@ -26,7 +26,7 @@ async def present_single_dir(dut):
     await dut.reset()
 
     # Get the width of the data
-    intf_size = int(dut.dut.STREAM_WIDTH)
+    intf_size = 31
 
     for dirx, exp in enumerate((
         dut.exp_north, dut.exp_east, dut.exp_south, dut.exp_west
@@ -53,7 +53,7 @@ async def present_multi_dir(dut, backpressure):
     dut.west.delays  = backpressure
 
     # Get the width of the data
-    intf_size = int(dut.dut.STREAM_WIDTH)
+    intf_size = 31
 
     # Queue up many messages to go to different responders
     exps = (

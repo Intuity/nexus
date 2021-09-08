@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-      parameter INSTR_WIDTH =  15 // Width of each instruction
-    , parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
+module testbench
+import NXConstants::*;
+#(
+      parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
     , parameter CTRL_WIDTH  =  13 // Width of each control entry
     , parameter MAX_CTRL    = 512 // Maximum number of control entries
 ) (
@@ -22,12 +23,12 @@ module testbench #(
     // Populated instruction counter
     , output logic [$clog2(MAX_INSTRS)-1:0] instr_count_o
     // Instruction load interface
-    , input  logic [INSTR_WIDTH-1:0] store_data_i
-    , input  logic                   store_valid_i
+    , input  instruction_t store_data_i
+    , input  logic         store_valid_i
     // Instruction fetch interfaces
     , input  logic [$clog2(MAX_INSTRS)-1:0] fetch_addr_i
     , input  logic                          fetch_rd_i
-    , output logic [       INSTR_WIDTH-1:0] fetch_data_o
+    , output instruction_t                  fetch_data_o
     , output logic                          fetch_stall_o
     // Control block interface
     , input  logic [$clog2(MAX_CTRL)-1:0] ctrl_addr_i
@@ -41,8 +42,7 @@ reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_node_store #(
-      .INSTR_WIDTH(INSTR_WIDTH)
-    , .MAX_INSTRS (MAX_INSTRS )
+      .MAX_INSTRS (MAX_INSTRS )
     , .CTRL_WIDTH (CTRL_WIDTH )
     , .MAX_CTRL   (MAX_CTRL   )
 ) dut (

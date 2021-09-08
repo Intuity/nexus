@@ -85,9 +85,10 @@ async def map_outputs(dut):
         for idx, (tgt_row, tgt_col, tgt_idx, tgt_seq) in enumerate(targets):
             ram_data = dut.memory.memory[output_base + idx]
             ram_seq  = (ram_data >> (0                          )) & 0x1
-            ram_idx  = (ram_data >> (1                          )) & 0x7
-            ram_col  = (ram_data >> (1 + input_width            )) & 0xF
-            ram_row  = (ram_data >> (1 + input_width + col_width)) & 0xF
+            ram_idx  = (ram_data >> (1                          )) & ((1 << input_width) - 1)
+            ram_col  = (ram_data >> (1 + input_width            )) & ((1 << row_width) - 1)
+            ram_row  = (ram_data >> (1 + input_width + col_width)) & ((1 << col_width) - 1)
+            ram_lb   = (ram_data >> (1 + input_width + col_width + row_width)) & 0x1
             assert tgt_row == ram_row, \
                 f"Output {output}[{idx}] - row exp: {tgt_row}, got: {ram_row}"
             assert tgt_col == ram_col, \
@@ -96,6 +97,9 @@ async def map_outputs(dut):
                 f"Output {output}[{idx}] - idx exp: {tgt_idx}, got: {ram_idx}"
             assert tgt_seq == ram_seq, \
                 f"Output {output}[{idx}] - seq exp: {tgt_seq}, got: {ram_seq}"
+            exp_lb = (1 if (ram_row == row and ram_col == col) else 0)
+            assert ram_lb == exp_lb, \
+                f"Output {output}[{idx}] - lb exp: {exp_lb}, got: {ram_lb}"
 
 @testcase()
 async def output_drive(dut):

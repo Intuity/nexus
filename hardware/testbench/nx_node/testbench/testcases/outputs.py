@@ -36,8 +36,8 @@ async def map_outputs(dut):
     num_outputs = int(dut.dut.dut.OUTPUTS)
     num_inputs  = int(dut.dut.dut.INPUTS)
     input_width = int(ceil(log2(num_inputs)))
-    col_width   = int(dut.dut.dut.ADDR_COL_WIDTH)
-    row_width   = int(dut.dut.dut.ADDR_ROW_WIDTH)
+    col_width   = 4
+    row_width   = 4
 
     # Map the outputs in order
     mapped  = {}

@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-    parameter STREAM_WIDTH = 31
-) (
-      input  logic                    rst
+module testbench
+import NXConstants::*;
+(
+      input  logic rst
     // Inbound message stream
-    , input  logic [STREAM_WIDTH-1:0] inbound_data_i
-    , input  logic                    inbound_valid_i
-    , output logic                    inbound_ready_o
+    , input  node_message_t inbound_data_i
+    , input  logic          inbound_valid_i
+    , output logic          inbound_ready_o
     // Outbound message stream
-    , output logic [STREAM_WIDTH-1:0] outbound_data_o
-    , output logic                    outbound_valid_o
-    , input  logic                    outbound_ready_i
+    , output node_message_t outbound_data_o
+    , output logic          outbound_valid_o
+    , input  logic          outbound_ready_i
 );
 
 reg clk = 1'b0;

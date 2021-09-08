@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
+module testbench
+import NXConstants::*;
+#(
       parameter ROWS       = 3
     , parameter COLUMNS    = 3
     , parameter INPUTS     = 8
@@ -21,11 +23,11 @@ module testbench #(
 ) (
       input  logic rst
     // Inbound message stream (from host)
-    , input  nx_ctrl_msg_t inbound_data_i
-    , input  logic         inbound_valid_i
-    , output logic         inbound_ready_o
+    , input  control_message_t inbound_data_i
+    , input  logic             inbound_valid_i
+    , output logic             inbound_ready_o
     // Outbound message stream (to host)
-    , output nx_ctrl_msg_resp_t outbound_data_o
+    , output control_response_t outbound_data_o
     , output logic              outbound_valid_o
     , input  logic              outbound_ready_i
     // Soft reset request

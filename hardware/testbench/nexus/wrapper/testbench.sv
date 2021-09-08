@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`include "nx_constants.svh"
-
-module testbench #(
-      parameter ROWS           =   6
-    , parameter COLUMNS        =   6
-    , parameter ADDR_ROW_WIDTH =   4
-    , parameter ADDR_COL_WIDTH =   4
-    , parameter COMMAND_WIDTH  =   2
-    , parameter INSTR_WIDTH    =  21
-    , parameter INPUTS         =  32
-    , parameter OUTPUTS        =  32
-    , parameter REGISTERS      =   8
-    , parameter MAX_INSTRS     = 512
-    , parameter OPCODE_WIDTH   =   3
+module testbench
+import NXConstants::*;
+#(
+      parameter ROWS      =  6
+    , parameter COLUMNS   =  6
+    , parameter INPUTS    = 32
+    , parameter OUTPUTS   = 32
+    , parameter REGISTERS =  8
 ) (
       input  logic rst
     // Status signals
@@ -34,22 +28,22 @@ module testbench #(
     , output logic status_trigger_o
     // Control message streams
     // - Inbound
-    , input  nx_message_t ctrl_ib_data_i
-    , input  logic        ctrl_ib_valid_i
-    , output logic        ctrl_ib_ready_o
+    , input  control_message_t ctrl_ib_data_i
+    , input  logic             ctrl_ib_valid_i
+    , output logic             ctrl_ib_ready_o
     // - Outbound
-    , output nx_message_t ctrl_ob_data_o
-    , output logic        ctrl_ob_valid_o
-    , input  logic        ctrl_ob_ready_i
+    , output control_response_t ctrl_ob_data_o
+    , output logic              ctrl_ob_valid_o
+    , input  logic              ctrl_ob_ready_i
     // Mesh message streams
     // - Inbound
-    , input  nx_message_t mesh_ib_data_i
-    , input  logic        mesh_ib_valid_i
-    , output logic        mesh_ib_ready_o
+    , input  node_message_t mesh_ib_data_i
+    , input  logic          mesh_ib_valid_i
+    , output logic          mesh_ib_ready_o
     // - Outbound
-    , output nx_message_t mesh_ob_data_o
-    , output logic        mesh_ob_valid_o
-    , input  logic        mesh_ob_ready_i
+    , output node_message_t mesh_ob_data_o
+    , output logic          mesh_ob_valid_o
+    , input  logic          mesh_ob_ready_i
 );
 
 reg clk = 1'b0;

@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-      parameter STREAM_WIDTH   = 31
-    , parameter ADDR_ROW_WIDTH =  4
-    , parameter ADDR_COL_WIDTH =  4
-    , parameter COMMAND_WIDTH  =  2
-    , parameter INSTR_WIDTH    = 15
-    , parameter INPUTS         =  8
-    , parameter OUTPUTS        =  8
+module testbench
+import NXConstants::*;
+#(
+      parameter INPUTS  = 8
+    , parameter OUTPUTS = 8
 ) (
       input  logic                    rst
     // Node identity
@@ -27,37 +24,33 @@ module testbench #(
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound message stream
-    , input  nx_message_t   msg_data_i
-    , input  nx_direction_t msg_dir_i
+    , input  node_message_t msg_data_i
+    , input  direction_t    msg_dir_i
     , input  logic          msg_valid_i
     , output logic          msg_ready_o
     // I/O mapping handling
-    , output logic [$clog2(OUTPUTS)-1:0] map_idx_o     // Output to configure
-    , output logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
-    , output logic [ ADDR_COL_WIDTH-1:0] map_tgt_col_o // Target node's column
-    , output logic [ $clog2(INPUTS)-1:0] map_tgt_idx_o // Target node's I/O index
+    , output logic [     IOR_WIDTH-1:0] map_idx_o     // Output to configure
+    , output logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
+    , output logic [ADDR_COL_WIDTH-1:0] map_tgt_col_o // Target node's column
+    , output logic [     IOR_WIDTH-1:0] map_tgt_idx_o // Target node's I/O index
     , output logic                       map_tgt_seq_o // Target node's input is sequential
     , output logic                       map_valid_o   // Mapping is valid
     // Signal state update
-    , output logic [$clog2(INPUTS)-1:0] signal_index_o  // Input index
-    , output logic                      signal_is_seq_o // Input is sequential
-    , output logic                      signal_state_o  // Signal state
-    , output logic                      signal_valid_o  // Update is valid
+    , output logic [IOR_WIDTH-1:0] signal_index_o  // Input index
+    , output logic                 signal_is_seq_o // Input is sequential
+    , output logic                 signal_state_o  // Signal state
+    , output logic                 signal_valid_o  // Update is valid
     // Instruction load
-    , output logic [INSTR_WIDTH-1:0] instr_data_o  // Instruction data
-    , output logic                   instr_valid_o // Instruction valid
+    , output instruction_t instr_data_o  // Instruction data
+    , output logic         instr_valid_o // Instruction valid
 );
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_msg_decoder #(
-      .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-    , .COMMAND_WIDTH (COMMAND_WIDTH )
-    , .INSTR_WIDTH   (INSTR_WIDTH   )
-    , .INPUTS        (INPUTS        )
-    , .OUTPUTS       (OUTPUTS       )
+      .INPUTS (INPUTS )
+    , .OUTPUTS(OUTPUTS)
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)

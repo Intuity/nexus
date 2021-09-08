@@ -75,7 +75,7 @@ async def execute(dut):
 
         # Generate a random starting point & setup I/O
         inputs = randint(0, (1 << 32) - 1)
-        dut.info(f"Setting input vector to {inputs:08b}")
+        dut.info(f"Setting input vector to {inputs:032b}")
         dut.inputs_i    <= inputs
         dut.populated_i <= len(memory)
 
@@ -91,6 +91,7 @@ async def execute(dut):
         for _ in range(randint(0, 2)):
             await ClockCycles(dut.clk, randint(1, len(memory)))
             inputs = randint(0, (1 << 8) - 1)
+            dut.info(f"Setting input vector to {inputs:032b}")
             dut.inputs_i  <= inputs
             dut.trigger_i <= 1
             await RisingEdge(dut.clk)
@@ -102,6 +103,9 @@ async def execute(dut):
         await First(ClockCycles(dut.clk, 1000), RisingEdge(dut.idle_o))
         await RisingEdge(dut.clk)
         assert dut.idle_o == 1, "DUT is not idle"
+
+        # Log the final input vector
+        dut.info(f"Final input vector: {inputs:032b}")
 
         # Calculate the expected output
         working = [0] * 8

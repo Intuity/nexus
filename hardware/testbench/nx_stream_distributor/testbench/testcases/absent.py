@@ -26,7 +26,7 @@ async def absent_single_dir(dut, absent):
     await dut.reset()
 
     # Get the width of the data
-    intf_size = int(dut.dut.STREAM_WIDTH)
+    intf_size = 31
 
     # Drop presence and force ready low for the absent interface
     dut.info(f"Setting {['north', 'east', 'south', 'west'][absent]} absent")
@@ -79,7 +79,7 @@ async def absent_multi_dir(dut, backpressure, absent):
     dut.west.delays  = backpressure
 
     # Get the width of the data
-    intf_size = int(dut.dut.STREAM_WIDTH)
+    intf_size = 31
 
     # Drop presence and force ready low for the absent interface
     dut.present[absent] <= 0

@@ -45,7 +45,7 @@ async def stream(dut, backpressure, gaps):
     dut.outbound.probability = 0.1
 
     # Get the width of the data
-    intf_size = int(dut.dut.STREAM_WIDTH)
+    intf_size = 31
 
     # Drive many messages
     for _ in range(1000):

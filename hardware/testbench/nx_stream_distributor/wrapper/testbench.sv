@@ -12,46 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-      parameter STREAM_WIDTH = 31
-    , parameter SKID_BUFFERS = "yes"
-) (
-      input  logic                    rst
+module testbench
+import NXConstants::*;
+(
+      input  logic rst
     // Inbound message stream
-    , input  logic [STREAM_WIDTH-1:0] dist_data_i
-    , input  logic [             1:0] dist_dir_i
-    , input  logic                    dist_valid_i
-    , output logic                    dist_ready_o
+    , input  node_message_t dist_data_i
+    , input  direction_t    dist_dir_i
+    , input  logic          dist_valid_i
+    , output logic          dist_ready_o
     // Outbound distributed message streams
     // - North
-    , output logic [STREAM_WIDTH-1:0] north_data_o
-    , output logic                    north_valid_o
-    , input  logic                    north_ready_i
-    , input  logic                    north_present_i
+    , output node_message_t north_data_o
+    , output logic          north_valid_o
+    , input  logic          north_ready_i
+    , input  logic          north_present_i
     // - East
-    , output logic [STREAM_WIDTH-1:0] east_data_o
-    , output logic                    east_valid_o
-    , input  logic                    east_ready_i
-    , input  logic                    east_present_i
+    , output node_message_t east_data_o
+    , output logic          east_valid_o
+    , input  logic          east_ready_i
+    , input  logic          east_present_i
     // - South
-    , output logic [STREAM_WIDTH-1:0] south_data_o
-    , output logic                    south_valid_o
-    , input  logic                    south_ready_i
-    , input  logic                    south_present_i
+    , output node_message_t south_data_o
+    , output logic          south_valid_o
+    , input  logic          south_ready_i
+    , input  logic          south_present_i
     // - West
-    , output logic [STREAM_WIDTH-1:0] west_data_o
-    , output logic                    west_valid_o
-    , input  logic                    west_ready_i
-    , input  logic                    west_present_i
+    , output node_message_t west_data_o
+    , output logic          west_valid_o
+    , input  logic          west_ready_i
+    , input  logic          west_present_i
 );
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
-nx_stream_distributor #(
-      .STREAM_WIDTH(STREAM_WIDTH)
-    , .SKID_BUFFERS(SKID_BUFFERS)
-) dut (
+nx_stream_distributor dut (
       .clk_i(clk)
     , .rst_i(rst)
     // Inbound message stream

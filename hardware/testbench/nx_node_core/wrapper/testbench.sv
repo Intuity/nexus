@@ -12,39 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-      parameter INPUTS       =  32
-    , parameter OUTPUTS      =  32
-    , parameter REGISTERS    =   8
-    , parameter MAX_INSTRS   = 512
-    , parameter INSTR_WIDTH  =  21
-    , parameter OPCODE_WIDTH =   3
+module testbench
+import NXConstants::*;
+#(
+      parameter INPUTS    = 32
+    , parameter OUTPUTS   = 32
+    , parameter REGISTERS =  8
 ) (
-      input  logic                          rst
+      input  logic rst
     // I/O from simulated logic
-    , input  logic [            INPUTS-1:0] inputs_i
-    , output logic [           OUTPUTS-1:0] outputs_o
+    , input  logic [ INPUTS-1:0] inputs_i
+    , output logic [OUTPUTS-1:0] outputs_o
     // Execution controls
-    , input  logic [$clog2(MAX_INSTRS)-1:0] populated_i
-    , input  logic                          trigger_i
-    , output logic                          idle_o
+    , input  logic [$clog2(MAX_NODE_INSTRS)-1:0] populated_i
+    , input  logic                               trigger_i
+    , output logic                               idle_o
     // Instruction fetch
-    , output logic [$clog2(MAX_INSTRS)-1:0] instr_addr_o
-    , output logic                          instr_rd_o
-    , input  logic [       INSTR_WIDTH-1:0] instr_data_i
-    , input  logic                          instr_stall_i
+    , output logic [$clog2(MAX_NODE_INSTRS)-1:0] instr_addr_o
+    , output logic                               instr_rd_o
+    , input  instruction_t                       instr_data_i
+    , input  logic                               instr_stall_i
 );
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_node_core #(
-      .INPUTS      (INPUTS      )
-    , .OUTPUTS     (OUTPUTS     )
-    , .REGISTERS   (REGISTERS   )
-    , .MAX_INSTRS  (MAX_INSTRS  )
-    , .INSTR_WIDTH (INSTR_WIDTH )
-    , .OPCODE_WIDTH(OPCODE_WIDTH)
+      .INPUTS   (INPUTS   )
+    , .OUTPUTS  (OUTPUTS  )
+    , .REGISTERS(REGISTERS)
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)

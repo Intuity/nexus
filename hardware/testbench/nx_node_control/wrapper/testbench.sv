@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-      parameter STREAM_WIDTH    =  31
-    , parameter ADDR_ROW_WIDTH  =   4
-    , parameter ADDR_COL_WIDTH  =   4
-    , parameter COMMAND_WIDTH   =   2
-    , parameter INPUTS          =   8
-    , parameter OUTPUTS         =   8
-    , parameter OP_STORE_LENGTH = 256
-    , parameter OP_STORE_WIDTH  = 1 + ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
+module testbench
+import NXConstants::*;
+#(
+      parameter INPUTS         = 32
+    , parameter OUTPUTS        = 32
+    , parameter OP_STORE_WIDTH = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + IOR_WIDTH + 2
 ) (
       input  logic rst
     // Node identity
@@ -32,28 +29,28 @@ module testbench #(
     , input  logic token_grant_i
     , output logic token_release_o
     // Outbound message stream
-    , output logic [STREAM_WIDTH-1:0] msg_data_o
-    , output logic [             1:0] msg_dir_o
-    , output logic                    msg_valid_o
-    , input  logic                    msg_ready_i
+    , output node_message_t msg_data_o
+    , output logic [1:0]    msg_dir_o
+    , output logic          msg_valid_o
+    , input  logic          msg_ready_i
     // I/O mapping
-    , input  logic [$clog2(OUTPUTS)-1:0] map_idx_i     // Which output to configure
-    , input  logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
-    , input  logic [ ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
-    , input  logic [ $clog2(INPUTS)-1:0] map_tgt_idx_i // Target node's input index
-    , input  logic                       map_tgt_seq_i // Target node's input is sequential
-    , input  logic                       map_valid_i   // Mapping is valid
+    , input  logic [     IOR_WIDTH-1:0] map_idx_i     // Which output to configure
+    , input  logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
+    , input  logic [ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
+    , input  logic [     IOR_WIDTH-1:0] map_tgt_idx_i // Target node's input index
+    , input  logic                      map_tgt_seq_i // Target node's input is sequential
+    , input  logic                      map_valid_i   // Mapping is valid
     // Signal state update
-    , input  logic [$clog2(OUTPUTS)-1:0] signal_index_i  // Input index
-    , input  logic                       signal_is_seq_i // Input is sequential
-    , input  logic                       signal_state_i  // Signal state
-    , input  logic                       signal_valid_i  // Update is valid
+    , input  logic [IOR_WIDTH-1:0] signal_index_i  // Input index
+    , input  logic                 signal_is_seq_i // Input is sequential
+    , input  logic                 signal_state_i  // Signal state
+    , input  logic                 signal_valid_i  // Update is valid
     // Interface to core
     , output logic               core_trigger_o
     , output logic [ INPUTS-1:0] core_inputs_o
     , input  logic [OUTPUTS-1:0] core_outputs_i
     // Interface to memory
-    , output logic [$clog2(OP_STORE_LENGTH)-1:0] store_addr_o    // Output store row address
+    , output logic [$clog2(MAX_NODE_CONFIG)-1:0] store_addr_o    // Output store row address
     , output logic [         OP_STORE_WIDTH-1:0] store_wr_data_o // Output store write data
     , output logic                               store_wr_en_o   // Output store write enable
     , output logic                               store_rd_en_o   // Output store read enable
@@ -64,13 +61,8 @@ reg clk = 1'b0;
 always #1 clk <= ~clk;
 
 nx_node_control #(
-      .ADDR_ROW_WIDTH (ADDR_ROW_WIDTH )
-    , .ADDR_COL_WIDTH (ADDR_COL_WIDTH )
-    , .COMMAND_WIDTH  (COMMAND_WIDTH  )
-    , .INPUTS         (INPUTS         )
-    , .OUTPUTS        (OUTPUTS        )
-    , .OP_STORE_LENGTH(OP_STORE_LENGTH)
-    , .OP_STORE_WIDTH (OP_STORE_WIDTH )
+      .INPUTS (INPUTS )
+    , .OUTPUTS(OUTPUTS)
 ) dut (
       .clk_i(clk)
     , .rst_i(rst)

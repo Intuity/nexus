@@ -12,38 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module testbench #(
-      parameter ADDR_ROW_WIDTH = 4
-    , parameter ADDR_COL_WIDTH = 4
-) (
+module testbench
+import NXConstants::*;
+(
       input  logic rst
     // Control signals
     , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
     , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Inbound message streams
     // - North
-    , input  nx_message_t north_data_i
-    , input  logic        north_valid_i
-    , output logic        north_ready_o
+    , input  node_message_t north_data_i
+    , input  logic          north_valid_i
+    , output logic          north_ready_o
     // - East
-    , input  nx_message_t east_data_i
-    , input  logic        east_valid_i
-    , output logic        east_ready_o
+    , input  node_message_t east_data_i
+    , input  logic          east_valid_i
+    , output logic          east_ready_o
     // - South
-    , input  nx_message_t south_data_i
-    , input  logic        south_valid_i
-    , output logic        south_ready_o
+    , input  node_message_t south_data_i
+    , input  logic          south_valid_i
+    , output logic          south_ready_o
     // - West
-    , input  nx_message_t west_data_i
-    , input  logic        west_valid_i
-    , output logic        west_ready_o
+    , input  node_message_t west_data_i
+    , input  logic          west_valid_i
+    , output logic          west_ready_o
     // Outbound stream for this node
-    , output nx_message_t internal_data_o
-    , output logic        internal_valid_o
-    , input  logic        internal_ready_i
+    , output node_message_t internal_data_o
+    , output logic          internal_valid_o
+    , input  logic          internal_ready_i
     // Outbound stream for bypass
-    , output nx_message_t   bypass_data_o
-    , output nx_direction_t bypass_dir_o
+    , output node_message_t bypass_data_o
+    , output direction_t    bypass_dir_o
     , output logic          bypass_valid_o
     , input  logic          bypass_ready_i
 );
@@ -51,10 +50,7 @@ module testbench #(
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
-nx_stream_arbiter #(
-      .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-) dut (
+nx_stream_arbiter dut (
       .clk_i(clk)
     , .rst_i(rst)
     // Control signals

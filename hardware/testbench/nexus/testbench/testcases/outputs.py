@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from math import ceil, log2
-from random import choice, randint, random
+from random import choice, randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
@@ -33,7 +33,7 @@ async def map_outputs(dut):
     num_inputs  = int(dut.dut.dut.INPUTS)
     input_width = int(ceil(log2(num_inputs)))
     num_outputs = int(dut.dut.dut.OUTPUTS)
-    col_width   = int(dut.dut.dut.ADDR_COL_WIDTH)
+    col_width   = 4
 
     # Setup random output mappings for every node
     mapped = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
@@ -83,7 +83,7 @@ async def map_outputs(dut):
                 for idx, (tgt_row, tgt_col, tgt_idx, tgt_seq) in enumerate(targets):
                     ram_data = int(node.store.ram.memory[512 + output_base + idx])
                     ram_seq  = (ram_data >> 0) & 0x1
-                    ram_idx  = (ram_data >> 1) & 0x7
+                    ram_idx  = (ram_data >> 1) & 0x1F
                     ram_col  = (ram_data >> 1 + input_width) & 0xF
                     ram_row  = (ram_data >> 1 + input_width + col_width) & 0xF
                     assert ram_seq == tgt_seq, \
