@@ -18,22 +18,19 @@ include ./common/Makefile
 # Options
 # ==============================================================================
 
-# Working directory
-WORK_DIR ?= work
-
 # Lint configuration
 LINT_TOP ?= nexus
 LINT_CFG ?= ./common/lint.cfg
-LINT_RPT ?= $(WORK_DIR)/lint.rpt
+LINT_RPT ?= $(WORKING_DIR)/lint.rpt
 
 # SV2V configuration
-SV2V_OUT ?= $(WORK_DIR)/nexus.v
+SV2V_OUT ?= $(WORKING_DIR)/nexus.v
 
 # Construct arguments to synthesis
 DESIGN_TOP   ?= nexus
 SYN_DEFINES  := $(filter-out USE_RAM_MODEL,$(DEFINES))
-YOS_TCL_PATH ?= $(WORK_DIR)/yosys.tcl
-VVD_TCL_PATH ?= $(WORK_DIR)/vivado.tcl
+YOS_TCL_PATH ?= $(WORKING_DIR)/yosys.tcl
+VVD_TCL_PATH ?= $(WORKING_DIR)/vivado.tcl
 VVD_TGT_PART ?= xc7a200tfbg484-3
 
 # Construct arguments to Verilator lint
@@ -55,7 +52,7 @@ SV2V_OPTS += $(SRC_FILES)
 # ==============================================================================
 
 .PHONY: lint
-lint: | $(WORK_DIR)
+lint: | $(WORKING_DIR)
 	@echo "# Running Verilator lint"
 	$(PREFIX)verilator $(LINT_OPTS) 2>&1 | tee $(LINT_RPT); exit $${PIPESTATUS[0]}
 
@@ -67,25 +64,25 @@ regress:
 .PHONY: sv2v
 sv2v: $(SV2V_OUT)
 
-$(SV2V_OUT): | $(WORK_DIR)
+$(SV2V_OUT): | $(WORKING_DIR)
 	@echo "# Running SV2V conversion"
 	$(PREFIX)sv2v $(SV2V_OPTS) --write $(SV2V_OUT)
 
 .PHONY: syn_yosys
-syn_yosys: $(SV2V_OUT) | $(WORK_DIR)
+syn_yosys: $(SV2V_OUT) | $(WORKING_DIR)
 	@echo "# Creating Yosys TCL file"
 	$(PREFIX)echo "read -sv $(abspath $<);" > $(YOS_TCL_PATH)
 	$(PREFIX)echo "synth_xilinx -top $(DESIGN_TOP) -family xc7;" >> $(YOS_TCL_PATH)
 	$(PREFIX)echo "tee -o yosys_$(DESIGN_TOP).rpt stat -tech xilinx;" >> $(YOS_TCL_PATH)
 	$(PREFIX)echo "write_verilog yosys_$(DESIGN_TOP).v" >> $(YOS_TCL_PATH)
 	@echo "# Running Yosys synthesis"
-	$(PREFIX)cd $(WORK_DIR) && yosys -Q -l yosys_$(DESIGN_TOP).log -s $(notdir $(YOS_TCL_PATH))
+	$(PREFIX)cd $(WORKING_DIR) && yosys -Q -l yosys_$(DESIGN_TOP).log -s $(notdir $(YOS_TCL_PATH))
 	@echo "# Extracting total cell counts"
-	$(PREFIX)python3 common/parse_yosys_rpt.py $(WORK_DIR)/yosys_$(DESIGN_TOP).rpt \
-	    $(WORK_DIR)/yosys_$(DESIGN_TOP).csv
+	$(PREFIX)python3 common/parse_yosys_rpt.py $(WORKING_DIR)/yosys_$(DESIGN_TOP).rpt \
+	    $(WORKING_DIR)/yosys_$(DESIGN_TOP).csv
 
 .PHONY: syn_vivado
-syn_vivado: | $(WORK_DIR)
+syn_vivado: | $(WORKING_DIR)
 	@echo "# Creating Vivado TCL file"
 	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_TCL_PATH)
 	$(PREFIX)echo "synth_design \
@@ -101,15 +98,14 @@ syn_vivado: | $(WORK_DIR)
 	    -force \
 	    vivado_$(DESIGN_TOP).v" >> $(VVD_TCL_PATH)
 	@echo "# Running Vivado synthesis"
-	$(PREFIX)cd $(WORK_DIR) && vivado -mode batch -source $(notdir $(VVD_TCL_PATH))
+	$(PREFIX)cd $(WORKING_DIR) && vivado -mode batch -source $(notdir $(VVD_TCL_PATH))
 
-.PHONY: clean
-clean:
-	@echo "# Removing work directory"
-	$(PREFIX)rm -rf $(WORK_DIR)
+# ==============================================================================
+# Standard Rules
+# ==============================================================================
+
+clean::
 	@echo "# Cleaning all build areas"
 	$(PREFIX)make -C testbench -j$(MAKE_J) clean
 
-$(WORK_DIR):
-	@echo "# Creating directory $@"
-	$(PREFIX)mkdir -p $@
+include ../common/flow/Makefile.rules

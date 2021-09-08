@@ -131,16 +131,12 @@ dmypy.json
 # macOS
 .DS_Store
 
-# Synthesis environments
-tests/*/work
-
 # Hardware design
 *.vcd
 *.lxt
 *.log
 *.vvp
 hardware/testbench/*/*.png
-hardware/work
 
 # CocoTB
 *.xml
@@ -149,6 +145,8 @@ sim_build
 # VSCode
 .vscode
 
-# Driver
+# Working directories
+common/work
+tests/*/work
 nxlink/work
-
+hardware/work
