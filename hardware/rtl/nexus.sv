@@ -12,22 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`include "nx_constants.svh"
-
 // nexus
 // Top-level of the Nexus simulation accelerator.
 //
-module nexus #(
-      parameter ROWS           =   3
-    , parameter COLUMNS        =   3
-    , parameter ADDR_ROW_WIDTH =   4
-    , parameter ADDR_COL_WIDTH =   4
-    , parameter INSTR_WIDTH    =  21
-    , parameter INPUTS         =  32
-    , parameter OUTPUTS        =  32
-    , parameter REGISTERS      =   8
-    , parameter MAX_INSTRS     = 512
-    , parameter OPCODE_WIDTH   =   3
+module nexus
+import NXConstants::*;
+#(
+      parameter ROWS      =  3
+    , parameter COLUMNS   =  3
+    , parameter INPUTS    = 32
+    , parameter OUTPUTS   = 32
+    , parameter REGISTERS =  8
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -37,24 +32,23 @@ module nexus #(
     , output logic status_trigger_o
     // Control message streams
     // - Inbound
-    , input  nx_message_t ctrl_ib_data_i
-    , input  logic        ctrl_ib_valid_i
-    , output logic        ctrl_ib_ready_o
+    , input  control_message_t ctrl_ib_data_i
+    , input  logic             ctrl_ib_valid_i
+    , output logic             ctrl_ib_ready_o
     // - Outbound
-    , output nx_message_t ctrl_ob_data_o
-    , output logic        ctrl_ob_valid_o
-    , input  logic        ctrl_ob_ready_i
+    , output control_response_t ctrl_ob_data_o
+    , output logic              ctrl_ob_valid_o
+    , input  logic              ctrl_ob_ready_i
     // Mesh message streams
     // - Inbound
-    , input  nx_message_t mesh_ib_data_i
-    , input  logic        mesh_ib_valid_i
-    , output logic        mesh_ib_ready_o
+    , input  node_message_t mesh_ib_data_i
+    , input  logic          mesh_ib_valid_i
+    , output logic          mesh_ib_ready_o
     // - Outbound
-    , output nx_message_t mesh_ob_data_o
-    , output logic        mesh_ob_valid_o
-    , input  logic        mesh_ob_ready_i
+    , output node_message_t mesh_ob_data_o
+    , output logic          mesh_ob_valid_o
+    , input  logic          mesh_ob_ready_i
 );
-
 
 // Instance the reset stretcher
 logic rst_soft, rst_internal;
@@ -102,16 +96,11 @@ nx_control #(
 
 // Instance the mesh
 nx_mesh #(
-      .ROWS          (ROWS          )
-    , .COLUMNS       (COLUMNS       )
-    , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-    , .INSTR_WIDTH   (INSTR_WIDTH   )
-    , .INPUTS        (INPUTS        )
-    , .OUTPUTS       (OUTPUTS       )
-    , .REGISTERS     (REGISTERS     )
-    , .MAX_INSTRS    (MAX_INSTRS    )
-    , .OPCODE_WIDTH  (OPCODE_WIDTH  )
+      .ROWS     (ROWS     )
+    , .COLUMNS  (COLUMNS  )
+    , .INPUTS   (INPUTS   )
+    , .OUTPUTS  (OUTPUTS  )
+    , .REGISTERS(REGISTERS)
 ) mesh (
       .clk_i(clk_i       )
     , .rst_i(rst_internal)

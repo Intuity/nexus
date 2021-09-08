@@ -13,46 +13,41 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_msg_decoder
 // Decode messages, route commands to control blocks, and distribute messages
 // marked with broadcast
 //
-module nx_msg_decoder #(
-      parameter ADDR_ROW_WIDTH =  4 // Message row address field width
-    , parameter ADDR_COL_WIDTH =  4 // Message column address field width
-    , parameter INSTR_WIDTH    = 15 // Width of each instruction
-    , parameter INPUTS         =  8 // Number of inputs
-    , parameter OUTPUTS        =  8 // Number of outputs
-) (
+module nx_msg_decoder
+import NXConstants::*;
+(
       input  logic clk_i
     , input  logic rst_i
     // Control signals
     , output logic idle_o
     // Inbound message stream
-    , input  nx_message_t msg_data_i
-    , input  logic        msg_valid_i
-    , output logic        msg_ready_o
+    , input  node_message_t msg_data_i
+    , input  logic          msg_valid_i
+    , output logic          msg_ready_o
     // I/O mapping handling
-    , output logic [$clog2(OUTPUTS)-1:0] map_idx_o     // Output to configure
-    , output logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
-    , output logic [ ADDR_COL_WIDTH-1:0] map_tgt_col_o // Target node's column
-    , output logic [ $clog2(INPUTS)-1:0] map_tgt_idx_o // Target node's I/O index
-    , output logic                       map_tgt_seq_o // Target node's input is sequential
-    , output logic                       map_valid_o   // Mapping is valid
+    , output logic [     IOR_WIDTH-1:0] map_idx_o     // Output to configure
+    , output logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
+    , output logic [ADDR_COL_WIDTH-1:0] map_tgt_col_o // Target node's column
+    , output logic [     IOR_WIDTH-1:0] map_tgt_idx_o // Target node's I/O index
+    , output logic                      map_tgt_seq_o // Target node's input is sequential
+    , output logic                      map_valid_o   // Mapping is valid
     // Signal state update
-    , output logic [$clog2(INPUTS)-1:0] signal_index_o  // Input index
-    , output logic                      signal_is_seq_o // Input is sequential
-    , output logic                      signal_state_o  // Signal state
-    , output logic                      signal_valid_o  // Update is valid
+    , output logic [IOR_WIDTH-1:0] signal_index_o  // Input index
+    , output logic                 signal_is_seq_o // Input is sequential
+    , output logic                 signal_state_o  // Signal state
+    , output logic                 signal_valid_o  // Update is valid
     // Instruction load
-    , output logic [INSTR_WIDTH-1:0] instr_data_o  // Instruction data
-    , output logic                   instr_valid_o // Instruction valid
+    , output instruction_t instr_data_o  // Instruction data
+    , output logic         instr_valid_o // Instruction valid
 );
 
-// Internal state
-`DECLARE_DQ (1, fifo_pop,  clk_i, rst_i, 1'b0)
+// Internal signals
+logic fifo_pop;
 
 // Construct outputs
 assign idle_o = (
@@ -61,12 +56,12 @@ assign idle_o = (
 );
 
 // Inbound FIFO - buffer incoming messages ready for digestion
-logic        fifo_empty, fifo_full;
-nx_message_t fifo_data;
+logic          fifo_empty, fifo_full;
+node_message_t fifo_data;
 
 nx_fifo #(
-      .DEPTH(                  4)
-    , .WIDTH($bits(nx_message_t))
+      .DEPTH(            4)
+    , .WIDTH(MESSAGE_WIDTH)
 ) msg_fifo (
       .clk_i    (clk_i)
     , .rst_i    (rst_i)
@@ -74,8 +69,8 @@ nx_fifo #(
     , .wr_data_i(msg_data_i                )
     , .wr_push_i(msg_valid_i && msg_ready_o)
     // Read interface
-    , .rd_data_o(fifo_data )
-    , .rd_pop_i (fifo_pop_q)
+    , .rd_data_o(fifo_data)
+    , .rd_pop_i (fifo_pop )
     // Status
     , .level_o(          )
     , .empty_o(fifo_empty)
@@ -85,16 +80,16 @@ nx_fifo #(
 assign msg_ready_o = ~fifo_full;
 
 // Decode the next message
-nx_message_t message;
+node_message_t message;
 assign message = fifo_data;
 
 // - Extract output mapping from payload
-`DECLARE_DQ($clog2(OUTPUTS), map_idx,     clk_i, rst_i, {$clog2(OUTPUTS){1'b0}})
-`DECLARE_DQ( ADDR_ROW_WIDTH, map_tgt_row, clk_i, rst_i, { ADDR_ROW_WIDTH{1'b0}})
-`DECLARE_DQ( ADDR_COL_WIDTH, map_tgt_col, clk_i, rst_i, { ADDR_COL_WIDTH{1'b0}})
-`DECLARE_DQ( $clog2(INPUTS), map_tgt_idx, clk_i, rst_i, { $clog2(INPUTS){1'b0}})
-`DECLARE_DQ(              1, map_tgt_seq, clk_i, rst_i,                    1'b0)
-`DECLARE_DQ(              1, map_valid,   clk_i, rst_i,                    1'b0)
+`DECLARE_DQ(IOR_WIDTH,      map_idx,     clk_i, rst_i, {     IOR_WIDTH{1'b0}})
+`DECLARE_DQ(ADDR_ROW_WIDTH, map_tgt_row, clk_i, rst_i, {ADDR_ROW_WIDTH{1'b0}})
+`DECLARE_DQ(ADDR_COL_WIDTH, map_tgt_col, clk_i, rst_i, {ADDR_COL_WIDTH{1'b0}})
+`DECLARE_DQ(IOR_WIDTH,      map_tgt_idx, clk_i, rst_i, {     IOR_WIDTH{1'b0}})
+`DECLARE_DQ(1,              map_tgt_seq, clk_i, rst_i,                   1'b0)
+`DECLARE_DQ(1,              map_valid,   clk_i, rst_i,                   1'b0)
 
 assign map_idx     = message.map_output.source_index;
 assign map_tgt_row = message.map_output.target_row;
@@ -110,13 +105,13 @@ assign map_tgt_seq_o = map_tgt_seq_q;
 assign map_valid_o   = map_valid_q;
 
 // - Extract signal state update from payload
-`DECLARE_DQ($clog2(INPUTS), signal_index,  clk_i, rst_i, {$clog2(INPUTS){1'b0}})
-`DECLARE_DQ(1,              signal_is_seq, clk_i, rst_i,                   1'b0)
-`DECLARE_DQ(1,              signal_state,  clk_i, rst_i,                   1'b0)
-`DECLARE_DQ(1,              signal_valid,  clk_i, rst_i,                   1'b0)
+`DECLARE_DQ(IOR_WIDTH, signal_index,  clk_i, rst_i, {IOR_WIDTH{1'b0}})
+`DECLARE_DQ(1,         signal_is_seq, clk_i, rst_i,              1'b0)
+`DECLARE_DQ(1,         signal_state,  clk_i, rst_i,              1'b0)
+`DECLARE_DQ(1,         signal_valid,  clk_i, rst_i,              1'b0)
 
-assign signal_index  = message.sig_state.target_index;
-assign signal_is_seq = message.sig_state.target_is_seq;
+assign signal_index  = message.sig_state.index;
+assign signal_is_seq = message.sig_state.is_seq;
 assign signal_state  = message.sig_state.state;
 
 assign signal_index_o  = signal_index_q;
@@ -125,10 +120,10 @@ assign signal_state_o  = signal_state_q;
 assign signal_valid_o  = signal_valid_q;
 
 // - Extract instruction load from payload
-`DECLARE_DQ(INSTR_WIDTH, instr_data,  clk_i, rst_i, {INSTR_WIDTH{1'b0}})
-`DECLARE_DQ(          1, instr_valid, clk_i, rst_i,                1'b0)
+`DECLARE_DQT(instruction_t, instr_data,  clk_i, rst_i, {$bits(instruction_t){1'b0}})
+`DECLARE_DQ (            1, instr_valid, clk_i, rst_i,                         1'b0)
 
-assign instr_data = message.load_instr.instruction;
+assign instr_data = message.load_instr.instr;
 
 assign instr_data_o  = instr_data_q;
 assign instr_valid_o = instr_valid_q;
@@ -136,7 +131,6 @@ assign instr_valid_o = instr_valid_q;
 // Decode and routing
 always_comb begin : p_decode
     // Initialise state
-    `INIT_D(fifo_pop);
     `INIT_D(map_valid);
     `INIT_D(signal_valid);
     `INIT_D(instr_valid);
@@ -145,20 +139,16 @@ always_comb begin : p_decode
     map_valid    = 1'b0;
     signal_valid = 1'b0;
     instr_valid  = 1'b0;
+    fifo_pop     = 1'b0;
 
     // Decode the next entry in the FIFO
-    if (!fifo_empty && !fifo_pop) begin
+    if (!fifo_empty) begin
+        // Set the right decoded operation valid
+        instr_valid  = (message.raw.header.command == NODE_COMMAND_LOAD_INSTR);
+        map_valid    = (message.raw.header.command == NODE_COMMAND_MAP_OUTPUT);
+        signal_valid = (message.raw.header.command == NODE_COMMAND_SIG_STATE );
         // Pop the FIFO as the data has been picked up
         fifo_pop = 1'b1;
-
-        instr_valid  = (message.raw.header.command == NX_CMD_LOAD_INSTR);
-        map_valid    = (message.raw.header.command == NX_CMD_MAP_OUTPUT);
-        signal_valid = (message.raw.header.command == NX_CMD_SIG_STATE );
-
-    // If not doing anything, clear the pop flag
-    end else begin
-        fifo_pop = 1'b0;
-
     end
 end
 

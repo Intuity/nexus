@@ -13,62 +13,63 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_stream_distributor
 // Distributes to multiple outbound message streams
 //
-module nx_stream_distributor (
+module nx_stream_distributor
+import NXConstants::*;
+(
       input  logic clk_i
     , input  logic rst_i
     // Idle flag
     , output logic idle_o
     // Inbound message stream
-    , input  nx_message_t   dist_data_i
-    , input  nx_direction_t dist_dir_i
+    , input  node_message_t dist_data_i
+    , input  direction_t    dist_dir_i
     , input  logic          dist_valid_i
     , output logic          dist_ready_o
     // Outbound distributed message streams
     // - North
-    , output nx_message_t north_data_o
-    , output logic        north_valid_o
-    , input  logic        north_ready_i
-    , input  logic        north_present_i
+    , output node_message_t north_data_o
+    , output logic          north_valid_o
+    , input  logic          north_ready_i
+    , input  logic          north_present_i
     // - East
-    , output nx_message_t east_data_o
-    , output logic        east_valid_o
-    , input  logic        east_ready_i
-    , input  logic        east_present_i
+    , output node_message_t east_data_o
+    , output logic          east_valid_o
+    , input  logic          east_ready_i
+    , input  logic          east_present_i
     // - South
-    , output nx_message_t south_data_o
-    , output logic        south_valid_o
-    , input  logic        south_ready_i
-    , input  logic        south_present_i
+    , output node_message_t south_data_o
+    , output logic          south_valid_o
+    , input  logic          south_ready_i
+    , input  logic          south_present_i
     // - West
-    , output nx_message_t west_data_o
-    , output logic        west_valid_o
-    , input  logic        west_ready_i
-    , input  logic        west_present_i
+    , output node_message_t west_data_o
+    , output logic          west_valid_o
+    , input  logic          west_ready_i
+    , input  logic          west_present_i
 );
 
 // Bind outbound ports into arrays
-nx_message_t egress_data [3:0];
+node_message_t egress_data [3:0];
 logic [3:0] egress_ready, egress_present, egress_full, egress_empty;
 
-assign { north_data_o, north_valid_o } = { egress_data[NX_DIRX_NORTH], !egress_empty[NX_DIRX_NORTH] };
-assign { east_data_o,  east_valid_o  } = { egress_data[NX_DIRX_EAST ], !egress_empty[NX_DIRX_EAST ] };
-assign { south_data_o, south_valid_o } = { egress_data[NX_DIRX_SOUTH], !egress_empty[NX_DIRX_SOUTH] };
-assign { west_data_o,  west_valid_o  } = { egress_data[NX_DIRX_WEST ], !egress_empty[NX_DIRX_WEST ] };
+assign { north_data_o, north_valid_o } = { egress_data[DIRECTION_NORTH], !egress_empty[DIRECTION_NORTH] };
+assign { east_data_o,  east_valid_o  } = { egress_data[DIRECTION_EAST ], !egress_empty[DIRECTION_EAST ] };
+assign { south_data_o, south_valid_o } = { egress_data[DIRECTION_SOUTH], !egress_empty[DIRECTION_SOUTH] };
+assign { west_data_o,  west_valid_o  } = { egress_data[DIRECTION_WEST ], !egress_empty[DIRECTION_WEST ] };
 
-assign egress_ready[NX_DIRX_NORTH] = north_ready_i;
-assign egress_ready[NX_DIRX_EAST ] = east_ready_i;
-assign egress_ready[NX_DIRX_SOUTH] = south_ready_i;
-assign egress_ready[NX_DIRX_WEST ] = west_ready_i;
+assign egress_ready[DIRECTION_NORTH] = north_ready_i;
+assign egress_ready[DIRECTION_EAST ] = east_ready_i;
+assign egress_ready[DIRECTION_SOUTH] = south_ready_i;
+assign egress_ready[DIRECTION_WEST ] = west_ready_i;
 
-assign egress_present[NX_DIRX_NORTH] = north_present_i;
-assign egress_present[NX_DIRX_EAST ] = east_present_i;
-assign egress_present[NX_DIRX_SOUTH] = south_present_i;
-assign egress_present[NX_DIRX_WEST ] = west_present_i;
+assign egress_present[DIRECTION_NORTH] = north_present_i;
+assign egress_present[DIRECTION_EAST ] = east_present_i;
+assign egress_present[DIRECTION_SOUTH] = south_present_i;
+assign egress_present[DIRECTION_WEST ] = west_present_i;
 
 generate
 for (genvar i = 0; i < 4; i = (i + 1)) begin
@@ -77,19 +78,19 @@ for (genvar i = 0; i < 4; i = (i + 1)) begin
 
     assign primary_active = (dist_dir_i == i) && egress_present[i];
 
-    if (i == NX_DIRX_NORTH) begin
-        assign aliased_active = (dist_dir_i == NX_DIRX_WEST) && !egress_present[NX_DIRX_WEST];
-    end else if (i == NX_DIRX_EAST ) begin
-        assign aliased_active = (dist_dir_i == NX_DIRX_NORTH) && !egress_present[NX_DIRX_NORTH];
-    end else if (i == NX_DIRX_SOUTH) begin
-        assign aliased_active = (dist_dir_i == NX_DIRX_EAST) && !egress_present[NX_DIRX_EAST];
-    end else if (i == NX_DIRX_WEST ) begin
-        assign aliased_active = (dist_dir_i == NX_DIRX_SOUTH) && !egress_present[NX_DIRX_SOUTH];
+    if (i == DIRECTION_NORTH) begin
+        assign aliased_active = (dist_dir_i == DIRECTION_WEST) && !egress_present[DIRECTION_WEST];
+    end else if (i == DIRECTION_EAST ) begin
+        assign aliased_active = (dist_dir_i == DIRECTION_NORTH) && !egress_present[DIRECTION_NORTH];
+    end else if (i == DIRECTION_SOUTH) begin
+        assign aliased_active = (dist_dir_i == DIRECTION_EAST) && !egress_present[DIRECTION_EAST];
+    end else if (i == DIRECTION_WEST ) begin
+        assign aliased_active = (dist_dir_i == DIRECTION_SOUTH) && !egress_present[DIRECTION_SOUTH];
     end
 
     nx_fifo #(
           .DEPTH(2)
-        , .WIDTH($bits(nx_message_t))
+        , .WIDTH($bits(node_message_t))
     ) egress_fifo (
           .clk_i(clk_i)
         , .rst_i(rst_i)
@@ -111,21 +112,21 @@ endgenerate
 
 // Drive inbound stream ready
 assign dist_ready_o = (
-    (dist_dir_i == NX_DIRX_NORTH && (
-        (!egress_full[NX_DIRX_NORTH] &&  egress_present[NX_DIRX_NORTH]) ||
-        (!egress_full[NX_DIRX_EAST ] && !egress_present[NX_DIRX_NORTH])
+    (dist_dir_i == DIRECTION_NORTH && (
+        (!egress_full[DIRECTION_NORTH] &&  egress_present[DIRECTION_NORTH]) ||
+        (!egress_full[DIRECTION_EAST ] && !egress_present[DIRECTION_NORTH])
     )) ||
-    (dist_dir_i == NX_DIRX_EAST && (
-        (!egress_full[NX_DIRX_EAST ] &&  egress_present[NX_DIRX_EAST ]) ||
-        (!egress_full[NX_DIRX_SOUTH] && !egress_present[NX_DIRX_EAST ])
+    (dist_dir_i == DIRECTION_EAST && (
+        (!egress_full[DIRECTION_EAST ] &&  egress_present[DIRECTION_EAST ]) ||
+        (!egress_full[DIRECTION_SOUTH] && !egress_present[DIRECTION_EAST ])
     )) ||
-    (dist_dir_i == NX_DIRX_SOUTH && (
-        (!egress_full[NX_DIRX_SOUTH] &&  egress_present[NX_DIRX_SOUTH]) ||
-        (!egress_full[NX_DIRX_WEST ] && !egress_present[NX_DIRX_SOUTH])
+    (dist_dir_i == DIRECTION_SOUTH && (
+        (!egress_full[DIRECTION_SOUTH] &&  egress_present[DIRECTION_SOUTH]) ||
+        (!egress_full[DIRECTION_WEST ] && !egress_present[DIRECTION_SOUTH])
     )) ||
-    (dist_dir_i == NX_DIRX_WEST && (
-        (!egress_full[NX_DIRX_WEST ] &&  egress_present[NX_DIRX_WEST ]) ||
-        (!egress_full[NX_DIRX_NORTH] && !egress_present[NX_DIRX_WEST ])
+    (dist_dir_i == DIRECTION_WEST && (
+        (!egress_full[DIRECTION_WEST ] &&  egress_present[DIRECTION_WEST ]) ||
+        (!egress_full[DIRECTION_NORTH] && !egress_present[DIRECTION_WEST ])
     ))
 );
 

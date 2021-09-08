@@ -13,40 +13,41 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_stream_combiner
 // Combines two directed streams, in different modes
 //
-module nx_stream_combiner #(
+module nx_stream_combiner
+import NXConstants::*;
+#(
     parameter ARB_SCHEME = "round_robin" // round_robin, prefer_a, prefer_b
 ) (
       input  logic clk_i
     , input  logic rst_i
     // Inbound message streams
     // - A
-    , input  nx_message_t stream_a_data_i
-    , input  logic [1:0]  stream_a_dir_i
-    , input  logic        stream_a_valid_i
-    , output logic        stream_a_ready_o
+    , input  node_message_t stream_a_data_i
+    , input  direction_t    stream_a_dir_i
+    , input  logic          stream_a_valid_i
+    , output logic          stream_a_ready_o
     // - B
-    , input  nx_message_t stream_b_data_i
-    , input  logic [1:0]  stream_b_dir_i
-    , input  logic        stream_b_valid_i
-    , output logic        stream_b_ready_o
+    , input  node_message_t stream_b_data_i
+    , input  direction_t    stream_b_dir_i
+    , input  logic          stream_b_valid_i
+    , output logic          stream_b_ready_o
     // Outbound arbitrated message stream
-    , output nx_message_t comb_data_o
-    , output logic [1:0]  comb_dir_o
-    , output logic        comb_valid_o
-    , input  logic        comb_ready_i
+    , output node_message_t comb_data_o
+    , output direction_t    comb_dir_o
+    , output logic          comb_valid_o
+    , input  logic          comb_ready_i
 );
 
 // Arbitrated state
-`DECLARE_DQT(nx_message_t, comb_data,  clk_i, rst_i, {$bits(nx_message_t){1'b0}})
-`DECLARE_DQ (           2, comb_dir,   clk_i, rst_i, NX_DIRX_NORTH)
-`DECLARE_DQ (           1, comb_valid, clk_i, rst_i, 1'b0)
-`DECLARE_DQ (           1, comb_next,  clk_i, rst_i, 1'b0)
-`DECLARE_DQ (           1, comb_curr,  clk_i, rst_i, 1'b0)
+`DECLARE_DQT(node_message_t, comb_data,  clk_i, rst_i, {MESSAGE_WIDTH{1'b0}})
+`DECLARE_DQ (             2, comb_dir,   clk_i, rst_i, DIRECTION_NORTH)
+`DECLARE_DQ (             1, comb_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ (             1, comb_next,  clk_i, rst_i, 1'b0)
+`DECLARE_DQ (             1, comb_curr,  clk_i, rst_i, 1'b0)
 
 assign comb_data_o  = comb_data_q;
 assign comb_dir_o   = comb_dir_q;

@@ -13,19 +13,17 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_node_control
 // Handles I/O mappings, signal state updates, and generates messages for output
 // signal state updates.
 //
-module nx_node_control #(
-      parameter ADDR_ROW_WIDTH  =   4 // Row address bit width
-    , parameter ADDR_COL_WIDTH  =   4 // Column address bit width
-    , parameter INPUTS          =   8 // Number of inputs to each node
-    , parameter OUTPUTS         =   8 // Number of outputs from each node
-    , parameter OP_STORE_LENGTH = 512 // Total number of output messages allowed
-    , parameter OP_STORE_WIDTH  = 1 + ADDR_ROW_WIDTH + ADDR_COL_WIDTH + $clog2(INPUTS) + 1
+module nx_node_control
+import NXConstants::*;
+#(
+      parameter INPUTS         =   8 // Number of inputs to each node
+    , parameter OUTPUTS        =   8 // Number of outputs from each node
+    , parameter OP_STORE_WIDTH = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + IOR_WIDTH + 2
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -39,62 +37,105 @@ module nx_node_control #(
     , input  logic token_grant_i   // Inbound token
     , output logic token_release_o // Outbound token
     // Outbound message stream
-    , output nx_message_t   msg_data_o
-    , output nx_direction_t msg_dir_o
+    , output node_message_t msg_data_o
+    , output direction_t    msg_dir_o
     , output logic          msg_valid_o
     , input  logic          msg_ready_i
     // I/O mapping
-    , input  logic [$clog2(OUTPUTS)-1:0] map_idx_i     // Which output to configure
-    , input  logic [ ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
-    , input  logic [ ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
-    , input  logic [ $clog2(INPUTS)-1:0] map_tgt_idx_i // Target node's input index
-    , input  logic                       map_tgt_seq_i // Target node's input is sequential
-    , input  logic                       map_valid_i   // Mapping is valid
+    , input  logic [     IOR_WIDTH-1:0] map_idx_i     // Which output to configure
+    , input  logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
+    , input  logic [ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
+    , input  logic [     IOR_WIDTH-1:0] map_tgt_idx_i // Target node's input index
+    , input  logic                     map_tgt_seq_i // Target node's input is sequential
+    , input  logic                     map_valid_i   // Mapping is valid
     // Signal state update
-    , input  logic [$clog2(OUTPUTS)-1:0] signal_index_i  // Input index
-    , input  logic                       signal_is_seq_i // Input is sequential
-    , input  logic                       signal_state_i  // Signal state
-    , input  logic                       signal_valid_i  // Update is valid
+    , input  logic [IOR_WIDTH-1:0] signal_index_i  // Input index
+    , input  logic                 signal_is_seq_i // Input is sequential
+    , input  logic                 signal_state_i  // Signal state
+    , input  logic                 signal_valid_i  // Update is valid
     // Interface to core
     , output logic               core_trigger_o // Start/restart instruction execution
     , output logic [ INPUTS-1:0] core_inputs_o  // Collected input state
     , input  logic [OUTPUTS-1:0] core_outputs_i // Output state from core
     // Interface to memory
-    , output logic [$clog2(OP_STORE_LENGTH)-1:0] store_addr_o    // Output store row address
+    , output logic [$clog2(MAX_NODE_CONFIG)-1:0] store_addr_o    // Output store row address
     , output logic [         OP_STORE_WIDTH-1:0] store_wr_data_o // Output store write data
     , output logic                               store_wr_en_o   // Output store write enable
     , output logic                               store_rd_en_o   // Output store read enable
     , input  logic [         OP_STORE_WIDTH-1:0] store_rd_data_i // Output store read data
 );
 
+// =============================================================================
 // Parameters and constants
-localparam OP_STORE_ADDR_W = $clog2(OP_STORE_LENGTH);
-localparam INPUT_W         = $clog2(INPUTS);
-localparam OUTPUT_W        = $clog2(OUTPUTS);
+// =============================================================================
 
+localparam OP_STORE_ADDR_W = $clog2(MAX_NODE_CONFIG);
+
+// =============================================================================
 // Internal state
-`DECLARE_DQ(1, first_cycle, clk_i, rst_i, 1'b1)
+// =============================================================================
 
-`DECLARE_DQT(nx_msg_sig_state_t, msg_data,     clk_i, rst_i, {$bits(nx_msg_sig_state_t){1'b0}})
-`DECLARE_DQT(nx_direction_t,     msg_dir,      clk_i, rst_i, NX_DIRX_NORTH)
-`DECLARE_DQ(1,                   msg_valid,    clk_i, rst_i, 1'b0)
+// First cycle marker
+`DECLARE_DQ(1, first_cycle, clk_i, rst_i, 'd1)
 
-`DECLARE_DQ(INPUTS, input_curr, clk_i, rst_i, {INPUTS{1'b0}})
-`DECLARE_DQ(INPUTS, input_next, clk_i, rst_i, {INPUTS{1'b0}})
-`DECLARE_DQ(1,      input_trig, clk_i, rst_i, 1'b0)
+// Emitted message
+`DECLARE_DQT(node_sig_state_t, msg_data,     clk_i, rst_i, 'd0)
+`DECLARE_DQT(direction_t,      msg_dir,      clk_i, rst_i, DIRECTION_NORTH)
+`DECLARE_DQ(1,                 msg_valid,    clk_i, rst_i, 'd0)
 
-`DECLARE_DQ(      OUTPUTS,                  output_actv,  clk_i, rst_i, {OUTPUTS{1'b0}})
-`DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_base,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_final, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(      OP_STORE_ADDR_W,          output_next,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+// Inputs (sequential & combinatorial)
+`DECLARE_DQ(INPUTS, input_curr, clk_i, rst_i, 'd0)
+`DECLARE_DQ(INPUTS, input_next, clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,      input_trig, clk_i, rst_i, 'd0)
 
-`DECLARE_DQ(INPUT_W, loopback_index, clk_i, rst_i, {INPUT_W{1'b0}})
-`DECLARE_DQ(1,       loopback_state, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,       loopback_valid, clk_i, rst_i, 1'b0)
+// Output message tracking
+`DECLARE_DQ(      OUTPUTS,                  output_actv,  clk_i, rst_i, 'd0)
+`DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_base,  clk_i, rst_i, 'd0)
+`DECLARE_DQ_ARRAY(OP_STORE_ADDR_W, OUTPUTS, output_final, clk_i, rst_i, 'd0)
+`DECLARE_DQ(      OP_STORE_ADDR_W,          output_next,  clk_i, rst_i, 'd0)
 
-`DECLARE_DQ(1, fifo_pop, clk_i, rst_i, 1'b0)
+// Node store interface
+`DECLARE_DQ(OP_STORE_ADDR_W, store_addr,    clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+`DECLARE_DQ(OP_STORE_WIDTH,  store_wr_data, clk_i, rst_i, {OP_STORE_WIDTH{1'b0}})
+`DECLARE_DQ(1,               store_wr_en,   clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,               store_rd_en,   clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,               store_rd_resp, clk_i, rst_i, 1'b0)
 
+// Internal loopback
+`DECLARE_DQ(IOR_WIDTH, loopback_index, clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,         loopback_state, clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,         loopback_valid, clk_i, rst_i, 'd0)
+
+// Message pipeline pop
+`DECLARE_DQ(1, fifo_pop, clk_i, rst_i, 'd0)
+
+// Output change detection
+`DECLARE_DQ(OUTPUTS,   detect_last,  clk_i, rst_i, 'd0)
+`DECLARE_DQ(OUTPUTS,   detect_xor,   clk_i, rst_i, 'd0)
+`DECLARE_DQ(IOR_WIDTH, detect_index, clk_i, rst_i, 'd0)
+`DECLARE_DQ(        1, detect_state, clk_i, rst_i, 'd0)
+`DECLARE_DQ(        1, detect_valid, clk_i, rst_i, 'd0)
+
+// Detected output change
+`DECLARE_DQ(OP_STORE_ADDR_W,   update_base,    clk_i, rst_i, 'd0)
+`DECLARE_DQ(OP_STORE_ADDR_W,   update_final,   clk_i, rst_i, 'd0)
+`DECLARE_DQ(              1,   update_state,   clk_i, rst_i, 'd0)
+`DECLARE_DQ(              1,   update_valid,   clk_i, rst_i, 'd0)
+
+// Output message generation
+`DECLARE_DQ(OP_STORE_ADDR_W, send_address, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+`DECLARE_DQ(OP_STORE_ADDR_W, send_final,   clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
+`DECLARE_DQ(1,               send_pending, clk_i, rst_i, 1'b0)
+`DECLARE_DQ(1,               send_value,   clk_i, rst_i, 1'b0)
+
+// Track message generation
+`DECLARE_DQ(OP_STORE_ADDR_W+1, msgs_queued, clk_i, rst_i, 'd0)
+`DECLARE_DQ(OP_STORE_ADDR_W+1, msgs_sent,   clk_i, rst_i, 'd0)
+
+// =============================================================================
 // Construct outputs
+// =============================================================================
+
 assign msg_data_o  = msg_data_q;
 assign msg_dir_o   = msg_dir_q;
 assign msg_valid_o = msg_valid_q;
@@ -102,18 +143,9 @@ assign msg_valid_o = msg_valid_q;
 assign core_trigger_o = input_trig_q;
 assign core_inputs_o  = input_curr_q;
 
-// Detect change in output vector
-`DECLARE_DQ(OUTPUTS, detect_last, clk_i, rst_i, {OUTPUTS{1'b0}})
-`DECLARE_DQ(OUTPUTS, detect_xor,  clk_i, rst_i, {OUTPUTS{1'b0}})
-
-`DECLARE_DQ(OUTPUT_W, detect_index, clk_i, rst_i, {OUTPUT_W{1'b0}})
-`DECLARE_DQ(       1, detect_state, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(       1, detect_valid, clk_i, rst_i, 1'b0)
-
-`DECLARE_DQ(OP_STORE_ADDR_W, update_base,  clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(OP_STORE_ADDR_W, update_final, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(              1, update_state, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(              1, update_valid, clk_i, rst_i, 1'b0)
+// =============================================================================
+// Detect changes in output
+// =============================================================================
 
 always_comb begin : p_detect_xor
     int i;
@@ -130,6 +162,12 @@ always_comb begin : p_detect_xor
     `INIT_D(update_state);
     `INIT_D(update_valid);
 
+    `INIT_D(msgs_queued);
+
+    // Track queued messages
+    if (update_valid && !queue_full)
+        msgs_queued = msgs_queued + (update_final - update_base + 'd1);
+
     // If update FIFO not full, clear update valid
     if (!queue_full) update_valid = 1'b0;
 
@@ -145,7 +183,7 @@ always_comb begin : p_detect_xor
     // Pipelined priority encoder to find first changed output
     for (i = 0; i < OUTPUTS; i = (i + 1)) begin
         if (!detect_valid && detect_xor[i]) begin
-            detect_index  = i[OUTPUT_W-1:0];
+            detect_index  = i[IOR_WIDTH-1:0];
             detect_state  = detect_last[i];
             detect_valid  = 1'b1;
             detect_xor[i] = 1'b0;
@@ -159,7 +197,10 @@ always_comb begin : p_detect_xor
     end
 end
 
+// =============================================================================
 // Update request queue
+// =============================================================================
+
 logic [OP_STORE_ADDR_W-1:0] queued_base, queued_final;
 logic                       queued_state, queue_full, queue_empty, queue_pop;
 
@@ -181,17 +222,10 @@ nx_fifo #(
     , .full_o (queue_full )
 );
 
-// Handle output message memory interface
-`DECLARE_DQ(OP_STORE_ADDR_W, store_addr,    clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(OP_STORE_WIDTH,  store_wr_data, clk_i, rst_i, {OP_STORE_WIDTH{1'b0}})
-`DECLARE_DQ(1,               store_wr_en,   clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,               store_rd_en,   clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,               store_rd_resp, clk_i, rst_i, 1'b0)
 
-`DECLARE_DQ(OP_STORE_ADDR_W, send_address, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(OP_STORE_ADDR_W, send_final,   clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(1,               send_pending, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,               send_value,   clk_i, rst_i, 1'b0)
+// =============================================================================
+// Handle reads and writes to the output message store
+// =============================================================================
 
 assign store_addr_o    = store_addr_q;
 assign store_wr_data_o = store_wr_data_q;
@@ -291,7 +325,10 @@ always_comb begin : p_output_memory
     end
 end
 
-// Token acquisition
+// =============================================================================
+// Acquire and release tokens
+// =============================================================================
+
 `DECLARE_DQ(1, token_held,    clk_i, rst_i, 1'b0)
 `DECLARE_DQ(1, token_release, clk_i, rst_i, 1'b0)
 
@@ -319,7 +356,10 @@ always_comb begin : p_token
     end
 end
 
+// =============================================================================
 // Generate output messages
+// =============================================================================
+
 logic [OP_STORE_WIDTH-1:0] msg_fifo_out;
 logic                      msg_fifo_empty;
 
@@ -341,17 +381,11 @@ nx_fifo #(
     , .full_o (              )
 );
 
-assign idle_o = (
-    queue_empty && state_fifo_empty && msg_fifo_empty && !msg_valid_q &&
-    !loopback_valid_q && !(|detect_xor) && !detect_valid && !store_rd_en &&
-    !input_trig_q && !update_valid
-);
-
 always_comb begin : p_output
     logic                      tgt_lb;
     logic [ADDR_ROW_WIDTH-1:0] tgt_row;
     logic [ADDR_COL_WIDTH-1:0] tgt_col;
-    logic [       INPUT_W-1:0] tgt_idx;
+    logic [     IOR_WIDTH-1:0] tgt_idx;
     logic                      tgt_seq;
 
     `INIT_D(msg_data);
@@ -361,6 +395,10 @@ always_comb begin : p_output
     `INIT_D(loopback_state);
     `INIT_D(loopback_valid);
     `INIT_D(fifo_pop);
+    `INIT_D(msgs_sent);
+
+    // Track messages being sent
+    if (fifo_pop) msgs_sent = msgs_sent + 'd1;
 
     // Clear message valid if accepted
     if (msg_ready_i) msg_valid = 1'b0;
@@ -385,16 +423,16 @@ always_comb begin : p_output
         // Build the message to send
         msg_data.header.row     = tgt_row;
         msg_data.header.column  = tgt_col;
-        msg_data.header.command = NX_CMD_SIG_STATE;
-        msg_data.target_index   = tgt_idx;
-        msg_data.target_is_seq  = tgt_seq;
+        msg_data.header.command = NODE_COMMAND_SIG_STATE;
+        msg_data.index          = tgt_idx;
+        msg_data.is_seq         = tgt_seq;
         msg_data.state          = state_fifo_out;
 
         // Route the message
-        if      (tgt_row < node_row_i) msg_dir = NX_DIRX_NORTH;
-        else if (tgt_row > node_row_i) msg_dir = NX_DIRX_SOUTH;
-        else if (tgt_col < node_col_i) msg_dir = NX_DIRX_WEST;
-        else if (tgt_col > node_col_i) msg_dir = NX_DIRX_EAST;
+        if      (tgt_row < node_row_i) msg_dir = DIRECTION_NORTH;
+        else if (tgt_row > node_row_i) msg_dir = DIRECTION_SOUTH;
+        else if (tgt_col < node_col_i) msg_dir = DIRECTION_WEST;
+        else if (tgt_col > node_col_i) msg_dir = DIRECTION_EAST;
 
         // Send when both state and message and not an internal loopback
         msg_valid = !state_fifo_empty && !msg_fifo_empty;
@@ -404,7 +442,10 @@ always_comb begin : p_output
     end
 end
 
+// =============================================================================
 // Handle input updates
+// =============================================================================
+
 always_comb begin : p_input_update
     int i;
     `INIT_D(first_cycle);
@@ -445,5 +486,16 @@ always_comb begin : p_input_update
     // Output->input loopbacks - only ever sequential (avoid deadlock loop)
     if (loopback_valid_q) input_next[loopback_index_q] = loopback_state_q;
 end
+
+// =============================================================================
+// Determine if the control block is idle
+// =============================================================================
+
+assign idle_o = (
+    (detect_xor    == 'd0        ) && // Output XOR all zero (no change)
+    (update_valid  == 'd0        ) && // No pipelined address lookup
+    (msgs_queued_q == msgs_sent_q) && // No pending messages
+    (input_trig_q  == 'd0        )    // No outstanding input updates
+);
 
 endmodule : nx_node_control

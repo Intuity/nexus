@@ -125,16 +125,11 @@ nx_axi4s_bridge #(
 // =============================================================================
 
 nexus #(
-      .ROWS          (  6)
-    , .COLUMNS       (  6)
-    , .ADDR_ROW_WIDTH(  4)
-    , .ADDR_COL_WIDTH(  4)
-    , .INSTR_WIDTH   ( 21)
-    , .INPUTS        ( 32)
-    , .OUTPUTS       ( 32)
-    , .REGISTERS     (  8)
-    , .MAX_INSTRS    (512)
-    , .OPCODE_WIDTH  (  3)
+      .ROWS     ( 6)
+    , .COLUMNS  ( 6)
+    , .INPUTS   (32)
+    , .OUTPUTS  (32)
+    , .REGISTERS( 8)
 ) core (
       .clk_i( clk )
     , .rst_i(~rstn)

@@ -13,13 +13,14 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_control
 // Nexus top-level controller. Responsible for monitoring the mesh, generating
 // tick events, and providing status feedback to the host.
 //
-module nx_control #(
+module nx_control
+import NXConstants::*;
+#(
       parameter ROWS       = 3
     , parameter COLUMNS    = 3
     , parameter INPUTS     = 8
@@ -29,11 +30,11 @@ module nx_control #(
       input  logic clk_i
     , input  logic rst_i
     // Inbound message stream (from host)
-    , input  nx_ctrl_msg_t inbound_data_i
-    , input  logic         inbound_valid_i
-    , output logic         inbound_ready_o
+    , input  control_message_t inbound_data_i
+    , input  logic             inbound_valid_i
+    , output logic             inbound_ready_o
     // Outbound message stream (to host)
-    , output nx_ctrl_msg_resp_t outbound_data_o
+    , output control_response_t outbound_data_o
     , output logic              outbound_valid_o
     , input  logic              outbound_ready_i
     // Soft reset request
@@ -49,8 +50,8 @@ module nx_control #(
     , input  logic [COLUMNS-1:0] token_release_i // Per-column token return
 );
 
-localparam RX_PYLD_WIDTH = `NX_MESSAGE_WIDTH - $bits(nx_ctrl_command_t);
-localparam TX_PYLD_WIDTH = `NX_MESSAGE_WIDTH;
+localparam RX_PYLD_WIDTH = MESSAGE_WIDTH - $bits(control_command_t);
+localparam TX_PYLD_WIDTH = MESSAGE_WIDTH;
 
 // Internal state
 `DECLARE_DQ (                 1, soft_reset,     clk_i, rst_i,                              1'b0)
@@ -63,7 +64,7 @@ localparam TX_PYLD_WIDTH = `NX_MESSAGE_WIDTH;
 `DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, clk_i, rst_i,             {RX_PYLD_WIDTH{1'b0}})
 `DECLARE_DQ (                 1, interval_set,   clk_i, rst_i,                              1'b0)
 `DECLARE_DQ (           COLUMNS, token_grant,    clk_i, rst_i,                   {COLUMNS{1'b0}})
-`DECLARE_DQT(nx_ctrl_msg_resp_t, send_data,      clk_i, rst_i, {$bits(nx_ctrl_msg_resp_t){1'b0}})
+`DECLARE_DQT(control_response_t, send_data,      clk_i, rst_i, {$bits(control_response_t){1'b0}})
 `DECLARE_DQ (                 1, send_valid,     clk_i, rst_i,                              1'b0)
 
 // Connect outputs
@@ -95,14 +96,14 @@ assign cycle = trigger ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle
 assign token_grant = (trigger && first_tick_q) ? {COLUMNS{1'b1}} : token_release_i;
 
 // Inbound message FIFO
-nx_ctrl_msg_t ib_fifo_data;
-logic         ib_fifo_empty, ib_fifo_full, ib_fifo_pop;
+control_message_t ib_fifo_data;
+logic             ib_fifo_empty, ib_fifo_full, ib_fifo_pop;
 
 assign inbound_ready_o = !ib_fifo_full;
 
 nx_fifo #(
-      .DEPTH(                2)
-    , .WIDTH(`NX_MESSAGE_WIDTH)
+      .DEPTH(            2)
+    , .WIDTH(MESSAGE_WIDTH)
 ) ib_fifo (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -151,33 +152,31 @@ always_comb begin : p_decode
         // Decode command
         case (ib_fifo_data.raw.command)
             // Respond with the device identifier (NXS)
-            NX_CTRL_ID: begin
+            CONTROL_COMMAND_ID: begin
                 send_valid = 1'b1;
-                send_data  = { {(`NX_MESSAGE_WIDTH-24){1'b0}}, `NX_DEVICE_ID };
+                send_data  = { {(MESSAGE_WIDTH-24){1'b0}}, HW_DEV_ID[23:0] };
             end
             // Respond with the major and minor versions of the mesh
-            NX_CTRL_VERSION: begin
+            CONTROL_COMMAND_VERSION: begin
                 send_valid = 1'b1;
                 send_data  = {
-                    {(`NX_MESSAGE_WIDTH-16){1'b0}},
-                    `NX_VERSION_MAJOR,
-                    `NX_VERSION_MINOR
+                    {(MESSAGE_WIDTH-16){1'b0}}, HW_VER_MAJOR[7:0], HW_VER_MINOR[7:0]
                 };
             end
             // Respond with the different parameters of the mesh
-            NX_CTRL_PARAM: begin
+            CONTROL_COMMAND_PARAM: begin
                 case (ib_fifo_data.param.param)
-                    NX_PARAM_COUNTER_WIDTH:
+                    CONTROL_PARAM_COUNTER_WIDTH:
                         send_data = TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0];
-                    NX_PARAM_ROWS:
+                    CONTROL_PARAM_ROWS:
                         send_data = ROWS[TX_PYLD_WIDTH-1:0];
-                    NX_PARAM_COLUMNS:
+                    CONTROL_PARAM_COLUMNS:
                         send_data = COLUMNS[TX_PYLD_WIDTH-1:0];
-                    NX_PARAM_NODE_INPUTS:
+                    CONTROL_PARAM_NODE_INPUTS:
                         send_data = INPUTS[TX_PYLD_WIDTH-1:0];
-                    NX_PARAM_NODE_OUTPUTS:
+                    CONTROL_PARAM_NODE_OUTPUTS:
                         send_data = OUTPUTS[TX_PYLD_WIDTH-1:0];
-                    NX_PARAM_NODE_REGISTERS:
+                    CONTROL_PARAM_NODE_REGISTERS:
                         send_data = REGISTERS[TX_PYLD_WIDTH-1:0];
                     default:
                         send_data = {TX_PYLD_WIDTH{1'b0}};
@@ -185,11 +184,11 @@ always_comb begin : p_decode
                 send_valid = 1'b1;
             end
             // Set/clear the active switch for the mesh
-            NX_CTRL_ACTIVE: begin
+            CONTROL_COMMAND_ACTIVE: begin
                 active = ib_fifo_data.active.active;
             end
             // Read back various status flags
-            NX_CTRL_STATUS: begin
+            CONTROL_COMMAND_STATUS: begin
                 send_valid = 1'b1;
                 send_data  = {
                     {(TX_PYLD_WIDTH-4){1'b0}}, active_q, seen_idle_low_q,
@@ -197,18 +196,18 @@ always_comb begin : p_decode
                 };
             end
             // Read back the number of elapsed cycles
-            NX_CTRL_CYCLES: begin
+            CONTROL_COMMAND_CYCLES: begin
                 send_valid = 1'b1;
                 send_data  = cycle_q;
             end
             // Set/clear the interval (number of cycles to run for)
-            NX_CTRL_INTERVAL: begin
-                interval       = ib_fifo_data.interval.interval;
+            CONTROL_COMMAND_INTERVAL: begin
+                interval       = ib_fifo_data.raw.payload;
                 interval_count = 'd0;
-                interval_set   = (ib_fifo_data.interval.interval != 0);
+                interval_set   = (ib_fifo_data.raw.payload != 0);
             end
             // Soft reset request
-            NX_CTRL_RESET: begin
+            CONTROL_COMMAND_RESET: begin
                 soft_reset = ib_fifo_data.raw.payload[0];
             end
             // Catch-all

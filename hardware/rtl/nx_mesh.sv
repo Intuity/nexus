@@ -13,22 +13,18 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_mesh
 // Mesh of nodes with any number of rows or columns.
 //
-module nx_mesh #(
-      parameter ROWS           =   3
-    , parameter COLUMNS        =   3
-    , parameter ADDR_ROW_WIDTH =   4
-    , parameter ADDR_COL_WIDTH =   4
-    , parameter INSTR_WIDTH    =  15
-    , parameter INPUTS         =   8
-    , parameter OUTPUTS        =   8
-    , parameter REGISTERS      =   8
-    , parameter MAX_INSTRS     = 512
-    , parameter OPCODE_WIDTH   =   3
+module nx_mesh
+import NXConstants::*;
+#(
+      parameter ROWS      = 3
+    , parameter COLUMNS   = 3
+    , parameter INPUTS    = 8
+    , parameter OUTPUTS   = 8
+    , parameter REGISTERS = 8
 ) (
       input  logic clk_i
     , input  logic rst_i
@@ -39,13 +35,13 @@ module nx_mesh #(
     , input  logic [COLUMNS-1:0] token_grant_i
     , output logic [COLUMNS-1:0] token_release_o
     // Inbound stream
-    , input  nx_message_t inbound_data_i
-    , input  logic        inbound_valid_i
-    , output logic        inbound_ready_o
+    , input  node_message_t inbound_data_i
+    , input  logic          inbound_valid_i
+    , output logic          inbound_ready_o
     // Outbound stream
-    , output nx_message_t outbound_data_o
-    , output logic        outbound_valid_o
-    , input  logic        outbound_ready_i
+    , output node_message_t outbound_data_o
+    , output logic          outbound_valid_o
+    , input  logic          outbound_ready_i
 );
 
 localparam NODES = ROWS * COLUMNS;
@@ -62,12 +58,12 @@ assign idle_o = idle_q;
 logic [NODES-1:0] column_grant, column_release;
 
 // Message interfaces for every node
-nx_message_t north_data [NODES-1:0], east_data [NODES-1:0],
-             south_data [NODES-1:0], west_data [NODES-1:0];
-logic        north_valid [NODES-1:0], east_valid [NODES-1:0],
-             south_valid [NODES-1:0], west_valid [NODES-1:0];
-logic        north_ready [NODES-1:0], east_ready [NODES-1:0],
-             south_ready [NODES-1:0], west_ready [NODES-1:0];
+node_message_t north_data [NODES-1:0], east_data [NODES-1:0],
+               south_data [NODES-1:0], west_data [NODES-1:0];
+logic          north_valid [NODES-1:0], east_valid [NODES-1:0],
+               south_valid [NODES-1:0], west_valid [NODES-1:0];
+logic          north_ready [NODES-1:0], east_ready [NODES-1:0],
+               south_ready [NODES-1:0], west_ready [NODES-1:0];
 
 // Generate the mesh
 generate
@@ -102,21 +98,21 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         // =====================================================================
         // Link up message interfaces
         // =====================================================================
-        nx_message_t ib_north_data, ib_east_data, ib_south_data,
-                     ib_west_data;
-        logic        ib_north_valid, ib_east_valid, ib_south_valid,
-                     ib_west_valid;
-        logic        ib_north_ready, ib_east_ready, ib_south_ready,
-                     ib_west_ready;
+        node_message_t ib_north_data, ib_east_data, ib_south_data,
+                       ib_west_data;
+        logic          ib_north_valid, ib_east_valid, ib_south_valid,
+                       ib_west_valid;
+        logic          ib_north_ready, ib_east_ready, ib_south_ready,
+                       ib_west_ready;
 
-        nx_message_t ob_north_data, ob_east_data, ob_south_data,
-                     ob_west_data;
-        logic        ob_north_valid, ob_east_valid, ob_south_valid,
-                     ob_west_valid;
-        logic        ob_north_ready, ob_east_ready, ob_south_ready,
-                     ob_west_ready;
-        logic        ob_north_present, ob_east_present,
-                     ob_south_present, ob_west_present;
+        node_message_t ob_north_data, ob_east_data, ob_south_data,
+                       ob_west_data;
+        logic          ob_north_valid, ob_east_valid, ob_south_valid,
+                       ob_west_valid;
+        logic          ob_north_ready, ob_east_ready, ob_south_ready,
+                       ob_west_ready;
+        logic          ob_north_present, ob_east_present,
+                       ob_south_present, ob_west_present;
 
         if (i_row == 0) begin
             assign ob_north_ready   = 1'b0;
@@ -126,7 +122,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
                 assign ib_north_valid  = inbound_valid_i;
                 assign inbound_ready_o = ib_north_ready;
             end else begin
-                assign ib_north_data  = {$bits(nx_message_t){1'b0}};
+                assign ib_north_data  = {MESSAGE_WIDTH{1'b0}};
                 assign ib_north_valid = 1'b0;
             end
         end else begin
@@ -141,7 +137,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         end
 
         if (i_col == (COLUMNS - 1)) begin
-            assign ib_east_data    = {$bits(nx_message_t){1'b0}};
+            assign ib_east_data    = {MESSAGE_WIDTH{1'b0}};
             assign ib_east_valid   = 1'b0;
             assign ob_east_ready   = 1'b0;
             assign ob_east_present = 1'b0;
@@ -157,7 +153,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         end
 
         if (i_row == (ROWS - 1)) begin
-            assign ib_south_data  = {$bits(nx_message_t){1'b0}};
+            assign ib_south_data  = {MESSAGE_WIDTH{1'b0}};
             assign ib_south_valid = 1'b0;
             if (i_col == 0) begin
                 assign outbound_data_o  = ob_south_data;
@@ -180,7 +176,7 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         end
 
         if (i_col == 0) begin
-            assign ib_west_data    = {$bits(nx_message_t){1'b0}};
+            assign ib_west_data    = {MESSAGE_WIDTH{1'b0}};
             assign ib_west_valid   = 1'b0;
             assign ob_west_ready   = 1'b0;
             assign ob_west_present = 1'b0;
@@ -199,14 +195,9 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
         // Instance the node
         // =====================================================================
         nx_node #(
-              .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-            , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-            , .INSTR_WIDTH   (INSTR_WIDTH   )
-            , .INPUTS        (INPUTS        )
-            , .OUTPUTS       (OUTPUTS       )
-            , .REGISTERS     (REGISTERS     )
-            , .MAX_INSTRS    (MAX_INSTRS    )
-            , .OPCODE_WIDTH  (OPCODE_WIDTH  )
+              .INPUTS   (INPUTS   )
+            , .OUTPUTS  (OUTPUTS  )
+            , .REGISTERS(REGISTERS)
         ) node (
               .clk_i(clk_i)
             , .rst_i(rst_i)

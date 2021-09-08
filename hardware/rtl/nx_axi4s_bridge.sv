@@ -13,12 +13,13 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_axi4s_bridge
 // AXI4-Stream to Nexus message stream
 //
-module nx_axi4s_bridge #(
+module nx_axi4s_bridge
+import NXConstants::*;
+#(
     parameter AXI4_DATA_WIDTH = 64
 ) (
       input  logic clk_i
@@ -29,13 +30,13 @@ module nx_axi4s_bridge #(
     , input  wire                       ib_axi4s_tvalid_i
     , output wire                       ib_axi4s_tready_o
     // Outbound Nexus message stream
-    , output nx_message_t ob_nx_data_o
-    , output logic        ob_nx_valid_o
-    , input  logic        ob_nx_ready_i
+    , output node_message_t ob_nx_data_o
+    , output logic          ob_nx_valid_o
+    , input  logic          ob_nx_ready_i
     // Inbound Nexus message stream
-    , input  nx_message_t ib_nx_data_i
-    , input  logic        ib_nx_valid_i
-    , output logic        ib_nx_ready_o
+    , input  node_message_t ib_nx_data_i
+    , input  logic          ib_nx_valid_i
+    , output logic          ib_nx_ready_o
     // Outbound AXI4-stream
     , output wire [AXI4_DATA_WIDTH-1:0] ob_axi4s_tdata_o
     , output wire                       ob_axi4s_tlast_o
@@ -43,8 +44,7 @@ module nx_axi4s_bridge #(
     , input  wire                       ob_axi4s_tready_i
 );
 
-localparam MSG_WIDTH   = $bits(nx_message_t);
-localparam SLOT_WIDTH  = MSG_WIDTH + 1;
+localparam SLOT_WIDTH  = MESSAGE_WIDTH + 1;
 localparam A2N_RATIO   = AXI4_DATA_WIDTH / SLOT_WIDTH;
 localparam A2N_RATIO_W = $clog2(A2N_RATIO);
 
@@ -77,18 +77,18 @@ assign ib_axi4s_tready_o = !axi4s_full;
 
 // MSB of each slot is a presence indicator
 logic [A2N_RATIO-1:0] ib_slot_present;
-nx_message_t          ib_message [A2N_RATIO-1:0];
+node_message_t        ib_message [A2N_RATIO-1:0];
 generate
 for (genvar i = 0; i < A2N_RATIO; i = (i + 1)) begin
     assign ib_slot_present[i] = axi4s_data[(i + 1)*SLOT_WIDTH - 1];
-    assign ib_message[i]      = axi4s_data[i*SLOT_WIDTH +: MSG_WIDTH];
+    assign ib_message[i]      = axi4s_data[i*SLOT_WIDTH +: MESSAGE_WIDTH];
 end
 endgenerate
 
 // Create state for output ports
-`DECLARE_DQ (A2N_RATIO_W,  ob_nx_slot,  clk_i, rst_i, {A2N_RATIO_W{1'b0}})
-`DECLARE_DQT(nx_message_t, ob_nx_data,  clk_i, rst_i, {$bits(nx_message_t){1'b0}})
-`DECLARE_DQ (1,            ob_nx_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ (A2N_RATIO_W,    ob_nx_slot,  clk_i, rst_i, {A2N_RATIO_W{1'b0}})
+`DECLARE_DQT(node_message_t, ob_nx_data,  clk_i, rst_i, {MESSAGE_WIDTH{1'b0}})
+`DECLARE_DQ (1,              ob_nx_valid, clk_i, rst_i, 1'b0)
 
 assign ob_nx_data_o  = ob_nx_data_q;
 assign ob_nx_valid_o = ob_nx_valid_q;
@@ -129,13 +129,13 @@ end
 // Outbound Pathway
 // =============================================================================
 
-logic [MSG_WIDTH-1:0] nx_fifo_data;
-logic [          1:0] nx_fifo_lvl;
-logic                 nx_fifo_empty, nx_fifo_full, nx_fifo_pop;
+logic [MESSAGE_WIDTH-1:0] nx_fifo_data;
+logic [              1:0] nx_fifo_lvl;
+logic                     nx_fifo_empty, nx_fifo_full, nx_fifo_pop;
 
 nx_fifo #(
-      .DEPTH(        2)
-    , .WIDTH(MSG_WIDTH)
+      .DEPTH(            2)
+    , .WIDTH(MESSAGE_WIDTH)
 ) nx_fifo (
       .clk_i(clk_i)
     , .rst_i(rst_i)
@@ -153,16 +153,16 @@ nx_fifo #(
 assign ib_nx_ready_o = !nx_fifo_full;
 
 // Create state for output ports
-`DECLARE_DQT_ARRAY(nx_message_t, A2N_RATIO, ob_axi4s_slot_data,  clk_i, rst_i, {MSG_WIDTH{1'b0}})
-`DECLARE_DQ_ARRAY (1,            A2N_RATIO, ob_axi4s_slot_valid, clk_i, rst_i, 1'b0)
-`DECLARE_DQ       (A2N_RATIO,               ob_axi4s_slot,       clk_i, rst_i, {A2N_RATIO_W{1'b0}})
-`DECLARE_DQ       (1,                       ob_axi4s_tlast,      clk_i, rst_i, 1'b0)
-`DECLARE_DQ       (1,                       ob_axi4s_tvalid,     clk_i, rst_i, 1'b0)
+`DECLARE_DQT_ARRAY(node_message_t, A2N_RATIO, ob_axi4s_slot_data,  clk_i, rst_i, {MESSAGE_WIDTH{1'b0}})
+`DECLARE_DQ_ARRAY (1,              A2N_RATIO, ob_axi4s_slot_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ       (A2N_RATIO,                 ob_axi4s_slot,       clk_i, rst_i, {A2N_RATIO_W{1'b0}})
+`DECLARE_DQ       (1,                         ob_axi4s_tlast,      clk_i, rst_i, 1'b0)
+`DECLARE_DQ       (1,                         ob_axi4s_tvalid,     clk_i, rst_i, 1'b0)
 
 generate
 for (genvar i = 0; i < A2N_RATIO; i = (i + 1)) begin
-    assign ob_axi4s_tdata_o[(i+1)*SLOT_WIDTH-1]        = ob_axi4s_slot_valid_q[i];
-    assign ob_axi4s_tdata_o[i*SLOT_WIDTH +: MSG_WIDTH] = ob_axi4s_slot_data_q[i];
+    assign ob_axi4s_tdata_o[(i+1)*SLOT_WIDTH-1]            = ob_axi4s_slot_valid_q[i];
+    assign ob_axi4s_tdata_o[i*SLOT_WIDTH +: MESSAGE_WIDTH] = ob_axi4s_slot_data_q[i];
 end
 endgenerate
 

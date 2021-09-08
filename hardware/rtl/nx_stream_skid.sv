@@ -17,21 +17,23 @@
 // nx_stream_skid
 // Parameterisable stream skid buffer
 //
-module nx_stream_skid (
+module nx_stream_skid
+import NXConstants::*;
+(
       input  logic                    clk_i
     , input  logic                    rst_i
     // Inbound message stream
-    , input  nx_message_t inbound_data_i
-    , input  logic        inbound_valid_i
-    , output logic        inbound_ready_o
+    , input  node_message_t inbound_data_i
+    , input  logic          inbound_valid_i
+    , output logic          inbound_ready_o
     // Outbound message stream
-    , output nx_message_t outbound_data_o
-    , output logic        outbound_valid_o
-    , input  logic        outbound_ready_i
+    , output node_message_t outbound_data_o
+    , output logic          outbound_valid_o
+    , input  logic          outbound_ready_i
 );
 
-nx_message_t buffer_q;
-logic        buffer_valid_q;
+node_message_t buffer_q;
+logic          buffer_valid_q;
 
 assign outbound_data_o  = buffer_valid_q ? buffer_q : inbound_data_i;
 assign outbound_valid_o = buffer_valid_q || inbound_valid_i;
@@ -39,7 +41,7 @@ assign inbound_ready_o  = !buffer_valid_q;
 
 always_ff @(posedge clk_i, posedge rst_i) begin : p_skid
     if (rst_i) begin
-        buffer_q       <= {$bits(nx_message_t){1'b0}};
+        buffer_q       <= {MESSAGE_WIDTH{1'b0}};
         buffer_valid_q <= 1'b0;
     end else begin
         // Fill buffer when it is empty and skid is backpressured

@@ -16,9 +16,10 @@
 // Dual ported data store - first port is used for the instruction sequence,
 // second port is used for the control block
 //
-module nx_node_store #(
-      parameter INSTR_WIDTH =  15 // Width of each instruction
-    , parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
+module nx_node_store
+import NXConstants::*;
+#(
+      parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
     , parameter CTRL_WIDTH  =  13 // Width of each control entry
     , parameter MAX_CTRL    = 512 // Maximum number of control entries
 ) (
@@ -27,12 +28,12 @@ module nx_node_store #(
     // Populated instruction counter
     , output logic [$clog2(MAX_INSTRS)-1:0] instr_count_o
     // Instruction load interface
-    , input  logic [INSTR_WIDTH-1:0] store_data_i
-    , input  logic                   store_valid_i
+    , input  instruction_t store_data_i
+    , input  logic         store_valid_i
     // Instruction fetch interfaces
     , input  logic [$clog2(MAX_INSTRS)-1:0] fetch_addr_i
     , input  logic                          fetch_rd_i
-    , output logic [       INSTR_WIDTH-1:0] fetch_data_o
+    , output instruction_t                  fetch_data_o
     , output logic                          fetch_stall_o
     // Control block interface
     , input  logic [$clog2(MAX_CTRL)-1:0] ctrl_addr_i
@@ -43,6 +44,7 @@ module nx_node_store #(
 );
 
 // Parameters
+localparam INSTR_WIDTH  = $bits(instruction_t);
 localparam INSTR_ADDR_W = $clog2(MAX_INSTRS);
 localparam CTRL_ADDR_W  = $clog2(MAX_CTRL);
 localparam MAX_ADDR_W   = (INSTR_ADDR_W > CTRL_ADDR_W) ? INSTR_ADDR_W : CTRL_ADDR_W;

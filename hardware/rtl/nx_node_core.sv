@@ -13,19 +13,17 @@
 // limitations under the License.
 
 `include "nx_common.svh"
-`include "nx_constants.svh"
 
 // nx_node_core
 // Evaluates instruction sequence against input values and internal register
 // state to produce outputs
 //
-module nx_node_core #(
-      parameter INPUTS       =   8 // Number of input signals
-    , parameter OUTPUTS      =   8 // Number of output signals
-    , parameter REGISTERS    =   8 // Number of internal registers
-    , parameter MAX_INSTRS   = 512 // Maximum instructions
-    , parameter INSTR_WIDTH  =  15 // Width of each instruction
-    , parameter OPCODE_WIDTH =   3 // Width of each opcode
+module nx_node_core
+import NXConstants::*;
+#(
+      parameter INPUTS    = 32 // Number of input signals
+    , parameter OUTPUTS   = 32 // Number of output signals
+    , parameter REGISTERS =  8 // Number of internal registers
 ) (
       input  logic                          clk_i
     , input  logic                          rst_i
@@ -33,18 +31,18 @@ module nx_node_core #(
     , input  logic [            INPUTS-1:0] inputs_i      // Input vector
     , output logic [           OUTPUTS-1:0] outputs_o     // Output vector
     // Execution controls
-    , input  logic [$clog2(MAX_INSTRS)-1:0] populated_i   // # of populated instructions
-    , input  logic                          trigger_i     // Trigger execution
-    , output logic                          idle_o        // Core idle flag
+    , input  logic [$clog2(MAX_NODE_INSTRS)-1:0] populated_i   // # of populated instructions
+    , input  logic                               trigger_i     // Trigger execution
+    , output logic                               idle_o        // Core idle flag
     // Instruction fetch
-    , output logic [$clog2(MAX_INSTRS)-1:0] instr_addr_o  // Instruction fetch address
-    , output logic                          instr_rd_o    // Read enable
-    , input  logic [       INSTR_WIDTH-1:0] instr_data_i  // Instruction data
-    , input  logic                          instr_stall_i // Fetch stall
+    , output logic [$clog2(MAX_NODE_INSTRS)-1:0] instr_addr_o  // Instruction fetch address
+    , output logic                               instr_rd_o    // Read enable
+    , input  instruction_t                       instr_data_i  // Instruction data
+    , input  logic                               instr_stall_i // Fetch stall
 );
 
 // Parameters
-localparam INSTR_ADDR_W    = $clog2(MAX_INSTRS);
+localparam INSTR_ADDR_W    = $clog2(MAX_NODE_INSTRS);
 localparam INPUT_IDX_W     = $clog2(INPUTS);
 localparam OUTPUT_IDX_W    = $clog2(OUTPUTS);
 localparam REGISTER_IDX_W  = $clog2(REGISTERS);
@@ -54,17 +52,6 @@ typedef enum logic [1:0] {
     , ACTIVE
     , RESTART
 } core_state_t;
-
-typedef enum logic [OPCODE_WIDTH-1:0] {
-      OP_INVERT // 0 - !A
-    , OP_AND    // 1 -   A & B
-    , OP_NAND   // 2 - !(A & B)
-    , OP_OR     // 3 -   A | B
-    , OP_NOR    // 4 - !(A | B)
-    , OP_XOR    // 5 -   A ^ B
-    , OP_XNOR   // 6 - !(A ^ B)
-    , OP_UNUSED // 7 - Unassigned
-} core_op_t;
 
 // Internal state
 `DECLARE_DQ(1,            restart_req, clk_i, rst_i, 1'b0)
@@ -114,7 +101,7 @@ always_comb begin : p_fetch
 end
 
 // Execution handling
-`DECLARE_DQT(nx_instruction_t, decoded, clk_i, rst_i, {$bits(nx_instruction_t){1'b0}})
+`DECLARE_DQT(instruction_t, decoded, clk_i, rst_i, 'd0)
 
 always_comb begin : p_execute
     // Working state
@@ -151,14 +138,14 @@ always_comb begin : p_execute
 
             // Perform the operation
             case (decoded.opcode)
-                NX_OP_INVERT: result = ! val_a         ;
-                NX_OP_AND   : result =   val_a & val_b ;
-                NX_OP_NAND  : result = !(val_a & val_b);
-                NX_OP_OR    : result =   val_a | val_b ;
-                NX_OP_NOR   : result = !(val_a | val_b);
-                NX_OP_XOR   : result =   val_a ^ val_b ;
-                NX_OP_XNOR  : result = !(val_a ^ val_b);
-                default     : result = 1'b0;
+                OPERATION_INVERT: result = ! val_a         ;
+                OPERATION_AND   : result =   val_a & val_b ;
+                OPERATION_NAND  : result = !(val_a & val_b);
+                OPERATION_OR    : result =   val_a | val_b ;
+                OPERATION_NOR   : result = !(val_a | val_b);
+                OPERATION_XOR   : result =   val_a ^ val_b ;
+                OPERATION_XNOR  : result = !(val_a ^ val_b);
+                default         : result = 1'b0;
             endcase
 
             // Store the result
@@ -172,9 +159,7 @@ always_comb begin : p_execute
         end
 
         // Decode the next instruction returned from the RAM
-        if (!decode_idle) begin
-            decoded = instr_data_i[$bits(nx_instruction_t)-1:0];
-        end
+        if (!decode_idle) decoded = instr_data_i;
 
         // Propagate idle state
         exec_idle   = decode_idle;
