@@ -86,13 +86,14 @@ class NodeCommand:
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class Operation:
     """ Operation encoding for instructions """
-    INVERT : Constant("X = !(A    )")
-    AND    : Constant("X =  (A & B)")
-    NAND   : Constant("X = !(A & B)")
-    OR     : Constant("X =  (A | B)")
-    NOR    : Constant("X = !(A | B)")
-    XOR    : Constant("X =  (A ^ B)")
-    XNOR   : Constant("X = !(A ^ B)")
+    INVERT   : Constant("X = !(A    )")
+    AND      : Constant("X =  (A & B)")
+    NAND     : Constant("X = !(A & B)")
+    OR       : Constant("X =  (A | B)")
+    NOR      : Constant("X = !(A | B)")
+    XOR      : Constant("X =  (A ^ B)")
+    XNOR     : Constant("X = !(A ^ B)")
+    RESERVED : Constant("Reserved instruction")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class ControlParam:
