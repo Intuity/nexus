@@ -81,24 +81,7 @@ syn_yosys: $(SV2V_OUT) | $(WORKING_DIR)
 	$(PREFIX)python3 common/parse_yosys_rpt.py $(WORKING_DIR)/yosys_$(DESIGN_TOP).rpt \
 	    $(WORKING_DIR)/yosys_$(DESIGN_TOP).csv
 
-.PHONY: syn_vivado
-syn_vivado: | $(WORKING_DIR)
-	@echo "# Creating Vivado TCL file"
-	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_TCL_PATH)
-	$(PREFIX)echo "synth_design \
-	    -top $(DESIGN_TOP) \
-	    -part $(VVD_TGT_PART) \
-	    -mode out_of_context \
-	    -include_dirs { $(SRC_DIRS) } \
-	$(addprefix -verilog_define ,$(SYN_DEFINES));" >> $(VVD_TCL_PATH)
-	$(PREFIX)echo "report_utilization -file vivado_$(DESIGN_TOP).rpt" >> $(VVD_TCL_PATH)
-	$(PREFIX)echo "write_verilog \
-	    -cell $(DESIGN_TOP) \
-	    -mode design \
-	    -force \
-	    vivado_$(DESIGN_TOP).v" >> $(VVD_TCL_PATH)
-	@echo "# Running Vivado synthesis"
-	$(PREFIX)cd $(WORKING_DIR) && vivado -mode batch -source $(notdir $(VVD_TCL_PATH))
+include common/Makefile.vivado
 
 # ==============================================================================
 # Standard Rules

@@ -30,7 +30,9 @@ HW_ROOT_DIR := $(abspath $(HW_COMMON_DIR)/..)
 # ==============================================================================
 # RTL input files
 # ==============================================================================
-SRC_DIRS  += $(HW_COMMON_DIR)/../../common/work $(HW_ROOT_DIR)/rtl
+SRC_DIRS  += $(HW_COMMON_DIR)/../../common/work
+SRC_DIRS  += $(HW_ROOT_DIR)/rtl
+SRC_DIRS  += $(HW_ROOT_DIR)/rtl/primitives
 SRC_EXTS  ?= .sv .v
 HDR_EXTS  ?= .svh .vh
 SRC_FILES ?= $(foreach d,$(SRC_DIRS),$(foreach x,$(SRC_EXTS),$(abspath $(wildcard $(d)/*$(x)))))

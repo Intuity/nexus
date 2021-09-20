@@ -1,0 +1,82 @@
+# Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ==============================================================================
+# Options
+# ==============================================================================
+
+# Construct arguments to synthesis
+DESIGN_TOP       ?=
+SYN_DEFINES      := $(filter-out USE_RAM_MODEL,$(DEFINES))
+VVD_SYN_TCL_PATH ?= $(WORKING_DIR)/vvd_syn_$(DESIGN_TOP).tcl
+VVD_IMP_TCL_PATH ?= $(WORKING_DIR)/vvd_imp_$(DESIGN_TOP).tcl
+VVD_IMP_XDC      ?= $(HW_COMMON_DIR)/vivado.xdc
+VVD_TGT_PART     ?= xc7a200tfbg484-3
+VVD_WORST_PATH   ?= $(WORKING_DIR)/vvd_worst_$(DESIGN_TOP).rpt
+VVD_NWORST       ?= 10
+
+ifeq ($(DESIGN_TOP),)
+  $(error No DESIGN_TOP has been specified)
+endif
+
+# ==============================================================================
+# Rules
+# ==============================================================================
+
+# Run an out-of-context synthesis and produce a utilization report
+.PHONY: syn_vivado
+syn_vivado: | $(WORKING_DIR)
+	@echo "# Creating Vivado TCL file"
+	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_SYN_TCL_PATH)
+	$(PREFIX)echo "synth_design \
+	    -top $(DESIGN_TOP) \
+	    -part $(VVD_TGT_PART) \
+	    -mode out_of_context \
+	    -flatten_hierarchy rebuilt \
+	    -include_dirs { $(SRC_DIRS) } \
+	$(addprefix -verilog_define ,$(SYN_DEFINES));" >> $(VVD_SYN_TCL_PATH)
+	$(PREFIX)echo "report_utilization -file vivado_$(DESIGN_TOP).rpt" >> $(VVD_SYN_TCL_PATH)
+	$(PREFIX)echo "write_verilog \
+	    -cell $(DESIGN_TOP) \
+	    -mode design \
+	    -force \
+	    vivado_$(DESIGN_TOP).v" >> $(VVD_SYN_TCL_PATH)
+	@echo "# Running Vivado synthesis"
+	$(PREFIX)cd $(WORKING_DIR) && vivado -mode batch -source $(notdir $(VVD_SYN_TCL_PATH))
+
+# Run an out-of-context implementation and produce a timing report
+.PHONY: imp_vivado
+imp_vivado: | $(WORKING_DIR)
+	@echo "# Creating Vivado TCL file"
+	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "synth_design \
+	    -top $(DESIGN_TOP) \
+	    -part $(VVD_TGT_PART) \
+	    -mode out_of_context \
+	    -flatten_hierarchy rebuilt \
+	    -include_dirs { $(SRC_DIRS) } \
+	    $(addprefix -verilog_define ,$(SYN_DEFINES));" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "set_property HD.PARTITION 1 [current_design]" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "read_xdc $(VVD_IMP_XDC)" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "opt_design" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "place_design" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "phys_opt_design" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "route_design" >> $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "report_timing \
+	    -file $(VVD_WORST_PATH) \
+	    -nworth $(VVD_NWORST) \
+	    -path_type full \
+	    -input_pins" >> $(VVD_IMP_TCL_PATH)
+	@echo "# Running Vivado implementation"
+	$(PREFIX)cd $(WORKING_DIR) && vivado -mode batch -source $(notdir $(VVD_IMP_TCL_PATH))
