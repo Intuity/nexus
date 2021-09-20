@@ -45,6 +45,8 @@ class NXConstants:
     MESSAGE_WIDTH  : Constant("Width of the message stream" ) = 31
     ADDR_ROW_WIDTH : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
     ADDR_COL_WIDTH : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
+    INPUT_WIDTH    : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
+    OUTPUT_WIDTH   : Constant("Width of output selector"    ) = ceil(log2(MAX_NODE_OUTPUTS))
     IOR_WIDTH      : Constant("Width of in/out/reg selector") = ceil(log2(MAX_NODE_IOR_COUNT))
 
     # Different command type widths (control plane versus nodes in mesh)
