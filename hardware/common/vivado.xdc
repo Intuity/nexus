@@ -20,10 +20,10 @@ set_property HD.CLK_SRC BUFGCTRL_X0Y15 [get_ports clk_i]
 set_system_jitter 0.0
 set_clock_latency -source -min 0.10
 set_clock_latency -source -max 0.20
-# Set I/O delays to 50-50
-set_input_delay -clock clk -max 2.500 [
+# Set I/O delays
+set_input_delay -clock clk -max 0.500 [
     get_ports * -filter {DIRECTION == IN && NAME !~ "*clk*" && NAME !~ "*rst*"}
 ]
-set_output_delay -clock clk -max 2.500 [
+set_output_delay -clock clk -max 0.500 [
     get_ports * -filter {DIRECTION == OUT && NAME !~ "*clk*" && NAME !~ "*rst*"}
 ]

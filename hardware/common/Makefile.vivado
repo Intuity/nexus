@@ -17,14 +17,15 @@
 # ==============================================================================
 
 # Construct arguments to synthesis
-DESIGN_TOP       ?=
-SYN_DEFINES      := $(filter-out USE_RAM_MODEL,$(DEFINES))
-VVD_SYN_TCL_PATH ?= $(WORKING_DIR)/vvd_syn_$(DESIGN_TOP).tcl
-VVD_IMP_TCL_PATH ?= $(WORKING_DIR)/vvd_imp_$(DESIGN_TOP).tcl
-VVD_IMP_XDC      ?= $(HW_COMMON_DIR)/vivado.xdc
-VVD_TGT_PART     ?= xc7a200tfbg484-3
-VVD_WORST_PATH   ?= $(WORKING_DIR)/vvd_worst_$(DESIGN_TOP).rpt
-VVD_NWORST       ?= 10
+DESIGN_TOP         ?=
+SYN_DEFINES        := $(filter-out USE_RAM_MODEL,$(DEFINES))
+VVD_SYN_TCL_PATH   ?= $(WORKING_DIR)/vvd_syn_$(DESIGN_TOP).tcl
+VVD_IMP_TCL_PATH   ?= $(WORKING_DIR)/vvd_imp_$(DESIGN_TOP).tcl
+VVD_IMP_XDC        ?= $(HW_COMMON_DIR)/vivado.xdc
+VVD_TGT_PART       ?= xc7a200tfbg484-3
+VVD_NWORST         ?= 10
+VVD_WORST_PATH_RPT ?= $(WORKING_DIR)/vvd_worst_$(VVD_NWORST)_$(DESIGN_TOP).rpt
+VVD_WORST_PATH     ?= $(WORKING_DIR)/vvd_worst_$(DESIGN_TOP).txt
 
 ifeq ($(DESIGN_TOP),)
   $(error No DESIGN_TOP has been specified)
@@ -74,9 +75,13 @@ imp_vivado: | $(WORKING_DIR)
 	$(PREFIX)echo "phys_opt_design" >> $(VVD_IMP_TCL_PATH)
 	$(PREFIX)echo "route_design" >> $(VVD_IMP_TCL_PATH)
 	$(PREFIX)echo "report_timing \
-	    -file $(VVD_WORST_PATH) \
-	    -nworth $(VVD_NWORST) \
+	    -file $(abspath $(VVD_WORST_PATH_RPT)) \
+	    -nworst $(VVD_NWORST) \
 	    -path_type full \
 	    -input_pins" >> $(VVD_IMP_TCL_PATH)
 	@echo "# Running Vivado implementation"
 	$(PREFIX)cd $(WORKING_DIR) && vivado -mode batch -source $(notdir $(VVD_IMP_TCL_PATH))
+	@echo "# Extracting worst slack"
+	$(PREFIX)parts=($$(grep "Slack" $(abspath $(VVD_WORST_PATH_RPT)) | head -n 1)) && \
+	    echo $${parts[3]} | sed -r 's/.*([0-9]+[.][0-9]+).*/\1/g' > $(VVD_WORST_PATH)
+	@echo "# Worst slack is $$(cat $(VVD_WORST_PATH))"
