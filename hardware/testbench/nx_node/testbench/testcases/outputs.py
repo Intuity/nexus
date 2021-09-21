@@ -36,6 +36,7 @@ async def map_outputs(dut):
     num_outputs = int(dut.dut.dut.OUTPUTS)
     num_inputs  = int(dut.dut.dut.INPUTS)
     input_width = int(ceil(log2(num_inputs)))
+    addr_width  = int(dut.dut.dut.control.ctrl_outputs.STORE_ADDR_W)
     col_width   = 4
     row_width   = 4
 
@@ -70,8 +71,19 @@ async def map_outputs(dut):
     # Check the mapping
     for output, targets in mapped.items():
         # Pickup the base address and final address of each output
-        output_base  = int(dut.dut.dut.control.output_base_q[output])
-        output_final = int(dut.dut.dut.control.output_final_q[output])
+        def get_slice(sig, msb, lsb):
+            value = 0
+            for idx in range(lsb, msb+1):
+                value |= int(sig[idx]) << (idx - lsb)
+            return value
+        output_base  = get_slice(
+            dut.dut.dut.control.output_base_q,
+            (output+1)*addr_width-1, output*addr_width
+        )
+        output_final = get_slice(
+            dut.dut.dut.control.output_final_q,
+            (output+1)*addr_width-1, output*addr_width
+        )
         # Check the correct number of outputs were loaded
         output_count = ((output_final - output_base) + 1)
         assert output_count == len(targets), \

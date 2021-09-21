@@ -163,9 +163,9 @@ async def mission_mode(dut):
         for row, row_entries in enumerate(dut.nodes):
             for col, node in enumerate(row_entries):
                 ctrl = node.entity.control
-                i_curr = int(ctrl.input_curr_q)
-                i_next = int(ctrl.input_next_q)
-                o_curr = int(ctrl.detect_last_q)
+                i_curr = int(ctrl.ctrl_inputs.input_curr_q)
+                i_next = int(ctrl.ctrl_inputs.input_next_q)
+                o_curr = int(ctrl.ctrl_outputs.output_state_q)
                 dut.info(
                     f"[{cycle:04d}] {row:2d}, {col:2d} - IC: {i_curr:0{nd_ips}b}, "
                     f"IN: {i_next:0{nd_ips}b}, OC: {o_curr:0{nd_ops}b} - Δ: "
@@ -177,13 +177,13 @@ async def mission_mode(dut):
         io_match = 0
         for (src_row, src_col, src_pos), entries in linked.items():
             src_node = dut.nodes[src_row][src_col]
-            src_out  = int(src_node.entity.control.detect_last_q[src_pos])
+            src_out  = int(src_node.entity.control.ctrl_outputs.output_state_q[src_pos])
             for tgt_row, tgt_col, tgt_pos in entries:
                 # Skip out-of-range rows (temporarily used for top-level outputs)
                 if tgt_row >= num_rows: continue
                 # Lookup the target node
                 tgt_node = dut.nodes[tgt_row][tgt_col]
-                tgt_in   = int(tgt_node.entity.control.input_next_q[tgt_pos])
+                tgt_in   = int(tgt_node.entity.control.ctrl_inputs.input_next_q[tgt_pos])
                 if src_out != tgt_in:
                     is_seq_in = seq_in[tgt_row, tgt_col, tgt_pos]
                     dut.error(
@@ -203,9 +203,9 @@ async def mission_mode(dut):
             for col, rtl_node in enumerate(row_entries):
                 # Get the RTL state
                 ctrl       = rtl_node.entity.control
-                rtl_i_curr = int(ctrl.input_curr_q)
-                rtl_i_next = int(ctrl.input_next_q)
-                rtl_o_curr = int(ctrl.detect_last_q)
+                rtl_i_curr = int(ctrl.ctrl_inputs.input_curr_q)
+                rtl_i_next = int(ctrl.ctrl_inputs.input_next_q)
+                rtl_o_curr = int(ctrl.ctrl_outputs.output_state_q)
                 # Get the model state
                 mdl_node   = mesh.nodes[row][col]
                 mdl_i_curr = sum([(y << x) for x, y in enumerate(mdl_node.input_state)])

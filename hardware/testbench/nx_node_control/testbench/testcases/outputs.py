@@ -40,6 +40,7 @@ async def map_outputs(dut):
     input_width = int(ceil(log2(num_inputs)))
     row_width   = max(dut.io.intf.tgt_row._range) - min(dut.io.intf.tgt_row._range) + 1
     col_width   = max(dut.io.intf.tgt_col._range) - min(dut.io.intf.tgt_col._range) + 1
+    addr_width  = int(dut.dut.dut.ctrl_outputs.STORE_ADDR_W)
 
     # Check all outputs are inactive
     assert dut.dut.dut.output_actv_q == 0
@@ -74,8 +75,20 @@ async def map_outputs(dut):
         # Check the output is active
         assert dut.dut.dut.output_actv_q[output] == 1
         # Pickup the base address and count of this output
-        output_base  = int(dut.dut.dut.output_base_q[output])
-        output_final = int(dut.dut.dut.output_final_q[output])
+        def get_slice(sig, msb, lsb):
+            value = 0
+            for idx in range(lsb, msb+1):
+                value |= int(sig[idx]) << (idx - lsb)
+            return value
+        output_base  = get_slice(
+            dut.dut.dut.output_base_q,
+            (output+1)*addr_width-1, output*addr_width
+        )
+        output_final = get_slice(
+            dut.dut.dut.output_final_q,
+            (output+1)*addr_width-1, output*addr_width
+        )
+        dut.info(f"Output B: 0x{output_base:04X}, F: 0x{output_final:04X}")
         # Check the correct number of outputs were loaded
         output_count = output_final - output_base + 1
         assert output_count == len(targets), \
@@ -159,7 +172,7 @@ async def output_drive(dut):
     await ClockCycles(dut.clk, 10)
 
     # Drive random I/O states
-    for _ in range(100):
+    for _ in range(30):
         # Generate a random state
         for idx in range(num_outputs): curr_state[idx] = choice((0, 1))
         # Run through every output
@@ -167,6 +180,7 @@ async def output_drive(dut):
             # If no change in state, no message should be generated
             if curr_state[idx] == last_state[idx]: continue
             # Generate expected messages
+            dut.info(f"Generating messages for output {idx}")
             for tgt_row, tgt_col, tgt_idx, tgt_seq in targets:
                 msg = NodeSigState()
                 msg.header.row     = tgt_row
@@ -175,25 +189,22 @@ async def output_drive(dut):
                 msg.index          = tgt_idx
                 msg.is_seq         = tgt_seq
                 msg.state          = curr_state[idx]
-                if tgt_row < row:
-                    dut.exp_msg.append((msg.pack(), int(Direction.NORTH)))
-                elif tgt_row > row:
-                    dut.exp_msg.append((msg.pack(), int(Direction.SOUTH)))
-                elif tgt_col < col:
-                    dut.exp_msg.append((msg.pack(), int(Direction.WEST )))
-                elif tgt_col > col:
-                    dut.exp_msg.append((msg.pack(), int(Direction.EAST )))
+                dut.exp_msg.append((msg.pack(), 0))
+                dut.info(
+                    f"Expecting {tgt_row} {tgt_col} {tgt_idx} {tgt_seq} {curr_state[idx]}"
+                )
         # Drive the new state
         dut.outputs <= sum([(y << x) for x, y in enumerate(curr_state)])
         # Keep track of the last state
         last_state = curr_state[:]
         # Loop until all expected messages are produced
+        last_exp = -1
         while dut.exp_msg:
             # Wait for some time, then check no messages have been received
             num_exp = len(dut.exp_msg)
-            await ClockCycles(dut.clk, randint(1, 100))
-            assert len(dut.exp_msg) == num_exp, "Messages were sent before grant"
-            # Raise trigger to let a chunk of messages be sent
-            grant_flag.set()
-            while dut.release == 0: await RisingEdge(dut.clk)
-            await RisingEdge(dut.clk)
+            if num_exp != last_exp:
+                dut.info(f"Waiting for {num_exp} messages")
+                last_exp = num_exp
+            await ClockCycles(dut.clk, 10)
+        # Delay between loops
+        await ClockCycles(dut.clk, 50)

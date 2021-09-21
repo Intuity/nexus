@@ -34,6 +34,9 @@ async def map_outputs(dut):
     input_width = int(ceil(log2(num_inputs)))
     num_outputs = int(dut.dut.dut.OUTPUTS)
     col_width   = 4
+    addr_width  = int(
+        dut.dut.dut.mesh.g_rows[0].g_columns[0].node.control.ctrl_outputs.STORE_ADDR_W
+    )
 
     # Setup random output mappings for every node
     mapped = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
@@ -73,19 +76,31 @@ async def map_outputs(dut):
 
     # Check the mappings
     dut.info("Checking mappings")
+    def get_slice(sig, msb, lsb):
+        value = 0
+        for idx in range(lsb, msb+1):
+            value |= int(sig[idx]) << (idx - lsb)
+        return value
     for row in range(num_rows):
         for col in range(num_cols):
             node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
             for output, targets in enumerate(mapped[row][col]):
                 # Check output is activated
                 assert node.control.output_actv_q[output] == 1
-                # Check for the right number of messages
-                output_base  = int(node.control.output_base_q[output])
-                output_final = int(node.control.output_final_q[output])
+                # Pickup the base address and final address of each output
+                output_base  = get_slice(
+                    node.control.output_base_q,
+                    (output+1)*addr_width-1, output*addr_width
+                )
+                output_final = get_slice(
+                    node.control.output_final_q,
+                    (output+1)*addr_width-1, output*addr_width
+                )
+                # Check the correct number of outputs were loaded
                 output_count = output_final - output_base + 1
                 assert output_count == len(targets), \
-                    f"R{row}C{col}O{output} - Expecting {output_count} targets, " \
-                    f"got {len(targets)} targets"
+                    f"R{row}C{col}O{output} - Expecting {len(targets)} targets, " \
+                    f"got {output_count} targets"
                 # Read the data back from the RAM
                 for idx, (tgt_row, tgt_col, tgt_idx, tgt_seq) in enumerate(targets):
                     ram_data = int(node.store.ram.memory[512 + output_base + idx])

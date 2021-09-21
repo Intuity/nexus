@@ -30,7 +30,6 @@ import NXConstants::*;
     , output logic token_release_o
     // Outbound message stream
     , output node_message_t msg_data_o
-    , output logic [1:0]    msg_dir_o
     , output logic          msg_valid_o
     , input  logic          msg_ready_i
     // I/O mapping
@@ -77,7 +76,6 @@ nx_node_control #(
     , .token_release_o(token_release_o)
     // Outbound message stream
     , .msg_data_o (msg_data_o )
-    , .msg_dir_o  (msg_dir_o  )
     , .msg_valid_o(msg_valid_o)
     , .msg_ready_i(msg_ready_i)
     // I/O mapping
