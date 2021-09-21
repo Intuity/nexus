@@ -27,24 +27,20 @@ import NXConstants::*;
     // Inbound message streams
     // - A
     , input  node_message_t stream_a_data_i
-    , input  direction_t    stream_a_dir_i
     , input  logic          stream_a_valid_i
     , output logic          stream_a_ready_o
     // - B
     , input  node_message_t stream_b_data_i
-    , input  direction_t    stream_b_dir_i
     , input  logic          stream_b_valid_i
     , output logic          stream_b_ready_o
     // Outbound arbitrated message stream
     , output node_message_t comb_data_o
-    , output direction_t    comb_dir_o
     , output logic          comb_valid_o
     , input  logic          comb_ready_i
 );
 
 // Arbitrated state
 `DECLARE_DQT(node_message_t, comb_data,  clk_i, rst_i, {MESSAGE_WIDTH{1'b0}})
-`DECLARE_DQ (             2, comb_dir,   clk_i, rst_i, DIRECTION_NORTH)
 `DECLARE_DQ (             1, comb_valid, clk_i, rst_i, 1'b0)
 `DECLARE_DQ (             1, comb_next,  clk_i, rst_i, 1'b0)
 `DECLARE_DQ (             1, comb_curr,  clk_i, rst_i, 1'b0)
@@ -63,7 +59,6 @@ always_comb begin : p_arbitrate
     logic found;
 
     `INIT_D(comb_data);
-    `INIT_D(comb_dir);
     `INIT_D(comb_valid);
     `INIT_D(comb_next);
     `INIT_D(comb_curr);
@@ -75,11 +70,9 @@ always_comb begin : p_arbitrate
         comb_curr = comb_next;
         if (comb_curr) begin
             comb_data  = stream_b_data_i;
-            comb_dir   = stream_b_dir_i;
             comb_valid = stream_b_valid_i;
         end else begin
             comb_data  = stream_a_data_i;
-            comb_dir   = stream_a_dir_i;
             comb_valid = stream_a_valid_i;
         end
     end
@@ -105,20 +98,6 @@ always_comb begin : p_arbitrate
             endcase
         end
     end
-end
-
-// Type conversion
-// NOTE: This is a workaround for converting from comb_dir_q (logic [1:0]) to
-//       comb_dir_o (an enumerated type). Icarus Verilog lacks support for
-//       proper type casting, and Vivado complains for direct assignments.
-//
-always_comb begin : p_convert
-    case (comb_dir_q)
-        2'b00: comb_dir_o = DIRECTION_NORTH;
-        2'b01: comb_dir_o = DIRECTION_EAST;
-        2'b10: comb_dir_o = DIRECTION_SOUTH;
-        2'b11: comb_dir_o = DIRECTION_WEST;
-    endcase
 end
 
 endmodule : nx_stream_combiner

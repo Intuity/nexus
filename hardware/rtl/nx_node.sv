@@ -96,7 +96,6 @@ assign idle_o = idle_q;
 
 node_message_t dcd_data,  byp_data;
 logic          dcd_valid, dcd_ready, byp_valid, byp_ready;
-direction_t    byp_dir;
 
 nx_stream_arbiter inbound_arb (
       .clk_i(clk_i)
@@ -127,7 +126,6 @@ nx_stream_arbiter inbound_arb (
     , .internal_ready_i(dcd_ready)
     // Outbound stream for bypass
     , .bypass_data_o (byp_data )
-    , .bypass_dir_o  (byp_dir  )
     , .bypass_valid_o(byp_valid)
     , .bypass_ready_i(byp_ready)
 );
@@ -137,17 +135,18 @@ nx_stream_arbiter inbound_arb (
 // -----------------------------------------------------------------------------
 
 node_message_t outbound_data;
-direction_t    outbound_dir;
 logic          outbound_valid, outbound_ready;
 
 nx_stream_distributor outbound_dist (
       .clk_i(clk_i)
     , .rst_i(rst_i)
+    // Control signals
+    , .node_row_i(node_row_i)
+    , .node_col_i(node_col_i)
     // Idle flag
     , .idle_o(dist_idle)
     // Inbound message stream
     , .dist_data_i (outbound_data )
-    , .dist_dir_i  (outbound_dir  )
     , .dist_valid_i(outbound_valid)
     , .dist_ready_o(outbound_ready)
     // Outbound distributed message streams
@@ -220,7 +219,6 @@ nx_msg_decoder decoder (
 // -----------------------------------------------------------------------------
 
 node_message_t emit_data;
-direction_t    emit_dir;
 logic          emit_valid, emit_ready;
 
 logic               core_trigger;
@@ -249,7 +247,6 @@ nx_node_control #(
     , .token_release_o(token_release_o)
     // Outbound message stream
     , .msg_data_o (emit_data )
-    , .msg_dir_o  (emit_dir  )
     , .msg_valid_o(emit_valid)
     , .msg_ready_i(emit_ready)
     // I/O mapping
@@ -288,17 +285,14 @@ nx_stream_combiner #(
     // Inbound message streams
     // - A
     , .stream_a_data_i (byp_data )
-    , .stream_a_dir_i  (byp_dir  )
     , .stream_a_valid_i(byp_valid)
     , .stream_a_ready_o(byp_ready)
     // - B
     , .stream_b_data_i (emit_data )
-    , .stream_b_dir_i  (emit_dir  )
     , .stream_b_valid_i(emit_valid)
     , .stream_b_ready_o(emit_ready)
     // Outbound arbitrated message stream
     , .comb_data_o (outbound_data )
-    , .comb_dir_o  (outbound_dir  )
     , .comb_valid_o(outbound_valid)
     , .comb_ready_i(outbound_ready)
 );

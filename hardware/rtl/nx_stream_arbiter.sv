@@ -28,27 +28,26 @@ import NXConstants::*;
     // Inbound message streams
     // - North
     , input  node_message_t north_data_i
-    , input  logic         north_valid_i
-    , output logic         north_ready_o
+    , input  logic          north_valid_i
+    , output logic          north_ready_o
     // - East
     , input  node_message_t east_data_i
-    , input  logic         east_valid_i
-    , output logic         east_ready_o
+    , input  logic          east_valid_i
+    , output logic          east_ready_o
     // - South
     , input  node_message_t south_data_i
-    , input  logic         south_valid_i
-    , output logic         south_ready_o
+    , input  logic          south_valid_i
+    , output logic          south_ready_o
     // - West
     , input  node_message_t west_data_i
-    , input  logic         west_valid_i
-    , output logic         west_ready_o
+    , input  logic          west_valid_i
+    , output logic          west_ready_o
     // Outbound stream for this node
     , output node_message_t internal_data_o
-    , output logic         internal_valid_o
-    , input  logic         internal_ready_i
+    , output logic          internal_valid_o
+    , input  logic          internal_ready_i
     // Outbound stream for bypass
     , output node_message_t bypass_data_o
-    , output direction_t    bypass_dir_o
     , output logic          bypass_valid_o
     , input  logic          bypass_ready_i
 );
@@ -87,12 +86,6 @@ assign internal_valid_o = arb_internal_valid_q;
 // Connect bypass output
 assign bypass_data_o  = arb_data_q;
 assign bypass_valid_o = arb_bypass_valid_q;
-assign bypass_dir_o   = (
-    (arb_data_q.raw.header.row    > node_row_i) ? DIRECTION_SOUTH : (
-    (arb_data_q.raw.header.row    < node_row_i) ? DIRECTION_NORTH : (
-    (arb_data_q.raw.header.column > node_col_i) ? DIRECTION_EAST  : (
-                                                  DIRECTION_WEST    )))
-);
 
 // Connect inbound ready signals
 logic both_ready;

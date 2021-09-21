@@ -22,11 +22,13 @@ import NXConstants::*;
 (
       input  logic clk_i
     , input  logic rst_i
+    // Control signals
+    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
+    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
     // Idle flag
     , output logic idle_o
     // Inbound message stream
     , input  node_message_t dist_data_i
-    , input  direction_t    dist_dir_i
     , input  logic          dist_valid_i
     , output logic          dist_ready_o
     // Outbound distributed message streams
@@ -52,6 +54,16 @@ import NXConstants::*;
     , input  logic          west_present_i
 );
 
+// Determine direction
+direction_t dist_dir;
+
+always_comb begin : comb_dir
+    if      (dist_data_i.raw.header.row    < node_row_i) dist_dir = DIRECTION_NORTH;
+    else if (dist_data_i.raw.header.row    > node_row_i) dist_dir = DIRECTION_SOUTH;
+    else if (dist_data_i.raw.header.column < node_col_i) dist_dir = DIRECTION_WEST;
+    else                                                 dist_dir = DIRECTION_EAST;
+end
+
 // Bind outbound ports into arrays
 node_message_t egress_data [3:0];
 logic [3:0] egress_ready, egress_present, egress_full, egress_empty;
@@ -76,16 +88,16 @@ for (genvar i = 0; i < 4; i = (i + 1)) begin
     logic primary_active;
     logic aliased_active;
 
-    assign primary_active = (dist_dir_i == i) && egress_present[i];
+    assign primary_active = (dist_dir == i) && egress_present[i];
 
     if (i == DIRECTION_NORTH) begin
-        assign aliased_active = (dist_dir_i == DIRECTION_WEST) && !egress_present[DIRECTION_WEST];
+        assign aliased_active = (dist_dir == DIRECTION_WEST) && !egress_present[DIRECTION_WEST];
     end else if (i == DIRECTION_EAST ) begin
-        assign aliased_active = (dist_dir_i == DIRECTION_NORTH) && !egress_present[DIRECTION_NORTH];
+        assign aliased_active = (dist_dir == DIRECTION_NORTH) && !egress_present[DIRECTION_NORTH];
     end else if (i == DIRECTION_SOUTH) begin
-        assign aliased_active = (dist_dir_i == DIRECTION_EAST) && !egress_present[DIRECTION_EAST];
+        assign aliased_active = (dist_dir == DIRECTION_EAST) && !egress_present[DIRECTION_EAST];
     end else if (i == DIRECTION_WEST ) begin
-        assign aliased_active = (dist_dir_i == DIRECTION_SOUTH) && !egress_present[DIRECTION_SOUTH];
+        assign aliased_active = (dist_dir == DIRECTION_SOUTH) && !egress_present[DIRECTION_SOUTH];
     end
 
     nx_fifo #(
@@ -112,19 +124,19 @@ endgenerate
 
 // Drive inbound stream ready
 assign dist_ready_o = (
-    (dist_dir_i == DIRECTION_NORTH && (
+    (dist_dir == DIRECTION_NORTH && (
         (!egress_full[DIRECTION_NORTH] &&  egress_present[DIRECTION_NORTH]) ||
         (!egress_full[DIRECTION_EAST ] && !egress_present[DIRECTION_NORTH])
     )) ||
-    (dist_dir_i == DIRECTION_EAST && (
+    (dist_dir == DIRECTION_EAST && (
         (!egress_full[DIRECTION_EAST ] &&  egress_present[DIRECTION_EAST ]) ||
         (!egress_full[DIRECTION_SOUTH] && !egress_present[DIRECTION_EAST ])
     )) ||
-    (dist_dir_i == DIRECTION_SOUTH && (
+    (dist_dir == DIRECTION_SOUTH && (
         (!egress_full[DIRECTION_SOUTH] &&  egress_present[DIRECTION_SOUTH]) ||
         (!egress_full[DIRECTION_WEST ] && !egress_present[DIRECTION_SOUTH])
     )) ||
-    (dist_dir_i == DIRECTION_WEST && (
+    (dist_dir == DIRECTION_WEST && (
         (!egress_full[DIRECTION_WEST ] &&  egress_present[DIRECTION_WEST ]) ||
         (!egress_full[DIRECTION_NORTH] && !egress_present[DIRECTION_WEST ])
     ))
