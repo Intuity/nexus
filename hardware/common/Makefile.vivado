@@ -39,14 +39,14 @@ endif
 .PHONY: syn_vivado
 syn_vivado: | $(WORKING_DIR)
 	@echo "# Creating Vivado TCL file"
-	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_SYN_TCL_PATH)
+	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) }" > $(VVD_SYN_TCL_PATH)
 	$(PREFIX)echo "synth_design \
 	    -top $(DESIGN_TOP) \
 	    -part $(VVD_TGT_PART) \
 	    -mode out_of_context \
 	    -flatten_hierarchy rebuilt \
 	    -include_dirs { $(SRC_DIRS) } \
-	$(addprefix -verilog_define ,$(SYN_DEFINES));" >> $(VVD_SYN_TCL_PATH)
+	    $(addprefix -verilog_define ,$(SYN_DEFINES))" >> $(VVD_SYN_TCL_PATH)
 	$(PREFIX)echo "report_utilization -file vivado_$(DESIGN_TOP).rpt" >> $(VVD_SYN_TCL_PATH)
 	$(PREFIX)echo "write_verilog \
 	    -cell $(DESIGN_TOP) \
@@ -60,14 +60,14 @@ syn_vivado: | $(WORKING_DIR)
 .PHONY: imp_vivado
 imp_vivado: | $(WORKING_DIR)
 	@echo "# Creating Vivado TCL file"
-	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) };" > $(VVD_IMP_TCL_PATH)
+	$(PREFIX)echo "read_verilog -sv { $(SRC_FILES) }" > $(VVD_IMP_TCL_PATH)
 	$(PREFIX)echo "synth_design \
 	    -top $(DESIGN_TOP) \
 	    -part $(VVD_TGT_PART) \
 	    -mode out_of_context \
 	    -flatten_hierarchy rebuilt \
 	    -include_dirs { $(SRC_DIRS) } \
-	    $(addprefix -verilog_define ,$(SYN_DEFINES));" >> $(VVD_IMP_TCL_PATH)
+	    $(addprefix -verilog_define ,$(SYN_DEFINES))" >> $(VVD_IMP_TCL_PATH)
 	$(PREFIX)echo "set_property HD.PARTITION 1 [current_design]" >> $(VVD_IMP_TCL_PATH)
 	$(PREFIX)echo "read_xdc $(VVD_IMP_XDC)" >> $(VVD_IMP_TCL_PATH)
 	$(PREFIX)echo "opt_design" >> $(VVD_IMP_TCL_PATH)
