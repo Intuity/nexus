@@ -20,14 +20,16 @@
 module nx_node_control_outputs
 import NXConstants::*;
 #(
-      parameter OUTPUTS      = 8
+      parameter OUTPUTS      = 32
     , parameter STORE_ADDR_W = $clog2(MAX_NODE_CONFIG)
     , parameter STORE_DATA_W = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + INPUT_WIDTH + 2
 ) (
       input logic                                  clk_i
     , input logic                                  rst_i
+    // Status
+    , output logic                                 idle_o
     // Interface from core
-    , output logic [OUTPUTS-1:0]                   core_outputs_i
+    , input  logic [OUTPUTS-1:0]                   core_outputs_i
     // Output RAM pointers
     , input  logic [OUTPUTS-1:0][STORE_ADDR_W-1:0] output_base_i
     , input  logic [OUTPUTS-1:0][STORE_ADDR_W-1:0] output_final_i
@@ -40,6 +42,10 @@ import NXConstants::*;
     , output node_message_t                        msg_data_o
     , output logic                                 msg_valid_o
     , input  logic                                 msg_ready_i
+    // Loopback interface
+    , output logic [IOR_WIDTH-1:0]                 loopback_index_o
+    , output logic                                 loopback_state_o
+    , output logic                                 loopback_valid_o
 );
 
 // =============================================================================
@@ -67,18 +73,18 @@ assign output_changed = (|output_xor);
 
 // Leading zero count of reversed vector determines which output has changed
 nx_clz #(
-      .WIDTH        (OUTPUTS     )
-    , .REVERSE_INPUT(1'b1        )
+      .WIDTH         ( OUTPUTS      )
+    , .REVERSE_INPUT ( 1'b1         )
 ) xor_clz (
-      .scalar_i     (output_xor  )
-    , .leading_o    (output_index)
+      .scalar_i      ( output_xor   )
+    , .leading_o     ( output_index )
 );
 
 // Mux to pickup output value
-assign output_value = output_changed ? core_outputs_i[output_index] : 'd0;
+assign output_value = output_changed ? core_outputs_i[output_index[IOR_WIDTH-1:0]] : 'd0;
 
 // On the last fetch, update the stored state
-assign output_state = (output_state_q ^ (fetch_last << output_index_q));
+assign output_state = (output_state_q ^ ({{(OUTPUTS-1){1'b0}},fetch_last} << output_index_q));
 
 // =============================================================================
 // Lookup the start and end addresses, and whether the entry is populated
@@ -152,6 +158,14 @@ logic                      msg_lb, msg_seq;
 assign { msg_lb, msg_row, msg_col, msg_idx, msg_seq } = fetched_data_q;
 
 // =============================================================================
+// Drive loopback
+// =============================================================================
+
+assign loopback_index_o = msg_idx;
+assign loopback_state_o = fetched_value_q;
+assign loopback_valid_o = msg_lb && fetched_valid_q;
+
+// =============================================================================
 // Construct outbound message
 // =============================================================================
 
@@ -184,5 +198,11 @@ assign msg_valid_o = msg_valid_q;
 
 // Control stall
 assign pipe_stall = msg_valid_o && !msg_ready_i;
+
+// =============================================================================
+// Determine idle state
+// =============================================================================
+
+assign idle_o = !(msg_valid_q || fetched_valid || output_changed);
 
 endmodule : nx_node_control_outputs

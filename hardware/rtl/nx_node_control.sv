@@ -38,7 +38,6 @@ import NXConstants::*;
     , output logic token_release_o // Outbound token
     // Outbound message stream
     , output node_message_t msg_data_o
-    , output direction_t    msg_dir_o
     , output logic          msg_valid_o
     , input  logic          msg_ready_i
     // I/O mapping
@@ -46,8 +45,8 @@ import NXConstants::*;
     , input  logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
     , input  logic [ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
     , input  logic [     IOR_WIDTH-1:0] map_tgt_idx_i // Target node's input index
-    , input  logic                     map_tgt_seq_i // Target node's input is sequential
-    , input  logic                     map_valid_i   // Mapping is valid
+    , input  logic                      map_tgt_seq_i // Target node's input is sequential
+    , input  logic                      map_valid_i   // Mapping is valid
     // Signal state update
     , input  logic [IOR_WIDTH-1:0] signal_index_i  // Input index
     , input  logic                 signal_is_seq_i // Input is sequential
@@ -65,6 +64,11 @@ import NXConstants::*;
     , input  logic [         OP_STORE_WIDTH-1:0] store_rd_data_i // Output store read data
 );
 
+// TEMP: Token tie-off
+assign token_release_o = 1'b1;
+logic _unused;
+assign _unused = |({1'b1, token_grant_i});
+
 // =============================================================================
 // Parameters and constants
 // =============================================================================
@@ -74,19 +78,6 @@ localparam OP_STORE_ADDR_W = $clog2(MAX_NODE_CONFIG);
 // =============================================================================
 // Internal state
 // =============================================================================
-
-// First cycle marker
-`DECLARE_DQ(1, first_cycle, clk_i, rst_i, 'd1)
-
-// Emitted message
-`DECLARE_DQT(node_sig_state_t, msg_data,     clk_i, rst_i, 'd0)
-`DECLARE_DQT(direction_t,      msg_dir,      clk_i, rst_i, DIRECTION_NORTH)
-`DECLARE_DQ(1,                 msg_valid,    clk_i, rst_i, 'd0)
-
-// Inputs (sequential & combinatorial)
-`DECLARE_DQ(INPUTS, input_curr, clk_i, rst_i, 'd0)
-`DECLARE_DQ(INPUTS, input_next, clk_i, rst_i, 'd0)
-`DECLARE_DQ(1,      input_trig, clk_i, rst_i, 'd0)
 
 // Output message tracking
 `DECLARE_DQ(      OUTPUTS,                  output_actv,  clk_i, rst_i, 'd0)
@@ -102,156 +93,12 @@ localparam OP_STORE_ADDR_W = $clog2(MAX_NODE_CONFIG);
 `DECLARE_DQ(1,               store_rd_resp, clk_i, rst_i, 1'b0)
 
 // Internal loopback
-`DECLARE_DQ(IOR_WIDTH, loopback_index, clk_i, rst_i, 'd0)
-`DECLARE_DQ(1,         loopback_state, clk_i, rst_i, 'd0)
-`DECLARE_DQ(1,         loopback_valid, clk_i, rst_i, 'd0)
-
-// Message pipeline pop
-`DECLARE_DQ(1, fifo_pop, clk_i, rst_i, 'd0)
-
-// Output change detection
-`DECLARE_DQ(OUTPUTS,   detect_last,  clk_i, rst_i, 'd0)
-`DECLARE_DQ(OUTPUTS,   detect_xor,   clk_i, rst_i, 'd0)
-`DECLARE_DQ(IOR_WIDTH, detect_index, clk_i, rst_i, 'd0)
-`DECLARE_DQ(        1, detect_state, clk_i, rst_i, 'd0)
-`DECLARE_DQ(        1, detect_valid, clk_i, rst_i, 'd0)
-
-// Detected output change
-`DECLARE_DQ(OP_STORE_ADDR_W,   update_base,    clk_i, rst_i, 'd0)
-`DECLARE_DQ(OP_STORE_ADDR_W,   update_final,   clk_i, rst_i, 'd0)
-`DECLARE_DQ(              1,   update_state,   clk_i, rst_i, 'd0)
-`DECLARE_DQ(              1,   update_valid,   clk_i, rst_i, 'd0)
-
-// Output message generation
-`DECLARE_DQ(OP_STORE_ADDR_W, send_address, clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(OP_STORE_ADDR_W, send_final,   clk_i, rst_i, {OP_STORE_ADDR_W{1'b0}})
-`DECLARE_DQ(1,               send_pending, clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1,               send_value,   clk_i, rst_i, 1'b0)
-
-// Track message generation
-`DECLARE_DQ(OP_STORE_ADDR_W+1, msgs_queued, clk_i, rst_i, 'd0)
-`DECLARE_DQ(OP_STORE_ADDR_W+1, msgs_sent,   clk_i, rst_i, 'd0)
-
-// =============================================================================
-// Construct outputs
-// =============================================================================
-
-assign msg_data_o  = msg_data_q;
-assign msg_dir_o   = msg_dir_q;
-assign msg_valid_o = msg_valid_q;
-
-assign core_trigger_o = input_trig_q;
-assign core_inputs_o  = input_curr_q;
-
-// =============================================================================
-// Detect changes in output
-// =============================================================================
-
-always_comb begin : p_detect_xor
-    int i;
-
-    `INIT_D(detect_last);
-    `INIT_D(detect_xor);
-
-    `INIT_D(detect_index);
-    `INIT_D(detect_state);
-    `INIT_D(detect_valid);
-
-    `INIT_D(update_base);
-    `INIT_D(update_final);
-    `INIT_D(update_state);
-    `INIT_D(update_valid);
-
-    `INIT_D(msgs_queued);
-
-    // Track queued messages
-    if (update_valid && !queue_full)
-        msgs_queued = msgs_queued + (update_final - update_base + 'd1);
-
-    // If update FIFO not full, clear update valid
-    if (!queue_full) update_valid = 1'b0;
-
-    // Pipelined address lookup
-    if (!update_valid) begin
-        update_base  = output_base_q[detect_index_q];
-        update_final = output_final_q[detect_index_q];
-        update_state = detect_state;
-        update_valid = detect_valid;
-        detect_valid = 1'b0;
-    end
-
-    // Pipelined priority encoder to find first changed output
-    for (i = 0; i < OUTPUTS; i = (i + 1)) begin
-        if (!detect_valid && detect_xor[i]) begin
-            detect_index  = i[IOR_WIDTH-1:0];
-            detect_state  = detect_last[i];
-            detect_valid  = 1'b1;
-            detect_xor[i] = 1'b0;
-        end
-    end
-
-    // If detect_xor cleared, take the next snapshot
-    if (!(|detect_xor)) begin
-        detect_xor  = core_outputs_i ^ detect_last;
-        detect_last = core_outputs_i;
-    end
-end
-
-// =============================================================================
-// Update request queue
-// =============================================================================
-
-logic [OP_STORE_ADDR_W-1:0] queued_base, queued_final;
-logic                       queued_state, queue_full, queue_empty, queue_pop;
-
-nx_fifo #(
-      .DEPTH(2)
-    , .WIDTH(OP_STORE_ADDR_W + OP_STORE_ADDR_W + 1)
-) queue_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Write interface
-    , .wr_data_i({ update_base, update_final, update_state })
-    , .wr_push_i(update_valid && !queue_full)
-    // Read interface
-    , .rd_data_o({ queued_base, queued_final, queued_state })
-    , .rd_pop_i (queue_pop)
-    // Status
-    , .level_o(           )
-    , .empty_o(queue_empty)
-    , .full_o (queue_full )
-);
-
+logic [IOR_WIDTH-1:0] loopback_index;
+logic                 loopback_state, loopback_valid;
 
 // =============================================================================
 // Handle reads and writes to the output message store
 // =============================================================================
-
-assign store_addr_o    = store_addr_q;
-assign store_wr_data_o = store_wr_data_q;
-assign store_wr_en_o   = store_wr_en_q;
-assign store_rd_en_o   = store_rd_en_q;
-
-logic state_fifo_out, state_fifo_full, state_fifo_empty;
-
-nx_fifo #(
-      .DEPTH   (3)
-    , .WIDTH   (1)
-    , .FULL_LVL(2)
-) output_state_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Write interface
-    , .wr_data_i(send_value )
-    , .wr_push_i(store_rd_en)
-    // Read interface
-    , .rd_data_o(state_fifo_out)
-    , .rd_pop_i (fifo_pop      )
-    // Status
-    , .level_o(                )
-    , .empty_o(state_fifo_empty)
-    , .full_o (state_fifo_full )
-);
 
 always_comb begin : p_output_memory
     `INIT_D(output_actv);
@@ -263,10 +110,6 @@ always_comb begin : p_output_memory
     `INIT_D(store_wr_en);
     `INIT_D(store_rd_en);
     `INIT_D(store_rd_resp);
-    `INIT_D(send_address);
-    `INIT_D(send_final);
-    `INIT_D(send_pending);
-    `INIT_D(send_value);
 
     // Pipeline store_rd_en -> store_rd_resp to align with data return
     store_rd_resp = store_rd_en;
@@ -274,9 +117,6 @@ always_comb begin : p_output_memory
     // Always clear write and read enable
     store_wr_en = 1'b0;
     store_rd_en = 1'b0;
-
-    // Always clear queue pop
-    queue_pop = 1'b0;
 
     // When a mapping update arrives, write it into the RAM
     if (map_valid_i) begin
@@ -300,145 +140,6 @@ always_comb begin : p_output_memory
         // Increment next pointer
         output_next = output_next + 'd1;
 
-    // Otherwise handle output state generation
-    end else if (!state_fifo_full) begin
-        // Increment to the next address to fetch
-        if (send_pending) begin
-            store_addr   = send_address;
-            send_address = send_address + { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 };
-            store_rd_en  = 1'b1;
-
-        // Pick-up the next update request
-        end else if (!queue_empty) begin
-            store_addr   = queued_base;
-            send_address = queued_base + { {(OP_STORE_ADDR_W-1){1'b0}}, 1'b1 };
-            send_final   = queued_final;
-            send_value   = queued_state;
-            store_rd_en  = 1'b1;
-            queue_pop    = 1'b1;
-
-        end
-
-        // Check for further messages to send
-        send_pending = store_rd_en && (store_addr != send_final);
-
-    end
-end
-
-// =============================================================================
-// Acquire and release tokens
-// =============================================================================
-
-`DECLARE_DQ(1, token_held,    clk_i, rst_i, 1'b0)
-`DECLARE_DQ(1, token_release, clk_i, rst_i, 1'b0)
-
-assign token_release_o = token_release_q;
-
-always_comb begin : p_token
-    `INIT_D(token_held);
-    `INIT_D(token_release);
-
-    // If token released, clear it
-    if (token_release) token_held = 1'b0;
-
-    // Always clear token release
-    token_release = 1'b0;
-
-    // If holding token and nothing more to do, release it
-    if (token_held && state_fifo_empty && !msg_valid_o) begin
-        token_release = 1'b1;
-
-    // If not holding token and one presented
-    end else if (!token_held && token_grant_i) begin
-        token_held    = !state_fifo_empty;
-        token_release =  state_fifo_empty;
-
-    end
-end
-
-// =============================================================================
-// Generate output messages
-// =============================================================================
-
-logic [OP_STORE_WIDTH-1:0] msg_fifo_out;
-logic                      msg_fifo_empty;
-
-nx_fifo #(
-      .DEPTH(             3)
-    , .WIDTH(OP_STORE_WIDTH)
-) output_msg_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
-    // Write interface
-    , .wr_data_i(store_rd_data_i)
-    , .wr_push_i(store_rd_resp_q)
-    // Read interface
-    , .rd_data_o(msg_fifo_out)
-    , .rd_pop_i (fifo_pop    )
-    // Status
-    , .level_o(              )
-    , .empty_o(msg_fifo_empty)
-    , .full_o (              )
-);
-
-always_comb begin : p_output
-    logic                      tgt_lb;
-    logic [ADDR_ROW_WIDTH-1:0] tgt_row;
-    logic [ADDR_COL_WIDTH-1:0] tgt_col;
-    logic [     IOR_WIDTH-1:0] tgt_idx;
-    logic                      tgt_seq;
-
-    `INIT_D(msg_data);
-    `INIT_D(msg_dir);
-    `INIT_D(msg_valid);
-    `INIT_D(loopback_index);
-    `INIT_D(loopback_state);
-    `INIT_D(loopback_valid);
-    `INIT_D(fifo_pop);
-    `INIT_D(msgs_sent);
-
-    // Track messages being sent
-    if (fifo_pop) msgs_sent = msgs_sent + 'd1;
-
-    // Clear message valid if accepted
-    if (msg_ready_i) msg_valid = 1'b0;
-
-    // Decode the fields from the RAM
-    { tgt_lb, tgt_row, tgt_col, tgt_idx, tgt_seq } = msg_fifo_out;
-
-    // Handle internal updates
-    loopback_index = tgt_idx;
-    loopback_state = state_fifo_out;
-    loopback_valid = (
-        !state_fifo_empty && // Entries ready in state FIFO
-        !msg_fifo_empty   && // Entries ready in message FIFO
-        tgt_lb               // Loopback flag set (calculated when filling RAM)
-    );
-
-    // Pop FIFO if loopback used
-    fifo_pop = loopback_valid;
-
-    // Generate the next message
-    if (!msg_valid && !tgt_lb && token_held_q) begin
-        // Build the message to send
-        msg_data.header.row     = tgt_row;
-        msg_data.header.column  = tgt_col;
-        msg_data.header.command = NODE_COMMAND_SIG_STATE;
-        msg_data.index          = tgt_idx;
-        msg_data.is_seq         = tgt_seq;
-        msg_data.state          = state_fifo_out;
-
-        // Route the message
-        if      (tgt_row < node_row_i) msg_dir = DIRECTION_NORTH;
-        else if (tgt_row > node_row_i) msg_dir = DIRECTION_SOUTH;
-        else if (tgt_col < node_col_i) msg_dir = DIRECTION_WEST;
-        else if (tgt_col > node_col_i) msg_dir = DIRECTION_EAST;
-
-        // Send when both state and message and not an internal loopback
-        msg_valid = !state_fifo_empty && !msg_fifo_empty;
-
-        // Pop FIFO if message queued up
-        fifo_pop = msg_valid;
     end
 end
 
@@ -446,56 +147,70 @@ end
 // Handle input updates
 // =============================================================================
 
-always_comb begin : p_input_update
-    int i;
-    `INIT_D(first_cycle);
-    `INIT_D(input_curr);
-    `INIT_D(input_next);
-    `INIT_D(input_trig);
+nx_node_control_inputs #(
+      .INPUTS          (INPUTS         )
+) ctrl_inputs (
+      .clk_i           (clk_i          )
+    , .rst_i           (rst_i          )
+    // External trigger signal
+    , .trigger_i       (trigger_i      )
+    // Signal state update
+    , .signal_index_i  (signal_index_i )
+    , .signal_is_seq_i (signal_is_seq_i)
+    , .signal_state_i  (signal_state_i )
+    , .signal_valid_i  (signal_valid_i )
+    // Loopback interface
+    , .loopback_index_i(loopback_index )
+    , .loopback_state_i(loopback_state )
+    , .loopback_valid_i(loopback_valid )
+    // Interface to core
+    , .core_trigger_o  (core_trigger_o )
+    , .core_inputs_o   (core_inputs_o  )
+);
 
-    // Always clear the input trigger after one cycle
-    input_trig = 1'b0;
+// =============================================================================
+// Handle output updates
+// =============================================================================
 
-    // If the external trigger is raised...
-    if (trigger_i) begin
-        // Copy next state into current, and look for differences
-        for (i = 0; i < INPUTS; i++) begin
-            // If there is a difference in input, trigger execution
-            if (input_curr[i] != input_next[i]) input_trig = 1'b1;
-            // Keep track of the state
-            input_curr[i] = input_next[i];
-        end
-        // On the very first cycle after setup, always trigger
-        input_trig  = input_trig | first_cycle;
-        first_cycle = 1'b0;
-    end
+logic [OP_STORE_ADDR_W-1:0] op_rd_addr;
+logic                       ctrl_op_idle, op_rd_en;
 
-    // Perform a signal state update
-    if (signal_valid_i) begin
-        // Always update the next state
-        input_next[signal_index_i] = signal_state_i;
-        // If not sequential...
-        if (!signal_is_seq_i) begin
-            // Update the current signal state
-            input_curr[signal_index_i] = signal_state_i;
-            // Determine if re-triggering is necessary
-            input_trig = input_trig || (input_curr_q[signal_index_i] != signal_state_i);
-        end
-    end
+nx_node_control_outputs #(
+      .OUTPUTS          ( OUTPUTS         )
+) ctrl_outputs (
+      .clk_i            ( clk_i           )
+    , .rst_i            ( rst_i           )
+    // Status
+    , .idle_o           ( ctrl_op_idle    )
+    // Interface from core
+    , .core_outputs_i   ( core_outputs_i  )
+    // Output RAM pointers
+    , .output_base_i    ( output_base_q   )
+    , .output_final_i   ( output_final_q  )
+    , .output_actv_i    ( output_actv_q   )
+    // Interface to memory
+    , .store_addr_o     ( op_rd_addr      )
+    , .store_rd_en_o    ( op_rd_en        )
+    , .store_rd_data_i  ( store_rd_data_i )
+    // Outbound message stream
+    , .msg_data_o       ( msg_data_o      )
+    , .msg_valid_o      ( msg_valid_o     )
+    , .msg_ready_i      ( msg_ready_i     )
+    // Loopback interface
+    , .loopback_index_o ( loopback_index  )
+    , .loopback_state_o ( loopback_state  )
+    , .loopback_valid_o ( loopback_valid  )
+);
 
-    // Output->input loopbacks - only ever sequential (avoid deadlock loop)
-    if (loopback_valid_q) input_next[loopback_index_q] = loopback_state_q;
-end
+assign store_addr_o    = op_rd_en ? op_rd_addr : store_addr_q;
+assign store_wr_data_o = store_wr_data_q;
+assign store_wr_en_o   = store_wr_en_q;
+assign store_rd_en_o   = op_rd_en;
 
 // =============================================================================
 // Determine if the control block is idle
 // =============================================================================
 
-assign idle_o = (
-    (detect_xor    == 'd0        ) && // Output XOR all zero (no change)
-    (update_valid  == 'd0        ) && // No pipelined address lookup
-    (msgs_queued_q == msgs_sent_q) && // No pending messages
-    (input_trig_q  == 'd0        )    // No outstanding input updates
-);
+assign idle_o = (ctrl_op_idle && !core_trigger_o);
 
 endmodule : nx_node_control
