@@ -71,12 +71,7 @@ async def bypass(dut, backpressure):
             if match:
                 dut.int_expected.append((data, 0))
             else:
-                tgt_dir = 0
-                if   tgt_row > row   : tgt_dir = 2
-                elif tgt_row < row   : tgt_dir = 0
-                elif tgt_col > column: tgt_dir = 1
-                elif tgt_col < column: tgt_dir = 3
-                dut.byp_expected.append((data, tgt_dir))
+                dut.byp_expected.append((data, 0))
         # Capture the last direction
         last = dirx
 

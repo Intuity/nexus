@@ -21,17 +21,14 @@ import NXConstants::*;
     // Inbound message streams
     // - A
     , input  node_message_t stream_a_data_i
-    , input  direction_t    stream_a_dir_i
     , input  logic          stream_a_valid_i
     , output logic          stream_a_ready_o
     // - B
     , input  node_message_t stream_b_data_i
-    , input  direction_t    stream_b_dir_i
     , input  logic          stream_b_valid_i
     , output logic          stream_b_ready_o
     // Outbound arbitrated message stream
     , output node_message_t comb_data_o
-    , output direction_t    comb_dir_o
     , output logic          comb_valid_o
     , input  logic          comb_ready_i
 );
@@ -47,17 +44,14 @@ nx_stream_combiner #(
     // Inbound message streams
     // - A
     , .stream_a_data_i (stream_a_data_i )
-    , .stream_a_dir_i  (stream_a_dir_i  )
     , .stream_a_valid_i(stream_a_valid_i)
     , .stream_a_ready_o(stream_a_ready_o)
     // - B
     , .stream_b_data_i (stream_b_data_i )
-    , .stream_b_dir_i  (stream_b_dir_i  )
     , .stream_b_valid_i(stream_b_valid_i)
     , .stream_b_ready_o(stream_b_ready_o)
     // Outbound arbitrated message stream
     , .comb_data_o (comb_data_o )
-    , .comb_dir_o  (comb_dir_o  )
     , .comb_valid_o(comb_valid_o)
     , .comb_ready_i(comb_ready_i)
 );

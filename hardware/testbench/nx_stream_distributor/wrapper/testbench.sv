@@ -16,9 +16,13 @@ module testbench
 import NXConstants::*;
 (
       input  logic rst
+    // Control signals
+    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
+    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+    // Idle flag
+    , output logic idle_o
     // Inbound message stream
     , input  node_message_t dist_data_i
-    , input  direction_t    dist_dir_i
     , input  logic          dist_valid_i
     , output logic          dist_ready_o
     // Outbound distributed message streams
@@ -50,9 +54,13 @@ always #1 clk <= ~clk;
 nx_stream_distributor dut (
       .clk_i(clk)
     , .rst_i(rst)
+    // Control signals
+    , .node_row_i(node_row_i)
+    , .node_col_i(node_col_i)
+    // Idle flag
+    , .idle_o(idle_o)
     // Inbound message stream
     , .dist_data_i (dist_data_i )
-    , .dist_dir_i  (dist_dir_i  )
     , .dist_valid_i(dist_valid_i)
     , .dist_ready_o(dist_ready_o)
     // Outbound distributed message streams

@@ -42,7 +42,6 @@ import NXConstants::*;
     , input  logic          internal_ready_i
     // Outbound stream for bypass
     , output node_message_t bypass_data_o
-    , output direction_t    bypass_dir_o
     , output logic          bypass_valid_o
     , input  logic          bypass_ready_i
 );
@@ -79,7 +78,6 @@ nx_stream_arbiter dut (
     , .internal_ready_i(internal_ready_i)
     // Outbound stream for bypass
     , .bypass_data_o (bypass_data_o )
-    , .bypass_dir_o  (bypass_dir_o  )
     , .bypass_valid_o(bypass_valid_o)
     , .bypass_ready_i(bypass_ready_i)
 );

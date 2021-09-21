@@ -18,7 +18,10 @@ from cocotb.handle import Force, Release
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
+from nxmodel.node import Direction
+
 from ..testbench import testcase
+assert testcase, "Import of testcase is required to setup factory"
 
 async def absent_single_dir(dut, absent):
     """ Test messages streamed via each interface one at a time """
@@ -26,7 +29,15 @@ async def absent_single_dir(dut, absent):
     await dut.reset()
 
     # Get the width of the data
+    row_size  = 4
+    col_size  = 4
     intf_size = 31
+    pyld_size = intf_size - row_size - col_size
+
+    # Setup a row & column
+    row, col = randint(1, 14), randint(1, 14)
+    dut.node_row_i <= row
+    dut.node_col_i <= col
 
     # Drop presence and force ready low for the absent interface
     dut.info(f"Setting {['north', 'east', 'south', 'west'][absent]} absent")
@@ -46,8 +57,15 @@ async def absent_single_dir(dut, absent):
     # Launch a message in every direction
     for dirx, exp in enumerate(queues):
         # Send a random message towards each interface
-        msg = randint(0, (1 << intf_size) - 1)
-        dut.dist.append((msg, dirx))
+        tgt_row, tgt_col = 0, 0
+        if   dirx == Direction.NORTH: tgt_row, tgt_col = randint(0, row-1), col
+        elif dirx == Direction.SOUTH: tgt_row, tgt_col = randint(row+1, (1 << row_size) - 1), col
+        elif dirx == Direction.EAST : tgt_row, tgt_col = row, randint(col+1, (1 << col_size) - 1)
+        elif dirx == Direction.WEST : tgt_row, tgt_col = row, randint(0, col-1)
+        msg = tgt_row
+        msg = (msg << col_size ) | tgt_col
+        msg = (msg << pyld_size) | randint(0, (1 << pyld_size) - 1)
+        dut.dist.append((msg, 0))
 
         # Queue up message on the expected output
         exp.append((msg, 0))
@@ -79,7 +97,10 @@ async def absent_multi_dir(dut, backpressure, absent):
     dut.west.delays  = backpressure
 
     # Get the width of the data
+    row_size  = 4
+    col_size  = 4
     intf_size = 31
+    pyld_size = intf_size - row_size - col_size
 
     # Drop presence and force ready low for the absent interface
     dut.present[absent] <= 0
@@ -87,6 +108,11 @@ async def absent_multi_dir(dut, backpressure, absent):
     elif absent == 1: dut.east.intf.ready  <= Force(0)
     elif absent == 2: dut.south.intf.ready <= Force(0)
     elif absent == 3: dut.west.intf.ready  <= Force(0)
+
+    # Setup a row & column
+    row, col = randint(1, 14), randint(1, 14)
+    dut.node_row_i <= row
+    dut.node_col_i <= col
 
     # Assemble the queues
     exps = [
@@ -104,8 +130,15 @@ async def absent_multi_dir(dut, backpressure, absent):
         exp, dirx = choice(exps)
 
         # Send a random message towards each interface
-        msg = randint(0, (1 << intf_size) - 1)
-        dut.dist.append((msg, dirx))
+        tgt_row, tgt_col = 0, 0
+        if   dirx == Direction.NORTH: tgt_row, tgt_col = randint(0, row-1), col
+        elif dirx == Direction.SOUTH: tgt_row, tgt_col = randint(row+1, (1 << row_size) - 1), col
+        elif dirx == Direction.EAST : tgt_row, tgt_col = row, randint(col+1, (1 << col_size) - 1)
+        elif dirx == Direction.WEST : tgt_row, tgt_col = row, randint(0, col-1)
+        msg = tgt_row
+        msg = (msg << col_size ) | tgt_col
+        msg = (msg << pyld_size) | randint(0, (1 << pyld_size) - 1)
+        dut.dist.append((msg, 0))
 
         # Queue up message on the expected output
         exp.append((msg, 0))

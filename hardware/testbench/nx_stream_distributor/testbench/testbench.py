@@ -72,6 +72,8 @@ class Testbench(TestbenchBase):
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
+        self.node_row_i <= 0
+        self.node_col_i <= 0
         self.dist.intf.initialise(IORole.INITIATOR)
         self.north.intf.initialise(IORole.RESPONDER)
         self.east.intf.initialise(IORole.RESPONDER)

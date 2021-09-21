@@ -47,12 +47,11 @@ async def single_dir(dut):
     # Drive a number of random messages from each interface
     for intf in (dut.stream_a, dut.stream_b):
         msgs = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
-        dirs = [choice(list(Direction)) for _ in msgs]
-        for msg, dirx in zip(msgs, dirs): intf.append((msg, dirx))
+        for msg in msgs: intf.append((msg, 0))
         dut.info(f"Generated {len(msgs)} messages")
 
         # Queue up the expected responses
-        dut.expected += [(x, int(y)) for x, y in zip(msgs, dirs)]
+        dut.expected += [(x, 0) for x in msgs]
 
         # Wait for the expected queue to drain
         while dut.expected: await RisingEdge(dut.clk)
@@ -69,17 +68,11 @@ async def multi_dir(dut, backpressure):
     intf_size = max(dut.comb.intf.data._range)-min(dut.comb.intf.data._range)+1
 
     # Queue up random messages onto the different drivers
-    msg_a = [
-        (randint(0, (1 << intf_size) - 1), int(choice(list(Direction))))
-        for _ in range(randint(50, 100))
-    ]
-    msg_b = [
-        (randint(0, (1 << intf_size) - 1), int(choice(list(Direction))))
-        for _ in range(randint(50, 100))
-    ]
+    msg_a = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
+    msg_b = [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
 
-    for msg, dirx in msg_a: dut.stream_a.append((msg, dirx))
-    for msg, dirx in msg_b: dut.stream_b.append((msg, dirx))
+    for msg in msg_a: dut.stream_a.append((msg, 0))
+    for msg in msg_b: dut.stream_b.append((msg, 0))
 
     # Construct the expected arbitration using the active scheme
     arb_scheme = dut.dut.dut.ARB_SCHEME.value.decode("utf-8")
@@ -89,14 +82,14 @@ async def multi_dir(dut, backpressure):
         if arb_scheme == "round_robin":
             for idx in range(2):
                 active = (idx + last + 1) % 2
-                if   active == 0 and msg_a: dut.expected.append(msg_a.pop(0))
-                elif active == 1 and msg_b: dut.expected.append(msg_b.pop(0))
+                if   active == 0 and msg_a: dut.expected.append((msg_a.pop(0), 0))
+                elif active == 1 and msg_b: dut.expected.append((msg_b.pop(0), 0))
         elif arb_scheme == "prefer_a":
-            if   msg_a: dut.expected.append(msg_a.pop(0))
-            elif msg_b: dut.expected.append(msg_b.pop(0))
+            if   msg_a: dut.expected.append((msg_a.pop(0), 0))
+            elif msg_b: dut.expected.append((msg_b.pop(0), 0))
         elif arb_scheme == "prefer_b":
-            if   msg_b: dut.expected.append(msg_b.pop(0))
-            elif msg_a: dut.expected.append(msg_a.pop(0))
+            if   msg_b: dut.expected.append((msg_b.pop(0), 0))
+            elif msg_a: dut.expected.append((msg_a.pop(0), 0))
         else:
             raise Exception(f"Unknown arbitration scheme: {arb_scheme}")
         # Capture the last selection

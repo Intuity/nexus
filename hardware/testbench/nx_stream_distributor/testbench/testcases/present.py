@@ -17,6 +17,8 @@ from random import choice, randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import RisingEdge
 
+from nxmodel.node import Direction
+
 from ..testbench import testcase
 
 @testcase()
@@ -26,14 +28,29 @@ async def present_single_dir(dut):
     await dut.reset()
 
     # Get the width of the data
+    row_size  = 4
+    col_size  = 4
     intf_size = 31
+    pyld_size = intf_size - row_size - col_size
+
+    # Setup a row & column
+    row, col = randint(1, 14), randint(1, 14)
+    dut.node_row_i <= row
+    dut.node_col_i <= col
 
     for dirx, exp in enumerate((
         dut.exp_north, dut.exp_east, dut.exp_south, dut.exp_west
     )):
         # Send a random message towards each interface
-        msg = randint(0, (1 << intf_size) - 1)
-        dut.dist.append((msg, dirx))
+        tgt_row, tgt_col = 0, 0
+        if   dirx == Direction.NORTH: tgt_row, tgt_col = randint(0, row-1), col
+        elif dirx == Direction.SOUTH: tgt_row, tgt_col = randint(row+1, (1 << row_size) - 1), col
+        elif dirx == Direction.EAST : tgt_row, tgt_col = row, randint(col+1, (1 << col_size) - 1)
+        elif dirx == Direction.WEST : tgt_row, tgt_col = row, randint(0, col-1)
+        msg = tgt_row
+        msg = (msg << col_size ) | tgt_col
+        msg = (msg << pyld_size) | randint(0, (1 << pyld_size) - 1)
+        dut.dist.append((msg, 0))
 
         # Queue up message on the expected output
         exp.append((msg, 0))
@@ -53,7 +70,15 @@ async def present_multi_dir(dut, backpressure):
     dut.west.delays  = backpressure
 
     # Get the width of the data
+    row_size  = 4
+    col_size  = 4
     intf_size = 31
+    pyld_size = intf_size - row_size - col_size
+
+    # Setup a row & column
+    row, col = randint(1, 14), randint(1, 14)
+    dut.node_row_i <= row
+    dut.node_col_i <= col
 
     # Queue up many messages to go to different responders
     exps = (
@@ -65,8 +90,15 @@ async def present_multi_dir(dut, backpressure):
         exp, dirx = choice(exps)
 
         # Send a random message towards each interface
-        msg = randint(0, (1 << intf_size) - 1)
-        dut.dist.append((msg, dirx))
+        tgt_row, tgt_col = 0, 0
+        if   dirx == Direction.NORTH: tgt_row, tgt_col = randint(0, row-1), col
+        elif dirx == Direction.SOUTH: tgt_row, tgt_col = randint(row+1, (1 << row_size) - 1), col
+        elif dirx == Direction.EAST : tgt_row, tgt_col = row, randint(col+1, (1 << col_size) - 1)
+        elif dirx == Direction.WEST : tgt_row, tgt_col = row, randint(0, col-1)
+        msg = tgt_row
+        msg = (msg << col_size ) | tgt_col
+        msg = (msg << pyld_size) | randint(0, (1 << pyld_size) - 1)
+        dut.dist.append((msg, 0))
 
         # Queue up message on the expected output
         exp.append((msg, 0))
