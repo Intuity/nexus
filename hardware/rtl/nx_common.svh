@@ -82,7 +82,8 @@
 //  I: Initial value for each signal to take
 //
 `define DECLARE_DQ_ARRAY(W, N, X, C, R, I) \
-    `DECLARE_DQT_ARRAY(logic [W-1:0], N, X, C, R, I)
+    localparam ARRAY_SIZE_``X`` = N; \
+    `DECLARE_DQT(logic [N-1:0][W-1:0], X, C, R, I)
 
 // INIT_D(X)
 // Copy the sequential value back to the combinatorial value, ready for
