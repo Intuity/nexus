@@ -58,9 +58,11 @@ logic [PAIRS-1:0][COUNT_WIDTH-1:0] summations;
 generate
 for (genvar idx = 0; idx < PAIRS; idx++) begin : gen_summation
     if (idx > 0) begin
-        assign summations[idx] = encoded[idx] + (encoded[idx][1] ? summations[idx-1] : 'd0);
+        assign summations[idx] = (
+            COUNT_WIDTH'(encoded[idx]) + (encoded[idx][1] ? summations[idx-1] : 'd0)
+        );
     end else begin
-        assign summations[idx] = encoded[idx];
+        assign summations[idx] = COUNT_WIDTH'(encoded[idx]);
     end
 end
 endgenerate
