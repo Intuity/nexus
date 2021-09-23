@@ -24,50 +24,65 @@ module nx_clz #(
     , output logic [COUNT_WIDTH-1:0] leading_o
 );
 
-localparam PAIRS = (WIDTH + 1) / 2;
+localparam SECT_SIZE  = 8;
+localparam NUM_SECTS  = (WIDTH + SECT_SIZE - 1) / SECT_SIZE;
+localparam SECT_WIDTH = $clog2(SECT_SIZE) + 1;
 
-// Reverse input if required
-logic [WIDTH-1:0] normalised;
+// Reverse the scalar to count from the LSB upwards
+logic [WIDTH-1:0] reversed;
 
 generate
-if (REVERSE_INPUT) begin
-    for (genvar idx = 0; idx < WIDTH; idx++) begin : gen_reverse
-        assign normalised[WIDTH-idx-1] = scalar_i[idx];
+for (genvar idx = 0; idx < WIDTH; idx++) begin : gen_reverse
+    assign reversed[idx] = REVERSE_INPUT ? scalar_i[idx] : scalar_i[WIDTH-idx-1];
+end
+endgenerate
+
+// Pad out to a full number of sections
+logic [(NUM_SECTS*SECT_SIZE)-1:0] padded;
+assign padded = { {((NUM_SECTS*SECT_SIZE)-WIDTH){1'b0}}, reversed };
+
+// Count each section
+logic [NUM_SECTS-1:0]                 active;
+logic [NUM_SECTS-1:0][SECT_WIDTH-1:0] sections;
+
+generate
+for (genvar idx = 0; idx < NUM_SECTS; idx++) begin
+    always_comb begin : comb_set_count
+        active[idx] = |(padded[((idx+1)*SECT_SIZE)-1:idx*SECT_SIZE]);
+        casex (padded[((idx+1)*SECT_SIZE)-1:idx*SECT_SIZE])
+            'b????_???1: sections[idx] = 'd0;
+            'b????_??10: sections[idx] = 'd1;
+            'b????_?100: sections[idx] = 'd2;
+            'b????_1000: sections[idx] = 'd3;
+            'b???1_0000: sections[idx] = 'd4;
+            'b??10_0000: sections[idx] = 'd5;
+            'b?100_0000: sections[idx] = 'd6;
+            'b1000_0000: sections[idx] = 'd7;
+            'b0000_0000: sections[idx] = 'd8;
+        endcase
     end
-end else begin
-    assign normalised = scalar_i;
 end
 endgenerate
 
-// Encode each pairing of bits
-logic [PAIRS-1:0][1:0] encoded;
+// Add up the full amount
+logic [NUM_SECTS-1:0]                  stop_sum;
+logic [NUM_SECTS-1:0][COUNT_WIDTH-1:0] summations;
 
 generate
-for (genvar idx = 0; idx < PAIRS; idx++) begin : gen_encode
-    assign encoded[idx] = (
-        (normalised[(idx*2)+:2] == 2'b00) ? 2'd2 : ( // Two leading zeroes
-        (normalised[(idx*2)+:2] == 2'b01) ? 2'd1 : ( // One leading zero
-                                            2'd0     // No leading zeroes
-    )));
-end
-endgenerate
-
-// Sum up the encodings
-logic [PAIRS-1:0][COUNT_WIDTH-1:0] summations;
-
-generate
-for (genvar idx = 0; idx < PAIRS; idx++) begin : gen_summation
+for (genvar idx = 0; idx < NUM_SECTS; idx++) begin : gen_summation
     if (idx > 0) begin
+        assign stop_sum[idx]   = stop_sum[idx-1] || active[idx];
         assign summations[idx] = (
-            COUNT_WIDTH'(encoded[idx]) + (encoded[idx][1] ? summations[idx-1] : 'd0)
+            summations[idx-1] + (stop_sum[idx-1] ? 'd0 : COUNT_WIDTH'(sections[idx]))
         );
     end else begin
-        assign summations[idx] = COUNT_WIDTH'(encoded[idx]);
+        assign stop_sum[idx]   = active[idx];
+        assign summations[idx] = COUNT_WIDTH'(sections[idx]);
     end
 end
 endgenerate
 
 // Drive output from final sum
-assign leading_o = summations[PAIRS-1];
+assign leading_o = summations[NUM_SECTS-1];
 
 endmodule : nx_clz
