@@ -83,5 +83,5 @@ imp_vivado: | $(WORKING_DIR)
 	$(PREFIX)cd $(WORKING_DIR) && vivado -mode batch -source $(notdir $(VVD_IMP_TCL_PATH))
 	@echo "# Extracting worst slack"
 	$(PREFIX)parts=($$(grep "Slack" $(abspath $(VVD_WORST_PATH_RPT)) | head -n 1)) && \
-	    echo $${parts[3]} | sed -r 's/.*([0-9]+[.][0-9]+).*/\1/g' > $(VVD_WORST_PATH)
+	    echo $${parts[3]} | sed -r 's/(\(-|\)?[0-9]+[.][0-9]+).*/\1/g' > $(VVD_WORST_PATH)
 	@echo "# Worst slack is $$(cat $(VVD_WORST_PATH))"
