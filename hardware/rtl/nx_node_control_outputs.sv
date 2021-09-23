@@ -55,18 +55,33 @@ import NXConstants::*;
 // Pipeline stall
 logic pipe_stall;
 
-// =============================================================================
-// Detect output changes
-// =============================================================================
-
+// XOR+CLZ detection
 logic [OUTPUTS-1:0] output_xor;
 `DECLARE_DQ(OUTPUTS,     output_state,   clk_i, rst_i, 'd0)
 `DECLARE_DQ(1,           output_changed, clk_i, rst_i, 'd0)
 `DECLARE_DQ(IOR_WIDTH+1, output_index,   clk_i, rst_i, 'd0)
-`DECLARE_DQ(1,           output_value,   clk_i, rst_i, 'd0)
+
+// Memory pointers
+`DECLARE_DQ(STORE_ADDR_W, pointer_start, clk_i, rst_i, 'd0)
+`DECLARE_DQ(STORE_ADDR_W, pointer_final, clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,            pointer_value, clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,            pointer_valid, clk_i, rst_i, 'd0)
+
+// Fetch
+logic fetch_step;
+`DECLARE_DQ(STORE_ADDR_W, fetch_address, clk_i, rst_i, 'd0)
+`DECLARE_DQ(STORE_ADDR_W, fetch_target,  clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,            fetch_active,  clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,            fetch_last,    clk_i, rst_i, 'd0)
+`DECLARE_DQ(1,            fetch_value,   clk_i, rst_i, 'd0)
+
+// =============================================================================
+// Detect output changes
+// =============================================================================
 
 // XOR current outputs against tracked state to detect changes
-assign output_xor = core_outputs_i ^ output_state;
+// NOTE: Mask with output_actv_i to ignore any unconfigure outputs
+assign output_xor = (core_outputs_i ^ output_state_q) & output_actv_i;
 
 // OR reduce XOR result to determine if an update needs to be made
 assign output_changed = (|output_xor);
@@ -80,59 +95,43 @@ nx_clz #(
     , .leading_o     ( output_index )
 );
 
-// Mux to pickup output value
-assign output_value = output_changed ? core_outputs_i[output_index[IOR_WIDTH-1:0]] : 'd0;
-
 // On the last fetch, update the stored state
-assign output_state = (output_state_q ^ ({{(OUTPUTS-1){1'b0}},fetch_last} << output_index_q));
+assign output_state = (output_state_q ^ ({{(OUTPUTS-1){1'b0}},(fetch_last && !pipe_stall)} << output_index_q));
 
 // =============================================================================
 // Lookup the start and end addresses, and whether the entry is populated
 // =============================================================================
 
-logic [STORE_ADDR_W-1:0] pointer_start, pointer_final;
-logic                    pointer_valid;
-
-assign pointer_valid = output_changed_q && output_actv_i[output_index_q[OUTPUT_WIDTH-1:0]];
-assign pointer_start = output_base_i[output_index_q[OUTPUT_WIDTH-1:0]];
-assign pointer_final = output_final_i[output_index_q[OUTPUT_WIDTH-1:0]];
+assign pointer_start = output_changed_q ? output_base_i[output_index_q[OUTPUT_WIDTH-1:0]] : pointer_start_q;
+assign pointer_final = output_changed_q ? output_final_i[output_index_q[OUTPUT_WIDTH-1:0]] : pointer_final_q;
+assign pointer_value = output_changed_q ? ~output_state_q[output_index_q[OUTPUT_WIDTH-1:0]] : pointer_valid_q;
+assign pointer_valid = (
+    (output_changed_q && (pointer_start != pointer_start_q)) ||
+    (pointer_valid_q  && pipe_stall                        )
+);
 
 // =============================================================================
 // Perform fetch
 // =============================================================================
 
-logic fetch_next, fetch_step;
+logic fetch_pickup;
+assign fetch_pickup = pointer_valid_q && !pipe_stall;
 
-`DECLARE_DQ(STORE_ADDR_W, fetch_address, clk_i, rst_i, 'd0)
-`DECLARE_DQ(STORE_ADDR_W, fetch_target,  clk_i, rst_i, 'd0)
-`DECLARE_DQ(1,            fetch_active,  clk_i, rst_i, 'd0)
-`DECLARE_DQ(1,            fetch_last,    clk_i, rst_i, 'd0)
+assign fetch_active  = (fetch_active_q && (!fetch_last_q || pipe_stall)) || fetch_pickup;
 
-assign fetch_next   = (!fetch_active_q || fetch_last_q) && !pipe_stall && pointer_valid;
+assign fetch_step    = fetch_active_q && !pipe_stall;
 
-assign fetch_active = (fetch_active_q && (fetch_address_q != fetch_target_q)) || fetch_next;
+assign fetch_address = fetch_pickup ? pointer_start_q
+                                    : (fetch_address_q + (fetch_step ? 'd1 : 'd0));
 
-assign fetch_step   = fetch_active_q && !pipe_stall;
-
-assign fetch_address = fetch_next ? pointer_start
-                                  : (fetch_address_q + (fetch_step ? 'd1 : 'd0));
-
-assign fetch_target  = fetch_next ? pointer_final : fetch_target_q;
+assign fetch_target  = fetch_pickup ? pointer_final_q : fetch_target_q;
 
 assign fetch_last    = fetch_active && (fetch_address == fetch_target);
 
+assign fetch_value   = fetch_pickup ? pointer_value_q : fetch_value_q;
+
 assign store_addr_o  = fetch_address;
 assign store_rd_en_o = fetch_active;
-
-// =============================================================================
-// Create delay lines for value and valid to align with fetch
-// =============================================================================
-
-`DECLARE_DQ(2, delayed_value, clk_i, rst_i, 'd0)
-`DECLARE_DQ(2, delayed_valid, clk_i, rst_i, 'd0)
-
-assign delayed_value = pipe_stall ? delayed_value_q : { delayed_value_q[0], output_value_q };
-assign delayed_valid = pipe_stall ? delayed_valid_q : { delayed_valid_q[0], pointer_valid  };
 
 // =============================================================================
 // Hold fetch result
@@ -143,8 +142,8 @@ assign delayed_valid = pipe_stall ? delayed_valid_q : { delayed_valid_q[0], poin
 `DECLARE_DQ(1,            fetched_value, clk_i, rst_i, 'd0)
 
 assign fetched_data  = pipe_stall ? fetched_data_q  : store_rd_data_i;
-assign fetched_valid = pipe_stall ? fetched_valid_q : delayed_valid_q[0];
-assign fetched_value = pipe_stall ? fetched_value_q : delayed_value_q[0];
+assign fetched_valid = pipe_stall ? fetched_valid_q : fetch_active_q;
+assign fetched_value = pipe_stall ? fetched_value_q : fetch_value_q;
 
 // =============================================================================
 // Decode fields from the fetched data
