@@ -62,6 +62,7 @@ logic [OUTPUTS-1:0] output_xor;
 `DECLARE_DQ(IOR_WIDTH+1, output_index,   clk_i, rst_i, 'd0)
 
 // Memory pointers
+`DECLARE_DQ(IOR_WIDTH,    pointer_index, clk_i, rst_i, 'd0)
 `DECLARE_DQ(STORE_ADDR_W, pointer_start, clk_i, rst_i, 'd0)
 `DECLARE_DQ(STORE_ADDR_W, pointer_final, clk_i, rst_i, 'd0)
 `DECLARE_DQ(1,            pointer_value, clk_i, rst_i, 'd0)
@@ -69,6 +70,7 @@ logic [OUTPUTS-1:0] output_xor;
 
 // Fetch
 logic fetch_step;
+`DECLARE_DQ(IOR_WIDTH,    fetch_index,   clk_i, rst_i, 'd0)
 `DECLARE_DQ(STORE_ADDR_W, fetch_address, clk_i, rst_i, 'd0)
 `DECLARE_DQ(STORE_ADDR_W, fetch_target,  clk_i, rst_i, 'd0)
 `DECLARE_DQ(1,            fetch_active,  clk_i, rst_i, 'd0)
@@ -95,31 +97,28 @@ nx_clz #(
     , .leading_o     ( output_index )
 );
 
-// On the last fetch, update the stored state
-assign output_state = (output_state_q ^ ({{(OUTPUTS-1){1'b0}},(fetch_last && !pipe_stall)} << output_index_q));
-
 // =============================================================================
-// Lookup the start and end addresses, and whether the entry is populated
+// Demux start/end addresses and the value
 // =============================================================================
 
-assign pointer_start = output_changed_q ? output_base_i[output_index_q[OUTPUT_WIDTH-1:0]] : pointer_start_q;
-assign pointer_final = output_changed_q ? output_final_i[output_index_q[OUTPUT_WIDTH-1:0]] : pointer_final_q;
-assign pointer_value = output_changed_q ? ~output_state_q[output_index_q[OUTPUT_WIDTH-1:0]] : pointer_valid_q;
-assign pointer_valid = (
-    (output_changed_q && (pointer_start != pointer_start_q)) ||
-    (pointer_valid_q  && pipe_stall                        )
-);
+assign pointer_index = output_index_q[OUTPUT_WIDTH-1:0];
+assign pointer_start = output_base_i[output_index_q[OUTPUT_WIDTH-1:0]];
+assign pointer_final = output_final_i[output_index_q[OUTPUT_WIDTH-1:0]];
+assign pointer_value = ~output_state_q[output_index_q[OUTPUT_WIDTH-1:0]];
+assign pointer_valid = output_changed_q && !fetch_last_q;
 
 // =============================================================================
 // Perform fetch
 // =============================================================================
 
 logic fetch_pickup;
-assign fetch_pickup = pointer_valid_q && !pipe_stall;
+assign fetch_pickup = pointer_valid_q && !pipe_stall && !fetch_last_q && !fetch_active_q;
 
 assign fetch_active  = (fetch_active_q && (!fetch_last_q || pipe_stall)) || fetch_pickup;
 
 assign fetch_step    = fetch_active_q && !pipe_stall;
+
+assign fetch_index   = fetch_pickup ? pointer_index_q : fetch_index_q;
 
 assign fetch_address = fetch_pickup ? pointer_start_q
                                     : (fetch_address_q + (fetch_step ? 'd1 : 'd0));
@@ -132,6 +131,9 @@ assign fetch_value   = fetch_pickup ? pointer_value_q : fetch_value_q;
 
 assign store_addr_o  = fetch_address;
 assign store_rd_en_o = fetch_active;
+
+// On pickup, update the stored state
+assign output_state = (output_state_q ^ ({{(OUTPUTS-1){1'b0}},(fetch_pickup && !pipe_stall)} << pointer_index_q));
 
 // =============================================================================
 // Hold fetch result
