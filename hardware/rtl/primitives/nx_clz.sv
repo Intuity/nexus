@@ -49,16 +49,16 @@ generate
 for (genvar idx = 0; idx < NUM_SECTS; idx++) begin
     always_comb begin : comb_set_count
         active[idx] = |(padded[((idx+1)*SECT_SIZE)-1:idx*SECT_SIZE]);
-        casex (padded[((idx+1)*SECT_SIZE)-1:idx*SECT_SIZE])
-            'b????_???1: sections[idx] = 'd0;
-            'b????_??10: sections[idx] = 'd1;
-            'b????_?100: sections[idx] = 'd2;
-            'b????_1000: sections[idx] = 'd3;
-            'b???1_0000: sections[idx] = 'd4;
-            'b??10_0000: sections[idx] = 'd5;
-            'b?100_0000: sections[idx] = 'd6;
-            'b1000_0000: sections[idx] = 'd7;
-            'b0000_0000: sections[idx] = 'd8;
+        casez (padded[((idx+1)*SECT_SIZE)-1:idx*SECT_SIZE])
+            8'b????_???1: sections[idx] = 'd0;
+            8'b????_??10: sections[idx] = 'd1;
+            8'b????_?100: sections[idx] = 'd2;
+            8'b????_1000: sections[idx] = 'd3;
+            8'b???1_0000: sections[idx] = 'd4;
+            8'b??10_0000: sections[idx] = 'd5;
+            8'b?100_0000: sections[idx] = 'd6;
+            8'b1000_0000: sections[idx] = 'd7;
+            8'b0000_0000: sections[idx] = 'd8;
         endcase
     end
 end
@@ -84,5 +84,9 @@ endgenerate
 
 // Drive output from final sum
 assign leading_o = summations[NUM_SECTS-1];
+
+// Tie-off final stop_sum
+logic _unused;
+assign _unused = |{ 1'b1, stop_sum[NUM_SECTS-1] };
 
 endmodule : nx_clz

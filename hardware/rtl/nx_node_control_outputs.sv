@@ -206,4 +206,11 @@ assign pipe_stall = msg_valid_o && !msg_ready_i;
 
 assign idle_o = !(msg_valid_q || fetched_valid || output_changed);
 
+// =============================================================================
+// Unused signals
+// =============================================================================
+
+logic _unused;
+assign _unused = |{ 1'b1, output_index_q[OUTPUT_WIDTH] };
+
 endmodule : nx_node_control_outputs
