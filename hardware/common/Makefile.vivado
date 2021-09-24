@@ -26,6 +26,8 @@ VVD_TGT_PART       ?= xc7a200tfbg484-3
 VVD_NWORST         ?= 10
 VVD_WORST_PATH_RPT ?= $(WORKING_DIR)/vvd_worst_$(VVD_NWORST)_$(DESIGN_TOP).rpt
 VVD_WORST_PATH     ?= $(WORKING_DIR)/vvd_worst_$(DESIGN_TOP).txt
+VVD_REQUIRE_PATH   ?= $(WORKING_DIR)/vvd_req_$(DESIGN_TOP).txt
+VVD_SLACK_CSV      ?= $(WORKING_DIR)/vvd_slack_$(DESIGN_TOP).csv
 
 ifeq ($(DESIGN_TOP),)
   $(error No DESIGN_TOP has been specified)
@@ -84,4 +86,8 @@ imp_vivado: | $(WORKING_DIR)
 	@echo "# Extracting worst slack"
 	$(PREFIX)parts=($$(grep "Slack" $(abspath $(VVD_WORST_PATH_RPT)) | head -n 1)) && \
 	    echo $${parts[3]} | sed -r 's/(\(-|\)?[0-9]+[.][0-9]+).*/\1/g' > $(VVD_WORST_PATH)
+	$(PREFIX)parts=($$(grep "Requirement" $(abspath $(VVD_WORST_PATH_RPT)) | head -n 1)) && \
+	    echo $${parts[1]} | sed -r 's/(\(-|\)?[0-9]+[.][0-9]+).*/\1/g' > $(VVD_REQUIRE_PATH)
 	@echo "# Worst slack is $$(cat $(VVD_WORST_PATH))"
+	$(PREFIX)echo "Worst,Requirement" > $(VVD_SLACK_CSV)
+	$(PREFIX)echo "$$(cat $(VVD_WORST_PATH)),$$(cat $(VVD_REQUIRE_PATH))" >> $(VVD_SLACK_CSV)
