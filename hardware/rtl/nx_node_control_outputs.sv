@@ -170,10 +170,6 @@ assign loopback_valid_o = msg_lb && fetched_valid_q;
 // Construct outbound message
 // =============================================================================
 
-// Hold valid
-`DECLARE_DQT(node_sig_state_t, msg_data,  clk_i, rst_i, 'd0)
-`DECLARE_DQ (               1, msg_valid, clk_i, rst_i, 'd0)
-
 // Construct the header
 node_header_t sig_hdr;
 assign sig_hdr.row     = msg_row;
@@ -181,30 +177,40 @@ assign sig_hdr.column  = msg_col;
 assign sig_hdr.command = NODE_COMMAND_SIG_STATE;
 
 // Construct the message
-node_sig_state_t msg_next;
-assign msg_next.header     = sig_hdr;
-assign msg_next.index      = msg_idx;
-assign msg_next.is_seq     = msg_seq;
-assign msg_next.state      = fetched_value_q;
-assign msg_next._padding_0 = 'd0;
+node_sig_state_t msg_data;
+assign msg_data.header     = sig_hdr;
+assign msg_data.index      = msg_idx;
+assign msg_data.is_seq     = msg_seq;
+assign msg_data.state      = fetched_value_q;
+assign msg_data._padding_0 = 'd0;
 
-assign msg_data = (!msg_valid_q || msg_ready_i) ? msg_next : msg_data_q;
+logic msg_valid;
+assign msg_valid = fetched_valid_q;
 
-// Drive the valid
-assign msg_valid = (msg_valid_q && !msg_ready_i) || fetched_valid_q;
+// Feed a FIFO
+logic fifo_empty;
+nx_fifo #(
+      .DEPTH (             2 )
+    , .WIDTH ( MESSAGE_WIDTH )
+) msg_fifo (
+      .clk_i     ( clk_i                      )
+    , .rst_i     ( rst_i                      )
+    , .wr_data_i ( msg_data                   )
+    , .wr_push_i ( msg_valid && !pipe_stall   )
+    , .rd_data_o ( msg_data_o                 )
+    , .rd_pop_i  ( msg_valid_o && msg_ready_i )
+    , .level_o   (                            )
+    , .empty_o   ( fifo_empty                 )
+    , .full_o    ( pipe_stall                 )
+);
 
-// Drive outputs
-assign msg_data_o  = msg_data_q;
-assign msg_valid_o = msg_valid_q;
-
-// Control stall
-assign pipe_stall = msg_valid_o && !msg_ready_i;
+assign msg_valid_o = !fifo_empty;
 
 // =============================================================================
 // Determine idle state
 // =============================================================================
 
-assign idle_o = !(msg_valid_q || fetched_valid || output_changed);
+assign idle_o = !(fetched_valid || output_changed) && fifo_empty;
 
 // =============================================================================
 // Unused signals
