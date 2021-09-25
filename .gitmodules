@@ -14,3 +14,15 @@
 	path = nxlink/thirdparty/grpc
 	url = https://github.com/grpc/grpc.git
 	branch = master
+[submodule "common/thirdparty/cxxopts"]
+	path = common/thirdparty/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
+	branch = master
+[submodule "common/thirdparty/json"]
+	path = common/thirdparty/json
+	url = https://github.com/nlohmann/json.git
+	branch = master
+[submodule "common/thirdparty/vcd-writer"]
+	path = common/thirdparty/vcd-writer
+	url = https://github.com/favorart/vcd-writer.git
+	branch = master

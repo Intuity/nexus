@@ -146,7 +146,4 @@ sim_build
 .vscode
 
 # Working directories
-common/work
-tests/*/work
-nxlink/work
-hardware/work
+work/
