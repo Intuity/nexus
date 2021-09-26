@@ -37,8 +37,8 @@ import NXConstants::*;
     , output logic status_idle_o    // High when the mesh goes idle
     , output logic status_trigger_o // Pulses high on every tick every
     // Interface to the mesh
-    , input  logic               mesh_idle_i     // High when mesh fully idle
-    , output logic               mesh_trigger_o  // Trigger for the next cycle
+    , input  logic [COLUMNS-1:0] mesh_idle_i     // High when mesh fully idle
+    , output logic [COLUMNS-1:0] mesh_trigger_o  // Trigger for the next cycle
     , output logic [COLUMNS-1:0] token_grant_o   // Per-column token emit
     , input  logic [COLUMNS-1:0] token_release_i // Per-column token return
 );

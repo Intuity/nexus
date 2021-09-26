@@ -40,14 +40,14 @@ async def set_active(dut):
         nonlocal triggered
         while True:
             await RisingEdge(dut.clk)
-            if dut.mesh_trigger_o == 1:
+            if dut.mesh_trigger_o == ((1 << int(dut.dut.COLUMNS)) - 1):
                 triggered += 1
     cocotb.fork(count_triggers())
 
     # Request the initial state
     dut.info("Checking initial state")
     dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
-    dut.expected.append((status(0, 0, 1, 0), 0))
+    dut.expected.append((status(0, 1, 1, 0), 0))
     while dut.expected: await RisingEdge(dut.clk)
 
     # Request the initial cycle count
@@ -67,7 +67,7 @@ async def set_active(dut):
     # Bounce idle (as if we were loading up a design)
     dut.mesh_idle_i <= 0
     await RisingEdge(dut.clk)
-    dut.mesh_idle_i <= 1
+    dut.mesh_idle_i <= ((1 << int(dut.dut.COLUMNS)) - 1)
     await RisingEdge(dut.clk)
 
     # Request the updated state
@@ -103,7 +103,7 @@ async def set_active(dut):
     for _ in range(num_cycles):
         dut.mesh_idle_i <= 0
         await ClockCycles(dut.clk, randint(10, 20))
-        dut.mesh_idle_i <= 1
+        dut.mesh_idle_i <= ((1 << int(dut.dut.COLUMNS)) - 1)
         await ClockCycles(dut.clk, randint(1, 5))
 
     # Wait a few cycles to settle

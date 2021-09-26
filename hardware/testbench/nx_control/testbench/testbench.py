@@ -49,7 +49,7 @@ class Testbench(TestbenchBase):
         await super().initialise()
         self.inbound.intf.initialise(IORole.INITIATOR)
         self.outbound.intf.initialise(IORole.RESPONDER)
-        self.mesh_idle_i     <= 1
+        self.mesh_idle_i     <= ((1 << int(self.dut.COLUMNS)) - 1)
         self.token_release_i <= 0
 
 class testcase(cocotb.test):
