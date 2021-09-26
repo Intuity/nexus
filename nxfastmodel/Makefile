@@ -35,14 +35,16 @@ LIBS_SO ?= $(patsubst lib%.so,%,$(notdir $(filter lib%.so,$(notdir $(LIBRARIES))
 # Library directories
 LIB_DIRS += $(sort $(dir $(LIBRARIES)))
 
+# Switches
+COMPILE_DEBUG ?= no
+
 # Compiler options
+CXX_OPTS += $(if $(findstring yes,$(COMPILE_DEBUG)),-g3,-O3)
 CXX_OPTS += -fPIC
-CXX_OPTS += -O3
 CXX_OPTS += -std=c++17
 CXX_OPTS += $(foreach d,$(CPP_INC_DIRS),-I $(d))
 CXX_OPTS += $(shell python3 -m pybind11 --includes)
 CXX_OPTS += -pthread
-CXX_OPTS += -g3
 CXX_OPTS += -MMD -MP
 CXX_OPTS += -fpermissive
 
