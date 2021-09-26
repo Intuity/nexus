@@ -16,11 +16,13 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <memory>
 #include <stdbool.h>
 #include <stdint.h>
 #include <tuple>
 
 #include "nxmesh.hpp"
+#include "nxmessagepipe.hpp"
 
 #ifndef __NEXUS_HPP__
 #define __NEXUS_HPP__
@@ -42,11 +44,7 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        Nexus (uint32_t rows, uint32_t columns)
-            : m_rows    ( rows          )
-            , m_columns ( columns       )
-            , m_mesh    ( rows, columns )
-        { }
+        Nexus (uint32_t rows, uint32_t columns);
 
         // =====================================================================
         // Public Methods
@@ -68,7 +66,19 @@ namespace NXModel {
          *
          * @return pointer to instance of NXMesh
          */
-        NXMesh * get_mesh (void) { return &m_mesh; }
+        std::shared_ptr<NXMesh> get_mesh (void) { return m_mesh; }
+
+        /** Return a pointer to the ingress pipe
+         *
+         * @return pointer to instance of NXMessagePipe
+         */
+        std::shared_ptr<NXMessagePipe> get_ingress (void) { return m_ingress; }
+
+        /** Return a pointer to the egress pipe
+         *
+         * @return pointer to instance of NXMessagePipe
+         */
+        std::shared_ptr<NXMessagePipe> get_egress (void) { return m_egress; }
 
         /** Run for a specified number of cycles
          *
@@ -82,6 +92,18 @@ namespace NXModel {
          */
         void dump_vcd (const std::string path);
 
+        /** Check if there are any output vectors available
+         *
+         * @return True if output is available, False otherwise
+         */
+        bool is_output_available (void) { return !m_output.empty(); }
+
+        /** Pop the next output vector from the store
+         *
+         * @return pointer to an instance of summary_t
+         */
+        summary_t * pop_output (void);
+
     private:
 
         // =====================================================================
@@ -93,7 +115,11 @@ namespace NXModel {
         uint32_t m_columns;
 
         // Mesh
-        NXMesh m_mesh;
+        std::shared_ptr<NXMesh> m_mesh;
+
+        // Ingress and egress pipes
+        std::shared_ptr<NXMessagePipe> m_ingress;
+        std::shared_ptr<NXMessagePipe> m_egress;
 
         // Track output state
         std::list<summary_t *> m_output;

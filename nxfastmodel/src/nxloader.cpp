@@ -21,6 +21,16 @@ using namespace NXModel;
 
 NXLoader::NXLoader(Nexus * model, std::filesystem::path path)
 {
+    load(model, path);
+}
+
+NXLoader::NXLoader(Nexus * model, std::string path)
+{
+    load(model, std::filesystem::path(path));
+}
+
+void NXLoader::load(Nexus * model, std::filesystem::path path)
+{
     std::ifstream fh(path);
     nlohmann::json data;
     fh >> data;
@@ -50,7 +60,7 @@ NXLoader::NXLoader(Nexus * model, std::filesystem::path path)
             msg.header.column  = column;
             msg.header.command = NODE_COMMAND_LOAD_INSTR;
             msg.instr          = NXConstants::unpack_instruction((uint8_t *)&instr);
-            model->get_mesh()->m_ingress->enqueue(msg);
+            model->get_ingress()->enqueue(msg);
         }
         // Load output mappings
         uint32_t output_index = 0;
@@ -73,7 +83,7 @@ NXLoader::NXLoader(Nexus * model, std::filesystem::path path)
                             << " TC: " << std::dec << (int)msg.target_column
                             << " TI: " << std::dec << (int)msg.target_index
                             << " TS: " << std::dec << (int)msg.target_is_seq << std::endl;
-                model->get_mesh()->m_ingress->enqueue(msg);
+                model->get_ingress()->enqueue(msg);
             }
             // Move to the next output
             output_index += 1;
@@ -86,4 +96,6 @@ NXLoader::NXLoader(Nexus * model, std::filesystem::path path)
         steps++;
     }
     std::cout << "[NXLoader] Ran mesh for " << steps << " steps" << std::endl;
+    // Close the file
+    fh.close();
 }

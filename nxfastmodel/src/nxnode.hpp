@@ -16,6 +16,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <memory>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -42,7 +43,7 @@ namespace NXModel {
             , m_seen_first ( false  )
         {
             for (int i = 0; i < 4; i++) {
-                m_inbound[i]  = new NXMessagePipe();
+                m_inbound[i]  = std::make_shared<NXMessagePipe>();
                 m_outbound[i] = NULL;
             }
         }
@@ -56,14 +57,14 @@ namespace NXModel {
          * @param dirx direction of the outbound pipe
          * @param pipe pointer to the outbound pipe
          */
-        void attach (direction_t dirx, NXMessagePipe * pipe);
+        void attach (direction_t dirx, std::shared_ptr<NXMessagePipe> pipe);
 
         /** Get a reference to an inbound pipe
          *
          * @param dirx direction of the inbound pipe
          * @return pointer to the NXMessagePipe
          */
-        NXMessagePipe * get_pipe (direction_t dirx);
+        std::shared_ptr<NXMessagePipe> get_pipe (direction_t dirx);
 
         /** Resets the state of the node
          */
@@ -130,7 +131,7 @@ namespace NXModel {
          * @param column target column
          * @return pointer to NXMessagePipe
          */
-        NXMessagePipe * route (uint32_t row, uint32_t column);
+        std::shared_ptr<NXMessagePipe> route (uint32_t row, uint32_t column);
 
         // =====================================================================
         // Private Members
@@ -144,8 +145,8 @@ namespace NXModel {
         bool m_seen_first;
 
         // Inbound and outbound message pipes
-        std::array<NXMessagePipe *, 4> m_inbound;
-        std::array<NXMessagePipe *, 4> m_outbound;
+        std::array<std::shared_ptr<NXMessagePipe>, 4> m_inbound;
+        std::array<std::shared_ptr<NXMessagePipe>, 4> m_outbound;
 
         // Instruction store
         typedef std::list<instruction_t> instrs_t;

@@ -86,5 +86,10 @@ int main (int argc, char * argv []) {
         );
     }
 
+    // Clean up
+    std::cout << "[NXFastModel] Cleaning up" << std::endl;
+    delete model;
+    std::cout << "[NXFastModel] Exiting" << std::endl;
+
     return 0;
 }

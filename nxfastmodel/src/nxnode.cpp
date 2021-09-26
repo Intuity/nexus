@@ -19,14 +19,14 @@
 using namespace NXModel;
 using namespace NXConstants;
 
-void NXNode::attach (direction_t dirx, NXMessagePipe * pipe)
+void NXNode::attach (direction_t dirx, std::shared_ptr<NXMessagePipe> pipe)
 {
     assert(dirx >= 0 && ((uint32_t)dirx) < 4);
     assert(m_outbound[(int)dirx] == NULL);
     m_outbound[(int)dirx] = pipe;
 }
 
-NXMessagePipe * NXNode::get_pipe (direction_t dirx)
+std::shared_ptr<NXMessagePipe> NXNode::get_pipe (direction_t dirx)
 {
     assert(dirx >= 0 && ((uint32_t)dirx) < 4);
     return m_inbound[(int)dirx];
@@ -133,8 +133,9 @@ bool NXNode::digest (void)
 
             // Otherwise, route it towards the correct node
             } else {
-                NXMessagePipe * tgt_pipe = route(header.row, header.column);
-                tgt_pipe->enqueue_raw(m_inbound[idx_pipe]->dequeue_raw());
+                route(header.row, header.column)->enqueue_raw(
+                    m_inbound[idx_pipe]->dequeue_raw()
+                );
             }
         }
     }
@@ -216,7 +217,9 @@ void NXNode::transmit (void)
                     msg.is_seq         = mapping.target_is_seq;
                     msg.state          = state;
                     // Dispatch the message
-                    NXMessagePipe * tgt_pipe = route(msg.header.row, msg.header.column);
+                    std::shared_ptr<NXMessagePipe> tgt_pipe = route(
+                        msg.header.row, msg.header.column
+                    );
                     tgt_pipe->enqueue(msg);
                 }
             }
@@ -236,12 +239,12 @@ bool NXNode::get_output (uint32_t index)
     return m_outputs.count(index) ? m_outputs[index] : false;
 }
 
-NXMessagePipe * NXNode::route (uint32_t row, uint32_t column)
+std::shared_ptr<NXMessagePipe> NXNode::route (uint32_t row, uint32_t column)
 {
     // NOTE: Messages routed towards unconnected pipes will be directed to
     //       adjacent pipes in a clockwise order
     assert(!(row == m_row && column == m_column));
-    NXMessagePipe * tgt_pipe = NULL;
+    std::shared_ptr<NXMessagePipe> tgt_pipe = NULL;
     uint32_t start;
     if      (row    < m_row   ) start = (int)DIRECTION_NORTH;
     else if (row    > m_row   ) start = (int)DIRECTION_SOUTH;

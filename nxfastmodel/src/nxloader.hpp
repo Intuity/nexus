@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
 
 #include "nexus.hpp"
 
@@ -31,12 +32,15 @@ namespace NXModel {
         // Constructor
         // =====================================================================
         NXLoader (Nexus * model, std::filesystem::path path);
+        NXLoader (Nexus * model, std::string           path);
 
     private:
 
         // =====================================================================
-        // Private Members
+        // Private Methods
         // =====================================================================
+
+        void load(Nexus * model, std::filesystem::path path);
 
     };
 

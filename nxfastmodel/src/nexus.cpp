@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <assert.h>
 #include <chrono>
 #include <sstream>
 
@@ -20,6 +21,17 @@
 #include "nexus.hpp"
 
 using namespace NXModel;
+
+Nexus::Nexus (uint32_t rows, uint32_t columns)
+    : m_rows    ( rows          )
+    , m_columns ( columns       )
+{
+    // Link the ingress & egress pipes
+    m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns);
+    m_ingress = m_mesh->get_node(0, 0)->get_pipe(DIRECTION_NORTH);
+    m_egress  = std::make_shared<NXMessagePipe>();
+    m_mesh->get_node(m_rows-1, 0)->attach(DIRECTION_SOUTH, m_egress);
+}
 
 void Nexus::run (uint32_t cycles)
 {
@@ -32,9 +44,9 @@ void Nexus::run (uint32_t cycles)
         // Step until idle
         uint32_t steps = 0;
         do  {
-            m_mesh.step((steps == 0));
+            m_mesh->step((steps == 0));
             steps++;
-        } while (!m_mesh.is_idle());
+        } while (!m_mesh->is_idle());
         // std::cout << "[NXMesh] Finished cycle " << cycle << " in "
         //           << steps << " steps" << std::endl;
         // Summarise final output state
@@ -49,16 +61,16 @@ void Nexus::run (uint32_t cycles)
             }
         }
         // - Digest all queued egress messages
-        while (!m_mesh.m_egress->is_idle()) {
-            node_header_t header = m_mesh.m_egress->next_header();
+        while (!m_egress->is_idle()) {
+            node_header_t header = m_egress->next_header();
             // Skip everything but signal state messages
             if (header.command != NODE_COMMAND_SIG_STATE) {
-                m_mesh.m_egress->dequeue_raw();
+                m_egress->dequeue_raw();
                 continue;
             }
             // Summarise final signal state
             node_sig_state_t msg;
-            m_mesh.m_egress->dequeue(msg);
+            m_egress->dequeue(msg);
             output_key_t key = { msg.header.row, msg.header.column, msg.index };
             (*summary)[key] = msg.state;
         }
@@ -129,4 +141,12 @@ void Nexus::dump_vcd (const std::string path)
         m_output.pop_front();
         delete summary;
     }
+}
+
+Nexus::summary_t * Nexus::pop_output (void)
+{
+    assert(m_output.size() > 0);
+    summary_t * output = m_output.front();
+    m_output.pop_front();
+    return output;
 }

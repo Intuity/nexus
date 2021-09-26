@@ -14,7 +14,9 @@
 
 #include <stdint.h>
 
-#include "nxmessagepipe.hpp"
+#include <memory>
+#include <vector>
+
 #include "nxnode.hpp"
 
 #ifndef __NXMESH_HPP__
@@ -32,6 +34,15 @@ namespace NXModel {
         NXMesh (uint32_t rows, uint32_t columns);
 
         // =====================================================================
+        // Destructor
+        // =====================================================================
+
+        ~NXMesh (void)
+        {
+            for (uint32_t row = 0; row < m_rows; row++) delete m_nodes[row];
+        }
+
+        // =====================================================================
         // Public Methods
         // =====================================================================
 
@@ -41,7 +52,7 @@ namespace NXModel {
          * @param column column address of the node
          * @return pointer to the NXNode instance
          */
-        NXNode * get_node (uint32_t row, uint32_t column);
+        std::shared_ptr<NXNode> get_node (uint32_t row, uint32_t column);
 
         /** Determine if the whole mesh is idle
          *
@@ -55,14 +66,6 @@ namespace NXModel {
          */
         void step (bool trigger);
 
-        // =====================================================================
-        // Public Members
-        // =====================================================================
-
-        // Ingress and egress pipes
-        NXMessagePipe * m_ingress;
-        NXMessagePipe * m_egress;
-
     private:
 
         // =====================================================================
@@ -74,7 +77,7 @@ namespace NXModel {
         uint32_t m_columns;
 
         // Nodes in mesh
-        NXNode *** m_nodes;
+        std::vector<std::vector<std::shared_ptr<NXNode>> *> m_nodes;
 
     };
 

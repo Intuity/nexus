@@ -23,37 +23,32 @@ NXMesh::NXMesh (uint32_t rows, uint32_t columns)
     , m_columns ( columns )
 {
     // Create the nodes
-    m_nodes = new NXNode **[m_rows];
     for (uint32_t row = 0; row < m_rows; row++) {
-        m_nodes[row] = new NXNode *[m_columns];
+        m_nodes.push_back(new std::vector<std::shared_ptr<NXNode>>());
         for (uint32_t column = 0; column < m_columns; column++) {
-            m_nodes[row][column] = new NXNode(row, column);
+            m_nodes[row]->push_back(std::make_shared<NXNode>(row, column));
         }
     }
     // Link nodes together
     for (uint32_t row = 0; row < m_rows; row++) {
         for (uint32_t column = 0; column < m_columns; column++) {
-            NXNode * node = m_nodes[row][column];
+            std::shared_ptr<NXNode> node = (*m_nodes[row])[column];
             if (row > 0)
-                node->attach(DIRECTION_NORTH, m_nodes[row-1][column]->get_pipe(DIRECTION_SOUTH));
+                node->attach(DIRECTION_NORTH, (*m_nodes[row-1])[column]->get_pipe(DIRECTION_SOUTH));
             if (row < (m_rows - 1))
-                node->attach(DIRECTION_SOUTH, m_nodes[row+1][column]->get_pipe(DIRECTION_NORTH));
+                node->attach(DIRECTION_SOUTH, (*m_nodes[row+1])[column]->get_pipe(DIRECTION_NORTH));
             if (column > 0)
-                node->attach(DIRECTION_WEST, m_nodes[row][column-1]->get_pipe(DIRECTION_EAST));
+                node->attach(DIRECTION_WEST, (*m_nodes[row])[column-1]->get_pipe(DIRECTION_EAST));
             if (column < (m_columns - 1))
-                node->attach(DIRECTION_EAST, m_nodes[row][column+1]->get_pipe(DIRECTION_WEST));
+                node->attach(DIRECTION_EAST, (*m_nodes[row])[column+1]->get_pipe(DIRECTION_WEST));
         }
     }
-    // Link the ingress & egress pipes
-    m_ingress = m_nodes[0][0]->get_pipe(DIRECTION_NORTH);
-    m_egress  = new NXMessagePipe();
-    m_nodes[m_rows-1][0]->attach(DIRECTION_SOUTH, m_egress);
 }
 
-NXNode * NXMesh::get_node (uint32_t row, uint32_t column)
+std::shared_ptr<NXNode> NXMesh::get_node (uint32_t row, uint32_t column)
 {
     assert((row < m_rows) && (column < m_columns));
-    return m_nodes[row][column];
+    return (*m_nodes[row])[column];
 }
 
 bool NXMesh::is_idle (void)
@@ -61,7 +56,7 @@ bool NXMesh::is_idle (void)
     bool is_idle = true;
     for (uint32_t row = 0; row < m_rows; row++) {
         for (uint32_t column = 0; column < m_columns; column++) {
-            is_idle &= m_nodes[row][column]->is_idle();
+            is_idle &= (*m_nodes[row])[column]->is_idle();
             if (!is_idle) break;
         }
         if (!is_idle) break;
@@ -73,5 +68,5 @@ void NXMesh::step (bool trigger)
 {
     for (uint32_t row = 0; row < m_rows; row++)
         for (uint32_t column = 0; column < m_columns; column++)
-            m_nodes[row][column]->step(trigger);
+            (*m_nodes[row])[column]->step(trigger);
 }
