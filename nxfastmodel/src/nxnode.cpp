@@ -87,17 +87,28 @@ void NXNode::step (bool trigger)
     m_seen_first |= trigger;
 }
 
-NXNode::io_state_t NXNode::get_current_inputs(void)
+std::vector<uint32_t> NXNode::get_instructions (void)
+{
+    std::vector<uint32_t> instrs;
+    for (const instruction_t & instr : m_instructions) {
+        uint32_t packed = 0;
+        pack_instruction(instr, (uint8_t *)&packed);
+        instrs.push_back(packed);
+    }
+    return instrs;
+}
+
+NXNode::io_state_t NXNode::get_current_inputs (void)
 {
     return m_inputs_curr;
 }
 
-NXNode::io_state_t NXNode::get_next_inputs(void)
+NXNode::io_state_t NXNode::get_next_inputs (void)
 {
     return m_inputs_next;
 }
 
-NXNode::io_state_t NXNode::get_current_outputs(void)
+NXNode::io_state_t NXNode::get_current_outputs (void)
 {
     return m_outputs;
 }

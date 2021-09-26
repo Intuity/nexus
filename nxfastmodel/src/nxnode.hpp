@@ -19,6 +19,7 @@
 #include <memory>
 #include <stdint.h>
 #include <stdbool.h>
+#include <vector>
 
 #include "nxconstants.hpp"
 #include "nxmessagepipe.hpp"
@@ -37,6 +38,7 @@ namespace NXModel {
         // Data Structures
         // =====================================================================
 
+        typedef std::list<instruction_t> instrs_t;
         typedef std::map<uint32_t, bool> io_state_t;
 
         // =====================================================================
@@ -95,23 +97,29 @@ namespace NXModel {
          */
         void step (bool trigger);
 
+        /** Get a list of all loaded instructions packed into uint32_t
+         *
+         * @return state of inputs in the current cycle
+         */
+        std::vector<uint32_t> get_instructions (void);
+
         /** Retrieve current input state
          *
          * @return state of inputs in the current cycle
          */
-        io_state_t get_current_inputs(void);
+        io_state_t get_current_inputs (void);
 
         /** Retrieve next input state
          *
          * @return state of inputs in the next cycle
          */
-        io_state_t get_next_inputs(void);
+        io_state_t get_next_inputs (void);
 
         /** Retrieve current output state
          *
          * @return state of output in the current cycle
          */
-        io_state_t get_current_outputs(void);
+        io_state_t get_current_outputs (void);
 
     private:
 
@@ -173,7 +181,6 @@ namespace NXModel {
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_outbound;
 
         // Instruction store
-        typedef std::list<instruction_t> instrs_t;
         instrs_t m_instructions;
 
         // Output mappings

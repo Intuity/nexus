@@ -45,6 +45,7 @@ PYBIND11_MODULE(nxfastmodel, m) {
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
         .def(py::init<uint32_t, uint32_t>())
+        .def("get_instructions",    &NXNode::get_instructions   )
         .def("get_current_inputs",  &NXNode::get_current_inputs )
         .def("get_next_inputs",     &NXNode::get_next_inputs    )
         .def("get_current_outputs", &NXNode::get_current_outputs);
