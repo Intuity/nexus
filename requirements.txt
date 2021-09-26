@@ -18,6 +18,7 @@ packtype==1.1.2
 Pillow==8.1.1
 pluggy==0.13.1
 py==1.10.0
+pybind11=2.7.1
 pydot==1.4.2
 Pygments==2.7.4
 pygraphviz==1.6
