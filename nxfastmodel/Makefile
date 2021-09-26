@@ -36,8 +36,11 @@ LIBS_SO ?= $(patsubst lib%.so,%,$(notdir $(filter lib%.so,$(notdir $(LIBRARIES))
 LIB_DIRS += $(sort $(dir $(LIBRARIES)))
 
 # Compiler options
+CXX_OPTS += -fPIC
+CXX_OPTS += -O3
 CXX_OPTS += -std=c++17
 CXX_OPTS += $(foreach d,$(CPP_INC_DIRS),-I $(d))
+CXX_OPTS += $(shell python3 -m pybind11 --includes)
 CXX_OPTS += -pthread
 CXX_OPTS += -g3
 CXX_OPTS += -MMD -MP
@@ -45,6 +48,9 @@ CXX_OPTS += -fpermissive
 
 # Linker options
 LD_OPTS += $(CXX_OPTS)
+ifneq ($(findstring darwin,$(OSTYPE)),)
+  LD_OPTS += -undefined dynamic_lookup
+endif
 ifneq ($(LIBS_SO),)
   LD_OPTS += --static
   LD_OPTS += $(addprefix -L ,$(LIB_DIRS))
@@ -57,6 +63,7 @@ OBJ_DIR   ?= $(WORK_DIR)/obj
 DEPS_DIR  ?= $(WORK_DIR)/deps
 EXE_NAME  ?= $(notdir $(abspath .))
 EXE_PATH  ?= $(WORK_DIR)/$(EXE_NAME)
+LIB_PATH  ?= $(WORK_DIR)/$(EXE_NAME)$(shell python3-config --extension-suffix)
 
 MKDIRS += $(WORK_DIR) $(PROTO_DIR) $(OBJ_DIR) $(DEPS_DIR)
 
@@ -84,10 +91,15 @@ $(foreach d,$(CPP_SRC_DIRS),$(eval $(call DO_BUILD_OBJ,$(d),c)))
 # Build executable
 $(EXE_PATH): $(ALL_OBJ) $(LIBRARIES) | $(WORK_DIR)
 	@echo "# Linking objects to form $(notdir $@)"
-	$(PREFIX)g++ $(ALL_OBJ) $(LD_OPTS) -o $@
+	$(PREFIX)g++ $(filter-out work/obj/nxpython.o,$(ALL_OBJ)) $(LD_OPTS) -o $@
+
+# Build library
+$(LIB_PATH): $(ALL_OBJ) $(LIBRARIES) | $(WORK_DIR)
+	@echo "# Linking objects to form $(notdir $@)"
+	$(PREFIX)g++ -undefined dynamic_lookup -shared $(filter-out work/obj/main.o,$(ALL_OBJ)) $(LD_OPTS) -o $@
 
 .PHONY: build
-build: $(EXE_PATH)
+build: $(EXE_PATH) $(LIB_PATH)
 
 # Create directory
 $(MKDIRS):
