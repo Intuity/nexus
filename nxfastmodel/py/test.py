@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import faulthandler
-faulthandler.enable()
-
 from pathlib import Path
 
 from nxfastmodel import Nexus, NXMesh, NXNode, NXLoader
