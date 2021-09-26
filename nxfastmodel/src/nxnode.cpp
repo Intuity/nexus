@@ -87,6 +87,21 @@ void NXNode::step (bool trigger)
     m_seen_first |= trigger;
 }
 
+NXNode::io_state_t NXNode::get_current_inputs(void)
+{
+    return m_inputs_curr;
+}
+
+NXNode::io_state_t NXNode::get_next_inputs(void)
+{
+    return m_inputs_next;
+}
+
+NXNode::io_state_t NXNode::get_current_outputs(void)
+{
+    return m_outputs;
+}
+
 bool NXNode::digest (void)
 {
     bool curr_delta = false;

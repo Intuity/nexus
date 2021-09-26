@@ -30,8 +30,8 @@ inst_mesh = instance.get_mesh()
 assert isinstance(inst_mesh, NXMesh)
 
 # Extract a node
-print("# Extracting node")
-inst_node = inst_mesh.get_node(2, 2)
+print("# Extracting node 0, 2")
+inst_node = inst_mesh.get_node(0, 2)
 assert isinstance(inst_node, NXNode)
 
 # Load a model into the mesh
@@ -44,6 +44,11 @@ instance.run(10000)
 for idx in range(10):
     summary = instance.pop_output()
     print(f"{idx:02d} : {summary}")
+
+# Read back the current input state from node
+print(f"# Current inputs : {inst_node.get_current_inputs()}")
+print(f"# Next inputs    : {inst_node.get_next_inputs()}")
+print(f"# Current outputs: {inst_node.get_current_outputs()}")
 
 # All good
 print("# All done!")

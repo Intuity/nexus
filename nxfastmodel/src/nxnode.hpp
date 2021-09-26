@@ -34,6 +34,12 @@ namespace NXModel {
     public:
 
         // =====================================================================
+        // Data Structures
+        // =====================================================================
+
+        typedef std::map<uint32_t, bool> io_state_t;
+
+        // =====================================================================
         // Constructor
         // =====================================================================
 
@@ -88,6 +94,24 @@ namespace NXModel {
          * @return True if the node is idle, False if still busy
          */
         void step (bool trigger);
+
+        /** Retrieve current input state
+         *
+         * @return state of inputs in the current cycle
+         */
+        io_state_t get_current_inputs(void);
+
+        /** Retrieve next input state
+         *
+         * @return state of inputs in the next cycle
+         */
+        io_state_t get_next_inputs(void);
+
+        /** Retrieve current output state
+         *
+         * @return state of output in the current cycle
+         */
+        io_state_t get_current_outputs(void);
 
     private:
 
@@ -156,7 +180,6 @@ namespace NXModel {
         std::map<uint32_t, std::list<node_map_output_t>> m_mappings;
 
         // Current state
-        typedef std::map<uint32_t, bool> io_state_t;
         io_state_t m_inputs_curr;
         io_state_t m_inputs_next;
         io_state_t m_outputs;

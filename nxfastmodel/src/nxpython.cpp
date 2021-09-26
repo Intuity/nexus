@@ -44,7 +44,10 @@ PYBIND11_MODULE(nxfastmodel, m) {
         .def("step",     &NXMesh::step    );
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
-        .def(py::init<uint32_t, uint32_t>());
+        .def(py::init<uint32_t, uint32_t>())
+        .def("get_current_inputs",  &NXNode::get_current_inputs )
+        .def("get_next_inputs",     &NXNode::get_next_inputs    )
+        .def("get_current_outputs", &NXNode::get_current_outputs);
 
     py::class_<NXMessagePipe, std::shared_ptr<NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())
