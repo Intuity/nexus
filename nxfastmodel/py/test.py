@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nxfastmodel import Nexus, NXMesh, NXNode
+import faulthandler
+faulthandler.enable()
+
+from pathlib import Path
+
+from nxfastmodel import Nexus, NXMesh, NXNode, NXLoader
 
 # Create an instance of the model
-print("# Creating a 10x10 mesh")
-instance = Nexus(10, 10)
+print("# Creating a 6x6 mesh")
+instance = Nexus(6, 6)
 print(f"# Instance reports {instance.get_rows()}x{instance.get_columns()}")
 
 # Extract the mesh
@@ -28,6 +33,17 @@ assert isinstance(inst_mesh, NXMesh)
 print("# Extracting node")
 inst_node = inst_mesh.get_node(2, 2)
 assert isinstance(inst_node, NXNode)
+
+# Load a model into the mesh
+NXLoader(instance, (Path(__file__).parent / "design.json").as_posix())
+
+# Run the mesh for 10,000 cycles
+instance.run(10000)
+
+# Pull the first few outputs
+for idx in range(10):
+    summary = instance.pop_output()
+    print(f"{idx:02d} : {summary}")
 
 # All good
 print("# All done!")
