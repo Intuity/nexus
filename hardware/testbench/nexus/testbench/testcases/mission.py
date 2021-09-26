@@ -13,17 +13,11 @@
 # limitations under the License.
 
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
-import simpy
 
-from nxconstants import (ControlCommand, ControlSetActive, NodeCommand,
-                         NodeLoadInstr, NodeMapOutput)
-from nxmodel.base import Base
-from nxmodel.capture import Capture
-from nxmodel.manager import Manager
-from nxmodel.mesh import Mesh
-from nxmodel.message import ConfigureOutput, LoadInstruction
-from nxmodel.node import Direction
-from nxmodel.pipe import Pipe
+from nxconstants import ControlCommand, ControlSetActive, NodeCommand
+
+from nxfastmodel import Nexus, NXLoader
+from nxloader import NXLoader as NXPyLoader
 
 from ..testbench import testcase
 
@@ -45,61 +39,33 @@ async def mission_mode(dut):
     # Disable scoreboarding of output
     dut.mesh_outbound._callbacks = []
 
-    # Setup an instance of nxmodel to match the design
-    env = simpy.Environment()
-    Base.setup_log(env, "INFO")
-    mesh = Mesh(env, num_rows, num_cols, nd_prms={
-        "inputs": nd_ips, "outputs": nd_ops, "registers": nd_regs,
-    })
+    # Work out the full path
+    full_path = dut.base_dir / "data" / "design.json"
 
-    # Create a manager and load the design
-    mngr = Manager(env, mesh, 1000, False)
-    mesh[0, 0].inbound[Direction.NORTH] = mngr.outbound
-    out_lkp = mngr.load(dut.base_dir / "data" / "design.json")
-    dsgn_rows = mngr.config[Manager.CONFIG_ROWS]
-    dsgn_cols = mngr.config[Manager.CONFIG_COLUMNS]
-    assert dsgn_rows == num_rows, \
-        f"Design requires {dsgn_rows} rows, mesh has {num_rows} rows"
-    assert dsgn_cols == num_cols, \
-        f"Design requires {dsgn_cols} columns, mesh has {num_cols} columns"
+    # Create an instance of NXModel
+    model = Nexus(num_rows, num_cols)
+    NXLoader(model, full_path.as_posix())
 
-    # Create a capture node
-    cap = Capture(env, mesh, num_cols, out_lkp)
-    for col, node in enumerate(mesh.nodes[num_rows-1]):
-        cap.inbound[col] = node.outbound[Direction.SOUTH] = Pipe(env, 1, 1)
-    mngr.add_observer(cap.tick)
+    # Load the design using the Python loader
+    design = NXPyLoader().load(full_path)
 
     # Push all of the queued messages into the design
     linked, seq_in = {}, {}
-    for msg in mngr.queue:
-        if isinstance(msg, ConfigureOutput):
-            map_msg                = NodeMapOutput()
-            map_msg.header.row     = msg.row
-            map_msg.header.column  = msg.col
-            map_msg.header.command = NodeCommand.MAP_OUTPUT
-            map_msg.source_index   = msg.src_idx
-            map_msg.target_row     = msg.tgt_row
-            map_msg.target_column  = msg.tgt_col
-            map_msg.target_index   = msg.tgt_idx
-            map_msg.target_is_seq  = (1 if msg.tgt_seq else 0)
-            dut.mesh_inbound.append(map_msg.pack())
-            # Setup source if not already tracked
-            src_key = msg.row, msg.col, msg.src_idx
-            if src_key not in linked: linked[src_key] = []
-            # Add a target entry
-            tgt_key = msg.tgt_row, msg.tgt_col, msg.tgt_idx
-            linked[src_key].append(tgt_key)
-            # Track sequential inputs
-            assert tgt_key not in seq_in, f"Clash for target: {tgt_key}"
-            seq_in[tgt_key] = msg.tgt_seq
-        elif isinstance(msg, LoadInstruction):
-            instr_msg                = NodeLoadInstr(instr=msg.instr.raw)
-            instr_msg.header.row     = msg.row
-            instr_msg.header.column  = msg.col
-            instr_msg.header.command = NodeCommand.LOAD_INSTR
-            dut.mesh_inbound.append(instr_msg.pack())
-        else:
-            raise Exception(f"Unexpected message {msg}")
+    for row in zip(design.instructions, design.mappings):
+        for instrs, mappings in zip(*row):
+            for msg in instrs:
+                dut.mesh_inbound.append(msg.pack())
+            for msg in mappings:
+                dut.mesh_inbound.append(msg.pack())
+                # Setup source if not already tracked
+                src_key = msg.header.row, msg.header.column, msg.source_index
+                if src_key not in linked: linked[src_key] = []
+                # Add a target entry
+                tgt_key = msg.target_row, msg.target_column, msg.target_index
+                linked[src_key].append(tgt_key)
+                # Track sequential inputs
+                assert tgt_key not in seq_in, f"Clash for target: {tgt_key}"
+                seq_in[tgt_key] = msg.target_is_seq
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {len(dut.mesh_inbound._sendQ)} messages to drain")
@@ -112,11 +78,6 @@ async def mission_mode(dut):
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)
 
-    # Run until idle to flush model setup
-    dut.info("Running model until first tick")
-    env.run(until=mngr.on_tick)
-    dut.info("Model reached until first tick")
-
     # Start monitoring the mesh
     dut.info("Starting node monitors")
     dut.start_node_monitors()
@@ -124,17 +85,17 @@ async def mission_mode(dut):
     # Check the instruction counters for every core
     for row in range(num_rows):
         for col in range(num_cols):
-            rtl_node = dut.nodes[row][col].entity
-            mdl_node = mesh.nodes[row][col]
-            i_count  = int(rtl_node.store.instr_count_o)
-            assert i_count == len(mdl_node.instrs), \
-                f"{row}, {col}: Expected {len(mdl_node.instrs)}, got {i_count}"
+            rtl_node  = dut.nodes[row][col].entity
+            mdl_node  = model.get_mesh().get_node(row, col)
+            mdl_instr = mdl_node.get_instructions()
+            i_count   = int(rtl_node.store.instr_count_o)
+            assert i_count == len(mdl_instr), \
+                f"{row}, {col}: Expected {len(mdl_instr)}, got {i_count}"
             # Check the loaded instructions
-            dut.info(f"Checking {len(mdl_node.instrs)} instructions for {row}, {col}")
-            for idx, instr in enumerate(mdl_node.instrs):
+            dut.info(f"Checking {len(mdl_instr)} instructions for {row}, {col}")
+            for idx, instr in enumerate(mdl_instr):
                 got = int(rtl_node.store.ram.memory[idx])
-                assert instr.raw == got, \
-                    f"Instruction {idx} - R: {hex(instr.raw)}, G: {hex(got)}"
+                assert instr == got, f"Instruction {idx} - R: {hex(instr)}, G: {hex(got)}"
 
     # Raise active and let nexus tick
     dut.info("Enabling nexus")
@@ -145,7 +106,7 @@ async def mission_mode(dut):
     for cycle in range(256):
         # Run the model for one tick
         dut.info("Running model until tick")
-        env.run(until=mngr.on_tick)
+        model.run(1)
         dut.info("Model reached next tick")
 
         # Wait for activity
@@ -207,10 +168,10 @@ async def mission_mode(dut):
                 rtl_i_next = int(ctrl.ctrl_inputs.input_next_q)
                 rtl_o_curr = int(ctrl.ctrl_outputs.output_state_q)
                 # Get the model state
-                mdl_node   = mesh.nodes[row][col]
-                mdl_i_curr = sum([(y << x) for x, y in enumerate(mdl_node.input_state)])
-                mdl_i_next = sum([(y << x) for x, y in enumerate(mdl_node.next_input_state)])
-                mdl_o_curr = sum([(y << x) for x, y in enumerate(mdl_node.output_state)])
+                mdl_node   = model.get_mesh().get_node(row, col)
+                mdl_i_curr = sum([(y << x) for x, y in mdl_node.get_current_inputs().items()])
+                mdl_i_next = sum([(y << x) for x, y in mdl_node.get_next_inputs().items()])
+                mdl_o_curr = sum([(y << x) for x, y in mdl_node.get_current_outputs().items()])
                 # Compare
                 if rtl_i_curr != mdl_i_curr:
                     dut.error(
@@ -251,7 +212,7 @@ async def mission_mode(dut):
                 rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val
 
         # Capture model outputs
-        for key, mdl_val in cap.snapshots[-1][1].items():
+        for key, mdl_val in model.pop_output().items():
             mdl_outputs[key] = mdl_val
 
         # Cross-check

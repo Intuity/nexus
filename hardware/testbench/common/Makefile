@@ -61,7 +61,9 @@ endif
 PYTHON_PATHS += $(COMMON_DIR)
 PYTHON_PATHS += $(abspath .)
 PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../..)
+PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../common/python)
 PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../common/work)
+PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../nxfastmodel/work)
 export PYTHONPATH := $(subst $(SPACE),:,$(PYTHON_PATHS)):$(PYTHONPATH)
 
 .PHONY: run results.xml
