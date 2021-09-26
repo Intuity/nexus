@@ -59,7 +59,7 @@ async def load(dut):
     dut.info(f"Breaking out TVALID {int(dut.ib_mesh.intf.tvalid)}, TREADY {int(dut.ib_mesh.intf.tready)}")
 
     # Wait for the idle flag to go high
-    if dut.dut.dut.core.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.core.mesh.idle_o)
+    if dut.status_idle == 0: await RisingEdge(dut.status_idle)
 
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)

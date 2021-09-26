@@ -107,7 +107,7 @@ async def mission_mode(dut):
     while dut.mesh_inbound.intf.valid == 1: await RisingEdge(dut.clk)
 
     # Wait for the idle flag to go high
-    if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
+    if dut.status_idle_o == 0: await RisingEdge(dut.status_idle_o)
 
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)
@@ -150,14 +150,14 @@ async def mission_mode(dut):
 
         # Wait for activity
         dut.info("Waiting for idle to fall")
-        if dut.dut.dut.mesh.idle_o == 1: await FallingEdge(dut.dut.dut.mesh.idle_o)
+        if dut.status_idle_o == 1: await FallingEdge(dut.status_idle_o)
 
         # Wait for idle (ensuring it is synchronous)
         dut.info("Waiting for idle to rise")
         while True:
-            await RisingEdge(dut.dut.dut.mesh.idle_o)
+            await RisingEdge(dut.status_idle_o)
             await RisingEdge(dut.clk)
-            if dut.dut.dut.mesh.idle_o == 1: break
+            if dut.status_idle_o == 1: break
 
         # Print out the input state for every node
         for row, row_entries in enumerate(dut.nodes):

@@ -52,7 +52,7 @@ async def load(dut):
     await dut.mesh_inbound.idle()
 
     # Wait for the idle flag to go high
-    if dut.dut.dut.mesh.idle_o == 0: await RisingEdge(dut.dut.dut.mesh.idle_o)
+    if dut.status_idle_o == 0: await RisingEdge(dut.status_idle_o)
 
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)
