@@ -44,8 +44,8 @@ import NXConstants::*;
     , output logic status_idle_o    // High when the mesh goes idle
     , output logic status_trigger_o // Pulses high on every tick every
     // Interface to the mesh
-    , input  logic               mesh_idle_i     // High when mesh fully idle
-    , output logic               mesh_trigger_o  // Trigger for the next cycle
+    , input  logic [COLUMNS-1:0] mesh_idle_i     // High when mesh fully idle
+    , output logic [COLUMNS-1:0] mesh_trigger_o  // Trigger for the next cycle
     , output logic [COLUMNS-1:0] token_grant_o   // Per-column token emit
     , input  logic [COLUMNS-1:0] token_release_i // Per-column token return
 );
@@ -54,18 +54,22 @@ localparam RX_PYLD_WIDTH = MESSAGE_WIDTH - $bits(control_command_t);
 localparam TX_PYLD_WIDTH = MESSAGE_WIDTH;
 
 // Internal state
-`DECLARE_DQ (                 1, soft_reset,     clk_i, rst_i,                              1'b0)
-`DECLARE_DQ (                 1, active,         clk_i, rst_i,                              1'b0)
-`DECLARE_DQ (                 1, trigger,        clk_i, rst_i,                              1'b0)
-`DECLARE_DQ (                 1, seen_idle_low,  clk_i, rst_i,                              1'b0)
-`DECLARE_DQ (                 1, first_tick,     clk_i, rst_i,                              1'b1)
-`DECLARE_DQ (     TX_PYLD_WIDTH, cycle,          clk_i, rst_i,             {TX_PYLD_WIDTH{1'b0}})
-`DECLARE_DQ (     RX_PYLD_WIDTH, interval,       clk_i, rst_i,             {RX_PYLD_WIDTH{1'b0}})
-`DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, clk_i, rst_i,             {RX_PYLD_WIDTH{1'b0}})
-`DECLARE_DQ (                 1, interval_set,   clk_i, rst_i,                              1'b0)
-`DECLARE_DQ (           COLUMNS, token_grant,    clk_i, rst_i,                   {COLUMNS{1'b0}})
-`DECLARE_DQT(control_response_t, send_data,      clk_i, rst_i, {$bits(control_response_t){1'b0}})
-`DECLARE_DQ (                 1, send_valid,     clk_i, rst_i,                              1'b0)
+`DECLARE_DQ (                 1, soft_reset,     clk_i, rst_i, 'd0)
+`DECLARE_DQ (                 1, active,         clk_i, rst_i, 'd0)
+`DECLARE_DQ (           COLUMNS, trigger,        clk_i, rst_i, 'd0)
+`DECLARE_DQ (                 1, seen_idle_low,  clk_i, rst_i, 'd0)
+`DECLARE_DQ (                 1, first_tick,     clk_i, rst_i, 'd1)
+`DECLARE_DQ (     TX_PYLD_WIDTH, cycle,          clk_i, rst_i, 'd0)
+`DECLARE_DQ (     RX_PYLD_WIDTH, interval,       clk_i, rst_i, 'd0)
+`DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, clk_i, rst_i, 'd0)
+`DECLARE_DQ (                 1, interval_set,   clk_i, rst_i, 'd0)
+`DECLARE_DQ (           COLUMNS, token_grant,    clk_i, rst_i, 'd0)
+`DECLARE_DQT(control_response_t, send_data,      clk_i, rst_i, 'd0)
+`DECLARE_DQ (                 1, send_valid,     clk_i, rst_i, 'd0)
+`DECLARE_DQ (                 1, all_idle,       clk_i, rst_i, 'd0)
+
+// Create a summary of column idle state
+assign all_idle = &mesh_idle_i;
 
 // Connect outputs
 assign outbound_data_o  = send_data_q;
@@ -74,26 +78,26 @@ assign outbound_valid_o = send_valid_q;
 assign soft_reset_o = soft_reset_q;
 
 assign status_active_o  = active_q;
-assign status_idle_o    = mesh_idle_i;
-assign status_trigger_o = trigger_q;
+assign status_idle_o    = all_idle_q;
+assign status_trigger_o = |trigger_q;
 
 assign mesh_trigger_o = trigger_q;
 assign token_grant_o  = token_grant_q;
 
-// Generate cycle triggers
-assign trigger = active_q && seen_idle_low_q && mesh_idle_i;
+// Generate column triggers
+assign trigger = {COLUMNS{active_q && seen_idle_low_q && all_idle_q}};
 
 // Monitor for idle going low after each trigger event
-assign seen_idle_low = trigger ? 1'b0 : (seen_idle_low_q || !mesh_idle_i);
+assign seen_idle_low = (|trigger) ? 1'b0 : (seen_idle_low_q || !all_idle_q);
 
 // Track the first trigger into the mesh
-assign first_tick = first_tick_q && !trigger;
+assign first_tick = first_tick_q && (trigger == 'd0);
 
 // Count active cycles
-assign cycle = trigger ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle_q;
+assign cycle = (|trigger) ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle_q;
 
 // Generate token grant signal
-assign token_grant = (trigger && first_tick_q) ? {COLUMNS{1'b1}} : token_release_i;
+assign token_grant = ((|trigger) && first_tick_q) ? {COLUMNS{1'b1}} : token_release_i;
 
 // Inbound message FIFO
 control_message_t ib_fifo_data;
@@ -143,7 +147,7 @@ always_comb begin : p_decode
     end
 
     // Increment interval counter on trigger high
-    if (trigger_q) begin
+    if (|trigger_q) begin
         interval_count = interval_count + 'd1;
     end
 

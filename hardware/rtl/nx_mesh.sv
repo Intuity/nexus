@@ -29,8 +29,8 @@ import NXConstants::*;
       input  logic clk_i
     , input  logic rst_i
     // Control signals
-    , input  logic trigger_i
-    , output logic idle_o
+    , input  logic [COLUMNS-1:0] trigger_i
+    , output logic [COLUMNS-1:0] idle_o
     // Token signals
     , input  logic [COLUMNS-1:0] token_grant_i
     , output logic [COLUMNS-1:0] token_release_o
@@ -47,11 +47,17 @@ import NXConstants::*;
 localparam NODES = ROWS * COLUMNS;
 
 // Idle flag for every node
-logic [NODES-1:0] idle_flags;
+logic [COLUMNS-1:0][ROWS-1:0] idle_flags;
 
-// AND all idle flags together to produce a mesh idle state
-`DECLARE_DQ(1, idle, clk_i, rst_i, 1'b0)
-assign idle   = &idle_flags;
+// AND each column of idle flags together to produce a summary
+`DECLARE_DQ(COLUMNS, idle, clk_i, rst_i, 'd0)
+
+generate
+for (genvar i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin : g_columns
+    assign idle[i_col] = &idle_flags[i_col];
+end
+endgenerate
+
 assign idle_o = idle_q;
 
 // Token grant and release for every node in every column
@@ -67,9 +73,8 @@ logic          north_ready [NODES-1:0], east_ready [NODES-1:0],
 
 // Generate the mesh
 generate
-genvar i_row, i_col;
-for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
-    for (i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin : g_columns
+for (genvar i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
+    for (genvar i_col = 0; i_col < COLUMNS; i_col = (i_col + 1)) begin : g_columns
         // =====================================================================
         // Link the token grant/release along columns. Columns have counter
         // rotating tokens to lower the chance of adjacent nodes communicating
@@ -202,10 +207,10 @@ for (i_row = 0; i_row < ROWS; i_row = (i_row + 1)) begin : g_rows
               .clk_i(clk_i)
             , .rst_i(rst_i)
             // Control signals
-            , .trigger_i (trigger_i                          )
-            , .idle_o    (idle_flags[i_row * COLUMNS + i_col])
-            , .node_row_i(i_row[ADDR_ROW_WIDTH-1:0]          )
-            , .node_col_i(i_col[ADDR_COL_WIDTH-1:0]          )
+            , .trigger_i (trigger_i[i_col]         )
+            , .idle_o    (idle_flags[i_col][i_row] )
+            , .node_row_i(i_row[ADDR_ROW_WIDTH-1:0])
+            , .node_col_i(i_col[ADDR_COL_WIDTH-1:0])
             // Channel tokens
             , .token_grant_i  (column_grant[i_row * COLUMNS + i_col]  )
             , .token_release_o(column_release[i_row * COLUMNS + i_col])

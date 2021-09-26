@@ -61,8 +61,7 @@ nx_reset reset_stretch (
 );
 
 // Instance the controller
-logic               ctrl_mesh_idle, ctrl_trigger;
-logic [COLUMNS-1:0] ctrl_token_grant, ctrl_token_release;
+logic [COLUMNS-1:0] ctrl_mesh_idle, ctrl_trigger, ctrl_token_grant, ctrl_token_release;
 
 nx_control #(
       .ROWS     (ROWS     )
