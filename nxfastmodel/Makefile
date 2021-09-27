@@ -50,7 +50,10 @@ CXX_OPTS += -fpermissive
 
 # Linker options
 LD_OPTS += $(CXX_OPTS)
-ifneq ($(findstring darwin,$(OSTYPE)),)
+ifneq ($(findstring gcc version 8,$(shell gcc -v 2>&1 | grep 'gcc version')),)
+  LD_OPTS += -lstdc++fs
+endif
+ifneq ($(findstring darwin,$(shell echo $$OSTYPE)),)
   LD_OPTS += -undefined dynamic_lookup
 endif
 ifneq ($(LIBS_SO),)
