@@ -98,7 +98,7 @@ $(EXE_PATH): $(ALL_OBJ) $(LIBRARIES) | $(WORK_DIR)
 # Build library
 $(LIB_PATH): $(ALL_OBJ) $(LIBRARIES) | $(WORK_DIR)
 	@echo "# Linking objects to form $(notdir $@)"
-	$(PREFIX)g++ -undefined dynamic_lookup -shared $(filter-out work/obj/main.o,$(ALL_OBJ)) $(LD_OPTS) -o $@
+	$(PREFIX)g++ -shared $(filter-out work/obj/main.o,$(ALL_OBJ)) $(LD_OPTS) -o $@
 
 .PHONY: build
 build: $(EXE_PATH) $(LIB_PATH)
