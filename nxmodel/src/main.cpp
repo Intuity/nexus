@@ -26,7 +26,7 @@
 int main (int argc, char * argv []) {
     // Create instance of cxxopts
     cxxopts::Options parser(
-        "nxfastmodel", "Fast non-timing accurate model of Nexus"
+        "nxmodel", "Fast non-timing accurate model of Nexus"
     );
 
     // Setup options
@@ -58,7 +58,7 @@ int main (int argc, char * argv []) {
 
     // Check positionl arguments
     if (!options["positional"].count()) {
-        std::cerr << "[NXFastModel] No path to design given" << std::endl;
+        std::cerr << "[NXModel] No path to design given" << std::endl;
         return 1;
     }
     auto & positional = options["positional"].as<std::vector<std::string>>();
@@ -66,7 +66,7 @@ int main (int argc, char * argv []) {
     // Pickup sizing
     uint32_t rows    = options["rows"].as<uint32_t>();
     uint32_t columns = options["columns"].as<uint32_t>();
-    std::cout << "[NXFastModel] Requested " << rows << "x" << columns << std::endl;
+    std::cout << "[NXModel] Requested " << rows << "x" << columns << std::endl;
 
     // Create the Nexus model
     NXModel::Nexus * model = new NXModel::Nexus(rows, columns);
@@ -87,9 +87,9 @@ int main (int argc, char * argv []) {
     }
 
     // Clean up
-    std::cout << "[NXFastModel] Cleaning up" << std::endl;
+    std::cout << "[NXModel] Cleaning up" << std::endl;
     delete model;
-    std::cout << "[NXFastModel] Exiting" << std::endl;
+    std::cout << "[NXModel] Exiting" << std::endl;
 
     return 0;
 }

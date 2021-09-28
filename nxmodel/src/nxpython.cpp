@@ -24,7 +24,7 @@ namespace py = pybind11;
 
 using namespace NXModel;
 
-PYBIND11_MODULE(nxfastmodel, m) {
+PYBIND11_MODULE(nxmodel, m) {
     py::class_<Nexus, std::shared_ptr<Nexus>>(m, "Nexus")
         .def(py::init<uint32_t, uint32_t>())
         .def("get_rows",            &Nexus::get_rows           )

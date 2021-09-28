@@ -14,7 +14,7 @@
 
 from pathlib import Path
 
-from nxfastmodel import Nexus, NXMesh, NXNode, NXLoader
+from nxmodel import Nexus, NXMesh, NXNode, NXLoader
 
 # Create an instance of the model
 print("# Creating a 6x6 mesh")
