@@ -17,7 +17,7 @@ from random import choice, randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import RisingEdge
 
-from nxmodel.node import Direction
+from nxconstants import Direction
 
 from ..testbench import testcase
 

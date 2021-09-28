@@ -18,7 +18,7 @@ from cocotb.handle import Force, Release
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nxmodel.node import Direction
+from nxconstants import Direction
 
 from ..testbench import testcase
 assert testcase, "Import of testcase is required to setup factory"

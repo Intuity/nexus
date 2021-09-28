@@ -12,13 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import randint
+from random import choice, randint
 
 from cocotb.triggers import ClockCycles, First, RisingEdge
 
-from nxmodel.node import Instruction, Operation
+from nxconstants import Instruction, Operation
 
 from ..testbench import testcase
+
+def rand_instr():
+    instr          = Instruction()
+    instr.opcode   = choice(list(filter(lambda x: x != Operation.RESERVED, Operation)))
+    instr.src_a    = randint(0, 31)
+    instr.src_a_ip = choice((0, 1))
+    instr.src_b    = randint(0, 31)
+    instr.src_b_ip = choice((0, 1))
+    instr.tgt_reg  = randint(0, 31)
+    instr.gen_out  = choice((0, 1))
+    return instr
+
+def evaluate(opcode, val_a, val_b):
+    if   opcode == Operation.INVERT: return (0 if val_a else 1)
+    elif opcode == Operation.AND   : return (val_a & val_b)
+    elif opcode == Operation.NAND  : return (0 if (val_a & val_b) else 1)
+    elif opcode == Operation.OR    : return (val_a | val_b)
+    elif opcode == Operation.NOR   : return (0 if (val_a | val_b) else 1)
+    elif opcode == Operation.XOR   : return (val_a ^ val_b)
+    elif opcode == Operation.XNOR  : return (0 if (val_a ^ val_b) else 1)
+    raise Exception(f"Unsupported opcode {opcode}")
 
 @testcase()
 async def execute(dut):
@@ -31,7 +52,7 @@ async def execute(dut):
     def get_data(_driver, address):
         assert address >= 0 and address < len(memory), \
             f"Address {address} is outside valid range 0-{len(memory)-1}"
-        return memory[address].raw
+        return memory[address].pack()
     dut.instr_store.resp_cb = get_data
 
     for idx in range(10):
@@ -49,13 +70,13 @@ async def execute(dut):
             dut.info(f"Generating instruction {instr_idx}")
             while True:
                 dut.info("Call randomise")
-                instr = Instruction.randomise()
+                instr = rand_instr()
                 dut.info("Randomise returned")
                 # If instruction uses a register, ensure it's been initialised
-                if not instr.is_input_a and ((actv_regs >> (instr.source_a % 8)) & 0x1) == 0:
+                if not instr.src_a_ip and ((actv_regs >> (instr.src_a % 8)) & 0x1) == 0:
                     dut.info("Input A not initialised")
                     continue
-                if not instr.is_input_b and ((actv_regs >> (instr.source_b % 8)) & 0x1) == 0:
+                if not instr.src_b_ip and ((actv_regs >> (instr.src_b % 8)) & 0x1) == 0:
                     dut.info("Input B not initialised")
                     continue
                 # This one is good
@@ -65,10 +86,10 @@ async def execute(dut):
             memory.append(instr)
             # Mark a register as active
             dut.info("Marking active register")
-            actv_regs |= 1 << (instr.target % 8)
+            actv_regs |= 1 << (instr.tgt_reg % 8)
             # Mark an output as consumed
             dut.info("Marking output as consumed")
-            if memory[-1].is_output:
+            if memory[-1].gen_out:
                 gen_outputs += 1
                 if gen_outputs >= 8: break
         dut.info(f"Generated {len(memory)} random instructions")
@@ -113,17 +134,17 @@ async def execute(dut):
         for idx, instr in enumerate(memory):
             dut.info(f"{idx:03d}: {instr}")
             val_a = (
-                ((inputs >> instr.source_a) & 0x1)
-                if instr.is_input_a else
-                working[instr.source_a % 8]
+                ((inputs >> instr.src_a) & 0x1)
+                if instr.src_a_ip else
+                working[instr.src_a % 8]
             )
             val_b = (
-                ((inputs >> instr.source_b) & 0x1)
-                if instr.is_input_b else
-                working[instr.source_b % 8]
+                ((inputs >> instr.src_b) & 0x1)
+                if instr.src_b_ip else
+                working[instr.src_b % 8]
             )
-            working[instr.target % 8] = int(Operation.evaluate(instr.op, val_a, val_b))
-            if instr.is_output: outputs.append(working[instr.target % 8])
+            working[instr.tgt_reg % 8] = int(evaluate(instr.opcode, val_a, val_b))
+            if instr.gen_out: outputs.append(working[instr.tgt_reg % 8])
         dut.info(f"Executed {len(memory)} instructions -> {len(outputs)} outputs")
 
         # Compare and contrast result
