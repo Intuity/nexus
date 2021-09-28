@@ -18,7 +18,7 @@ from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 
 from nxconstants import ControlCommand, ControlSetActive, NodeCommand
 
-from nxfastmodel import Nexus, NXLoader
+from nxmodel import Nexus, NXLoader
 from nxloader import NXLoader as NXPyLoader
 
 from drivers.axi4stream.common import AXI4StreamTransaction
