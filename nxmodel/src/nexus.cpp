@@ -64,12 +64,12 @@ void Nexus::run (uint32_t cycles)
         while (!m_egress->is_idle()) {
             node_header_t header = m_egress->next_header();
             // Skip everything but signal state messages
-            if (header.command != NODE_COMMAND_SIG_STATE) {
+            if (header.command != NODE_COMMAND_SIGNAL) {
                 m_egress->dequeue_raw();
                 continue;
             }
             // Summarise final signal state
-            node_sig_state_t msg;
+            node_signal_t msg;
             m_egress->dequeue(msg);
             output_key_t key = { msg.header.row, msg.header.column, msg.index };
             (*summary)[key] = msg.state;

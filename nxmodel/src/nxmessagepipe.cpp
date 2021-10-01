@@ -18,27 +18,35 @@
 using namespace NXModel;
 using namespace NXConstants;
 
-void NXMessagePipe::enqueue (node_load_instr_t message)
+void NXMessagePipe::enqueue (node_load_t message)
 {
     entry_t entry;
     entry.header = message.header;
-    pack_node_load_instr(message, (uint8_t *)&entry.encoded);
+    pack_node_load(message, (uint8_t *)&entry.encoded);
     m_messages.push(entry);
 }
 
-void NXMessagePipe::enqueue (node_map_output_t message)
+void NXMessagePipe::enqueue (node_loopback_t message)
 {
     entry_t entry;
     entry.header = message.header;
-    pack_node_map_output(message, (uint8_t *)&entry.encoded);
+    pack_node_loopback(message, (uint8_t *)&entry.encoded);
     m_messages.push(entry);
 }
 
-void NXMessagePipe::enqueue (node_sig_state_t message)
+void NXMessagePipe::enqueue (node_signal_t message)
 {
     entry_t entry;
     entry.header = message.header;
-    pack_node_sig_state(message, (uint8_t *)&entry.encoded);
+    pack_node_signal(message, (uint8_t *)&entry.encoded);
+    m_messages.push(entry);
+}
+
+void NXMessagePipe::enqueue (node_control_t message)
+{
+    entry_t entry;
+    entry.header = message.header;
+    pack_node_control(message, (uint8_t *)&entry.encoded);
     m_messages.push(entry);
 }
 
@@ -74,28 +82,36 @@ node_header_t NXMessagePipe::next_header (void)
     return front.header;
 }
 
-void NXMessagePipe::dequeue (node_load_instr_t & message)
+void NXMessagePipe::dequeue (node_load_t & message)
 {
     if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
     entry_t front = m_messages.front();
     m_messages.pop();
-    message = unpack_node_load_instr((uint8_t *)&front.encoded);
+    message = unpack_node_load((uint8_t *)&front.encoded);
 }
 
-void NXMessagePipe::dequeue (node_map_output_t & message)
+void NXMessagePipe::dequeue (node_loopback_t & message)
 {
     if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
     entry_t front = m_messages.front();
     m_messages.pop();
-    message = unpack_node_map_output((uint8_t *)&front.encoded);
+    message = unpack_node_loopback((uint8_t *)&front.encoded);
 }
 
-void NXMessagePipe::dequeue (node_sig_state_t & message)
+void NXMessagePipe::dequeue (node_signal_t & message)
 {
     if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
     entry_t front = m_messages.front();
     m_messages.pop();
-    message = unpack_node_sig_state((uint8_t *)&front.encoded);
+    message = unpack_node_signal((uint8_t *)&front.encoded);
+}
+
+void NXMessagePipe::dequeue (node_control_t & message)
+{
+    if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
+    entry_t front = m_messages.front();
+    m_messages.pop();
+    message = unpack_node_control((uint8_t *)&front.encoded);
 }
 
 void NXMessagePipe::dequeue (node_raw_t & message)

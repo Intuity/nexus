@@ -53,10 +53,11 @@ namespace NXModel {
          * @param message the message to append
          *
          */
-        void enqueue (node_load_instr_t message);
-        void enqueue (node_map_output_t message);
-        void enqueue (node_sig_state_t  message);
-        void enqueue (node_raw_t        message);
+        void enqueue (node_load_t     message);
+        void enqueue (node_loopback_t message);
+        void enqueue (node_signal_t   message);
+        void enqueue (node_control_t  message);
+        void enqueue (node_raw_t      message);
 
         /** Append an already encoded entry
          *
@@ -86,10 +87,11 @@ namespace NXModel {
          *
          * @param message reference to dequeue the message into
          */
-        void dequeue (node_load_instr_t & message);
-        void dequeue (node_map_output_t & message);
-        void dequeue (node_sig_state_t  & message);
-        void dequeue (node_raw_t        & message);
+        void dequeue (node_load_t     & message);
+        void dequeue (node_loopback_t & message);
+        void dequeue (node_signal_t   & message);
+        void dequeue (node_control_t  & message);
+        void dequeue (node_raw_t      & message);
 
         /** Dequeue an entry without decoding it
          *

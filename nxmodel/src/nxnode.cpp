@@ -35,7 +35,11 @@ std::shared_ptr<NXMessagePipe> NXNode::get_pipe (direction_t dirx)
 void NXNode::reset (void)
 {
     m_seen_first = false;
-    m_instructions.clear();
+    m_accumulator = 0;
+    m_memory.clear();
+    m_num_instr  = 0;
+    m_num_output = 0;
+    m_loopback   = 0;
     m_inputs_curr.clear();
     m_inputs_next.clear();
     m_outputs.clear();
@@ -49,11 +53,6 @@ bool NXNode::is_idle (void)
         (m_inbound[2] == NULL || m_inbound[2]->is_idle()) &&
         (m_inbound[3] == NULL || m_inbound[3]->is_idle())
     );
-}
-
-void NXNode::append (NXConstants::instruction_t instr)
-{
-    m_instructions.push_back(instr);
 }
 
 void NXNode::step (bool trigger)
@@ -87,15 +86,9 @@ void NXNode::step (bool trigger)
     m_seen_first |= trigger;
 }
 
-std::vector<uint32_t> NXNode::get_instructions (void)
+std::vector<uint32_t> NXNode::get_memory (void)
 {
-    std::vector<uint32_t> instrs;
-    for (const instruction_t & instr : m_instructions) {
-        uint32_t packed = 0;
-        pack_instruction(instr, (uint8_t *)&packed);
-        instrs.push_back(packed);
-    }
-    return instrs;
+    return m_memory;
 }
 
 NXNode::io_state_t NXNode::get_current_inputs (void)
@@ -118,40 +111,70 @@ bool NXNode::digest (void)
     bool curr_delta = false;
     for (int idx_pipe = 0; idx_pipe < 4; idx_pipe++)
     {
+        std::shared_ptr<NXMessagePipe> pipe = m_inbound[idx_pipe];
         // Skip unconnected pipes
-        if (m_inbound[idx_pipe] == NULL) continue;
+        if (pipe == NULL) continue;
         // Iterate until pipe is empty
-        while (!m_inbound[idx_pipe]->is_idle()) {
-            node_header_t header = m_inbound[idx_pipe]->next_header();
+        while (!pipe->is_idle()) {
+            node_header_t   header = pipe->next_header();
             // Is the message targeted at this node?
             if (header.row == m_row && header.column == m_column) {
                 // std::cout << "[NXNode " << m_row << ", " << m_column << "] "
                 //           << "Received command " << header.command << std::endl;
                 switch (header.command) {
-                    case NODE_COMMAND_LOAD_INSTR: {
-                        node_load_instr_t instr;
-                        m_inbound[idx_pipe]->dequeue(instr);
-                        append(instr.instr);
-                        break;
-                    }
-                    case NODE_COMMAND_MAP_OUTPUT: {
-                        node_map_output_t mapping;
-                        m_inbound[idx_pipe]->dequeue(mapping);
-                        m_mappings[mapping.source_index].push_back(mapping);
-                        break;
-                    }
-                    case NODE_COMMAND_SIG_STATE: {
-                        node_sig_state_t state;
-                        m_inbound[idx_pipe]->dequeue(state);
-                        m_inputs_next[state.index] = state.state;
-                        if (!state.is_seq) {
-                            curr_delta = (m_inputs_curr[state.index] != state.state);
-                            m_inputs_curr[state.index] = state.state;
+                    case NODE_COMMAND_LOAD: {
+                        node_load_t msg;
+                        pipe->dequeue(msg);
+                        // Accumulate the value
+                        m_accumulator = (
+                            (m_accumulator << LOAD_SEG_WIDTH) |
+                            msg.data
+                        );
+                        // When the last flag is set, load into the memory
+                        if (msg.last) {
+                            m_memory.push_back(m_accumulator);
+                            m_accumulator = 0;
                         }
                         break;
                     }
-                    case NODE_COMMAND_NODE_CTRL: {
-                        assert(!"Received unexpected node control command");
+                    case NODE_COMMAND_LOOPBACK: {
+                        node_loopback_t msg;
+                        pipe->dequeue(msg);
+                        // Create a mask for this section
+                        uint64_t shift = msg.section * LB_SECTION_WIDTH;
+                        uint64_t mask  = ((1 << LB_SECTION_WIDTH) - 1) << shift;
+                        // Update the held loopback
+                        m_loopback = (
+                            (m_loopback & ~mask) |
+                            ((msg.section << shift) & mask)
+                        );
+                        break;
+                    }
+                    case NODE_COMMAND_SIGNAL: {
+                        node_signal_t msg;
+                        pipe->dequeue(msg);
+                        // Update input state
+                        m_inputs_next[msg.index] = msg.state;
+                        if (!msg.is_seq) {
+                            curr_delta = (m_inputs_curr[msg.index] != msg.state);
+                            m_inputs_curr[msg.index] = msg.state;
+                        }
+                        break;
+                    }
+                    case NODE_COMMAND_CONTROL: {
+                        node_control_t msg;
+                        pipe->dequeue(msg);
+                        switch (msg.param) {
+                            case NODE_PARAMETER_INSTRUCTIONS:
+                                m_num_instr = msg.value;
+                                break;
+                            case NODE_PARAMETER_OUTPUTS:
+                                m_num_output = msg.value;
+                                break;
+                            default:
+                                assert(!"Unsupported control parameter");
+                                break;
+                        }
                         break;
                     }
                     default: assert(!"Unsupported command received");
@@ -180,29 +203,25 @@ bool NXNode::evaluate (void)
     // Iterate through instructions performing input->output transform
     uint32_t op_index = 0;
     bool     op_delta = false;
-    for (const instruction_t & instr : m_instructions) {
+    for (uint32_t pc = 0; pc < m_num_instr; pc++) {
+        uint32_t      raw_data = m_memory[pc];
+        instruction_t instr    = unpack_instruction((uint8_t *)&raw_data);
         // std::cout << "[NXNode " << m_row << ", " << m_column << "] Executing -"
-        //             << " OPCODE: " << (int)instr.opcode
+        //             << " TT: 0x"   << std::hex << instr.truth << std::dec
         //             << " SRC_A: "  << (instr.src_a_ip ? "I[" : "R[") << (int)instr.src_a << "]"
         //             << " SRC_B: "  << (instr.src_b_ip ? "I[" : "R[") << (int)instr.src_b << "]"
+        //             << " SRC_C: "  << (instr.src_c_ip ? "I[" : "R[") << (int)instr.src_c << "]"
         //             << " TGT: "    << (int)instr.tgt_reg
         //             << " OUTPUT: " << (instr.gen_out ? "YES" : "NO")
         //             << std::endl;
         // Pickup the inputs
         bool input_a = instr.src_a_ip ? get_input(instr.src_a) : get_reg(instr.src_a);
         bool input_b = instr.src_b_ip ? get_input(instr.src_b) : get_reg(instr.src_b);
-        // Perform the operation
-        bool result = false;
-        switch (instr.opcode) {
-            case OPERATION_INVERT : { result = !(input_a           ); break; }
-            case OPERATION_AND    : { result =  (input_a && input_b); break; }
-            case OPERATION_NAND   : { result = !(input_a && input_b); break; }
-            case OPERATION_OR     : { result =  (input_a || input_b); break; }
-            case OPERATION_NOR    : { result = !(input_a || input_b); break; }
-            case OPERATION_XOR    : { result =  (input_a ^  input_b); break; }
-            case OPERATION_XNOR   : { result = !(input_a ^  input_b); break; }
-            default               : { assert(!"Unsupported operation"); break; }
-        }
+        bool input_c = instr.src_c_ip ? get_input(instr.src_c) : get_reg(instr.src_c);
+        // Work out the shift
+        uint32_t shift = (input_a ? 4 : 0) + (input_b ? 2 : 0) + (input_c ? 1 : 0);
+        // Select the right entry from the truth table
+        bool result = (((instr.truth >> shift) & 0x1) != 0);
         // Store to the target register
         working[instr.tgt_reg] = result;
         // Does this instruction generate an output?
@@ -225,30 +244,28 @@ void NXNode::transmit (void)
         uint32_t index = it->first;
         bool     state = it->second;
         bool     last  = m_outputs_last.count(index) ? m_outputs_last[index] : false;
-        // If current output state differs from last state...
-        if (state != last && m_mappings.count(index)) {
-            for (const node_map_output_t & mapping : m_mappings[index]) {
-                // Is this a loopback?
-                if (mapping.target_row == m_row && mapping.target_column == m_column) {
-                    assert(mapping.target_is_seq);
-                    m_inputs_next[mapping.target_index] = state;
-
-                // Otherwise, send a message
-                } else {
-                    node_sig_state_t msg;
-                    msg.header.row     = mapping.target_row;
-                    msg.header.column  = mapping.target_column;
-                    msg.header.command = NODE_COMMAND_SIG_STATE;
-                    msg.index          = mapping.target_index;
-                    msg.is_seq         = mapping.target_is_seq;
-                    msg.state          = state;
-                    // Dispatch the message
-                    std::shared_ptr<NXMessagePipe> tgt_pipe = route(
-                        msg.header.row, msg.header.column
-                    );
-                    tgt_pipe->enqueue(msg);
-                }
-            }
+        // Skip outputs that are not enabled
+        if (index >= m_num_output) continue;
+        // Lookup the output mappings
+        uint32_t raw_lookup    = m_memory[m_num_instr + index];
+        output_lookup_t lookup = unpack_output_lookup((uint8_t *)&raw_lookup);
+        // Fetch and generate each of the messages
+        for (uint32_t addr = lookup.start; addr <= lookup.final; addr++) {
+            // Sanity check
+            assert(addr < MAX_NODE_MEMORY);
+            // Fetch the mapping
+            uint32_t         raw_mapping = m_memory[addr];
+            output_mapping_t mapping     = unpack_output_mapping((uint8_t *)&raw_mapping);
+            // Generate and send a message
+            node_signal_t msg;
+            msg.header.row     = mapping.row;
+            msg.header.column  = mapping.column;
+            msg.header.command = NODE_COMMAND_SIGNAL;
+            msg.index          = mapping.index;
+            msg.is_seq         = mapping.is_seq;
+            msg.state          = state;
+            // Dispatch the message
+            route(mapping.row, mapping.column)->enqueue(msg);
         }
         // Always update the last sent state
         m_outputs_last[index] = state;

@@ -14,7 +14,6 @@
 
 #include <array>
 #include <iostream>
-#include <list>
 #include <map>
 #include <memory>
 #include <stdint.h>
@@ -38,7 +37,7 @@ namespace NXModel {
         // Data Structures
         // =====================================================================
 
-        typedef std::list<instruction_t> instrs_t;
+        typedef std::vector<uint32_t> memory_t;
         typedef std::map<uint32_t, bool> io_state_t;
 
         // =====================================================================
@@ -46,9 +45,13 @@ namespace NXModel {
         // =====================================================================
 
         NXNode (uint32_t row, uint32_t column)
-            : m_row        ( row    )
-            , m_column     ( column )
-            , m_seen_first ( false  )
+            : m_row         ( row    )
+            , m_column      ( column )
+            , m_seen_first  ( false  )
+            , m_accumulator ( 0      )
+            , m_num_instr   ( 0      )
+            , m_num_output  ( 0      )
+            , m_loopback    ( 0      )
         {
             for (int i = 0; i < 4; i++) {
                 m_inbound[i]  = std::make_shared<NXMessagePipe>();
@@ -84,12 +87,6 @@ namespace NXModel {
          */
         bool is_idle (void);
 
-        /** Appends an instruction to the internal store
-         *
-         * @param instruction encoded instruction to append
-         */
-        void append (instruction_t instr);
-
         /** Performs a single step of execution
          *
          * @param trigger whether this is the start of a new tick
@@ -97,11 +94,11 @@ namespace NXModel {
          */
         void step (bool trigger);
 
-        /** Get a list of all loaded instructions packed into uint32_t
+        /** Return the contents of the memory
          *
-         * @return state of inputs in the current cycle
+         * @return vector of the contents of the memory
          */
-        std::vector<uint32_t> get_instructions (void);
+        std::vector<uint32_t> get_memory (void);
 
         /** Retrieve current input state
          *
@@ -120,6 +117,18 @@ namespace NXModel {
          * @return state of output in the current cycle
          */
         io_state_t get_current_outputs (void);
+
+        /** Return the number of instructions loaded
+         *
+         * @return integer count of instructions
+         */
+        uint32_t get_instruction_count (void) { return m_num_instr; }
+
+        /** Return the number of outputs configured
+         *
+         * @return integer count of outputs
+         */
+        uint32_t get_output_count (void) { return m_num_output; }
 
     private:
 
@@ -180,11 +189,14 @@ namespace NXModel {
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_inbound;
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_outbound;
 
-        // Instruction store
-        instrs_t m_instructions;
+        // Node memory
+        uint32_t m_accumulator;
+        memory_t m_memory;
 
-        // Output mappings
-        std::map<uint32_t, std::list<node_map_output_t>> m_mappings;
+        // Node parameters
+        uint32_t m_num_instr;
+        uint32_t m_num_output;
+        uint64_t m_loopback;
 
         // Current state
         io_state_t m_inputs_curr;
