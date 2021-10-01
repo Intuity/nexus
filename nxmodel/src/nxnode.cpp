@@ -230,6 +230,10 @@ bool NXNode::evaluate (void)
             op_delta |= (result != get_output(op_index));
             // Store the output value
             m_outputs[op_index] = result;
+            // Does this need to loopback?
+            if (((m_loopback >> op_index) & 0x1) != 0) {
+                m_inputs_next[op_index] = result;
+            }
             // Always increment the output
             op_index++;
         }
