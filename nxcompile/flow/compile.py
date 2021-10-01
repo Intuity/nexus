@@ -230,10 +230,38 @@ class Node:
                     unordered.remove(op)
                     break
         assert len(unordered) == 0, f"Failed to order {len(unordered)} ops"
+        # Allocate outputs to instructions
+        outputs = [None] * self.__num_outputs
+        for op_idx, op in enumerate(ordered):
+            # If this op doesn't generate an output, skip it
+            if not self.count_op_output_usage(op): continue
+            # Check for the next available slot
+            assert None in outputs, f"Run out of outputs for node {self.position}"
+            slot_idx = outputs.index(None)
+            # Allocate the output
+            log.debug(
+                f"{self.position} - {op_idx}/{len(ordered)}: OUT[{slot_idx}]"
+            )
+            outputs[slot_idx] = op
+        # Allocate loopback inputs (using the same position as matching output)
+        inputs = [None] * self.__num_inputs
+        for op_idx, op in enumerate(ordered):
+            for src in op.sources:
+                # Skip sources that are already placed
+                if src in inputs: continue
+                # Skip allocation of constants and instructions (only want state)
+                if type(src) in (Constant, Instruction): continue
+                # Test if the state is fed by an output of this node
+                assert isinstance(src, State), \
+                    f"{self.position}: Got a non-state source"
+                if src.source not in outputs: continue
+                # Place this input in the same position
+                op_idx = outputs.index(src.source)
+                assert inputs[op_idx] == None, \
+                    f"{self.position}: Input {op_idx} already taken"
+                inputs[op_idx] = src
         # Allocate input, output, and register usage
         regs    = [None] * self.__num_registers
-        inputs  = [None] * self.__num_inputs
-        outputs = [None] * self.__num_outputs
         encoded = []
         for op_idx, op in enumerate(ordered):
             # If no free registers, raise an exception
@@ -273,16 +301,8 @@ class Node:
                 f"{self.position} - {op_idx}/{len(ordered)}: REG[{use_reg}]"
             )
             regs[use_reg] = op
-            # Does this operation generate any outputs?
-            use_output = None
-            if self.count_op_output_usage(op):
-                if None not in outputs:
-                    raise Exception(f"Run out of outputs in node {self.position}")
-                use_output = outputs.index(None)
-                log.debug(
-                    f"{self.position} - {op_idx}/{len(ordered)}: OUT[{use_output}]"
-                )
-                outputs[use_output] = op
+            # Lookup output
+            use_output = outputs.index(op) if op in outputs else None
             # Encode the instruction
             encoded.append(self.encode(op, op_sources, use_reg, use_output))
             # Check for any registers that have freed up
@@ -604,9 +624,20 @@ def compile(
             compiled_outputs[node.position],
             compiled_instrs[node.position],
         ) = node.compile_operations()
-    # Compile internal messages for every node (sequential & combinatorial)
-    compiled_msgs = {}
+    # Compile signal state updates
+    compiled_loopback = {}
+    compiled_msgs     = {}
     for (tgt_row, tgt_col), inputs in compiled_inputs.items():
+        # Compile loopbacks
+        compiled_loopback[tgt_row, tgt_col] = 0
+        for idx_input, input in enumerate(inputs):
+            # Skip non-stateful inputs
+            if not isinstance(input, State): continue
+            # Check if this is a loopback
+            if input.source not in compiled_outputs[tgt_row, tgt_col]: continue
+            # Append to the loopback mask
+            compiled_loopback[tgt_row, tgt_col] |= (1 << idx_input)
+        # Compile messages between nodes
         for idx_input, input in enumerate(inputs):
             # Skip unpopulated inputs
             if not input: continue
@@ -616,15 +647,18 @@ def compile(
             true_source = input.source if is_stateful else input
             # Get source row and column
             src_row, src_col = true_source.node.position
+            # Skip loopbacks (handled separately)
+            if (src_row == tgt_row) and (src_col == tgt_col): continue
             # Get the output index for the source
             src_idx = compiled_outputs[src_row, src_col].index(true_source)
             # Ensure message storage exists for the source node
             if (src_row, src_col) not in compiled_msgs:
                 compiled_msgs[src_row, src_col] = [[] for _ in range(node_outputs)]
             # Append an internal message
-            compiled_msgs[src_row, src_col][src_idx].append((
-                tgt_row, tgt_col, idx_input, is_stateful
-            ))
+            compiled_msgs[src_row, src_col][src_idx].append({
+                "row": tgt_row, "column": tgt_col, "index": idx_input,
+                "is_seq": is_stateful
+            })
     # Build a report of where outputs are generated from, and insert messages
     # TODO: Temporarily using 'fake' nodes to receive outputs, in the longer
     #       term will separate 'internal' and 'external' messaging
@@ -665,6 +699,6 @@ def compile(
     log.info(f" - Avg count: {mean(msg_counts)}")
     # Return instruction sequences, input handling, output handling
     return (
-        compiled_instrs, compiled_msgs, mesh.report_state(compiled_inputs),
-        output_drivers
+        compiled_instrs, compiled_loopback, compiled_msgs,
+        mesh.report_state(compiled_inputs), output_drivers
     )

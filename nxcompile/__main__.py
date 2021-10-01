@@ -111,7 +111,7 @@ def main(
 
     # Compile onto mesh
     log.info("Compiling design onto mesh")
-    c_instrs, c_msgs, c_state_map, c_output_map = compile(
+    c_instrs, c_lbs, c_msgs, c_state_map, c_output_map = compile(
         smpl, rows=rows, columns=cols,
         node_inputs=node_inputs, node_outputs=node_outputs,
         node_registers=node_registers, node_slots=node_slots,
@@ -123,7 +123,7 @@ def main(
         output,
         rows, cols,
         node_inputs, node_outputs, node_registers, node_slots,
-        c_instrs, c_msgs, c_state_map, c_output_map,
+        c_instrs, c_lbs, c_msgs, c_state_map, c_output_map,
     )
 
 if __name__ == "__main__":
