@@ -32,8 +32,7 @@ class NXConstants:
     # Maximum sizes
     MAX_ROW_COUNT      : Constant("Maximum number of rows"                ) = 16
     MAX_COLUMN_COUNT   : Constant("Maximum number of columns"             ) = 16
-    MAX_NODE_INSTRS    : Constant("Maximum instructions per node"         ) = 512
-    MAX_NODE_CONFIG    : Constant("Maximum output configurations per node") = 512
+    MAX_NODE_MEMORY    : Constant("Maximum memory rows per node"          ) = 1024
     MAX_NODE_INPUTS    : Constant("Maximum number of inputs per node"     ) = 32
     MAX_NODE_OUTPUTS   : Constant("Maximum number of outputs per node"    ) = 32
     MAX_NODE_REGISTERS : Constant("Maximum number of registers per node"  ) = 32
@@ -52,6 +51,22 @@ class NXConstants:
     # Different command type widths (control plane versus nodes in mesh)
     CTRL_CMD_WIDTH : Constant("Control message command width") = 3
     NODE_CMD_WIDTH : Constant("Node message command width"   ) = 2
+
+    # Truth table
+    TT_WIDTH : Constant("Width of a three input truth table") = 8
+
+    # Node memory and loading
+    LOAD_SEG_WIDTH      : Constant("Segment width for accumulated load") = 16
+    NODE_MEM_ADDR_WIDTH : Constant("Width of node memory address"      ) = ceil(log2(MAX_NODE_MEMORY))
+
+    # Node loopback
+    LB_SECTION_WIDTH : Constant("Section width for loopback" ) = 16
+    LB_SELECT_WIDTH  : Constant("Selector width for loopback") = (
+        MAX_NODE_IOR_COUNT // LB_SECTION_WIDTH
+    )
+
+    # Node control
+    NODE_PARAM_WIDTH : Constant("Maximum width of a node parameter") = 16
 
 # ==============================================================================
 # Enumerations
@@ -80,10 +95,16 @@ class ControlCommand:
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
     """ Different message types for nodes in the mesh """
-    LOAD_INSTR : Constant("Load a new instruction")
-    MAP_OUTPUT : Constant("Add an output signal mapping")
-    SIG_STATE  : Constant("Update input signal state for a node")
-    NODE_CTRL  : Constant("Control node behaviour")
+    LOAD     : Constant("Load data into the node's memory")
+    LOOPBACK : Constant("Setup output to input loopback mask")
+    SIGNAL   : Constant("Carries signal state to and from a node")
+    CONTROL  : Constant("Control node behaviour")
+
+@packtype.enum(package=NXConstants, mode=Enum.INDEXED)
+class NodeParameter:
+    """ Different control parameters within the node """
+    INSTRUCTIONS : Constant("Number of instructions")
+    OUTPUTS      : Constant("Number of enabled outputs")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class Operation:
@@ -110,16 +131,36 @@ class ControlParam:
 # Instruction Format
 # ==============================================================================
 
-@packtype.struct(package=NXConstants, width=21, pack=Struct.FROM_MSB)
+@packtype.struct(package=NXConstants, width=32, pack=Struct.FROM_MSB)
 class Instruction:
     """ Node instruction encoding """
-    opcode   : Operation(desc="Operation to perform")
+    truth    : Scalar(width=NXConstants.TT_WIDTH, desc="Encoded truth table")
     src_a    : Scalar(width=NXConstants.IOR_WIDTH, desc="Source selector A")
     src_a_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
     src_b    : Scalar(width=NXConstants.IOR_WIDTH, desc="Source selector B")
     src_b_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
+    src_c    : Scalar(width=NXConstants.IOR_WIDTH, desc="Source selector C")
+    src_c_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
     tgt_reg  : Scalar(width=NXConstants.IOR_WIDTH, desc="Target register")
     gen_out  : Scalar(width=1, desc="Generate an output message")
+
+# ==============================================================================
+# Output Mappings
+# ==============================================================================
+
+@packtype.struct(package=NXConstants)
+class OutputLookup:
+    """ Node output lookup encoding (lists start and end point of messages) """
+    start : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Start address")
+    final : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Final address")
+
+@packtype.struct(package=NXConstants)
+class OutputMapping:
+    """ Single node output mapping """
+    row    : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Target row")
+    column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Target column")
+    index  : Scalar(width=NXConstants.IOR_WIDTH,      desc="Target index")
+    is_seq : Scalar(width=1,                          desc="Is target sequential")
 
 # ==============================================================================
 # Control Plane Message Formats
@@ -173,33 +214,39 @@ class NodeRaw:
     payload : Scalar(width=(NXConstants.MESSAGE_WIDTH.value - NodeHeader._pt_width), desc="Payload")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class NodeLoadInstr:
-    """ Load an instruction into a node """
+class NodeLoad:
+    """ Load data into a node's memory in segments (accumulated on receive) """
     header : NodeHeader(desc="Header carrying row, column, and command")
-    instr  : Instruction(desc="Encoded instruction")
+    last   : Scalar(width=1,                          desc="Marks the final segment")
+    data   : Scalar(width=NXConstants.LOAD_SEG_WIDTH, desc="Segment of data to load")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class NodeMapOutput:
-    """ Append a mapping for an output of the node """
-    header        : NodeHeader(desc="Header carrying row, column, and command")
-    source_index  : Scalar(width=NXConstants.IOR_WIDTH, desc="Output signal index")
-    target_row    : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Target row in the mesh")
-    target_column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Target column in the mesh")
-    target_index  : Scalar(width=NXConstants.IOR_WIDTH.value, desc="Input index of the target node")
-    target_is_seq : Scalar(width=1, desc="Is the target's input sequential")
+class NodeLoopback:
+    """ Configure the output to input loopback mask """
+    header  : NodeHeader(desc="Header carrying row, column, and command")
+    select  : Scalar(width=NXConstants.LB_SELECT_WIDTH,  desc="Section to update")
+    section : Scalar(width=NXConstants.LB_SECTION_WIDTH, desc="Updated value")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class NodeSigState:
-    """ Updates input signal state of a node """
+class NodeSignal:
+    """ Signal state carried to/from a node """
     header : NodeHeader(desc="Header carrying row, column, and command")
     index  : Scalar(width=NXConstants.IOR_WIDTH.value, desc="Input signal index")
     is_seq : Scalar(width=1, desc="Is the input signal sequential or combinatorial")
     state  : Scalar(width=1, desc="Value of the signal")
 
+@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
+class NodeControl:
+    """ Set attributes of a node """
+    header : NodeHeader(desc="Header carrying row, column, and command")
+    param  : NodeParameter(desc="Parameter to update")
+    value  : Scalar(width=NXConstants.NODE_PARAM_WIDTH, desc="Updated value")
+
 @packtype.union(package=NXConstants)
 class NodeMessage:
     """ Union of different node message types """
-    raw        : NodeRaw(desc="Raw message encoding")
-    load_instr : NodeLoadInstr(desc="Load instruction encoding")
-    map_output : NodeMapOutput(desc="Map output encoding")
-    sig_state  : NodeSigState(desc="Signal state update encoding")
+    raw      : NodeRaw(desc="Raw message encoding")
+    load     : NodeLoad(desc="Data load encoding")
+    loopback : NodeLoopback(desc="Loopback configuration encoding")
+    signal   : NodeSignal(desc="Signal state encoding")
+    control  : NodeControl(desc="Parameter control encoding")
