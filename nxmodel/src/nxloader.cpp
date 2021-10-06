@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iomanip>
+
 #include "json.hpp"
 
 #include "nxloader.hpp"
@@ -19,17 +21,17 @@
 
 using namespace NXModel;
 
-NXLoader::NXLoader(Nexus * model, std::filesystem::path path)
+NXLoader::NXLoader(Nexus * model, std::filesystem::path path, bool verbose)
 {
-    load(model, path);
+    load(model, path, verbose);
 }
 
-NXLoader::NXLoader(Nexus * model, std::string path)
+NXLoader::NXLoader(Nexus * model, std::string path, bool verbose)
 {
-    load(model, std::filesystem::path(path));
+    load(model, std::filesystem::path(path), verbose);
 }
 
-void NXLoader::load(Nexus * model, std::filesystem::path path)
+void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
 {
     std::ifstream fh(path);
     nlohmann::json data;
@@ -37,10 +39,12 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
     // Sanity check the design against the model
     uint32_t design_rows = data["configuration"]["rows"];
     uint32_t design_cols = data["configuration"]["columns"];
-    std::cout << "[NXLoader] Opened " << path << " - "
-                << " rows: " << design_rows << ", "
-                << " columns: " << design_cols
-                << std::endl;
+    if (verbose) {
+        std::cout << "[NXLoader] Opened " << path << " - "
+                  << " rows: " << design_rows << ", "
+                  << " columns: " << design_cols
+                  << std::endl;
+    }
     assert(
         (design_rows == model->get_rows()   ) &&
         (design_cols == model->get_columns())
@@ -51,9 +55,11 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
         uint32_t column = node["column"];
         // Configure loopback lines
         uint32_t loopback = node["loopback"];
-        std::cout << "[NXLoader] Setting loopback row: " << row
-                    << ", column: " << column << ", loopback 0x"
-                    << std::hex << loopback << std::dec << std::endl;
+        if (verbose) {
+            std::cout << "[NXLoader] Setting loopback row: " << row
+                      << ", column: " << column << ", loopback 0x"
+                      << std::hex << (int)loopback << std::dec << std::endl;
+        }
         for (uint32_t idx = 0; idx < 2; idx++) {
             node_loopback_t msg;
             msg.header.row     = row;
@@ -66,9 +72,12 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
         // Load instructions
         for (const auto & json_instr : node["instructions"]) {
             uint32_t instr = json_instr;
-            std::cout << "[NXLoader] Loading row: " << row
-                      << ", column: " << column << ", instruction: 0x"
-                      << std::hex << instr << std::dec << std::endl;
+            if (verbose) {
+                std::cout << "[NXLoader] Loading row: " << row
+                          << ", column: " << column << ", instruction: 0x"
+                          << std::hex << std::setw(8) << std::setfill('0') << instr
+                          << std::dec << std::endl;
+            }
             // Load over two 16-bit chunks
             for (uint32_t idx = 0; idx < 2; idx++) {
                 node_load_t msg;
@@ -76,7 +85,7 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
                 msg.header.column  = column;
                 msg.header.command = NODE_COMMAND_LOAD;
                 msg.last           = (idx == 1);
-                msg.data           = (instr >> (16 * idx)) & 0xFFFF;
+                msg.data           = (instr >> (16 * (1 - idx))) & 0xFFFF;
                 model->get_ingress()->enqueue(msg);
             }
         }
@@ -88,25 +97,29 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
         ctrl_instr.param          = NODE_PARAMETER_INSTRUCTIONS;
         ctrl_instr.value          = node["instructions"].size();
         model->get_ingress()->enqueue(ctrl_instr);
-        std::cout << "[NXLoader] Setting instruction count row: " << row
-                    << ", column: " << column << ", count "
-                    << node["instructions"].size() << std::endl;
+        if (verbose) {
+            std::cout << "[NXLoader] Setting instruction count row: " << row
+                      << ", column: " << column << ", count "
+                      << node["instructions"].size() << std::endl;
+        }
         // Setup the output lookups
         uint32_t output_index = 0;
         uint32_t next_address = node["instructions"].size() + node["outputs"].size();
         for (const auto & outputs : node["outputs"]) {
-            // Break out if no mappings for this output
-            if (outputs.size() == 0) break;
             // Generate the lookup
             output_lookup_t lookup;
-            lookup.start = next_address;
-            lookup.final = next_address + outputs.size() - 1;
+            lookup.start  = next_address;
+            lookup.final  = next_address + outputs.size() - 1;
+            lookup.active = (outputs.size() > 0);
             uint32_t encoded = 0;
             pack_output_lookup(lookup, (uint8_t *)&encoded);
-            std::cout << "[NXLoader] Loading lookup - row: " << row
-                      << ", column: " << column << ", start: 0x"
-                      << std::hex << lookup.start << ", end: 0x"
-                      << lookup.final << std::dec << std::endl;
+            if (verbose) {
+                std::cout << "[NXLoader] Loading lookup - row: " << row
+                          << ", column: " << column << ", start: 0x"
+                          << std::hex << lookup.start << ", end: 0x"
+                          << lookup.final << std::dec << ", active: "
+                          << (lookup.active ? "YES" : "NO") << std::endl;
+            }
             // Load the lookup over two steps
             for (uint32_t idx = 0; idx < 2; idx++) {
                 node_load_t msg;
@@ -114,11 +127,13 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
                 msg.header.column  = column;
                 msg.header.command = NODE_COMMAND_LOAD;
                 msg.last           = (idx == 1);
-                msg.data           = (encoded >> (16 * idx)) & 0xFFFF;
+                msg.data           = (encoded >> (16 * (1 - idx))) & 0xFFFF;
                 model->get_ingress()->enqueue(msg);
             }
             // Increment to the next output
             output_index++;
+            // Offset the address
+            next_address += outputs.size();
         }
         // Load the output mappings
         for (const auto & outputs : node["outputs"]) {
@@ -131,12 +146,14 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
                 entry.is_seq = mapping["is_seq"];
                 uint32_t encoded = 0;
                 pack_output_mapping(entry, (uint8_t *)&encoded);
-                std::cout << "[NXLoader] Loading mapping - row: " << row
-                          << ", column: " << column
-                          << ", target row: " << entry.row
-                          << ", target column: " << entry.column
-                          << ", target index: " << entry.index
-                          << ", target is seq: " << entry.is_seq << std::endl;
+                if (verbose) {
+                    std::cout << "[NXLoader] Loading mapping - row: " << row
+                              << ", column: " << column
+                              << ", target row: " << (int)entry.row
+                              << ", target column: " << (int)entry.column
+                              << ", target index: " << (int)entry.index
+                              << ", target is seq: " << (int)entry.is_seq << std::endl;
+                }
                 // Load the mapping over two steps
                 for (uint32_t idx = 0; idx < 2; idx++) {
                     node_load_t msg;
@@ -144,7 +161,7 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
                     msg.header.column  = column;
                     msg.header.command = NODE_COMMAND_LOAD;
                     msg.last           = (idx == 1);
-                    msg.data           = (encoded >> (16 * idx)) & 0xFFFF;
+                    msg.data           = (encoded >> (16 * (1 - idx))) & 0xFFFF;
                     model->get_ingress()->enqueue(msg);
                 }
             }
@@ -156,9 +173,11 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
         ctrl_output.header.command = NODE_COMMAND_CONTROL;
         ctrl_output.param          = NODE_PARAMETER_OUTPUTS;
         ctrl_output.value          = output_index;
-        std::cout << "[NXLoader] Setting output count row: " << row
-                    << ", column: " << column << ", count "
-                    << output_index << std::endl;
+        if (verbose) {
+            std::cout << "[NXLoader] Setting output count row: " << row
+                      << ", column: " << column << ", count "
+                      << output_index << std::endl;
+        }
         model->get_ingress()->enqueue(ctrl_output);
     }
     // Run the mesh until it sinks all of the queued messages
@@ -167,7 +186,9 @@ void NXLoader::load(Nexus * model, std::filesystem::path path)
         model->get_mesh()->step(false);
         steps++;
     }
-    std::cout << "[NXLoader] Ran mesh for " << steps << " steps" << std::endl;
+    if (verbose) {
+        std::cout << "[NXLoader] Ran mesh for " << steps << " steps" << std::endl;
+    }
     // Close the file
     fh.close();
 }

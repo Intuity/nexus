@@ -44,7 +44,7 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        Nexus (uint32_t rows, uint32_t columns);
+        Nexus (uint32_t rows, uint32_t columns, bool verbose = false);
 
         // =====================================================================
         // Public Methods
@@ -113,6 +113,9 @@ namespace NXModel {
         // Sizing
         uint32_t m_rows;
         uint32_t m_columns;
+
+        // Verbosity
+        bool m_verbose;
 
         // Mesh
         std::shared_ptr<NXMesh> m_mesh;

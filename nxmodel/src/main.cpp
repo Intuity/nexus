@@ -56,6 +56,9 @@ int main (int argc, char * argv []) {
         return 0;
     }
 
+    // Pickup verbosity
+    bool verbose = (options.count("verbose") != 0);
+
     // Check positionl arguments
     if (!options["positional"].count()) {
         std::cerr << "[NXModel] No path to design given" << std::endl;
@@ -66,10 +69,10 @@ int main (int argc, char * argv []) {
     // Pickup sizing
     uint32_t rows    = options["rows"].as<uint32_t>();
     uint32_t columns = options["columns"].as<uint32_t>();
-    std::cout << "[NXModel] Requested " << rows << "x" << columns << std::endl;
+    if (verbose) std::cout << "[NXModel] Requested " << rows << "x" << columns << std::endl;
 
     // Create the Nexus model
-    NXModel::Nexus * model = new NXModel::Nexus(rows, columns);
+    NXModel::Nexus * model = new NXModel::Nexus(rows, columns, verbose);
 
     // Load a design
     std::filesystem::path path = positional[0];
@@ -87,9 +90,9 @@ int main (int argc, char * argv []) {
     }
 
     // Clean up
-    std::cout << "[NXModel] Cleaning up" << std::endl;
+    if (verbose) std::cout << "[NXModel] Cleaning up" << std::endl;
     delete model;
-    std::cout << "[NXModel] Exiting" << std::endl;
+    if (verbose) std::cout << "[NXModel] Exiting" << std::endl;
 
     return 0;
 }

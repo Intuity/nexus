@@ -31,8 +31,8 @@ namespace NXModel {
         // =====================================================================
         // Constructor
         // =====================================================================
-        NXLoader (Nexus * model, std::filesystem::path path);
-        NXLoader (Nexus * model, std::string           path);
+        NXLoader (Nexus * model, std::filesystem::path path, bool verbose = false);
+        NXLoader (Nexus * model, std::string           path, bool verbose = false);
 
     private:
 
@@ -40,7 +40,7 @@ namespace NXModel {
         // Private Methods
         // =====================================================================
 
-        void load(Nexus * model, std::filesystem::path path);
+        void load(Nexus * model, std::filesystem::path path, bool verbose = false);
 
     };
 

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <assert.h>
+#include <bitset>
+#include <iomanip>
 
 #include "nxnode.hpp"
 
@@ -116,7 +118,7 @@ bool NXNode::digest (void)
         if (pipe == NULL) continue;
         // Iterate until pipe is empty
         while (!pipe->is_idle()) {
-            node_header_t   header = pipe->next_header();
+            node_header_t header = pipe->next_header();
             // Is the message targeted at this node?
             if (header.row == m_row && header.column == m_column) {
                 // std::cout << "[NXNode " << m_row << ", " << m_column << "] "
@@ -141,19 +143,34 @@ bool NXNode::digest (void)
                         node_loopback_t msg;
                         pipe->dequeue(msg);
                         // Create a mask for this section
-                        uint64_t shift = msg.section * LB_SECTION_WIDTH;
+                        uint64_t shift = msg.select * LB_SECTION_WIDTH;
                         uint64_t mask  = ((1 << LB_SECTION_WIDTH) - 1) << shift;
                         // Update the held loopback
                         m_loopback = (
                             (m_loopback & ~mask) |
                             ((msg.section << shift) & mask)
                         );
+                        if (m_verbose) {
+                            std::cout << "[NXNode " << m_row << ", " << m_column << "] "
+                                      << "Loading loopback select:  " << std::dec
+                                      << (int)msg.select << ", section: "
+                                      << std::bitset<16>(msg.section)
+                                      << ", full bitmap: "
+                                      << std::bitset<32>(m_loopback) << std::endl;
+                        }
                         break;
                     }
                     case NODE_COMMAND_SIGNAL: {
                         node_signal_t msg;
                         pipe->dequeue(msg);
                         // Update input state
+                        if (m_verbose) {
+                            std::cout << "[NXNode " << m_row << ", " << m_column << "]"
+                                      << " Received Signal -"
+                                      << " IDX: " << (int)msg.index
+                                      << " VAL: " << (int)msg.state
+                                      << " SEQ: " << (int)msg.is_seq << std::endl;
+                        }
                         m_inputs_next[msg.index] = msg.state;
                         if (!msg.is_seq) {
                             curr_delta = (m_inputs_curr[msg.index] != msg.state);
@@ -195,6 +212,13 @@ bool NXNode::digest (void)
 
 bool NXNode::evaluate (void)
 {
+    // Log the current inputs
+    uint64_t vector = 0;
+    for (uint32_t idx = 0; idx < 32; idx++) vector |= (get_input(idx) << idx);
+    if (m_verbose) {
+        std::cout << "[NXNode " << m_row << ", " << m_column << "] Inputs "
+                  << std::bitset<32>(vector) << std::endl;
+    }
     // Declare storage for the working registers
     io_state_t working;
     auto get_reg = [&] (uint32_t index) -> bool {
@@ -206,14 +230,6 @@ bool NXNode::evaluate (void)
     for (uint32_t pc = 0; pc < m_num_instr; pc++) {
         uint32_t      raw_data = m_memory[pc];
         instruction_t instr    = unpack_instruction((uint8_t *)&raw_data);
-        // std::cout << "[NXNode " << m_row << ", " << m_column << "] Executing -"
-        //             << " TT: 0x"   << std::hex << instr.truth << std::dec
-        //             << " SRC_A: "  << (instr.src_a_ip ? "I[" : "R[") << (int)instr.src_a << "]"
-        //             << " SRC_B: "  << (instr.src_b_ip ? "I[" : "R[") << (int)instr.src_b << "]"
-        //             << " SRC_C: "  << (instr.src_c_ip ? "I[" : "R[") << (int)instr.src_c << "]"
-        //             << " TGT: "    << (int)instr.tgt_reg
-        //             << " OUTPUT: " << (instr.gen_out ? "YES" : "NO")
-        //             << std::endl;
         // Pickup the inputs
         bool input_a = instr.src_a_ip ? get_input(instr.src_a) : get_reg(instr.src_a);
         bool input_b = instr.src_b_ip ? get_input(instr.src_b) : get_reg(instr.src_b);
@@ -224,6 +240,27 @@ bool NXNode::evaluate (void)
         bool result = (((instr.truth >> shift) & 0x1) != 0);
         // Store to the target register
         working[instr.tgt_reg] = result;
+        // Log
+        if (m_verbose) {
+            std::cout << "[NXNode " << m_row << ", " << m_column << "] "
+                      << "@" << std::dec << std::setw(4) << std::setfill('0') << (int)pc << " -"
+                      << " 0x" << std::hex << std::setw(8) << std::setfill('0') << (int)raw_data << " -"
+                      << " TT: 0x"   << std::bitset<8>(instr.truth) << std::dec
+                      << " SRC_A: "  << (instr.src_a_ip ? "I[" : "R[") << std::dec << std::setw(2) << std::setfill(' ') << (int)instr.src_a << "]"
+                      << " SRC_B: "  << (instr.src_b_ip ? "I[" : "R[") << std::dec << std::setw(2) << std::setfill(' ') << (int)instr.src_b << "]"
+                      << " SRC_C: "  << (instr.src_c_ip ? "I[" : "R[") << std::dec << std::setw(2) << std::setfill(' ') << (int)instr.src_c << "]"
+                      << " TGT: "    << (int)instr.tgt_reg
+                      << " OUTPUT: " << (instr.gen_out ? "YES" : "NO ")
+                      << " - F(" << (input_a ? "1" : "0")
+                      << ", "    << (input_b ? "1" : "0")
+                      << ", "    << (input_c ? "1" : "0")
+                      << ") => " << (result  ? "1" : "0");
+            if (instr.gen_out) {
+                std::cout << " -> O[" << std::dec << std::setw(2) << std::setfill(' ')
+                        << (int)op_index << "]";
+            }
+            std::cout << std::endl;
+        }
         // Does this instruction generate an output?
         if (instr.gen_out) {
             // Has the output value changed
@@ -232,6 +269,10 @@ bool NXNode::evaluate (void)
             m_outputs[op_index] = result;
             // Does this need to loopback?
             if (((m_loopback >> op_index) & 0x1) != 0) {
+                if (m_verbose) {
+                    std::cout << "[NXNode " << m_row << ", " << m_column << "] Loopback "
+                              << (int)op_index << " - " << result << std::endl;
+                }
                 m_inputs_next[op_index] = result;
             }
             // Always increment the output
@@ -248,11 +289,23 @@ void NXNode::transmit (void)
         uint32_t index = it->first;
         bool     state = it->second;
         bool     last  = m_outputs_last.count(index) ? m_outputs_last[index] : false;
+        // Skip outputs where the value has not changed
+        if (state == last) continue;
         // Skip outputs that are not enabled
         if (index >= m_num_output) continue;
         // Lookup the output mappings
         uint32_t raw_lookup    = m_memory[m_num_instr + index];
         output_lookup_t lookup = unpack_output_lookup((uint8_t *)&raw_lookup);
+        // Skip inactive entries (i.e. those with no non-loopback outputs)
+        if (!lookup.active) continue;
+        // Log
+        if (m_verbose) {
+            std::cout << "[NXNode " << m_row << ", " << m_column << "]"
+                      << " Lookup for output " << std::dec << (int)index
+                      << " - START: 0x" << std::hex << (int)lookup.start
+                      << ", FINAL: 0x" << std::hex << (int)lookup.final
+                      << std::endl;
+        }
         // Fetch and generate each of the messages
         for (uint32_t addr = lookup.start; addr <= lookup.final; addr++) {
             // Sanity check
@@ -268,6 +321,16 @@ void NXNode::transmit (void)
             msg.index          = mapping.index;
             msg.is_seq         = mapping.is_seq;
             msg.state          = state;
+            // Log
+            if (m_verbose) {
+                std::cout << "[NXNode " << m_row << ", " << m_column << "]"
+                          << " Sending Signal -"
+                          << " ROW: " << std::dec << (int)msg.header.row
+                          << " COL: " << std::dec << (int)msg.header.column
+                          << " IDX: " << std::dec << (int)msg.index
+                          << " VAL: " << std::dec << (int)msg.state
+                          << " SEQ: " << std::dec << (int)msg.is_seq << std::endl;
+            }
             // Dispatch the message
             route(mapping.row, mapping.column)->enqueue(msg);
         }
@@ -290,7 +353,7 @@ std::shared_ptr<NXMessagePipe> NXNode::route (uint32_t row, uint32_t column)
 {
     // NOTE: Messages routed towards unconnected pipes will be directed to
     //       adjacent pipes in a clockwise order
-    assert(!(row == m_row && column == m_column));
+    assert(row != m_row || column != m_column);
     std::shared_ptr<NXMessagePipe> tgt_pipe = NULL;
     uint32_t start;
     if      (row    < m_row   ) start = (int)DIRECTION_NORTH;

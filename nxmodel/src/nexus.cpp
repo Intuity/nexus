@@ -22,12 +22,13 @@
 
 using namespace NXModel;
 
-Nexus::Nexus (uint32_t rows, uint32_t columns)
+Nexus::Nexus (uint32_t rows, uint32_t columns, bool verbose /* = false */)
     : m_rows    ( rows          )
     , m_columns ( columns       )
+    , m_verbose ( verbose       )
 {
     // Link the ingress & egress pipes
-    m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns);
+    m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns, verbose);
     m_ingress = m_mesh->get_node(0, 0)->get_pipe(DIRECTION_NORTH);
     m_egress  = std::make_shared<NXMessagePipe>();
     m_mesh->get_node(m_rows-1, 0)->attach(DIRECTION_SOUTH, m_egress);
@@ -75,16 +76,17 @@ void Nexus::run (uint32_t cycles)
             (*summary)[key] = msg.state;
         }
         // - Summarise the output
-        // std::cout << "[NXMesh] Cycle " << cycle << " state: " << std::endl;
-        // for (typename summary_t::iterator it = summary->begin(); it != summary->end(); it++) {
-        //     output_key_t key   = it->first;
-        //     bool         state = it->second;
-        //     std::cout << " - "
-        //               << std::get<0>(key) << ", "
-        //               << std::get<1>(key) << ", "
-        //               << std::get<2>(key) << " = "
-        //               << state << std::endl;
-        // }
+        if (m_verbose) {
+            std::cout << "[Nexus] Cycle " << cycle << " state: " << std::endl;
+            for (typename summary_t::iterator it = summary->begin(); it != summary->end(); it++) {
+                output_key_t key   = it->first;
+                bool         state = it->second;
+                std::cout << " - " << std::get<0>(key)
+                          << ", "  << std::get<1>(key)
+                          << ", "  << std::get<2>(key)
+                          << " = " << state << std::endl;
+            }
+        }
         // Record state
         m_output.push_back(summary);
     }
@@ -99,10 +101,7 @@ void Nexus::run (uint32_t cycles)
 void Nexus::dump_vcd (const std::string path)
 {
     std::cout << "[Nexus] Writing VCD to " << path << std::endl;
-    // vcd::HeadPtr head = vcd::makeVCDHeader(
-    //     vcd::TimeScale::ONE, vcd::TimeScaleUnit::ns, vcd::utils::now()
-    // );
-    vcd::VCDWriter writer(path); // , head);
+    vcd::VCDWriter writer(path);
     // Register all outputs
     std::map<output_key_t, vcd::VarPtr> output_vars;
     for (
@@ -112,9 +111,9 @@ void Nexus::dump_vcd (const std::string path)
         output_key_t key = it->first;
         std::stringstream ss;
         ss << "R" << (int)std::get<0>(key) << "C" << (int)std::get<1>(key)
-            << "I" << (int)std::get<2>(key);
+           << "I" << (int)std::get<2>(key);
         output_vars[key] = writer.register_var(
-            "dut", ss.str().c_str(), vcd::VariableType::integer, 1
+            "dut", ss.str().c_str(), vcd::VariableType::reg, 1
         );
     }
     // Set an initial value for all signals
@@ -132,10 +131,7 @@ void Nexus::dump_vcd (const std::string path)
         ) {
             output_key_t key   = it->first;
             bool         state = it->second;
-            writer.change(
-                output_vars[key], step,
-                vcd::utils::format(state ? "1" : "0")
-            );
+            writer.change(output_vars[key], step, state ? "1" : "0");
         }
         step += 1;
         m_output.pop_front();

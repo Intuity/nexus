@@ -18,15 +18,16 @@
 
 using namespace NXModel;
 
-NXMesh::NXMesh (uint32_t rows, uint32_t columns)
+NXMesh::NXMesh (uint32_t rows, uint32_t columns, bool verbose /* = false */)
     : m_rows    ( rows    )
     , m_columns ( columns )
+    , m_verbose ( verbose )
 {
     // Create the nodes
     for (uint32_t row = 0; row < m_rows; row++) {
         m_nodes.push_back(new std::vector<std::shared_ptr<NXNode>>());
         for (uint32_t column = 0; column < m_columns; column++) {
-            m_nodes[row]->push_back(std::make_shared<NXNode>(row, column));
+            m_nodes[row]->push_back(std::make_shared<NXNode>(row, column, verbose));
         }
     }
     // Link nodes together
