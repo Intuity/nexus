@@ -151,8 +151,9 @@ class Instruction:
 @packtype.struct(package=NXConstants)
 class OutputLookup:
     """ Node output lookup encoding (lists start and end point of messages) """
-    start : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Start address")
-    final : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Final address")
+    active : Scalar(width=1,                               desc="Is external output")
+    start  : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Start address")
+    final  : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Final address")
 
 @packtype.struct(package=NXConstants)
 class OutputMapping:
