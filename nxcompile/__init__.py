@@ -13,6 +13,11 @@
 # limitations under the License.
 
 import logging
+import sys
+from pathlib import Path
+
+root = Path(__file__).parent.parent
+sys.path.append((root / "common" / "work").as_posix())
 
 # If available, use Rich to colourise the output log
 try:

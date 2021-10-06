@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import json
-from operator import sub
 
 # Main sections
 DESIGN_CONFIG  = "configuration"
@@ -32,7 +31,7 @@ NODE_ROW    = "row"
 NODE_COLUMN = "column"
 NODE_INSTRS = "instructions"
 NODE_LOOP   = "loopback"
-NODE_MSGS   = "messages"
+NODE_OUTS   = "outputs"
 # Design reports
 DSG_REP_STATE   = "state"
 DSG_REP_OUTPUTS = "outputs"
@@ -85,7 +84,7 @@ def export(
             NODE_COLUMN: col,
             NODE_INSTRS: instrs,
             NODE_LOOP  : loopbacks.get((row, col), 0),
-            NODE_MSGS  : messages.get((row, col), []),
+            NODE_OUTS  : messages.get((row, col), []),
         }
         # Append node into the model
         model[DESIGN_NODES].append(node)

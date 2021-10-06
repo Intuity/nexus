@@ -19,6 +19,8 @@ from ..models.constant import Constant
 from ..models.flop import Flop
 from ..models.gate import Gate, Operation
 
+from nxconstants import Instruction as NXInstruction
+
 log = logging.getLogger("compiler.compile")
 
 class Input:
@@ -179,15 +181,27 @@ class Node:
     def encode(self, op, sources, tgt_reg, output):
         assert len(sources) <= 2
         sources += [(0, 0)] * (2 - len(sources)) if len(sources) < 2 else []
-        return (
-            ((int(op.op.op) & 0x7         ) << 18) | # [20:18] - OPCODE
-            ((sources[0][1] & 0x1F        ) << 13) | # [17:13] - SOURCE A
-            ((1 if sources[0][0] else 0   ) << 12) | # [12:12] - INPUT/!REG A
-            ((sources[1][1] & 0x1F        ) <<  7) | # [11: 7] - SOURCE B
-            ((1 if sources[1][0] else 0   ) <<  6) | # [ 6: 6] - INPUT/!REG B
-            ((tgt_reg & 0x1F              ) <<  1) | # [ 5: 1] - TARGET
-            ((1 if (output != None) else 0) <<  0)   # [ 0: 0] - OUTPUT
-        )
+        # Truth tables:
+        #  - Bit [2] (+4) : Controlled by input A
+        #  - Bit [1] (+2) : Controlled by input B
+        #  - Bit [0] (+1) : Controlled by input C
+        instr          = NXInstruction()
+        instr.truth    = {
+            Operation.INVERT: 0b0000_1111,
+            Operation.AND   : 0b1100_0000,
+            Operation.NAND  : 0b0011_1111,
+            Operation.OR    : 0b1111_1100,
+            Operation.NOR   : 0b0000_0011,
+            Operation.XOR   : 0b0011_1100,
+            Operation.XNOR  : 0b1100_0011,
+        }[op.op.op]
+        instr.src_a    = sources[0][1]
+        instr.src_a_ip = 1 if sources[0][0] else 0
+        instr.src_b    = sources[1][1]
+        instr.src_b_ip = 1 if sources[1][0] else 0
+        instr.tgt_reg  = tgt_reg
+        instr.gen_out  = 1 if output else 0
+        return instr.pack()
 
     def decode(self, op):
         assert isinstance(op, int)
@@ -253,7 +267,7 @@ class Node:
                 if type(src) in (Constant, Instruction): continue
                 # Test if the state is fed by an output of this node
                 assert isinstance(src, State), \
-                    f"{self.position}: Got a non-state source"
+                    f"{self.position}: Got a non-stateful source"
                 if src.source not in outputs: continue
                 # Place this input in the same position
                 op_idx = outputs.index(src.source)
@@ -301,10 +315,8 @@ class Node:
                 f"{self.position} - {op_idx}/{len(ordered)}: REG[{use_reg}]"
             )
             regs[use_reg] = op
-            # Lookup output
-            use_output = outputs.index(op) if op in outputs else None
             # Encode the instruction
-            encoded.append(self.encode(op, op_sources, use_reg, use_output))
+            encoded.append(self.encode(op, op_sources, use_reg, op in outputs))
             # Check for any registers that have freed up
             required = sum([x.sources for x in ordered[op_idx+1:]], [])
             for reg_idx, reg in enumerate(regs):
@@ -686,9 +698,10 @@ def compile(
             if (src_row, src_col) not in compiled_msgs:
                 compiled_msgs[src_row, src_col] = [[] for _ in range(node_outputs)]
             # Setup a message for this output on the source node
-            compiled_msgs[src_row, src_col][src_idx].append((
-                tgt_row, col_offset, input_offset, is_stateful
-            ))
+            compiled_msgs[src_row, src_col][src_idx].append({
+                "row": tgt_row, "column": col_offset, "index": input_offset,
+                "is_seq": is_stateful
+            })
             # Increment the output counter
             output_counter += 1
     # Accumulate message statistics
