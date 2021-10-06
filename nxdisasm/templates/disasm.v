@@ -28,17 +28,23 @@ module Top (
 // =============================================================================
 
 // Input Construction
-<%      stateful = [] %>\
+<%
+        stateful = []
+        loopback = []
+%>\
         %for idx in range(cfg_nd_ins):
             %if idx not in node_inputs[row][col]:
 wire r${row}_c${col}_input_${idx} = 1'b0;
             %else:
 <%
-                src_row, src_col, src_pos, state = node_inputs[row][col][idx]
+                src_row, src_col, src_pos, state, is_lb = node_inputs[row][col][idx]
                 src_instr_idx = node_outputs[src_row][src_col][src_pos]
+                if is_lb:
+                    loopback.append((idx, src_instr_idx))
+                elif state:
+                    stateful.append((idx, src_row, src_col, src_instr_idx))
 %>\
-                %if state:
-<%                  stateful.append((idx, src_row, src_col, src_instr_idx)) %>\
+                %if is_lb or state:
 reg  r${row}_c${col}_input_${idx};
                 %else:
 wire r${row}_c${col}_input_${idx} = r${src_row}_c${src_col}_instr_${src_instr_idx};
@@ -51,29 +57,29 @@ wire r${row}_c${col}_input_${idx} = r${src_row}_c${src_col}_instr_${src_instr_id
 <%          reg_state = [0] * cfg_nd_regs %>\
             %for idx, instr in enumerate(instrs):
 wire r${row}_c${col}_instr_${idx} = \
-                %if instr.op in (INVERT, NAND, NOR, XNOR):
+                %if is_inverting(instr):
 !\
                 %else:
  \
-                %endif ## instr.op in (INVERT, NAND, NOR, XNOR)
+                %endif ## is_inverting(instr.op)
 (\
-                %if instr.is_input_a:
-r${row}_c${col}_input_${instr.source_a}\
+                %if instr.src_a_ip:
+r${row}_c${col}_input_${instr.src_a}\
                 %else:
-r${row}_c${col}_instr_${reg_state[instr.source_a]}\
-                %endif ## instr.is_input_a
-                %if instr.op != INVERT:
- ${verilog_op_map[instr.op]} \
-                    %if instr.is_input_b:
-r${row}_c${col}_input_${instr.source_b}\
+r${row}_c${col}_instr_${reg_state[instr.src_a]}\
+                %endif ## instr.src_a_ip
+                %if verilog_op(instr) != "!":
+ ${verilog_op(instr)} \
+                    %if instr.src_b_ip:
+r${row}_c${col}_input_${instr.src_b}\
                     %else:
-r${row}_c${col}_instr_${reg_state[instr.source_b]}\
-                    %endif ## instr.is_input_b
+r${row}_c${col}_instr_${reg_state[instr.src_b]}\
+                    %endif ## instr.src_b_ip
                 %else:
                 \
-                %endif ## instr.op != INVERT
-); // ${instr}
-<%              reg_state[instr.target] = idx %>\
+                %endif ## verilog_op(instr) != "!"
+); // TT: ${f"{instr.truth:08b}"}
+<%              reg_state[instr.tgt_reg] = idx %>\
             %endfor ## idx, instr in enumerate(instrs)
 
 // Generated outputs
@@ -93,14 +99,27 @@ r${row}_c${col}_instr_${node_outputs[row][col][out_idx]};
 reg  [${cfg_nd_outs-1}:0] r${row}_c${col}_outputs;
 always @(posedge clk, posedge rst) begin : p_r${row}_c${col}_state
     if (rst) begin
+            %for idx, _ in loopback:
+        r${row}_c${col}_input_${idx} <= 1'b0;
+            %endfor ## idx, _ in loopback
             %for idx, _, _, _ in stateful:
         r${row}_c${col}_input_${idx} <= 1'b0;
             %endfor ## idx in stateful
         r${row}_c${col}_outputs <= ${cfg_nd_outs}'d0;
     end else begin
+            %if loopback:
+        // Loopbacks
+            %endif
+            %for idx, src_instr_idx in loopback:
+        r${row}_c${col}_input_${idx} <= r${row}_c${col}_instr_${src_instr_idx};
+            %endfor ## idx, src_instr_idx in loopback
+            %if stateful:
+        // Cross-node state
+            %endif
             %for idx, src_row, src_col, src_instr_idx in stateful:
         r${row}_c${col}_input_${idx} <= r${src_row}_c${src_col}_instr_${src_instr_idx};
-            %endfor ## idx in stateful
+            %endfor ## idx, src_row, src_col, src_instr_idx in stateful
+        // Register outputs
         r${row}_c${col}_outputs <= r${row}_c${col}_outputs_next;
     end
 end

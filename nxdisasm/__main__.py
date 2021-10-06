@@ -18,8 +18,29 @@ from pathlib import Path
 import click
 from mako.lookup import TemplateLookup
 
-from nxmodel.manager import Manager
-from nxmodel.node import Instruction, Operation
+from nxconstants import Instruction
+
+# Main sections
+DESIGN_CONFIG  = "configuration"
+DESIGN_NODES   = "nodes"
+DESIGN_REPORTS = "reports"
+# Mesh configuration
+CONFIG_ROWS    = "rows"
+CONFIG_COLUMNS = "columns"
+CONFIG_NODE    = "node"
+CFG_ND_INPUTS  = "inputs"
+CFG_ND_OUTPUTS = "outputs"
+CFG_ND_REGS    = "registers"
+CFG_ND_SLOTS   = "slots"
+# Per-node configuration
+NODE_ROW    = "row"
+NODE_COLUMN = "column"
+NODE_INSTRS = "instructions"
+NODE_LOOP   = "loopback"
+NODE_OUTS   = "outputs"
+# Design reports
+DSG_REP_STATE   = "state"
+DSG_REP_OUTPUTS = "outputs"
 
 def verilog_safe(val):
     """ Reformat a name to be safe for Verilog """
@@ -38,14 +59,14 @@ def main(listing, verilog, design):
     # Read in the design
     model = json.load(design)
     # Pickup the configuration section
-    config   = model[Manager.DESIGN_CONFIG]
-    cfg_rows = config[Manager.CONFIG_ROWS]
-    cfg_cols = config[Manager.CONFIG_COLUMNS]
-    cfg_node = config[Manager.CONFIG_NODE]
+    config   = model[DESIGN_CONFIG]
+    cfg_rows = config[CONFIG_ROWS]
+    cfg_cols = config[CONFIG_COLUMNS]
+    cfg_node = config[CONFIG_NODE]
     # Extract per node configuration
-    nc_inputs    = cfg_node[Manager.CFG_ND_INPUTS]
-    nc_outputs   = cfg_node[Manager.CFG_ND_OUTPUTS]
-    nc_registers = cfg_node[Manager.CFG_ND_REGS]
+    nc_inputs    = cfg_node[CFG_ND_INPUTS]
+    nc_outputs   = cfg_node[CFG_ND_OUTPUTS]
+    nc_registers = cfg_node[CFG_ND_REGS]
     # Load the instruction sequences for every node
     nodes = [
         [[] for _c in range(cfg_cols)] for _r in range(cfg_rows)
@@ -57,27 +78,42 @@ def main(listing, verilog, design):
         [{} for _c in range(cfg_cols)] for _r in range(cfg_cols)
     ]
     outputs = {}
-    for node_data in model[Manager.DESIGN_NODES]:
-        n_row = node_data[Manager.NODE_ROW]
-        n_col = node_data[Manager.NODE_COLUMN]
+    for node_data in model[DESIGN_NODES]:
+        n_row = node_data[NODE_ROW]
+        n_col = node_data[NODE_COLUMN]
         # Load the instruction sequence
         out_idx = 0
-        for instr_idx, raw in enumerate(node_data[Manager.NODE_INSTRS]):
-            instr = Instruction(raw)
+        for instr_idx, raw in enumerate(node_data[NODE_INSTRS]):
+            instr = Instruction()
+            instr.unpack(raw)
             nodes[n_row][n_col].append(instr)
-            if instr.is_output:
+            if instr.gen_out:
                 node_outputs[n_row][n_col][out_idx] = instr_idx
                 out_idx += 1
+        # Load the node loopback
+        lb_val = node_data[NODE_LOOP]
+        lb_idx = 0
+        while lb_val != 0:
+            # Check for loopback
+            if lb_val & 0x1:
+                node_inputs[n_row][n_col][lb_idx] = (n_row, n_col, lb_idx, 1, True)
+            # Shift to the next signal
+            lb_val >>= 1
+            lb_idx  += 1
         # Load the node inputs
-        for idx_output, msgs in enumerate(node_data[Manager.NODE_MSGS]):
-            for tgt_row, tgt_col, tgt_idx, tgt_seq in msgs:
+        for idx_output, msgs in enumerate(node_data[NODE_OUTS]):
+            for msg in msgs:
+                tgt_row = msg["row"]
+                tgt_col = msg["column"]
+                tgt_idx = msg["index"]
+                tgt_seq = msg["is_seq"]
                 # Skip entries talking to 'fake' nodes
                 if tgt_row >= cfg_rows: continue
                 # Link input -> output
                 node_inputs[tgt_row][tgt_col][tgt_idx] = (
-                    n_row, n_col, idx_output, tgt_seq
+                    n_row, n_col, idx_output, tgt_seq, False
                 )
-    for name, bits in model[Manager.DESIGN_REPORTS][Manager.DSG_REP_OUTPUTS].items():
+    for name, bits in model[DESIGN_REPORTS][DSG_REP_OUTPUTS].items():
         for idx_bit, (src_row, src_col, src_idx, _, _, _, is_seq) in enumerate(bits):
             if not name in outputs: outputs[name] = {}
             outputs[name][idx_bit] = (src_row, src_col, src_idx, is_seq)
@@ -103,12 +139,21 @@ def main(listing, verilog, design):
             # Helper functions
             verilog_safe=verilog_safe,
             # Constants
-            **Operation.__members__,
-            verilog_op_map={
-                Operation.AND: "&", Operation.NAND: "&",
-                Operation.OR : "|", Operation.NOR : "|",
-                Operation.XOR: "^", Operation.XNOR: "^",
-            },
+            is_inverting=lambda x: (x.truth in (
+                0b0000_1111, # INVERT
+                0b0011_1111, # NAND
+                0b0000_0011, # NOR
+                0b1100_0011, # XNOR
+            )),
+            verilog_op=lambda x: {
+                0b0000_1111 : "!", # INVERT
+                0b1100_0000 : "&", # AND
+                0b0011_1111 : "&", # NAND
+                0b1111_1100 : "|", # OR
+                0b0000_0011 : "|", # NOR
+                0b0011_1100 : "^", # XOR
+                0b1100_0011 : "^", # XNOR
+            }[x.truth],
         ))
 
 if __name__ == "__main__":

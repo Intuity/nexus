@@ -13,13 +13,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 </%doc>
+<%
+def src(instr, pos):
+    index = getattr(instr, f"src_{pos}")
+    input = getattr(instr, f"src_{pos}_ip")
+    return ("I" if input else "R") + f"[{index}]"
+%>\
 %for row, columns in enumerate(nodes):
     %for col, instrs in enumerate(columns):
 # ==============================================================================
 # Row ${f"{row:03d}"}, Column ${f"{col:03d}"}
 # ==============================================================================
         %for idx, instr in enumerate(instrs):
-${f"{idx:03d}"}: ${instr}
+${f"{idx:03d}"} - 0x${f"{instr.pack():08X}"} - TT: 0b${f"{instr.truth:08b}"} A: ${src(instr, "a")} B: ${src(instr, "b")} C: ${src(instr, "c")} TGT: ${instr.tgt_reg} OUT: ${instr.gen_out}
         %endfor
 
     %endfor
