@@ -15,76 +15,87 @@
 module testbench
 import NXConstants::*;
 (
-      input  logic rst
-    // Control signals
-    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+      input  logic          rst
     // Idle flag
-    , output logic idle_o
+    , output logic          o_idle
     // Inbound message stream
-    , input  node_message_t dist_data_i
-    , input  logic          dist_valid_i
-    , output logic          dist_ready_o
+    , input  direction_t    i_inbound_dir
+    , input  node_message_t i_inbound_data
+    , input  logic          i_inbound_valid
+    , output logic          o_inbound_ready
     // Outbound distributed message streams
     // - North
-    , output node_message_t north_data_o
-    , output logic          north_valid_o
-    , input  logic          north_ready_i
-    , input  logic          north_present_i
+    , output node_message_t o_north_data
+    , output logic          o_north_valid
+    , input  logic          i_north_ready
     // - East
-    , output node_message_t east_data_o
-    , output logic          east_valid_o
-    , input  logic          east_ready_i
-    , input  logic          east_present_i
+    , output node_message_t o_east_data
+    , output logic          o_east_valid
+    , input  logic          i_east_ready
     // - South
-    , output node_message_t south_data_o
-    , output logic          south_valid_o
-    , input  logic          south_ready_i
-    , input  logic          south_present_i
+    , output node_message_t o_south_data
+    , output logic          o_south_valid
+    , input  logic          i_south_ready
     // - West
-    , output node_message_t west_data_o
-    , output logic          west_valid_o
-    , input  logic          west_ready_i
-    , input  logic          west_present_i
+    , output node_message_t o_west_data
+    , output logic          o_west_valid
+    , input  logic          i_west_ready
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
-nx_stream_distributor dut (
-      .clk_i(clk)
-    , .rst_i(rst)
-    // Control signals
-    , .node_row_i(node_row_i)
-    , .node_col_i(node_col_i)
+// =============================================================================
+// Shims
+// =============================================================================
+
+logic [3:0][MESSAGE_WIDTH-1:0] outbound_data;
+logic [3:0]                    outbound_valid, outbound_ready;
+
+assign o_north_data = outbound_data[DIRECTION_NORTH];
+assign o_east_data  = outbound_data[DIRECTION_EAST ];
+assign o_south_data = outbound_data[DIRECTION_SOUTH];
+assign o_west_data  = outbound_data[DIRECTION_WEST ];
+
+assign o_north_valid = outbound_valid[DIRECTION_NORTH];
+assign o_east_valid  = outbound_valid[DIRECTION_EAST ];
+assign o_south_valid = outbound_valid[DIRECTION_SOUTH];
+assign o_west_valid  = outbound_valid[DIRECTION_WEST ];
+
+assign outbound_ready[DIRECTION_NORTH] = i_north_ready;
+assign outbound_ready[DIRECTION_EAST ] = i_east_ready;
+assign outbound_ready[DIRECTION_SOUTH] = i_south_ready;
+assign outbound_ready[DIRECTION_WEST ] = i_west_ready;
+
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
+nx_stream_distributor #(
+      .STREAMS          ( 4               )
+) u_dut (
+      .i_clk            ( clk             )
+    , .i_rst            ( rst             )
     // Idle flag
-    , .idle_o(idle_o)
+    , .o_idle           ( o_idle          )
     // Inbound message stream
-    , .dist_data_i (dist_data_i )
-    , .dist_valid_i(dist_valid_i)
-    , .dist_ready_o(dist_ready_o)
-    // Outbound distributed message streams
-    // - North
-    , .north_data_o   (north_data_o   )
-    , .north_valid_o  (north_valid_o  )
-    , .north_ready_i  (north_ready_i  )
-    , .north_present_i(north_present_i)
-    // - East
-    , .east_data_o   (east_data_o   )
-    , .east_valid_o  (east_valid_o  )
-    , .east_ready_i  (east_ready_i  )
-    , .east_present_i(east_present_i)
-    // - South
-    , .south_data_o   (south_data_o   )
-    , .south_valid_o  (south_valid_o  )
-    , .south_ready_i  (south_ready_i  )
-    , .south_present_i(south_present_i)
-    // - West
-    , .west_data_o   (west_data_o   )
-    , .west_valid_o  (west_valid_o  )
-    , .west_ready_i  (west_ready_i  )
-    , .west_present_i(west_present_i)
+    , .i_inbound_dir    ( i_inbound_dir   )
+    , .i_inbound_data   ( i_inbound_data  )
+    , .i_inbound_valid  ( i_inbound_valid )
+    , .o_inbound_ready  ( o_inbound_ready )
+    // Outbound message streams
+    , .o_outbound_data  ( outbound_data   )
+    , .o_outbound_valid ( outbound_valid  )
+    , .i_outbound_ready ( outbound_ready  )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace

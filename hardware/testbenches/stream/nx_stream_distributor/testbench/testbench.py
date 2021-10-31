@@ -31,31 +31,26 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
-        # Wrap complex interfaces
-        self.present  = [
-            self.dut.north_present_i, self.dut.east_present_i,
-            self.dut.south_present_i, self.dut.west_present_i,
-        ]
         # Setup drivers/monitors
-        self.dist  = StreamInitiator(
+        self.inbound = StreamInitiator(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "dist",  IORole.RESPONDER),
+            StreamIO(self.dut, "inbound", IORole.RESPONDER),
         )
         self.north = StreamResponder(
             self, self.clk, self.rst,
             StreamIO(self.dut, "north", IORole.INITIATOR), name="north",
         )
-        self.east  = StreamResponder(
+        self.east = StreamResponder(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "east",  IORole.INITIATOR), name="east",
+            StreamIO(self.dut, "east", IORole.INITIATOR), name="east",
         )
         self.south = StreamResponder(
             self, self.clk, self.rst,
             StreamIO(self.dut, "south", IORole.INITIATOR), name="south",
         )
-        self.west  = StreamResponder(
+        self.west = StreamResponder(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "west",  IORole.INITIATOR), name="west",
+            StreamIO(self.dut, "west", IORole.INITIATOR), name="west",
         )
         # Create a queue for expected messages
         self.exp_north = []
@@ -72,14 +67,11 @@ class Testbench(TestbenchBase):
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.node_row_i <= 0
-        self.node_col_i <= 0
-        self.dist.intf.initialise(IORole.INITIATOR)
+        self.inbound.intf.initialise(IORole.INITIATOR)
         self.north.intf.initialise(IORole.RESPONDER)
         self.east.intf.initialise(IORole.RESPONDER)
         self.south.intf.initialise(IORole.RESPONDER)
         self.west.intf.initialise(IORole.RESPONDER)
-        for flag in self.present: flag <= 1
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
