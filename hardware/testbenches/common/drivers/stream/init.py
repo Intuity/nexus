@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cocotb_bus.drivers import Driver
-from cocotb.triggers import Lock, RisingEdge
+from cocotb.triggers import Lock, RisingEdge, ClockCycles
 
 class StreamInitiator(Driver):
     """ Testbench driver acting as an initiator of a stream interface """
@@ -50,7 +50,12 @@ class StreamInitiator(Driver):
             while self._sendQ:
                 tran, cb, evt, kwargs = self._sendQ.popleft()
                 self.log.debug("Sending queued packet")
-                await self._send(tran, cb, evt, sync=not synchronised, **kwargs)
+                try:
+                    await self._send(tran, cb, evt, sync=not synchronised, **kwargs)
+                except ValueError as e:
+                    self.log.error(f"Hit value error: {e}")
+                    await ClockCycles(self.clock, 10)
+                    raise e
                 synchronised = True
             await self.lock.acquire()
             self.busy = False

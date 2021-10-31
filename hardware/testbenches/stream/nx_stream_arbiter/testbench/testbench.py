@@ -31,40 +31,32 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
+        # Wrap complex interfaces
+        self.north_io    = StreamIO(self.dut, "north",    IORole.RESPONDER)
+        self.east_io     = StreamIO(self.dut, "east",     IORole.RESPONDER)
+        self.south_io    = StreamIO(self.dut, "south",    IORole.RESPONDER)
+        self.west_io     = StreamIO(self.dut, "west",     IORole.RESPONDER)
+        self.outbound_io = StreamIO(self.dut, "outbound", IORole.INITIATOR)
         # Setup drivers/monitors
-        self.stream_a = StreamInitiator(
-            self, self.clk, self.rst, StreamIO(self.dut, "stream_a", IORole.RESPONDER)
-        )
-        self.stream_b = StreamInitiator(
-            self, self.clk, self.rst, StreamIO(self.dut, "stream_b", IORole.RESPONDER)
-        )
-        self.comb     = StreamResponder(
-            self, self.clk, self.rst, StreamIO(self.dut, "comb", IORole.INITIATOR)
-        )
+        self.north    = StreamInitiator(self, self.clk, self.rst, self.north_io)
+        self.east     = StreamInitiator(self, self.clk, self.rst, self.east_io )
+        self.south    = StreamInitiator(self, self.clk, self.rst, self.south_io)
+        self.west     = StreamInitiator(self, self.clk, self.rst, self.west_io )
+        self.outbound = StreamResponder(self, self.clk, self.rst, self.outbound_io)
         # Create a queue for expected messages
         self.expected = []
         # Create a scoreboard
         self.scoreboard = Scoreboard(self, fail_immediately=False)
-        def find_exp(tran):
-            # Set the maximum length to search to based on arbitration scheme
-            if dut.dut.ARB_SCHEME.value.decode("utf-8") == "round_robin":
-                search_to = min(3, len(self.expected))
-            else:
-                search_to = len(self.expected)
-            # Search for the entry
-            for i in range(search_to):
-                if self.expected[i] == tran: break
-            else:
-                i = 0
-            return self.expected.pop(i)
-        self.scoreboard.add_interface(self.comb, find_exp, reorder_depth=2)
+        self.scoreboard.add_interface(self.outbound, self.expected, reorder_depth=4)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.stream_a.intf.initialise(IORole.INITIATOR)
-        self.stream_b.intf.initialise(IORole.INITIATOR)
-        self.comb.intf.initialise(IORole.RESPONDER)
+        self.north_io.initialise(IORole.INITIATOR)
+        self.east_io.initialise(IORole.INITIATOR)
+        self.south_io.initialise(IORole.INITIATOR)
+        self.west_io.initialise(IORole.INITIATOR)
+        self.outbound_io.initialise(IORole.RESPONDER)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

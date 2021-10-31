@@ -12,4 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .testcases import *
+# Common bench support
+include ../../common/Makefile
+
+# CocoTB bench support
+include $(shell cocotb-config --makefiles)/Makefile.sim

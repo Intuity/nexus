@@ -45,8 +45,8 @@ class BaseIO:
         # Pickup attributes
         self.__initiators, self.__responders = {}, {}
         for comp in self.__init_sigs:
-            sig  = f"{self.__name}_{comp}_"
-            sig += "o" if self.__role == IORole.INITIATOR else "i"
+            sig  = "o" if self.__role == IORole.INITIATOR else "i"
+            sig += f"_{self.__name}_{comp}"
             if not hasattr(self.__dut, sig):
                 print(f"{type(self).__name__}: Did not find I/O component {sig} on {dut}")
                 continue
@@ -54,8 +54,8 @@ class BaseIO:
             self.__initiators[comp] = sig_ptr
             setattr(self, comp, sig_ptr)
         for comp in self.__resp_sigs:
-            sig  = f"{self.__name}_{comp}_"
-            sig += "i" if self.__role == IORole.INITIATOR else "o"
+            sig  = "i" if self.__role == IORole.INITIATOR else "o"
+            sig += f"_{self.__name}_{comp}"
             if not hasattr(self.__dut, sig):
                 print(f"{type(self).__name__}: Did not find I/O component {sig} on {dut}")
                 continue

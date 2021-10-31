@@ -62,6 +62,6 @@ class TestbenchBase:
             key: Name of the attribute
         """
         try:
-            return super().__getattr__(key)
+            return getattr(super(), key)
         except Exception:
             return getattr(self.dut, key)

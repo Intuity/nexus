@@ -42,11 +42,9 @@ async def single_dir(dut):
     # Set the node address to a random value
     row    = randint(1, 14)
     column = randint(1, 14)
-    dut.node_row_i <= row
-    dut.node_col_i <= column
 
     # Get the width of the data
-    intf_size = max(dut.int_io.data._range)-min(dut.int_io.data._range)+1
+    intf_size = dut.outbound_io.width("data")
 
     for intf in (dut.north, dut.east, dut.south, dut.west):
         # Drive a number of random messages from the selected interface
@@ -60,37 +58,25 @@ async def single_dir(dut):
         dut.info(f"Generated {len(msgs)} messages")
 
         # Queue up the expected responses
-        dut.int_expected += [(x, 0) for x in msgs]
+        dut.expected += [(x, 0) for x in msgs]
 
         # Wait for the expected queue to drain
-        while dut.int_expected: await RisingEdge(dut.clk)
+        while dut.expected: await RisingEdge(dut.clk)
 
 async def multi_dir(dut, backpressure):
     """ Queue up many messages onto different interfaces """
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Set the node address to a random value
-    row    = randint(1, 14)
-    column = randint(1, 14)
-    dut.node_row_i <= row
-    dut.node_col_i <= column
-
     # Activate/deactivate backpressure
-    dut.int.delays = backpressure
-    dut.byp.delays = backpressure
+    dut.outbound.delays = backpressure
 
     # Get the width of the data
-    intf_size = max(dut.int_io.data._range)-min(dut.int_io.data._range)+1
+    intf_size = dut.outbound_io.width("data")
 
     # Function to generate messages
     def gen_msg():
-        return [
-            (row    << 27) |
-            (column << 23) |
-            randint(0, (1 << (intf_size - 8)) - 1)
-            for _ in range(randint(50, 100))
-        ]
+        return [randint(0, (1 << intf_size) - 1) for _ in range(randint(50, 100))]
 
     # Queue up random messages onto the different drivers
     north, east, south, west = gen_msg(), gen_msg(), gen_msg(), gen_msg()
@@ -105,10 +91,10 @@ async def multi_dir(dut, backpressure):
     while north or east or south or west:
         for idx in range(4):
             dirx = (idx + last + 1) % 4
-            if   dirx == 0 and north: dut.int_expected.append((north.pop(0), 0))
-            elif dirx == 1 and east : dut.int_expected.append((east.pop(0),  0))
-            elif dirx == 2 and south: dut.int_expected.append((south.pop(0), 0))
-            elif dirx == 3 and west : dut.int_expected.append((west.pop(0),  0))
+            if   dirx == 0 and north: dut.expected.append((north.pop(0), 0))
+            elif dirx == 1 and east : dut.expected.append((east.pop(0),  0))
+            elif dirx == 2 and south: dut.expected.append((south.pop(0), 0))
+            elif dirx == 3 and west : dut.expected.append((west.pop(0),  0))
         # Capture the last direction
         last = dirx
 
