@@ -29,21 +29,21 @@ import NXConstants::*,
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
 ) (
-      input  logic                i_clk
-    , input  logic                i_rst
+      input  logic                          i_clk
+    , input  logic                          i_rst
     // Control signals
-    , input  node_id_t            i_node_id
-    , input  logic                i_trigger
-    , output logic                o_idle
+    , input  node_id_t                      i_node_id
+    , input  logic                          i_trigger
+    , output logic                          o_idle
     // Inbound interfaces
-    , input  node_message_t [3:0] i_inbound_data
-    , input  logic [3:0]          i_inbound_valid
-    , output logic [3:0]          o_inbound_ready
+    , input  logic [3:0][MESSAGE_WIDTH-1:0] i_inbound_data
+    , input  logic [3:0]                    i_inbound_valid
+    , output logic [3:0]                    o_inbound_ready
     // Outbound interfaces
-    , output node_message_t [3:0] o_outbound_data
-    , output logic [3:0]          o_outbound_valid
-    , input  logic [3:0]          i_outbound_ready
-    , input  logic [3:0]          i_outbound_present
+    , output logic [3:0][MESSAGE_WIDTH-1:0] o_outbound_data
+    , output logic [3:0]                    o_outbound_valid
+    , input  logic [3:0]                    i_outbound_ready
+    , input  logic [3:0]                    i_outbound_present
 );
 
 // =============================================================================
@@ -54,11 +54,13 @@ import NXConstants::*,
 struct packed { logic core, decode, ctrl, distrib; } comp_idle;
 
 // Inbound stream arbiter
-logic arb_valid, arb_ready, arb_match;
+node_message_t arb_data;
+logic          arb_valid, arb_ready, arb_match;
 
 // Stream combiner
-node_message_t [1:0] comb_data;
-logic [1:0]          comb_valid, comb_ready;
+// NOTE: Not using node_message_t is a workaround for Icarus Verilog
+logic [1:0][MESSAGE_WIDTH-1:0] comb_data;
+logic [1:0]                    comb_valid, comb_ready;
 
 // Outbound stream distributor
 node_message_t outbound_data;
@@ -113,15 +115,18 @@ nx_stream_arbiter #(
     , .i_inbound_valid  ( i_inbound_valid )
     , .o_inbound_ready  ( o_inbound_ready )
     // Outbound stream
-    , .o_outbound_data  ( comb_data[0]    )
+    , .o_outbound_data  ( arb_data        )
     , .o_outbound_valid ( arb_valid       )
     , .i_outbound_ready ( arb_ready       )
 );
 
+// Link arbitrated data up to the combiner's bypass port
+assign comb_data[0] = arb_data;
+
 // Detect if the arbitrated stream targets this node
 assign arb_match = (
-    (comb_data[0].raw.header.row    == i_node_id.row   ) &&
-    (comb_data[0].raw.header.column == i_node_id.column)
+    (arb_data.raw.header.row    == i_node_id.row   ) &&
+    (arb_data.raw.header.column == i_node_id.column)
 );
 
 // Discern decode from bypass traffic

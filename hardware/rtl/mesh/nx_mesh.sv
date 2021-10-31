@@ -47,17 +47,17 @@ import NXConstants::*;
 // Types
 // =============================================================================
 
-typedef node_message_t [3:0] node_bundle_data_t;
-typedef logic          [3:0] node_bundle_ctrl_t;
+// Workaround for Icarus Verilog not liking multi-dimensional packed structs
+typedef logic [MESSAGE_WIDTH-1:0] raw_msg_t;
 
 // =============================================================================
 // Internal Signals
 // =============================================================================
 
 // I/O bundle for every node
-node_bundle_data_t [COLUMNS-1:0][ROWS-1:0] mesh_ob_data;
-node_bundle_ctrl_t [COLUMNS-1:0][ROWS-1:0] mesh_ob_valid;
-node_bundle_ctrl_t [COLUMNS-1:0][ROWS-1:0] mesh_ib_ready;
+raw_msg_t [COLUMNS-1:0][ROWS-1:0][3:0] mesh_ob_data;
+logic     [COLUMNS-1:0][ROWS-1:0][3:0] mesh_ob_valid;
+logic     [COLUMNS-1:0][ROWS-1:0][3:0] mesh_ib_ready;
 
 // Column grouped idle signals
 logic [COLUMNS-1:0][ROWS-1:0] node_idle;
@@ -102,10 +102,10 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
         assign node_id.column = idx_col;
 
         // Build bundles
-        node_bundle_data_t node_ib_data;
-        node_bundle_ctrl_t node_ib_valid;
-        node_bundle_ctrl_t node_ob_ready;
-        node_bundle_ctrl_t node_ob_present;
+        raw_msg_t [3:0] node_ib_data;
+        logic [3:0]     node_ib_valid;
+        logic [3:0]     node_ob_ready;
+        logic [3:0]     node_ob_present;
 
         // For the top row, only first column has northbound connection
         if (idx_row == 0) begin

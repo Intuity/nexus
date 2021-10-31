@@ -14,6 +14,7 @@
 
 package nx_primitives;
 
+// Arbitration scheme enumeration
 typedef enum logic {
       ROUND_ROBIN
     , ORDINAL

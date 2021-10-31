@@ -23,16 +23,17 @@ import NXConstants::*;
       parameter STREAMS = 4
     , parameter SCHEME  = nx_primitives::ROUND_ROBIN
 ) (
-      input  logic                        i_clk
-    , input  logic                        i_rst
+      input  logic                                  i_clk
+    , input  logic                                  i_rst
     // Inbound message streams
-    , input  node_message_t [STREAMS-1:0] i_inbound_data
-    , input  logic          [STREAMS-1:0] i_inbound_valid
-    , output logic          [STREAMS-1:0] o_inbound_ready
+    // NOTE: Icarus Verilog only works with explicit multi-dimensional array
+    , input  logic [STREAMS-1:0][MESSAGE_WIDTH-1:0] i_inbound_data
+    , input  logic [STREAMS-1:0]                    i_inbound_valid
+    , output logic [STREAMS-1:0]                    o_inbound_ready
     // Outbound stream
-    , output node_message_t               o_outbound_data
-    , output logic                        o_outbound_valid
-    , input  logic                        i_outbound_ready
+    , output node_message_t                         o_outbound_data
+    , output logic                                  o_outbound_valid
+    , input  logic                                  i_outbound_ready
 );
 
 // Constants
@@ -44,7 +45,7 @@ typedef logic [INDEX_WIDTH-1:0] arb_dir_t;
 // Arbitrated state
 `DECLARE_DQT(node_message_t, arb_data,  i_clk, i_rst, 'd0)
 `DECLARE_DQ (             1, arb_valid, i_clk, i_rst, 'd0)
-`DECLARE_DQT(     arb_dir_t, arb_last,  i_clk, i_rst, 'd0)
+`DECLARE_DQT(     arb_dir_t, arb_next,  i_clk, i_rst, 'd0)
 
 // Connect output
 assign o_outbound_data  = arb_data_q;
@@ -61,33 +62,40 @@ always_comb begin : comb_arb_select
     int idx;
     logic found;
 
-    // Set the search start point based on the selected arbitration scheme
-    case (SCHEME)
-        // Round-robin: Start search at the last used input
-        nx_primitives::ROUND_ROBIN : arb_dir = arb_last_q;
-        // Ordinal: Always start the search at zero
-        nx_primitives::ORDINAL     : arb_dir = 'd0;
-    endcase
+    // Initialise
+    `INIT_D(arb_next);
 
-    // Search for an active stream
-    found = 'd0;
-    for (idx = 0; idx < STREAMS; idx++) begin
-        // Until a stream is selected...
-        if (!found && i_inbound_valid[arb_dir]) begin
-            // ...step to the next direction...
-            arb_dir = arb_dir + 'd1;
-            // ...if out of range, reset to 0...
-            if (arb_dir >= STREAMS[INDEX_WIDTH-1:0]) arb_dir = 'd0;
-            // ...mark that the stream is active
-            found = 'd1;
+    // If not stalled, arbitrate next input
+    if (!outbound_stall) begin
+
+        // Set the search start point based on the selected arbitration scheme
+        case (SCHEME)
+            // Round-robin: Start search at the last used input
+            nx_primitives::ROUND_ROBIN : arb_next = arb_next_q;
+            // Ordinal: Always start the search at zero
+            nx_primitives::ORDINAL     : arb_next = 'd0;
+        endcase
+
+        // Search for an active stream
+        found = 'd0;
+        for (idx = 0; idx < STREAMS; idx++) begin
+            if (!found) begin
+                // Pickup next arbitration
+                arb_dir = arb_next;
+                // Increment
+                arb_next = arb_next + 'd1;
+                if ({ 1'b0, arb_next } >= STREAMS) arb_next = 'd0;
+                // Check if this stream is active
+                found = i_inbound_valid[arb_dir];
+            end
         end
+
     end
 end
 
 // Arbitration
 assign arb_data  = outbound_stall ? arb_data_q  : i_inbound_data[arb_dir];
 assign arb_valid = outbound_stall ? arb_valid_q : i_inbound_valid[arb_dir];
-assign arb_last  = outbound_stall ? arb_last_q  : arb_dir;
 
 // Drive the ready for the selected stream
 generate

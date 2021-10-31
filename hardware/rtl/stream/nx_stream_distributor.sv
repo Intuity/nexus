@@ -22,19 +22,19 @@ import NXConstants::*;
 #(
       parameter STREAMS = 4
 ) (
-      input  logic                        i_clk
-    , input  logic                        i_rst
+      input  logic                                  i_clk
+    , input  logic                                  i_rst
     // Idle flag
-    , output logic                        o_idle
+    , output logic                                  o_idle
     // Inbound message stream
-    , input  logic [$clog2(STREAMS)-1:0]  i_inbound_target
-    , input  node_message_t               i_inbound_data
-    , input  logic                        i_inbound_valid
-    , output logic                        o_inbound_ready
+    , input  logic [$clog2(STREAMS)-1:0]            i_inbound_target
+    , input  node_message_t                         i_inbound_data
+    , input  logic                                  i_inbound_valid
+    , output logic                                  o_inbound_ready
     // Outbound message streams
-    , output node_message_t [STREAMS-1:0] o_outbound_data
-    , output logic [STREAMS-1:0]          o_outbound_valid
-    , input  logic [STREAMS-1:0]          i_outbound_ready
+    , output logic [STREAMS-1:0][MESSAGE_WIDTH-1:0] o_outbound_data
+    , output logic [STREAMS-1:0]                    o_outbound_valid
+    , input  logic [STREAMS-1:0]                    i_outbound_ready
 );
 
 // Constants
