@@ -18,16 +18,14 @@ include ./common/Makefile
 # Options
 # ==============================================================================
 
+# Common attributes
+DESIGN_TOP ?= nexus
+
 # Lint configuration
-LINT_TOP ?= nexus
 LINT_CFG ?= ./common/lint.cfg
 LINT_RPT ?= $(WORKING_DIR)/lint.rpt
 
-# SV2V configuration
-SV2V_OUT ?= $(WORKING_DIR)/nexus.v
-
 # Construct arguments to synthesis
-DESIGN_TOP   ?= nexus
 SYN_DEFINES  := $(filter-out USE_RAM_MODEL,$(DEFINES))
 YOS_TCL_PATH ?= $(WORKING_DIR)/yosys.tcl
 VVD_TCL_PATH ?= $(WORKING_DIR)/vivado.tcl
@@ -40,9 +38,10 @@ LINT_OPTS += $(addprefix -I,$(SRC_DIRS))
 LINT_OPTS += $(addprefix -D,$(DEFINES))
 LINT_OPTS += $(LINT_CFG)
 LINT_OPTS += $(SRC_FILES)
-LINT_OPTS += --top $(LINT_TOP)
+LINT_OPTS += --top $(DESIGN_TOP)
 
 # Construct arguments to SV2V
+SV2V_OUT  ?= $(WORKING_DIR)/$(DESIGN_TOP).v
 SV2V_OPTS += $(addprefix -I,$(SRC_DIRS))
 SV2V_OPTS += $(addprefix -D,$(SYN_DEFINES))
 SV2V_OPTS += $(SRC_FILES)
