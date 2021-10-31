@@ -65,7 +65,7 @@ logic [1:0]                    comb_valid, comb_ready;
 // Outbound stream distributor
 node_message_t outbound_data;
 logic          outbound_valid, outbound_ready;
-direction_t    outbound_tgt;
+direction_t    outbound_dir;
 
 // Message decoder
 logic                        dcd_valid, dcd_ready;
@@ -163,15 +163,15 @@ nx_stream_arbiter #(
 // Determine target direction based on two factors:
 //  - Target row & column set the initial direction
 //  - If a particular direction is absent, routes to the next clockwise stream
-always_comb begin : comb_outbound_tgt
+always_comb begin : comb_outbound_dir
     if      (outbound_data.raw.header.row    < i_node_id.row   )
-        outbound_tgt = i_outbound_present[DIRECTION_NORTH] ? DIRECTION_NORTH : DIRECTION_EAST;
+        outbound_dir = i_outbound_present[DIRECTION_NORTH] ? DIRECTION_NORTH : DIRECTION_EAST;
     else if (outbound_data.raw.header.row    > i_node_id.row   )
-        outbound_tgt = i_outbound_present[DIRECTION_SOUTH] ? DIRECTION_SOUTH : DIRECTION_WEST;
+        outbound_dir = i_outbound_present[DIRECTION_SOUTH] ? DIRECTION_SOUTH : DIRECTION_WEST;
     else if (outbound_data.raw.header.column < i_node_id.column)
-        outbound_tgt = i_outbound_present[DIRECTION_WEST ] ? DIRECTION_WEST  : DIRECTION_NORTH;
+        outbound_dir = i_outbound_present[DIRECTION_WEST ] ? DIRECTION_WEST  : DIRECTION_NORTH;
     else
-        outbound_tgt = i_outbound_present[DIRECTION_EAST ] ? DIRECTION_EAST  : DIRECTION_SOUTH;
+        outbound_dir = i_outbound_present[DIRECTION_EAST ] ? DIRECTION_EAST  : DIRECTION_SOUTH;
 end
 
 nx_stream_distributor #(
@@ -182,7 +182,7 @@ nx_stream_distributor #(
     // Idle flag
     , .o_idle           ( comp_idle.distrib )
     // Inbound message stream
-    , .i_inbound_target ( outbound_tgt      )
+    , .i_inbound_dir    ( outbound_dir      )
     , .i_inbound_data   ( outbound_data     )
     , .i_inbound_valid  ( outbound_valid    )
     , .o_inbound_ready  ( outbound_ready    )

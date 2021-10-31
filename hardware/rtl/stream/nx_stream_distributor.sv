@@ -27,7 +27,7 @@ import NXConstants::*;
     // Idle flag
     , output logic                                  o_idle
     // Inbound message stream
-    , input  logic [$clog2(STREAMS)-1:0]            i_inbound_target
+    , input  logic [$clog2(STREAMS)-1:0]            i_inbound_dir
     , input  node_message_t                         i_inbound_data
     , input  logic                                  i_inbound_valid
     , output logic                                  o_inbound_ready
@@ -47,7 +47,7 @@ generate
 for (genvar idx = 0; idx < STREAMS; idx++) begin : gen_egress_fifo
     logic fifo_match, fifo_push, fifo_pop;
 
-    assign fifo_match = (i_inbound_target == idx[STREAM_WIDTH-1:0]);
+    assign fifo_match = (i_inbound_dir == idx[STREAM_WIDTH-1:0]);
     assign fifo_push  = fifo_match && i_inbound_valid && !fifo_full[idx];
     assign fifo_pop   = !fifo_empty[idx] && i_outbound_ready[idx];
 
@@ -74,7 +74,7 @@ end
 endgenerate
 
 // Drive inbound stream ready
-assign o_inbound_ready = !fifo_full[i_inbound_target];
+assign o_inbound_ready = !fifo_full[i_inbound_dir];
 
 // Detect idleness
 assign o_idle = (&fifo_empty) && !i_inbound_valid;
