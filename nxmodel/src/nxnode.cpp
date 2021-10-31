@@ -303,11 +303,11 @@ void NXNode::transmit (void)
             std::cout << "[NXNode " << m_row << ", " << m_column << "]"
                       << " Lookup for output " << std::dec << (int)index
                       << " - START: 0x" << std::hex << (int)lookup.start
-                      << ", FINAL: 0x" << std::hex << (int)lookup.final
+                      << ", END: 0x" << std::hex << (int)lookup.stop
                       << std::endl;
         }
         // Fetch and generate each of the messages
-        for (uint32_t addr = lookup.start; addr <= lookup.final; addr++) {
+        for (uint32_t addr = lookup.start; addr <= lookup.stop; addr++) {
             // Sanity check
             assert(addr < MAX_NODE_MEMORY);
             // Fetch the mapping

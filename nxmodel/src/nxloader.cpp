@@ -109,15 +109,15 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
             // Generate the lookup
             output_lookup_t lookup;
             lookup.start  = next_address;
-            lookup.final  = next_address + outputs.size() - 1;
+            lookup.stop   = next_address + outputs.size() - 1;
             lookup.active = (outputs.size() > 0);
             uint32_t encoded = 0;
             pack_output_lookup(lookup, (uint8_t *)&encoded);
             if (verbose) {
                 std::cout << "[NXLoader] Loading lookup - row: " << row
                           << ", column: " << column << ", start: 0x"
-                          << std::hex << lookup.start << ", end: 0x"
-                          << lookup.final << std::dec << ", active: "
+                          << std::hex << lookup.start << ", stop: 0x"
+                          << lookup.stop << std::dec << ", active: "
                           << (lookup.active ? "YES" : "NO") << std::endl;
             }
             // Load the lookup over two steps
