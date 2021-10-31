@@ -41,12 +41,12 @@ class NXConstants:
     )
 
     # Interface and selector sizes
-    MESSAGE_WIDTH  : Constant("Width of the message stream" ) = 31
-    ADDR_ROW_WIDTH : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
-    ADDR_COL_WIDTH : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
-    INPUT_WIDTH    : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
-    OUTPUT_WIDTH   : Constant("Width of output selector"    ) = ceil(log2(MAX_NODE_OUTPUTS))
-    IOR_WIDTH      : Constant("Width of in/out/reg selector") = ceil(log2(MAX_NODE_IOR_COUNT))
+    MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 31
+    ADDR_ROW_WIDTH   : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
+    ADDR_COL_WIDTH   : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
+    MAX_INPUT_WIDTH  : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
+    MAX_OUTPUT_WIDTH : Constant("Width of output selector"    ) = ceil(log2(MAX_NODE_OUTPUTS))
+    MAX_IOR_WIDTH    : Constant("Width of in/out/reg selector") = ceil(log2(MAX_NODE_IOR_COUNT))
 
     # Different command type widths (control plane versus nodes in mesh)
     CTRL_CMD_WIDTH : Constant("Control message command width") = 3
@@ -128,6 +128,16 @@ class ControlParam:
     NODE_REGISTERS : Constant(desc="Number of internal registers per node")
 
 # ==============================================================================
+# Node Identifier
+# ==============================================================================
+
+@packtype.struct(package=NXConstants)
+class NodeID:
+    """ Identifier for a node """
+    row    : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Row within the mesh")
+    column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Column within the mesh")
+
+# ==============================================================================
 # Instruction Format
 # ==============================================================================
 
@@ -135,13 +145,13 @@ class ControlParam:
 class Instruction:
     """ Node instruction encoding """
     truth    : Scalar(width=NXConstants.TT_WIDTH, desc="Encoded truth table")
-    src_a    : Scalar(width=NXConstants.IOR_WIDTH, desc="Source selector A")
+    src_a    : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Source selector A")
     src_a_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
-    src_b    : Scalar(width=NXConstants.IOR_WIDTH, desc="Source selector B")
+    src_b    : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Source selector B")
     src_b_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
-    src_c    : Scalar(width=NXConstants.IOR_WIDTH, desc="Source selector C")
+    src_c    : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Source selector C")
     src_c_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
-    tgt_reg  : Scalar(width=NXConstants.IOR_WIDTH, desc="Target register")
+    tgt_reg  : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Target register")
     gen_out  : Scalar(width=1, desc="Generate an output message")
 
 # ==============================================================================
@@ -153,14 +163,14 @@ class OutputLookup:
     """ Node output lookup encoding (lists start and end point of messages) """
     active : Scalar(width=1,                               desc="Is external output")
     start  : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Start address")
-    final  : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Final address")
+    stop   : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Stop address")
 
 @packtype.struct(package=NXConstants)
 class OutputMapping:
     """ Single node output mapping """
     row    : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Target row")
     column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Target column")
-    index  : Scalar(width=NXConstants.IOR_WIDTH,      desc="Target index")
+    index  : Scalar(width=NXConstants.MAX_IOR_WIDTH,  desc="Target index")
     is_seq : Scalar(width=1,                          desc="Is target sequential")
 
 # ==============================================================================
@@ -232,7 +242,7 @@ class NodeLoopback:
 class NodeSignal:
     """ Signal state carried to/from a node """
     header : NodeHeader(desc="Header carrying row, column, and command")
-    index  : Scalar(width=NXConstants.IOR_WIDTH.value, desc="Input signal index")
+    index  : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Input signal index")
     is_seq : Scalar(width=1, desc="Is the input signal sequential or combinatorial")
     state  : Scalar(width=1, desc="Value of the signal")
 
