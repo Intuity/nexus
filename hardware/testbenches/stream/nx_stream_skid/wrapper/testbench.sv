@@ -15,32 +15,44 @@
 module testbench
 import NXConstants::*;
 (
-      input  logic rst
+      input  logic          rst
     // Inbound message stream
-    , input  node_message_t inbound_data_i
-    , input  logic          inbound_valid_i
-    , output logic          inbound_ready_o
+    , input  node_message_t i_inbound_data
+    , input  logic          i_inbound_valid
+    , output logic          o_inbound_ready
     // Outbound message stream
-    , output node_message_t outbound_data_o
-    , output logic          outbound_valid_o
-    , input  logic          outbound_ready_i
+    , output node_message_t o_outbound_data
+    , output logic          o_outbound_valid
+    , input  logic          i_outbound_ready
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nx_stream_skid dut (
-      .clk_i(clk)
-    , .rst_i(rst)
+      .i_clk            ( clk              )
+    , .i_rst            ( rst              )
     // Inbound message stream
-    , .inbound_data_i (inbound_data_i )
-    , .inbound_valid_i(inbound_valid_i)
-    , .inbound_ready_o(inbound_ready_o)
+    , .i_inbound_data   ( i_inbound_data   )
+    , .i_inbound_valid  ( i_inbound_valid  )
+    , .o_inbound_ready  ( o_inbound_ready  )
     // Outbound message stream
-    , .outbound_data_o (outbound_data_o )
-    , .outbound_valid_o(outbound_valid_o)
-    , .outbound_ready_i(outbound_ready_i)
+    , .o_outbound_data  ( o_outbound_data  )
+    , .o_outbound_valid ( o_outbound_valid )
+    , .i_outbound_ready ( i_outbound_ready )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace
