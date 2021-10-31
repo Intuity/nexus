@@ -20,37 +20,37 @@
 module nx_stream_skid
 import NXConstants::*;
 (
-      input  logic                    clk_i
-    , input  logic                    rst_i
+      input  logic          i_clk
+    , input  logic          i_rst
     // Inbound message stream
-    , input  node_message_t inbound_data_i
-    , input  logic          inbound_valid_i
-    , output logic          inbound_ready_o
+    , input  node_message_t i_inbound_data
+    , input  logic          i_inbound_valid
+    , output logic          o_inbound_ready
     // Outbound message stream
-    , output node_message_t outbound_data_o
-    , output logic          outbound_valid_o
-    , input  logic          outbound_ready_i
+    , output node_message_t o_outbound_data
+    , output logic          o_outbound_valid
+    , input  logic          i_outbound_ready
 );
 
 node_message_t buffer_q;
 logic          buffer_valid_q;
 
-assign outbound_data_o  = buffer_valid_q ? buffer_q : inbound_data_i;
-assign outbound_valid_o = buffer_valid_q || inbound_valid_i;
-assign inbound_ready_o  = !buffer_valid_q;
+assign o_outbound_data  = buffer_valid_q ? buffer_q : i_inbound_data;
+assign o_outbound_valid = buffer_valid_q || i_inbound_valid;
+assign o_inbound_ready  = !buffer_valid_q;
 
-always_ff @(posedge clk_i, posedge rst_i) begin : p_skid
-    if (rst_i) begin
-        buffer_q       <= {MESSAGE_WIDTH{1'b0}};
-        buffer_valid_q <= 1'b0;
+always_ff @(posedge i_clk, posedge i_rst) begin : p_skid
+    if (i_rst) begin
+        buffer_q       <= 'd0;
+        buffer_valid_q <= 'd0;
     end else begin
         // Fill buffer when it is empty and skid is backpressured
-        if (!buffer_valid_q && !outbound_ready_i) begin
-            buffer_q       <= inbound_data_i;
-            buffer_valid_q <= inbound_valid_i;
+        if (!buffer_valid_q && !i_outbound_ready) begin
+            buffer_q       <= i_inbound_data;
+            buffer_valid_q <= i_inbound_valid;
 
         // Empty buffer with priority
-        end else if (outbound_ready_i) begin
+        end else if (i_outbound_ready) begin
             buffer_valid_q <= 1'b0;
 
         end

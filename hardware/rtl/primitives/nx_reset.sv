@@ -18,10 +18,10 @@
 module nx_reset #(
     parameter RESET_LENGTH = 10 // Number of cycles to stretch the reset for
 ) (
-      input  logic clk_i
-    , input  logic rst_hard_i
-    , input  logic rst_soft_i
-    , output logic rst_internal_o
+      input  logic i_clk
+    , input  logic i_rst_hard
+    , input  logic i_rst_soft
+    , output logic o_rst_internal
 );
 
 logic                    rst_combined;
@@ -29,12 +29,12 @@ logic [RESET_LENGTH-1:0] extended_q;
 logic                    result_q;
 
 // Drive reset output from the extended reset signal
-assign rst_internal_o = result_q;
+assign o_rst_internal = result_q;
 
 // Combine soft and hard reset requests
-assign rst_combined = (rst_hard_i || rst_soft_i);
+assign rst_combined = (i_rst_hard || i_rst_soft);
 
-always_ff @(posedge clk_i, posedge rst_combined) begin : p_reset
+always_ff @(posedge i_clk, posedge rst_combined) begin : p_reset
     if (rst_combined) begin
         extended_q <= {RESET_LENGTH{1'b1}};
         result_q   <= 1'b1;

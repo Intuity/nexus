@@ -15,34 +15,38 @@
 `include "nx_common.svh"
 
 // nx_axi4s_bridge
-// AXI4-Stream to Nexus message stream
+// Bidirectional AXI4-Stream to Nexus message stream
 //
 module nx_axi4s_bridge
 import NXConstants::*;
 #(
     parameter AXI4_DATA_WIDTH = 64
 ) (
-      input  logic clk_i
-    , input  logic rst_i
+      input  logic                      i_clk
+    , input  logic                      i_rst
     // Inbound AXI4-stream
-    , input  wire [AXI4_DATA_WIDTH-1:0] ib_axi4s_tdata_i
-    , input  wire                       ib_axi4s_tlast_i
-    , input  wire                       ib_axi4s_tvalid_i
-    , output wire                       ib_axi4s_tready_o
+    , input  wire [AXI4_DATA_WIDTH-1:0] i_ib_axi4s_tdata
+    , input  wire                       i_ib_axi4s_tlast
+    , input  wire                       i_ib_axi4s_tvalid
+    , output wire                       o_ib_axi4s_tready
     // Outbound Nexus message stream
-    , output node_message_t ob_nx_data_o
-    , output logic          ob_nx_valid_o
-    , input  logic          ob_nx_ready_i
+    , output node_message_t             o_ob_nx_data
+    , output logic                      o_ob_nx_valid
+    , input  logic                      i_ob_nx_ready
     // Inbound Nexus message stream
-    , input  node_message_t ib_nx_data_i
-    , input  logic          ib_nx_valid_i
-    , output logic          ib_nx_ready_o
+    , input  node_message_t             i_ib_nx_data
+    , input  logic                      i_ib_nx_valid
+    , output logic                      o_ib_nx_ready
     // Outbound AXI4-stream
-    , output wire [AXI4_DATA_WIDTH-1:0] ob_axi4s_tdata_o
-    , output wire                       ob_axi4s_tlast_o
-    , output wire                       ob_axi4s_tvalid_o
-    , input  wire                       ob_axi4s_tready_i
+    , output wire [AXI4_DATA_WIDTH-1:0] o_ob_axi4s_tdata
+    , output wire                       o_ob_axi4s_tlast
+    , output wire                       o_ob_axi4s_tvalid
+    , input  wire                       i_ob_axi4s_tready
 );
+
+// =============================================================================
+// Constants
+// =============================================================================
 
 localparam SLOT_WIDTH  = MESSAGE_WIDTH + 1;
 localparam A2N_RATIO   = AXI4_DATA_WIDTH / SLOT_WIDTH;
@@ -53,27 +57,29 @@ localparam A2N_RATIO_W = $clog2(A2N_RATIO);
 // =============================================================================
 
 logic [AXI4_DATA_WIDTH-1:0] axi4s_data;
-logic                       axi4s_empty, axi4s_full, axi4s_pop;
+logic                       axi4s_empty, axi4s_full, axi4s_push, axi4s_pop;
+
+assign axi4s_push = i_ib_axi4s_tvalid && !axi4s_full;
 
 nx_fifo #(
-      .DEPTH(              2)
-    , .WIDTH(AXI4_DATA_WIDTH)
+      .DEPTH     ( 2                )
+    , .WIDTH     ( AXI4_DATA_WIDTH  )
 ) axi4s_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
+      .i_clk     ( i_clk            )
+    , .i_rst     ( i_rst            )
     // Write interface
-    , .wr_data_i(ib_axi4s_tdata_i)
-    , .wr_push_i(ib_axi4s_tvalid_i && !axi4s_full)
+    , .i_wr_data ( i_ib_axi4s_tdata )
+    , .i_wr_push ( axi4s_push       )
     // Read interface
-    , .rd_data_o(axi4s_data)
-    , .rd_pop_i (axi4s_pop )
+    , .o_rd_data ( axi4s_data       )
+    , .i_rd_pop  ( axi4s_pop        )
     // Status
-    , .level_o(           )
-    , .empty_o(axi4s_empty)
-    , .full_o (axi4s_full )
+    , .o_level   (                  )
+    , .o_empty   ( axi4s_empty      )
+    , .o_full    ( axi4s_full       )
 );
 
-assign ib_axi4s_tready_o = !axi4s_full;
+assign o_ib_axi4s_tready = !axi4s_full;
 
 // MSB of each slot is a presence indicator
 logic [A2N_RATIO-1:0] ib_slot_present;
@@ -86,12 +92,12 @@ end
 endgenerate
 
 // Create state for output ports
-`DECLARE_DQ (A2N_RATIO_W,    ob_nx_slot,  clk_i, rst_i, {A2N_RATIO_W{1'b0}})
-`DECLARE_DQT(node_message_t, ob_nx_data,  clk_i, rst_i, {MESSAGE_WIDTH{1'b0}})
-`DECLARE_DQ (1,              ob_nx_valid, clk_i, rst_i, 1'b0)
+`DECLARE_DQ (A2N_RATIO_W,    ob_nx_slot,  i_clk, i_rst, {A2N_RATIO_W{1'b0}})
+`DECLARE_DQT(node_message_t, ob_nx_data,  i_clk, i_rst, {MESSAGE_WIDTH{1'b0}})
+`DECLARE_DQ (1,              ob_nx_valid, i_clk, i_rst, 1'b0)
 
-assign ob_nx_data_o  = ob_nx_data_q;
-assign ob_nx_valid_o = ob_nx_valid_q;
+assign o_ob_nx_data  = ob_nx_data_q;
+assign o_ob_nx_valid = ob_nx_valid_q;
 
 // Decoding process
 always_comb begin : p_inbound
@@ -103,7 +109,7 @@ always_comb begin : p_inbound
     axi4s_pop = 1'b0;
 
     // Clear valid if acknowledged
-    if (ob_nx_ready_i) ob_nx_valid = 1'b0;
+    if (i_ob_nx_ready) ob_nx_valid = 1'b0;
 
     // If valid clear, decode the next packet
     if (!ob_nx_valid && !axi4s_empty) begin
@@ -131,43 +137,46 @@ end
 
 logic [MESSAGE_WIDTH-1:0] nx_fifo_data;
 logic [              1:0] nx_fifo_lvl;
-logic                     nx_fifo_empty, nx_fifo_full, nx_fifo_pop;
+logic                     nx_fifo_empty, nx_fifo_full, nx_fifo_push, nx_fifo_pop;
+
+assign nx_fifo_push = i_ib_nx_valid && !nx_fifo_full;
 
 nx_fifo #(
-      .DEPTH(            2)
-    , .WIDTH(MESSAGE_WIDTH)
-) nx_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
+      .DEPTH     ( 2             )
+    , .WIDTH     ( MESSAGE_WIDTH )
+) u_nx_fifo (
+      .i_clk     ( i_clk         )
+    , .i_rst     ( i_rst         )
     // Write interface
-    , .wr_data_i(ib_nx_data_i)
-    , .wr_push_i(ib_nx_valid_i && !nx_fifo_full)
+    , .i_wr_data ( i_ib_nx_data  )
+    , .i_wr_push ( nx_fifo_push  )
     // Read interface
-    , .rd_data_o(nx_fifo_data)
-    , .rd_pop_i (nx_fifo_pop )
+    , .o_rd_data ( nx_fifo_data  )
+    , .i_rd_pop  ( nx_fifo_pop   )
     // Status
-    , .level_o(nx_fifo_lvl  )
-    , .empty_o(nx_fifo_empty)
-    , .full_o (nx_fifo_full )
+    , .o_level   ( nx_fifo_lvl   )
+    , .o_empty   ( nx_fifo_empty )
+    , .o_full    ( nx_fifo_full  )
 );
-assign ib_nx_ready_o = !nx_fifo_full;
+
+assign o_ib_nx_ready = !nx_fifo_full;
 
 // Create state for output ports
-`DECLARE_DQT_ARRAY(node_message_t, A2N_RATIO, ob_axi4s_slot_data,  clk_i, rst_i, {MESSAGE_WIDTH{1'b0}})
-`DECLARE_DQ_ARRAY (1,              A2N_RATIO, ob_axi4s_slot_valid, clk_i, rst_i, 1'b0)
-`DECLARE_DQ       (A2N_RATIO,                 ob_axi4s_slot,       clk_i, rst_i, {A2N_RATIO_W{1'b0}})
-`DECLARE_DQ       (1,                         ob_axi4s_tlast,      clk_i, rst_i, 1'b0)
-`DECLARE_DQ       (1,                         ob_axi4s_tvalid,     clk_i, rst_i, 1'b0)
+`DECLARE_DQT_ARRAY(node_message_t, A2N_RATIO, ob_axi4s_slot_data,  i_clk, i_rst, {MESSAGE_WIDTH{1'b0}})
+`DECLARE_DQ_ARRAY (1,              A2N_RATIO, ob_axi4s_slot_valid, i_clk, i_rst, 1'b0)
+`DECLARE_DQ       (A2N_RATIO,                 ob_axi4s_slot,       i_clk, i_rst, {A2N_RATIO_W{1'b0}})
+`DECLARE_DQ       (1,                         ob_axi4s_tlast,      i_clk, i_rst, 1'b0)
+`DECLARE_DQ       (1,                         ob_axi4s_tvalid,     i_clk, i_rst, 1'b0)
 
 generate
 for (genvar i = 0; i < A2N_RATIO; i = (i + 1)) begin
-    assign ob_axi4s_tdata_o[(i+1)*SLOT_WIDTH-1]            = ob_axi4s_slot_valid_q[i];
-    assign ob_axi4s_tdata_o[i*SLOT_WIDTH +: MESSAGE_WIDTH] = ob_axi4s_slot_data_q[i];
+    assign o_ob_axi4s_tdata[(i+1)*SLOT_WIDTH-1]            = ob_axi4s_slot_valid_q[i];
+    assign o_ob_axi4s_tdata[i*SLOT_WIDTH +: MESSAGE_WIDTH] = ob_axi4s_slot_data_q[i];
 end
 endgenerate
 
-assign ob_axi4s_tlast_o  = ob_axi4s_tlast_q;
-assign ob_axi4s_tvalid_o = ob_axi4s_tvalid_q;
+assign o_ob_axi4s_tlast  = ob_axi4s_tlast_q;
+assign o_ob_axi4s_tvalid = ob_axi4s_tvalid_q;
 
 // Encoding process
 always_comb begin : p_encode
@@ -183,7 +192,7 @@ always_comb begin : p_encode
     nx_fifo_pop = 1'b0;
 
     // Clear valid if accepted
-    if (ob_axi4s_tready_i && ob_axi4s_tvalid) begin
+    if (i_ob_axi4s_tready && ob_axi4s_tvalid) begin
         ob_axi4s_tlast  = 1'b0;
         ob_axi4s_tvalid = 1'b0;
         for (idx = 0; idx < A2N_RATIO; idx = (idx + 1)) begin
@@ -199,7 +208,7 @@ always_comb begin : p_encode
         ob_axi4s_slot_valid[ob_axi4s_slot] = 1'b1;
 
         // If FIFO emptied, raise TLAST
-        ob_axi4s_tlast = (nx_fifo_lvl == 2'd1 && !ib_nx_valid_i);
+        ob_axi4s_tlast = (nx_fifo_lvl == 2'd1 && !i_ib_nx_valid);
 
         // Increment the active slot
         ob_axi4s_slot = ob_axi4s_slot + { {(A2N_RATIO_W-1){1'b0}}, 1'b1 };

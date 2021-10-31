@@ -16,7 +16,7 @@
 
 // nx_control
 // Nexus top-level controller. Responsible for monitoring the mesh, generating
-// tick events, and providing status feedback to the host.
+// tick events, and providing feedback to the host.
 //
 module nx_control
 import NXConstants::*;
@@ -27,104 +27,101 @@ import NXConstants::*;
     , parameter OUTPUTS    = 8
     , parameter REGISTERS  = 8
 ) (
-      input  logic clk_i
-    , input  logic rst_i
+      input  logic               i_clk
+    , input  logic               i_rst
     // Inbound message stream (from host)
-    , input  control_message_t inbound_data_i
-    , input  logic             inbound_valid_i
-    , output logic             inbound_ready_o
+    , input  control_message_t   i_inbound_data
+    , input  logic               i_inbound_valid
+    , output logic               o_inbound_ready
     // Outbound message stream (to host)
-    , output control_response_t outbound_data_o
-    , output logic              outbound_valid_o
-    , input  logic              outbound_ready_i
+    , output control_response_t  o_outbound_data
+    , output logic               o_outbound_valid
+    , input  logic               i_outbound_ready
     // Soft reset request
-    , output logic soft_reset_o
+    , output logic               o_soft_reset
     // Externally visible status
-    , output logic status_active_o  // High when the mesh is active
-    , output logic status_idle_o    // High when the mesh goes idle
-    , output logic status_trigger_o // Pulses high on every tick every
+    , output logic               o_status_active
+    , output logic               o_status_idle
+    , output logic               o_status_trigger
     // Interface to the mesh
-    , input  logic [COLUMNS-1:0] mesh_idle_i     // High when mesh fully idle
-    , output logic [COLUMNS-1:0] mesh_trigger_o  // Trigger for the next cycle
-    , output logic [COLUMNS-1:0] token_grant_o   // Per-column token emit
-    , input  logic [COLUMNS-1:0] token_release_i // Per-column token return
+    , input  logic [COLUMNS-1:0] i_mesh_idle
+    , output logic [COLUMNS-1:0] o_mesh_trigger
 );
+
+// =============================================================================
+// Constants
+// =============================================================================
 
 localparam RX_PYLD_WIDTH = MESSAGE_WIDTH - $bits(control_command_t);
 localparam TX_PYLD_WIDTH = MESSAGE_WIDTH;
 
-// Internal state
-`DECLARE_DQ (                 1, soft_reset,     clk_i, rst_i, 'd0)
-`DECLARE_DQ (                 1, active,         clk_i, rst_i, 'd0)
-`DECLARE_DQ (           COLUMNS, trigger,        clk_i, rst_i, 'd0)
-`DECLARE_DQ (                 1, seen_idle_low,  clk_i, rst_i, 'd0)
-`DECLARE_DQ (                 1, first_tick,     clk_i, rst_i, 'd1)
-`DECLARE_DQ (     TX_PYLD_WIDTH, cycle,          clk_i, rst_i, 'd0)
-`DECLARE_DQ (     RX_PYLD_WIDTH, interval,       clk_i, rst_i, 'd0)
-`DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, clk_i, rst_i, 'd0)
-`DECLARE_DQ (                 1, interval_set,   clk_i, rst_i, 'd0)
-`DECLARE_DQ (           COLUMNS, token_grant,    clk_i, rst_i, 'd0)
-`DECLARE_DQT(control_response_t, send_data,      clk_i, rst_i, 'd0)
-`DECLARE_DQ (                 1, send_valid,     clk_i, rst_i, 'd0)
-`DECLARE_DQ (                 1, all_idle,       clk_i, rst_i, 'd0)
+// =============================================================================
+// Internal Signals and State
+// =============================================================================
 
-// Create a summary of column idle state
-assign all_idle = &mesh_idle_i;
+// Controller State
+`DECLARE_DQ (                 1, soft_reset,     i_clk, i_rst, 'd0)
+`DECLARE_DQ (                 1, seen_idle_low,  i_clk, i_rst, 'd0)
+`DECLARE_DQ (     RX_PYLD_WIDTH, interval,       i_clk, i_rst, 'd0)
+`DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, i_clk, i_rst, 'd0)
+`DECLARE_DQ (                 1, interval_set,   i_clk, i_rst, 'd0)
+`DECLARE_DQT(control_response_t, send_data,      i_clk, i_rst, 'd0)
+`DECLARE_DQ (                 1, send_valid,     i_clk, i_rst, 'd0)
+`DECLARE_DQ (                 1, all_idle,       i_clk, i_rst, 'd0)
 
-// Connect outputs
-assign outbound_data_o  = send_data_q;
-assign outbound_valid_o = send_valid_q;
+// Trigger generation
+`DECLARE_DQ(      1, active,     i_clk, i_rst, 'd0)
+`DECLARE_DQ(      1, first_tick, i_clk, i_rst, 'd1)
+`DECLARE_DQ(COLUMNS, trigger,    i_clk, i_rst, 'd0)
 
-assign soft_reset_o = soft_reset_q;
+// Cycle counter
+`DECLARE_DQ(TX_PYLD_WIDTH, cycle, i_clk, i_rst, 'd0)
 
-assign status_active_o  = active_q;
-assign status_idle_o    = all_idle_q;
-assign status_trigger_o = |trigger_q;
-
-assign mesh_trigger_o = trigger_q;
-assign token_grant_o  = token_grant_q;
-
-// Generate column triggers
-assign trigger = {COLUMNS{active_q && seen_idle_low_q && all_idle_q}};
-
-// Monitor for idle going low after each trigger event
-assign seen_idle_low = (|trigger) ? 1'b0 : (seen_idle_low_q || !all_idle_q);
-
-// Track the first trigger into the mesh
-assign first_tick = first_tick_q && (trigger == 'd0);
-
-// Count active cycles
-assign cycle = (|trigger) ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle_q;
-
-// Generate token grant signal
-assign token_grant = ((|trigger) && first_tick_q) ? {COLUMNS{1'b1}} : token_release_i;
-
-// Inbound message FIFO
+// Inbound FIFO
 control_message_t ib_fifo_data;
-logic             ib_fifo_empty, ib_fifo_full, ib_fifo_pop;
+logic             ib_fifo_empty, ib_fifo_full, ib_fifo_push, ib_fifo_pop;
 
-assign inbound_ready_o = !ib_fifo_full;
+// Drive soft reset request
+assign o_soft_reset = soft_reset_q;
+
+// =============================================================================
+// Inbound Message FIFO
+// =============================================================================
+
+// Push when message presented and not full
+assign ib_fifo_push = i_inbound_valid && !ib_fifo_full;
+
+// Deassert stream ready when FIFO is full
+assign o_inbound_ready = !ib_fifo_full;
 
 nx_fifo #(
-      .DEPTH(            2)
-    , .WIDTH(MESSAGE_WIDTH)
-) ib_fifo (
-      .clk_i(clk_i)
-    , .rst_i(rst_i)
+      .DEPTH     ( 2              )
+    , .WIDTH     ( MESSAGE_WIDTH  )
+) u_ib_fifo (
+      .i_clk     ( i_clk          )
+    , .i_rst     ( i_rst          )
     // Write interface
-    , .wr_data_i(inbound_data_i                    )
-    , .wr_push_i(inbound_valid_i && inbound_ready_o)
+    , .i_wr_data ( i_inbound_data )
+    , .i_wr_push ( ib_fifo_push   )
     // Read interface
-    , .rd_data_o(ib_fifo_data)
-    , .rd_pop_i (ib_fifo_pop )
+    , .o_rd_data ( ib_fifo_data   )
+    , .i_rd_pop  ( ib_fifo_pop    )
     // Status
-    , .level_o()
-    , .empty_o(ib_fifo_empty)
-    , .full_o (ib_fifo_full )
+    , .o_level   (                )
+    , .o_empty   ( ib_fifo_empty  )
+    , .o_full    ( ib_fifo_full   )
 );
 
-// Inbound stream decoder
-always_comb begin : p_decode
+// =============================================================================
+// Message Handling
+// =============================================================================
+
+// Drive outputs with send data
+assign o_outbound_data  = send_data_q;
+assign o_outbound_valid = send_valid_q;
+
+// Perform decode
+always_comb begin : comb_decode
     // Internal state
     `INIT_D(soft_reset);
     `INIT_D(active);
@@ -138,7 +135,7 @@ always_comb begin : p_decode
     ib_fifo_pop = 1'b0;
 
     // Clear valid if accepted
-    if (outbound_ready_i) send_valid = 1'b0;
+    if (i_outbound_ready) send_valid = 1'b0;
 
     // On counter elapse, deactivate automatically & clear counter for next run
     if (interval_set && interval_count == interval) begin
@@ -223,5 +220,38 @@ always_comb begin : p_decode
         ib_fifo_pop = 1'b1;
     end
 end
+
+// =============================================================================
+// Trigger Generation
+// =============================================================================
+
+// Create a summary of column idle state
+assign all_idle = &i_mesh_idle;
+
+// Monitor for idle going low after each trigger event
+assign seen_idle_low = (|trigger) ? 1'b0 : (seen_idle_low_q || !all_idle_q);
+
+// Generate column triggers
+assign trigger = {COLUMNS{active_q && seen_idle_low_q && all_idle_q}};
+
+// Track the first trigger into the mesh
+assign first_tick = first_tick_q && (trigger == 'd0);
+
+// Drive mesh trigger
+assign o_mesh_trigger = trigger_q;
+
+// =============================================================================
+// Cycle Counter
+// =============================================================================
+
+assign cycle = (|trigger) ? (cycle_q + { {(TX_PYLD_WIDTH-1){1'b0}}, 1'b1 }) : cycle_q;
+
+// =============================================================================
+// Debug Status Flags
+// =============================================================================
+
+assign o_status_active  = active_q;
+assign o_status_idle    = all_idle_q;
+assign o_status_trigger = |trigger_q;
 
 endmodule : nx_control

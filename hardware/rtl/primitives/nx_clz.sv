@@ -20,8 +20,8 @@ module nx_clz #(
     , parameter REVERSE_INPUT = 1'b0              // Whether to reverse input bits
     , parameter COUNT_WIDTH   = $clog2(WIDTH) + 1 // Required counter width
 ) (
-      input  logic [WIDTH-1:0]       scalar_i
-    , output logic [COUNT_WIDTH-1:0] leading_o
+      input  logic [WIDTH-1:0]       i_scalar
+    , output logic [COUNT_WIDTH-1:0] o_leading
 );
 
 localparam SECT_SIZE  = 8;
@@ -33,7 +33,7 @@ logic [WIDTH-1:0] reversed;
 
 generate
 for (genvar idx = 0; idx < WIDTH; idx++) begin : gen_reverse
-    assign reversed[idx] = REVERSE_INPUT ? scalar_i[idx] : scalar_i[WIDTH-idx-1];
+    assign reversed[idx] = REVERSE_INPUT ? i_scalar[idx] : i_scalar[WIDTH-idx-1];
 end
 endgenerate
 
@@ -83,7 +83,7 @@ end
 endgenerate
 
 // Drive output from final sum
-assign leading_o = summations[NUM_SECTS-1];
+assign o_leading = summations[NUM_SECTS-1];
 
 // Tie-off final stop_sum
 logic _unused;

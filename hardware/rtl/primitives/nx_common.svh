@@ -60,7 +60,7 @@
 //
 `define DECLARE_DQT_ARRAY(T, N, X, C, R, I) \
     T ``X`` [N-1:0], ``X``_q [N-1:0]; \
-    localparam ARRAY_SIZE_``X`` = N; \
+    localparam __ARRAY_SIZE_``X`` = N; \
     always_ff @(posedge C, posedge R) begin : s_``X \
         int i; \
         if (R) begin \
@@ -82,7 +82,7 @@
 //  I: Initial value for each signal to take
 //
 `define DECLARE_DQ_ARRAY(W, N, X, C, R, I) \
-    localparam ARRAY_SIZE_``X`` = N; \
+    localparam __ARRAY_SIZE_``X`` = N; \
     `DECLARE_DQT(logic [N-1:0][W-1:0], X, C, R, I)
 
 // INIT_D(X)
@@ -100,6 +100,6 @@
 //  X: Name of the signal
 //
 `define INIT_D_ARRAY(X) \
-    for (int _i = 0; _i < ARRAY_SIZE_``X``; _i = (_i + 1)) X[_i] = ``X``_q[_i]
+    for (int _i = 0; _i < __ARRAY_SIZE_``X``; _i = (_i + 1)) X[_i] = ``X``_q[_i]
 
 `endif // __NX_COMMON_SVH__

@@ -22,18 +22,18 @@ module nx_fifo #(
     , parameter WIDTH    =    32 // The width of each FIFO entry
     , parameter FULL_LVL = DEPTH // The level at which the full flag is raised
 ) (
-      input  logic                   clk_i
-    , input  logic                   rst_i
+      input  logic                   i_clk
+    , input  logic                   i_rst
     // Write interface
-    , input  logic [      WIDTH-1:0] wr_data_i
-    , input  logic                   wr_push_i
+    , input  logic [WIDTH-1:0]       i_wr_data
+    , input  logic                   i_wr_push
     // Read interface
-    , output logic [      WIDTH-1:0] rd_data_o
-    , input  logic                   rd_pop_i
+    , output logic [WIDTH-1:0]       o_rd_data
+    , input  logic                   i_rd_pop
     // Status
-    , output logic [$clog2(DEPTH):0] level_o
-    , output logic                   empty_o
-    , output logic                   full_o
+    , output logic [$clog2(DEPTH):0] o_level
+    , output logic                   o_empty
+    , output logic                   o_full
 );
 
 // Parameters and constants
@@ -46,33 +46,33 @@ logic [WIDTH-1:0] data [DEPTH-1:0];
 logic [PTR_W-1:0] wr_ptr, rd_ptr;
 logic [PTR_W  :0] level;
 
-assign rd_data_o = data[rd_ptr];
-assign level_o   = level;
-assign empty_o   = (level ==        0);
-assign full_o    = (level >= FULL_LVL);
+assign o_rd_data = data[rd_ptr];
+assign o_level   = level;
+assign o_empty   = (level ==        0);
+assign o_full    = (level >= FULL_LVL);
 
 logic truly_full;
 assign truly_full = (level == DEPTH);
 
-always @(posedge clk_i, posedge rst_i) begin : p_handle
-    if (rst_i) begin
-        wr_ptr <= {PTR_W{1'b0}};
-        rd_ptr <= {PTR_W{1'b0}};
-        level  <= {(PTR_W+1){1'b0}};
+always @(posedge i_clk, posedge i_rst) begin : p_handle
+    if (i_rst) begin
+        wr_ptr <= 'd0;
+        rd_ptr <= 'd0;
+        level  <= 'd0;
     end else begin
         // Pop from FIFO if not empty
-        if (rd_pop_i && !empty_o) begin
+        if (i_rd_pop && !o_empty) begin
             rd_ptr <= ((rd_ptr + 'd1) == DEPTH[PTR_W-1:0]) ? 'd0 : (rd_ptr + 'd1);
         end
         // Push to FIFO if not full, or top entry just popped
-        if (wr_push_i && (!truly_full || rd_pop_i)) begin
-            data[wr_ptr] <= wr_data_i;
+        if (i_wr_push && (!truly_full || i_rd_pop)) begin
+            data[wr_ptr] <= i_wr_data;
             wr_ptr <= ((wr_ptr + 'd1) == DEPTH[PTR_W-1:0]) ? 'd0 : (wr_ptr + 'd1);
         end
         // Update the level
-        if (wr_push_i && !rd_pop_i && !truly_full)
+        if (i_wr_push && !i_rd_pop && !truly_full)
             level <= (level + LVL_STEP);
-        else if (!wr_push_i && rd_pop_i && !empty_o)
+        else if (!i_wr_push && i_rd_pop && !o_empty)
             level <= (level - LVL_STEP);
     end
 end
