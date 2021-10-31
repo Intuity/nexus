@@ -31,6 +31,10 @@ if __name__ == "__main__":
     lines = []
     with open(sys.argv[1], "r") as fh:
         lines += [x.strip() for x in fh.readlines()]
+    # Check for the design hierarchy marker
+    if FINAL_SECTION not in lines:
+        print(f"Could not extract design hierarchy section from {sys.argv[1]}")
+        sys.exit(0)
     # Filter out just the final section
     lines = lines[lines.index(FINAL_SECTION):]
     # Extract each metric
