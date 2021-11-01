@@ -17,155 +17,122 @@ from random import choice, randint, random
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from drivers.map_io.common import IOMapping
 from drivers.state.common import SignalState
 
 from ..testbench import testcase
 
 @testcase()
-async def input_drive(dut):
-    """ Configure input mappings, then check signal state tracks correctly """
-    dut.info("Resetting the DUT")
+async def inputs_non_seq(dut):
+    """ Exercise updates to non-sequential inputs """
+    # Reset the DUT
     await dut.reset()
 
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.node_row_i <= row
-    dut.node_col_i <= col
+    # Pickup the number of inputs
+    inputs = int(dut.INPUTS)
 
-    # Work out the number of inputs
-    num_inputs = max(dut.inputs._range) - min(dut.inputs._range) + 1
+    # Track state
+    state = 0
 
-    # Start monitoring the trigger signal
-    triggers = 0
-    async def monitor_trigger():
-        nonlocal triggers
-        while True:
+    # Randomly drive inputs and check core input state updates
+    for _ in range(1000):
+        # Choose a random input index and value
+        index = randint(0, inputs-1)
+        value = choice((0, 1))
+        # Update the input state
+        new_state = state
+        if value: new_state |= (1 << index)
+        else    : new_state &= ((1 << inputs) - 1) - (1 << index)
+        changed = (new_state != state)
+        state   = new_state
+        # Drive the input
+        dut.input.append(SignalState(index=index, sequential=False, state=value))
+        await dut.input.idle()
+        await RisingEdge(dut.clk)
+        # Check the state
+        assert dut.core_inputs == state, \
+            f"Mismatch input - 0x{state:08X} != 0x{int(dut.core_inputs):08X}"
+        # Check that the trigger pulses on change...
+        assert dut.core_trigger == (1 if changed else 0), \
+            f"Mismatch trigger - {changed} != {int(dut.core_trigger)}"
+        # ...and drops one cycle later
+        await RisingEdge(dut.clk)
+        assert dut.core_trigger == 0, "Trigger still high, should have fallen"
+
+@testcase()
+async def inputs_seq(dut):
+    """ Exercise updates to sequential inputs """
+    # Reset the DUT
+    await dut.reset()
+
+    # Pickup the number of inputs
+    inputs = int(dut.INPUTS)
+
+    # Track state
+    curr_state = 0
+    next_state = 0
+
+    # Run a number of passes
+    for _ in range(100):
+        # Make 10 input updates on each pass
+        for _ in range(10):
+            # Choose a random input index and value
+            index = randint(0, inputs-1)
+            value = choice((0, 1))
+            # Update the next input state
+            if value: next_state |= (1 << index)
+            else    : next_state &= ((1 << inputs) - 1) - (1 << index)
+            # Drive the input
+            dut.input.append(SignalState(index=index, sequential=True, state=value))
+        # Wait for driver to flush
+        await dut.input.idle()
+        await RisingEdge(dut.clk)
+        # Check inputs still match current state
+        assert dut.core_inputs == curr_state, \
+            f"Core inputs have changed - 0x{curr_state:08X} != 0x{int(dut.core_inputs):08X}"
+        # Trigger design
+        dut.trigger <= 1
+        await RisingEdge(dut.clk)
+        dut.trigger <= 0
+        await RisingEdge(dut.clk)
+        # Check inputs have updated
+        assert dut.core_inputs == next_state, \
+            f"Core inputs haven't updated - 0x{next_state:08X} != 0x{int(dut.core_inputs):08X}"
+        # Move next -> current
+        curr_state = next_state
+
+@testcase()
+async def inputs_lb(dut):
+    """ Check that masked outputs are looped back to inputs sequentially """
+    # Reset the DUT
+    await dut.reset()
+
+    # Pickup the number of inputs
+    inputs  = int(dut.INPUTS)
+    outputs = int(dut.OUTPUTS)
+
+    # Keep track of state
+    state = 0
+
+    # Run a number of iterations
+    for _ in range(100):
+        # Randomise the loopback mask
+        lb_mask = randint(0, (1 << inputs) - 1)
+        dut.lb_mask <= lb_mask
+        # Drive different output patterns
+        for _ in range(10):
+            # Setup outputs
+            out_state = randint(0, (1 << outputs) - 1)
+            dut.core_outputs <= out_state
             await RisingEdge(dut.clk)
-            if dut.trigger == 1: triggers += 1
-    cocotb.fork(monitor_trigger())
-
-    # Check the initial input state is all low
-    assert dut.inputs  == 0, f"Core inputs are not zero: {int(dut.inputs):08b}"
-    assert dut.trigger == 0, f"Core trigger is not zero: {int(dut.trigger)}"
-
-    # Check no triggers have gone off
-    assert triggers == 0
-
-    # Test every signal as sequential
-    curr_state = [0 for _ in range(num_inputs)]
-    next_state = [0 for _ in range(num_inputs)]
-    last_triggers = triggers
-    for _ in range(100):
-        # Setup the 'next' state
-        for idx in sorted(range(num_inputs), key=lambda _: random()):
-            next_state[idx] = choice((0, 1))
-            dut.signal.append(SignalState(idx, True, next_state[idx]))
-
-        # Wait for queue to drain
-        while dut.signal._sendQ: await RisingEdge(dut.clk)
-        await ClockCycles(dut.clk, 2)
-
-        # Check that the current state is still valid
-        for idx, state in enumerate(curr_state):
-            assert dut.inputs[idx] == state, \
-                f"Core input {idx} mismatches - expecting {state}, got {int(dut.inputs[idx])}"
-
-        # Determine if there is a delta
-        delta = (next_state != curr_state)
-
-        # Provide an external trigger
-        dut.ext_trigger <= 1
-        await RisingEdge(dut.clk)
-        dut.ext_trigger <= 0
-        await ClockCycles(dut.clk, 2)
-
-        # Propagate next -> current
-        curr_state = next_state[:]
-
-        # Check that the current state has updated
-        for idx, state in enumerate(curr_state):
-            assert dut.inputs[idx] == state, \
-                f"Core input {idx} mismatches - expecting {state}, got {int(dut.inputs[idx])}"
-
-        # Check for exactly one trigger
-        exp_triggers = last_triggers
-        if delta: exp_triggers += 1
-        assert triggers == exp_triggers, \
-            f"Expecting {exp_triggers} triggers, observed {triggers}"
-        last_triggers = triggers
-
-    # Test every signal as combinatorial
-    for _ in range(100):
-        # Setup combinatorial signal values (immediate propagation)
-        num_triggers = 0
-        for idx in sorted(range(num_inputs), key=lambda _: random()):
-            # Send in a random state
-            new_state = choice((0, 1))
-            dut.signal.append(SignalState(idx, False, new_state))
-            # Count number of expected triggers
-            if new_state != curr_state[idx]: num_triggers += 1
-            # Track state
-            curr_state[idx] = next_state[idx] = new_state
-
-        # Wait for queue to drain
-        while dut.signal._sendQ: await RisingEdge(dut.clk)
-        await ClockCycles(dut.clk, 2)
-
-        # Check that the current state has updated
-        for idx, state in enumerate(curr_state):
-            assert dut.inputs[idx] == state, \
-                f"Core input {idx} mismatches - expecting {state}, got {int(dut.inputs[idx])}"
-
-        # Check for triggers being seen
-        assert triggers == (last_triggers + num_triggers), \
-            f"Base {last_triggers}, expecting {num_triggers}, observed {triggers}"
-        last_triggers = triggers
-
-    # Test all signals as a mix of combinatorial and sequential
-    last_triggers = triggers
-    for _ in range(100):
-        # Select which signals are sequential
-        seq_sig = [choice((True, False)) for _ in range(num_inputs)]
-
-        # Setup the 'next' state
-        num_triggers = 0
-        for idx, is_seq in sorted(enumerate(seq_sig), key=lambda _: random()):
-            # Send in a random state
-            next_state[idx] = choice((0, 1))
-            if not is_seq:
-                if next_state[idx] != curr_state[idx]:
-                    num_triggers += 1
-                curr_state[idx] = next_state[idx]
-            dut.signal.append(SignalState(idx, is_seq, next_state[idx]))
-
-        # Wait for queue to drain
-        while dut.signal._sendQ: await RisingEdge(dut.clk)
-        await ClockCycles(dut.clk, 2)
-
-        # Check the current state is valid
-        for idx, state in enumerate(curr_state):
-            assert dut.inputs[idx] == state, \
-                f"Core input {idx} mismatches - expecting {state}, got {int(dut.inputs[idx])}"
-
-        # Determine if there is a delta
-        if next_state != curr_state: num_triggers += 1
-
-        # Provide an external trigger
-        dut.ext_trigger <= 1
-        await RisingEdge(dut.clk)
-        dut.ext_trigger <= 0
-        await ClockCycles(dut.clk, 2)
-
-        # Propagate next -> current
-        curr_state = next_state[:]
-
-        # Check that the current state has updated
-        for idx, state in enumerate(curr_state):
-            assert dut.inputs[idx] == state, \
-                f"Core input {idx} mismatches - expecting {state}, got {int(dut.inputs[idx])}"
-
-        # Check for exactly one trigger
-        assert triggers == (last_triggers + num_triggers), \
-            f"Base {last_triggers}, expecting {num_triggers}, observed {triggers}"
-        last_triggers = triggers
+            # Check inputs haven't changed
+            assert dut.core_inputs == state, \
+                f"Core inputs changed - 0x{state:08X} != 0x{int(dut.core_inputs):08X}"
+            # Trigger
+            dut.trigger <= 1
+            await RisingEdge(dut.clk)
+            dut.trigger <= 0
+            await RisingEdge(dut.clk)
+            # Check inputs have updated
+            state = out_state & lb_mask
+            assert dut.core_inputs == state, \
+                f"Core inputs haven't updated - 0x{state:08X} != 0x{int(dut.core_inputs):08X}"

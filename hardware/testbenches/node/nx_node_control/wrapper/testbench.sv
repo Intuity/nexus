@@ -15,92 +15,84 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter INPUTS         = 32
-    , parameter OUTPUTS        = 32
-    , parameter OP_STORE_WIDTH = ADDR_ROW_WIDTH + ADDR_COL_WIDTH + IOR_WIDTH + 2
+      parameter INPUTS     = 32
+    , parameter OUTPUTS    = 32
+    , parameter RAM_ADDR_W = 10
+    , parameter RAM_DATA_W = 32
 ) (
-      input  logic rst
-    // Node identity
-    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
-    // External trigger signal
-    , input  logic trigger_i
-    // Channel tokens
-    , input  logic token_grant_i
-    , output logic token_release_o
-    // Outbound message stream
-    , output node_message_t msg_data_o
-    , output logic          msg_valid_o
-    , input  logic          msg_ready_i
-    // I/O mapping
-    , input  logic [     IOR_WIDTH-1:0] map_idx_i     // Which output to configure
-    , input  logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_i // Target node's row
-    , input  logic [ADDR_COL_WIDTH-1:0] map_tgt_col_i // Target node's column
-    , input  logic [     IOR_WIDTH-1:0] map_tgt_idx_i // Target node's input index
-    , input  logic                      map_tgt_seq_i // Target node's input is sequential
-    , input  logic                      map_valid_i   // Mapping is valid
-    // Signal state update
-    , input  logic [IOR_WIDTH-1:0] signal_index_i  // Input index
-    , input  logic                 signal_is_seq_i // Input is sequential
-    , input  logic                 signal_state_i  // Signal state
-    , input  logic                 signal_valid_i  // Update is valid
-    // Interface to core
-    , output logic               core_trigger_o
-    , output logic [ INPUTS-1:0] core_inputs_o
-    , input  logic [OUTPUTS-1:0] core_outputs_i
-    // Interface to memory
-    , output logic [$clog2(MAX_NODE_CONFIG)-1:0] store_addr_o    // Output store row address
-    , output logic [         OP_STORE_WIDTH-1:0] store_wr_data_o // Output store write data
-    , output logic                               store_wr_en_o   // Output store write enable
-    , output logic                               store_rd_en_o   // Output store read enable
-    , input  logic [         OP_STORE_WIDTH-1:0] store_rd_data_i // Output store read data
+      input  logic                        rst
+    // Control signals
+    , input  logic                        i_trigger
+    , output logic                        o_idle
+    // Inputs from decoder
+    , input  logic [INPUTS-1:0]           i_loopback_mask
+    , input  logic [$clog2(INPUTS)-1:0]   i_input_index
+    , input  logic                        i_input_value
+    , input  logic                        i_input_is_seq
+    , input  logic                        i_input_update
+    , input  logic [NODE_PARAM_WIDTH-1:0] i_num_instr
+    , input  logic [NODE_PARAM_WIDTH-1:0] i_num_output
+    // Output message stream
+    , output node_message_t               o_msg_data
+    , output logic                        o_msg_valid
+    , input  logic                        i_msg_ready
+    // Interface to store
+    , output logic [RAM_ADDR_W-1:0]       o_ram_addr
+    , output logic                        o_ram_rd_en
+    , input  logic [RAM_DATA_W-1:0]       i_ram_rd_data
+    // Interface to logic core
+    , output logic [INPUTS-1:0]           o_core_inputs
+    , input  logic [OUTPUTS-1:0]          i_core_outputs
+    , output logic                        o_core_trigger
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nx_node_control #(
-      .INPUTS (INPUTS )
-    , .OUTPUTS(OUTPUTS)
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
+      .INPUTS     ( INPUTS     )
+    , .OUTPUTS    ( OUTPUTS    )
+    , .RAM_ADDR_W ( RAM_ADDR_W )
+    , .RAM_DATA_W ( RAM_DATA_W )
+) u_dut (
+      .i_clk           ( clk             )
+    , .i_rst           ( rst             )
     // Control signals
-    , .idle_o    (idle_o    )
-    , .node_row_i(node_row_i)
-    , .node_col_i(node_col_i)
-    // External trigger signal
-    , .trigger_i(trigger_i)
-    // Channel tokens
-    , .token_grant_i  (token_grant_i  )
-    , .token_release_o(token_release_o)
-    // Outbound message stream
-    , .msg_data_o (msg_data_o )
-    , .msg_valid_o(msg_valid_o)
-    , .msg_ready_i(msg_ready_i)
-    // I/O mapping
-    , .map_idx_i    (map_idx_i    )
-    , .map_tgt_row_i(map_tgt_row_i)
-    , .map_tgt_col_i(map_tgt_col_i)
-    , .map_tgt_idx_i(map_tgt_idx_i)
-    , .map_tgt_seq_i(map_tgt_seq_i)
-    , .map_valid_i  (map_valid_i  )
-    // Signal state update
-    , .signal_index_i (signal_index_i )
-    , .signal_is_seq_i(signal_is_seq_i)
-    , .signal_state_i (signal_state_i )
-    , .signal_valid_i (signal_valid_i )
-    // Interface to core
-    , .core_trigger_o(core_trigger_o)
-    , .core_inputs_o (core_inputs_o )
-    , .core_outputs_i(core_outputs_i)
-    // Interface to memory
-    , .store_addr_o   (store_addr_o   )
-    , .store_wr_data_o(store_wr_data_o)
-    , .store_wr_en_o  (store_wr_en_o  )
-    , .store_rd_en_o  (store_rd_en_o  )
-    , .store_rd_data_i(store_rd_data_i)
+    , .i_trigger       ( i_trigger       )
+    , .o_idle          ( o_idle          )
+    // Inputs from decoder
+    , .i_loopback_mask ( i_loopback_mask )
+    , .i_input_index   ( i_input_index   )
+    , .i_input_value   ( i_input_value   )
+    , .i_input_is_seq  ( i_input_is_seq  )
+    , .i_input_update  ( i_input_update  )
+    , .i_num_instr     ( i_num_instr     )
+    , .i_num_output    ( i_num_output    )
+    // Output message stream
+    , .o_msg_data      ( o_msg_data      )
+    , .o_msg_valid     ( o_msg_valid     )
+    , .i_msg_ready     ( i_msg_ready     )
+    // Interface to store
+    , .o_ram_addr      ( o_ram_addr      )
+    , .o_ram_rd_en     ( o_ram_rd_en     )
+    , .i_ram_rd_data   ( i_ram_rd_data   )
+    // Interface to logic core
+    , .o_core_inputs   ( o_core_inputs   )
+    , .i_core_outputs  ( i_core_outputs  )
+    , .o_core_trigger  ( o_core_trigger  )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace

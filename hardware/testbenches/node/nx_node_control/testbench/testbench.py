@@ -18,14 +18,12 @@ from cocotb.triggers import ClockCycles, RisingEdge
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
-from drivers.map_io.io import IOMapIO
-from drivers.map_io.driver import IOMapInitiator
+from drivers.memory.io import MemoryIO
+from drivers.memory.resp import MemoryResponder
 from drivers.state.io import StateIO
 from drivers.state.driver import StateInitiator
 from drivers.stream.io import StreamIO
 from drivers.stream.resp import StreamResponder
-from drivers.memory.io import MemoryIO
-from drivers.memory.resp import MemoryResponder
 
 class Testbench(TestbenchBase):
 
@@ -36,25 +34,24 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
-        # Pickup signals
-        self.ext_trigger = dut.trigger_i
-        self.trigger     = dut.core_trigger_o
-        self.inputs      = dut.core_inputs_o
-        self.outputs     = dut.core_outputs_i
-        self.grant       = dut.token_grant_i
-        self.release     = dut.token_release_o
+        # Basic interfaces
+        self.trigger      = self.dut.i_trigger
+        self.idle         = self.dut.o_idle
+        self.lb_mask      = self.dut.i_loopback_mask
+        self.num_instr    = self.dut.i_num_instr
+        self.num_output   = self.dut.i_num_output
+        self.core_inputs  = self.dut.o_core_inputs
+        self.core_outputs = self.dut.i_core_outputs
+        self.core_trigger = self.dut.o_core_trigger
         # Setup drivers/monitors
+        self.input = StateInitiator(
+            self, self.clk, self.rst, StateIO(self.dut, "input", IORole.RESPONDER),
+        )
         self.msg = StreamResponder(
             self, self.clk, self.rst, StreamIO(self.dut, "msg", IORole.INITIATOR),
         )
-        self.io = IOMapInitiator(
-            self, self.clk, self.rst, IOMapIO(self.dut, "map", IORole.RESPONDER),
-        )
-        self.signal = StateInitiator(
-            self, self.clk, self.rst, StateIO(self.dut, "signal", IORole.RESPONDER),
-        )
-        self.memory = MemoryResponder(
-            self, self.clk, self.rst, MemoryIO(self.dut, "store", IORole.INITIATOR),
+        self.ram = MemoryResponder(
+            self, self.clk, self.rst, MemoryIO(self.dut, "ram", IORole.INITIATOR),
         )
         # Create queues for expected transactions
         self.exp_msg = []
@@ -65,16 +62,16 @@ class Testbench(TestbenchBase):
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.ext_trigger <= 0
-        self.outputs     <= 0
-        self.grant       <= 0
-        self.release     <= 0
-        self.node_row_i  <= 0
-        self.node_col_i  <= 0
+        # Basic interfaces
+        self.trigger      <= 0
+        self.lb_mask      <= 0
+        self.num_instr    <= 0
+        self.num_output   <= 0
+        self.core_outputs <= 0
+        # Drivers/monitors
+        self.input.intf.initialise(IORole.INITIATOR)
         self.msg.intf.initialise(IORole.RESPONDER)
-        self.io.intf.initialise(IORole.INITIATOR)
-        self.signal.intf.initialise(IORole.INITIATOR)
-        self.memory.intf.initialise(IORole.RESPONDER)
+        self.ram.intf.initialise(IORole.RESPONDER)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
