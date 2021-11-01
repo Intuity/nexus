@@ -278,14 +278,14 @@ nx_node_store #(
     , .i_wr_en      ( dcd_wr_en     )
     // Read ports
     // - A
-    , .i_rd_a_addr  ( core_rd_addr  )
-    , .i_rd_a_en    ( core_rd_en    )
-    , .o_rd_a_data  ( core_rd_data  )
-    , .o_rd_a_stall ( core_rd_stall )
+    , .i_a_rd_addr  ( core_rd_addr  )
+    , .i_a_rd_en    ( core_rd_en    )
+    , .o_a_rd_data  ( core_rd_data  )
+    , .o_a_rd_stall ( core_rd_stall )
     // - B
-    , .i_rd_b_addr  ( ctrl_rd_addr  )
-    , .i_rd_b_en    ( ctrl_rd_en    )
-    , .o_rd_b_data  ( ctrl_rd_data  )
+    , .i_b_rd_addr  ( ctrl_rd_addr  )
+    , .i_b_rd_en    ( ctrl_rd_en    )
+    , .o_b_rd_data  ( ctrl_rd_data  )
 );
 
 // =============================================================================

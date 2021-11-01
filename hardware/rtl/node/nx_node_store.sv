@@ -33,29 +33,29 @@ import NXConstants::*;
     , input  logic                  i_wr_en
     // Read ports
     // - A
-    , input  logic [RAM_ADDR_W-1:0] i_rd_a_addr
-    , input  logic                  i_rd_a_en
-    , output logic [RAM_DATA_W-1:0] o_rd_a_data
-    , output logic                  o_rd_a_stall
+    , input  logic [RAM_ADDR_W-1:0] i_a_rd_addr
+    , input  logic                  i_a_rd_en
+    , output logic [RAM_DATA_W-1:0] o_a_rd_data
+    , output logic                  o_a_rd_stall
     // - B
-    , input  logic [RAM_ADDR_W-1:0] i_rd_b_addr
-    , input  logic                  i_rd_b_en
-    , output logic [RAM_DATA_W-1:0] o_rd_b_data
+    , input  logic [RAM_ADDR_W-1:0] i_b_rd_addr
+    , input  logic                  i_b_rd_en
+    , output logic [RAM_DATA_W-1:0] o_b_rd_data
 );
 
 // Mux port A between the write stream and read port A
 logic [RAM_ADDR_W-1:0] muxed_addr;
 logic                  muxed_en;
 
-assign muxed_addr   = i_wr_en ? i_wr_addr : i_rd_a_addr;
-assign muxed_en     = i_wr_en || i_rd_a_en;
-assign o_rd_a_stall = i_wr_en;
+assign muxed_addr   = i_wr_en ? i_wr_addr : i_a_rd_addr;
+assign muxed_en     = i_wr_en || i_a_rd_en;
+assign o_a_rd_stall = i_wr_en;
 
 // Instance the RAM
 nx_ram #(
       .ADDRESS_WIDTH ( RAM_ADDR_W )
     , .DATA_WIDTH    ( RAM_DATA_W )
-) ram (
+) u_ram (
     // Port A
       .i_clk_a     ( i_clk       )
     , .i_rst_a     ( i_rst       )
@@ -63,15 +63,15 @@ nx_ram #(
     , .i_wr_data_a ( i_wr_data   )
     , .i_wr_en_a   ( i_wr_en     )
     , .i_en_a      ( muxed_en    )
-    , .o_rd_data_a ( o_rd_a_data )
+    , .o_rd_data_a ( o_a_rd_data )
     // Port B
     , .i_clk_b     ( i_clk       )
     , .i_rst_b     ( i_rst       )
-    , .i_addr_b    ( i_rd_b_addr )
+    , .i_addr_b    ( i_b_rd_addr )
     , .i_wr_data_b ( 'd0         )
     , .i_wr_en_b   ( 'd0         )
-    , .i_en_b      ( i_rd_b_en   )
-    , .o_rd_data_b ( o_rd_b_data )
+    , .i_en_b      ( i_b_rd_en   )
+    , .o_rd_data_b ( o_b_rd_data )
 );
 
 endmodule : nx_node_store
