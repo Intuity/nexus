@@ -106,7 +106,9 @@ assign o_ram_wr_en   = is_msg_load && i_msg_data.load.last;
 assign load_address = load_address_q + (o_ram_wr_en ? 'd1 : 'd0);
 
 // Clear out the held data whenever a write occurs, else pickup the new value
-assign load_segment = o_ram_wr_en ? 'd0 : i_msg_data.load.data;
+assign load_segment = o_ram_wr_en ? 'd0 :
+                      is_msg_load ? i_msg_data.load.data
+                                  : load_segment_q;
 
 // =============================================================================
 // Loopback mask handling
@@ -116,7 +118,7 @@ assign load_segment = o_ram_wr_en ? 'd0 : i_msg_data.load.data;
 generate
 for (genvar idx = 0; idx < LB_NUM_SEG; idx++) begin : gen_lb_seg
     assign loopback_mask[idx] = (
-        (is_msg_loopback && i_msg_data.loopback.select[LB_NUM_SEG_W-1:0])
+        (is_msg_loopback && i_msg_data.loopback.select[LB_NUM_SEG_W-1:0] == idx)
             ? i_msg_data.loopback.section : loopback_mask_q[idx]
     );
 end
