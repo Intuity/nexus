@@ -26,7 +26,7 @@ class MemoryIO(BaseIO):
             role: Role of this signal on the DUT boundary
         """
         super().__init__(dut, name, role, [
-            "addr", "wr_data", "wr_en", "rd_en",
+            "addr", "wr_data", "wr_en", "rd_en"
         ], [
-            "rd_data",
+            "rd_data", "stall"
         ])
