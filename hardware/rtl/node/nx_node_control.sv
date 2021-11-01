@@ -44,9 +44,9 @@ import NXConstants::*;
     , output logic                        o_msg_valid
     , input  logic                        i_msg_ready
     // Interface to store
-    , output logic [RAM_ADDR_W-1:0]       o_rd_addr
-    , output logic                        o_rd_en
-    , input  logic [RAM_DATA_W-1:0]       i_rd_data
+    , output logic [RAM_ADDR_W-1:0]       o_ram_addr
+    , output logic                        o_ram_rd_en
+    , input  logic [RAM_DATA_W-1:0]       i_ram_rd_data
     // Interface to logic core
     , output logic [INPUTS-1:0]           o_core_inputs
     , input  logic [OUTPUTS-1:0]          i_core_outputs
@@ -107,9 +107,9 @@ nx_node_control_outputs #(
     , .o_msg_valid    ( o_msg_valid    )
     , .i_msg_ready    ( i_msg_ready    )
     // Interface to store
-    , .o_rd_addr      ( o_rd_addr      )
-    , .o_rd_en        ( o_rd_en        )
-    , .i_rd_data      ( i_rd_data      )
+    , .o_ram_addr     ( o_ram_addr     )
+    , .o_ram_rd_en    ( o_ram_rd_en    )
+    , .i_ram_rd_data  ( i_ram_rd_data  )
     // Interface to core
     , .i_core_outputs ( i_core_outputs )
 );

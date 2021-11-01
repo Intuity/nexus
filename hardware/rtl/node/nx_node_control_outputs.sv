@@ -36,9 +36,9 @@ import NXConstants::*;
     , output logic                        o_msg_valid
     , input  logic                        i_msg_ready
     // Interface to store
-    , output logic [RAM_ADDR_W-1:0]       o_rd_addr
-    , output logic                        o_rd_en
-    , input  logic [RAM_DATA_W-1:0]       i_rd_data
+    , output logic [RAM_ADDR_W-1:0]       o_ram_addr
+    , output logic                        o_ram_rd_en
+    , input  logic [RAM_DATA_W-1:0]       i_ram_rd_data
     // Interface to logic core
     , input  logic [OUTPUTS-1:0]          i_core_outputs
 );
@@ -63,8 +63,8 @@ typedef enum logic [1:0] { IDLE, LOOKUP, QUERY, SEND } fsm_t;
 `DECLARE_DQ(OUTPUT_WIDTH, output_index, i_clk, i_rst, 'd0)
 `DECLARE_DQ(1,            output_value, i_clk, i_rst, 'd0)
 
-logic [OUTPUTS-1:0]      output_mask, output_xor;
-logic                    output_change;
+logic [OUTPUTS-1:0] output_mask, output_xor;
+logic               output_change;
 
 // RAM interface
 `DECLARE_DQT(output_lookup_t, pointers, i_clk, i_rst, 'd0)
@@ -74,6 +74,7 @@ logic                    output_change;
 `DECLARE_DQ (1,             msg_valid, i_clk, i_rst, 'd0)
 `DECLARE_DQT(node_signal_t, msg_data,  i_clk, i_rst, 'd0)
 
+node_header_t    msg_hdr;
 output_mapping_t mapping;
 logic            msg_stall;
 
@@ -98,8 +99,9 @@ always_comb begin : comb_fsm
         QUERY : begin
             // For purely looped-back outputs:
             //   - If another change is detected go straight to LOOKUP
+            if      (!pointers.active &&  output_change) fsm_state = LOOKUP;
             //   - Otherwise go to idle
-            if (!pointers.active) fsm_state = output_change ? LOOKUP : IDLE;
+            else if (!pointers.active && !output_change) fsm_state = IDLE;
             // Otherwise move on to SEND
             else                  fsm_state = SEND;
         end
@@ -107,7 +109,10 @@ always_comb begin : comb_fsm
         SEND : begin
             // On the last read go to LOOKUP if another change is detected,
             // otherwise go to idle
-            if (rd_addr == pointers.stop) fsm_state = output_change ? LOOKUP : IDLE;
+            if (rd_addr == pointers.stop) begin
+                if (output_change) fsm_state = LOOKUP;
+                else               fsm_state = IDLE;
+            end
         end
     endcase
 end
@@ -167,11 +172,11 @@ always_comb begin : comb_rd_addr
 end
 
 // Drive read request
-assign o_rd_en   = (fsm_state_q != IDLE);
-assign o_rd_addr = rd_addr;
+assign o_ram_rd_en = (fsm_state_q != IDLE);
+assign o_ram_addr  = rd_addr;
 
 // Capture lookup result
-assign pointers = (fsm_state_q == QUERY) ? i_rd_data[$bits(output_lookup_t)-1:0]
+assign pointers = (fsm_state_q == QUERY) ? i_ram_rd_data[$bits(output_lookup_t)-1:0]
                                          : pointers_q;
 
 // =============================================================================
@@ -179,19 +184,22 @@ assign pointers = (fsm_state_q == QUERY) ? i_rd_data[$bits(output_lookup_t)-1:0]
 // =============================================================================
 
 // Decode RAM response
-assign mapping = i_rd_data[$bits(output_mapping_t)-1:0];
+assign mapping = i_ram_rd_data[$bits(output_mapping_t)-1:0];
 
 // Determine stall condition
 assign msg_stall = msg_valid_q && !i_msg_ready;
 
+// Generate the header
+assign msg_hdr.row     = !msg_stall ? mapping.row    : msg_data_q.header.row;
+assign msg_hdr.column  = !msg_stall ? mapping.column : msg_data_q.header.column;
+assign msg_hdr.command = NODE_COMMAND_SIGNAL;
+
 // Generate the output message
-assign msg_data.header.row     = !msg_stall ? mapping.row    : msg_data_q.header.row;
-assign msg_data.header.column  = !msg_stall ? mapping.column : msg_data_q.header.column;
-assign msg_data.header.command = NODE_COMMAND_SIGNAL;
-assign msg_data.index          = !msg_stall ? mapping.index  : msg_data_q.index;
-assign msg_data.is_seq         = !msg_stall ? mapping.is_seq : msg_data_q.is_seq;
-assign msg_data.state          = !msg_stall ? output_value_q : msg_data_q.state;
-assign msg_data._padding_0     = 'd0;
+assign msg_data.header     = msg_hdr;
+assign msg_data.index      = !msg_stall ? mapping.index  : msg_data_q.index;
+assign msg_data.is_seq     = !msg_stall ? mapping.is_seq : msg_data_q.is_seq;
+assign msg_data.state      = !msg_stall ? output_value_q : msg_data_q.state;
+assign msg_data._padding_0 = 'd0;
 
 // Drive message valid high when in SEND
 assign msg_valid = (msg_stall && msg_valid_q) || (fsm_state_q == SEND);

@@ -253,9 +253,9 @@ nx_node_control #(
     , .o_msg_valid     ( comb_valid[1]     )
     , .i_msg_ready     ( comb_ready[1]     )
     // Interface to store
-    , .o_rd_addr       ( ctrl_rd_addr      )
-    , .o_rd_en         ( ctrl_rd_en        )
-    , .i_rd_data       ( ctrl_rd_data      )
+    , .o_ram_addr      ( ctrl_rd_addr      )
+    , .o_ram_rd_en     ( ctrl_rd_en        )
+    , .i_ram_rd_data   ( ctrl_rd_data      )
     // Interface to logic core
     , .o_core_inputs   ( core_inputs       )
     , .i_core_outputs  ( core_outputs      )
