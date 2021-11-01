@@ -44,9 +44,9 @@ class StateMonitor(Monitor):
             # Skip cycle if reset
             if self.reset == 1: continue
             # Capture any I/O mappings
-            if self.intf.valid == 1:
+            if self.intf.update == 1:
                 self._recv(SignalState(
-                    index     =int(self.intf.index),
+                    index     =int(self.intf.index ),
                     sequential=int(self.intf.is_seq),
-                    state     =int(self.intf.state),
+                    state     =int(self.intf.value ),
                 ))

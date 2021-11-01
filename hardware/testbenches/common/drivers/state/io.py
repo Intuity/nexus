@@ -26,5 +26,5 @@ class StateIO(BaseIO):
             role: Role of this signal on the DUT boundary
         """
         super().__init__(
-            dut, name, role, ["index", "is_seq", "state", "valid",], []
+            dut, name, role, ["index", "is_seq", "value", "update"], []
         )

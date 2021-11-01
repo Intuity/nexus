@@ -15,24 +15,10 @@
 from cocotb_bus.drivers import Driver
 from cocotb.triggers import RisingEdge
 
-class StateInitiator(Driver):
+from ..driver_common import BaseDriver
+
+class StateInitiator(BaseDriver):
     """ Drivers signal state updates as an initiator """
-
-    def __init__(self, entity, clock, reset, intf):
-        """ Initialise the StateInitiator instance.
-
-        Args:
-            entity : Pointer to the testbench/DUT
-            clock  : Clock signal for the interface
-            reset  : Reset signal for the interface
-            intf   : Interface
-        """
-        self.name   = "StateInitiator"
-        self.entity = entity
-        self.clock  = clock
-        self.reset  = reset
-        self.intf   = intf
-        super().__init__()
 
     async def _driver_send(self, transaction, sync=True, **kwargs):
         """ Send queued transactions onto the interface.
@@ -49,7 +35,7 @@ class StateInitiator(Driver):
         # Drive the request
         self.intf.index  <= transaction.index
         self.intf.is_seq <= transaction.sequential
-        self.intf.state  <= transaction.state
-        self.intf.valid  <= 1
+        self.intf.value  <= transaction.state
+        self.intf.update <= 1
         await RisingEdge(self.clock)
-        self.intf.valid  <= 0
+        self.intf.update <= 0
