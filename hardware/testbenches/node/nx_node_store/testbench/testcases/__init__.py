@@ -13,5 +13,4 @@
 # limitations under the License.
 
 from .basic import *
-from .ctrl import *
-from .instr import *
+from .memory import *

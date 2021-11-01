@@ -31,25 +31,23 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
-        # Pickup signals
-        self.populated = dut.instr_count_o
         # Setup drivers/monitors
-        self.store = InstrStoreInitiator(
-            self, self.clk, self.rst, InstrStoreIO(self.dut, "store", IORole.RESPONDER),
+        self.load = MemoryInitiator(
+            self, self.clk, self.rst, MemoryIO(self.dut, "ld", IORole.RESPONDER),
         )
-        self.fetch = InstrFetchInitiator(
-            self, self.clk, self.rst, InstrFetchIO(self.dut, "fetch", IORole.RESPONDER),
+        self.rd_a = MemoryInitiator(
+            self, self.clk, self.rst, MemoryIO(self.dut, "a", IORole.RESPONDER),
         )
-        self.ctrl = MemoryInitiator(
-            self, self.clk, self.rst, MemoryIO(self.dut, "ctrl", IORole.RESPONDER),
+        self.rd_b = MemoryInitiator(
+            self, self.clk, self.rst, MemoryIO(self.dut, "b", IORole.RESPONDER),
         )
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.store.intf.initialise(IORole.INITIATOR)
-        self.fetch.intf.initialise(IORole.INITIATOR)
-        self.ctrl.intf.initialise(IORole.INITIATOR)
+        self.load.intf.initialise(IORole.INITIATOR)
+        self.rd_a.intf.initialise(IORole.INITIATOR)
+        self.rd_b.intf.initialise(IORole.INITIATOR)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

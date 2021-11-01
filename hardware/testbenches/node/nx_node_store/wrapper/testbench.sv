@@ -15,56 +15,62 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter MAX_INSTRS  = 512 // Maximum number of instructions per core
-    , parameter CTRL_WIDTH  =  13 // Width of each control entry
-    , parameter MAX_CTRL    = 512 // Maximum number of control entries
+      parameter RAM_ADDR_W = 10
+    , parameter RAM_DATA_W = 32
 ) (
-      input  logic rst
-    // Populated instruction counter
-    , output logic [$clog2(MAX_INSTRS)-1:0] instr_count_o
-    // Instruction load interface
-    , input  instruction_t store_data_i
-    , input  logic         store_valid_i
-    // Instruction fetch interfaces
-    , input  logic [$clog2(MAX_INSTRS)-1:0] fetch_addr_i
-    , input  logic                          fetch_rd_i
-    , output instruction_t                  fetch_data_o
-    , output logic                          fetch_stall_o
-    // Control block interface
-    , input  logic [$clog2(MAX_CTRL)-1:0] ctrl_addr_i
-    , input  logic [      CTRL_WIDTH-1:0] ctrl_wr_data_i
-    , input  logic                        ctrl_wr_en_i
-    , input  logic                        ctrl_rd_en_i
-    , output logic [      CTRL_WIDTH-1:0] ctrl_rd_data_o
+      input  logic                  rst
+    // Write port
+    , input  logic [RAM_ADDR_W-1:0] i_ld_addr
+    , input  logic [RAM_DATA_W-1:0] i_ld_wr_data
+    , input  logic                  i_ld_wr_en
+    // Read ports
+    // - A
+    , input  logic [RAM_ADDR_W-1:0] i_a_addr
+    , input  logic                  i_a_rd_en
+    , output logic [RAM_DATA_W-1:0] o_a_rd_data
+    , output logic                  o_a_stall
+    // - B
+    , input  logic [RAM_ADDR_W-1:0] i_b_addr
+    , input  logic                  i_b_rd_en
+    , output logic [RAM_DATA_W-1:0] o_b_rd_data
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nx_node_store #(
-      .MAX_INSTRS (MAX_INSTRS )
-    , .CTRL_WIDTH (CTRL_WIDTH )
-    , .MAX_CTRL   (MAX_CTRL   )
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
-    // Populated instruction counter
-    , .instr_count_o(instr_count_o)
-    // Instruction load interface
-    , .store_data_i (store_data_i )
-    , .store_valid_i(store_valid_i)
-    // Instruction fetch interfaces
-    , .fetch_addr_i (fetch_addr_i )
-    , .fetch_rd_i   (fetch_rd_i   )
-    , .fetch_data_o (fetch_data_o )
-    , .fetch_stall_o(fetch_stall_o)
-    // Control block interface
-    , .ctrl_addr_i   (ctrl_addr_i   )
-    , .ctrl_wr_data_i(ctrl_wr_data_i)
-    , .ctrl_wr_en_i  (ctrl_wr_en_i  )
-    , .ctrl_rd_en_i  (ctrl_rd_en_i  )
-    , .ctrl_rd_data_o(ctrl_rd_data_o)
+      .RAM_ADDR_W ( RAM_ADDR_W )
+    , .RAM_DATA_W ( RAM_DATA_W )
+) u_dut (
+      .i_clk        ( clk          )
+    , .i_rst        ( rst          )
+    // Write port
+    , .i_wr_addr    ( i_ld_addr    )
+    , .i_wr_data    ( i_ld_wr_data )
+    , .i_wr_en      ( i_ld_wr_en   )
+    // Read ports
+    // - A
+    , .i_a_rd_addr  ( i_a_addr     )
+    , .i_a_rd_en    ( i_a_rd_en    )
+    , .o_a_rd_data  ( o_a_rd_data  )
+    , .o_a_rd_stall ( o_a_stall    )
+    // - B
+    , .i_b_rd_addr  ( i_b_addr     )
+    , .i_b_rd_en    ( i_b_rd_en    )
+    , .o_b_rd_data  ( o_b_rd_data  )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace
