@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Common bench support
-include ../common/Makefile
+include ../../common/Makefile
 
 # CocoTB bench support
 include $(shell cocotb-config --makefiles)/Makefile.sim

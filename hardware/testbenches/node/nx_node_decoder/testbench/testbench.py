@@ -17,17 +17,14 @@ from cocotb.triggers import ClockCycles, RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
 
 from tb_base import TestbenchBase
+from drivers.basic.unstrobed import UnstrobedMonitor
 from drivers.io_common import IORole
-from drivers.instr.io import InstrStoreIO
-from drivers.instr.store import InstrStoreMonitor
-from drivers.stream.io import StreamIO
-from drivers.stream.init import StreamInitiator
-from drivers.stream.resp import StreamResponder
-
-from drivers.map_io.io import IOMapIO
-from drivers.map_io.monitor import IOMapMonitor
+from drivers.memory.io import MemoryIO
+from drivers.memory.monitor import MemoryMonitor
 from drivers.state.io import StateIO
 from drivers.state.monitor import StateMonitor
+from drivers.stream.io import StreamIO
+from drivers.stream.init import StreamInitiator
 
 class Testbench(TestbenchBase):
 
@@ -38,42 +35,58 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
-        # Wrap complex interfaces
-        self.msg_io = StreamIO(self.dut, "msg",    IORole.RESPONDER)
-        # Setup drivers/monitors
-        self.msg = StreamInitiator(self, self.clk, self.rst, self.msg_io)
-        self.instr_load = InstrStoreMonitor(
-            self, self.clk, self.rst, InstrStoreIO(self.dut, "instr", IORole.INITIATOR),
+        # Setup drivers for complex interfaces
+        self.msg = StreamInitiator(
+            self, self.clk, self.rst, StreamIO(self.dut, "msg", IORole.RESPONDER)
         )
-        self.io_map = IOMapMonitor(
-            self, self.clk, self.rst, IOMapIO(self.dut, "map", IORole.INITIATOR),
+        self.ram = MemoryMonitor(
+            self, self.clk, self.rst, MemoryIO(self.dut, "ram", IORole.INITIATOR)
         )
-        self.state = StateMonitor(
-            self, self.clk, self.rst, StateIO(self.dut, "signal", IORole.INITIATOR),
+        self.sig = StateMonitor(
+            self, self.clk, self.rst, StateIO(self.dut, "input", IORole.INITIATOR)
+        )
+        # Pickup simple interfaces
+        self.idle       = self.dut.o_idle
+        self.lb_mask    = UnstrobedMonitor(
+            self, self.clk, self.rst, self.dut.o_loopback_mask, name="lb_mask"
+        )
+        self.num_instr  = UnstrobedMonitor(
+            self, self.clk, self.rst, self.dut.o_num_instr, name="num_instr"
+        )
+        self.num_output = UnstrobedMonitor(
+            self, self.clk, self.rst, self.dut.o_num_output, name="num_output"
         )
         # Create queues for expected transactions
-        self.exp_instr = []
-        self.exp_io    = []
-        self.exp_state = []
+        self.exp_ram        = []
+        self.exp_sig        = []
+        self.exp_lb_mask    = []
+        self.exp_num_instr  = []
+        self.exp_num_output = []
         # Create a scoreboard
         self.scoreboard = Scoreboard(self) # , fail_immediately=False)
-        self.scoreboard.add_interface(self.instr_load, self.exp_instr)
-        self.scoreboard.add_interface(self.io_map,     self.exp_io)
-        self.scoreboard.add_interface(self.state,      self.exp_state)
+        self.scoreboard.add_interface(self.ram,        self.exp_ram       )
+        self.scoreboard.add_interface(self.sig,        self.exp_sig       )
+        self.scoreboard.add_interface(self.lb_mask,    self.exp_lb_mask   )
+        self.scoreboard.add_interface(self.num_instr,  self.exp_num_instr )
+        self.scoreboard.add_interface(self.num_output, self.exp_num_output)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.msg_io.initialise(IORole.INITIATOR)
+        self.msg.intf.initialise(IORole.INITIATOR)
+        self.ram.intf.initialise(IORole.RESPONDER)
+        self.sig.intf.initialise(IORole.RESPONDER)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.exp_instr: await RisingEdge(tb.clk)
-            while tb.exp_io   : await RisingEdge(tb.clk)
-            while tb.exp_state: await RisingEdge(tb.clk)
+            while tb.exp_ram       : await RisingEdge(tb.clk)
+            while tb.exp_sig       : await RisingEdge(tb.clk)
+            while tb.exp_lb_mask   : await RisingEdge(tb.clk)
+            while tb.exp_num_instr : await RisingEdge(tb.clk)
+            while tb.exp_num_output: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

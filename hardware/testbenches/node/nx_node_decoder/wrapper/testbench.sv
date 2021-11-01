@@ -15,47 +15,76 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter INPUTS  = 8
-    , parameter OUTPUTS = 8
+      parameter INPUTS     = 32
+    , parameter RAM_ADDR_W = 10
+    , parameter RAM_DATA_W = 32
 ) (
-      input  logic                    rst
-    // Node identity
-    , output logic                      idle_o
-    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+      input  logic                        rst
+    // Control signals
+    , output logic                        o_idle
     // Inbound message stream
-    , input  node_message_t msg_data_i
-    , input  direction_t    msg_dir_i
-    , input  logic          msg_valid_i
-    , output logic          msg_ready_o
-    // I/O mapping handling
-    , output logic [     IOR_WIDTH-1:0] map_idx_o     // Output to configure
-    , output logic [ADDR_ROW_WIDTH-1:0] map_tgt_row_o // Target node's row
-    , output logic [ADDR_COL_WIDTH-1:0] map_tgt_col_o // Target node's column
-    , output logic [     IOR_WIDTH-1:0] map_tgt_idx_o // Target node's I/O index
-    , output logic                       map_tgt_seq_o // Target node's input is sequential
-    , output logic                       map_valid_o   // Mapping is valid
-    // Signal state update
-    , output logic [IOR_WIDTH-1:0] signal_index_o  // Input index
-    , output logic                 signal_is_seq_o // Input is sequential
-    , output logic                 signal_state_o  // Signal state
-    , output logic                 signal_valid_o  // Update is valid
-    // Instruction load
-    , output instruction_t instr_data_o  // Instruction data
-    , output logic         instr_valid_o // Instruction valid
+    , input  node_message_t               i_msg_data
+    , input  logic                        i_msg_valid
+    , output logic                        o_msg_ready
+    // Write interface to node's memory (driven by node_load_t)
+    , output logic [RAM_ADDR_W-1:0]       o_ram_addr
+    , output logic [RAM_DATA_W-1:0]       o_ram_wr_data
+    , output logic                        o_ram_wr_en
+    // Loopback mask (driven by node_loopback_t)
+    , output logic [INPUTS-1:0]           o_loopback_mask
+    // Input signal state (driven by node_signal_t)
+    , output logic [$clog2(INPUTS)-1:0]   o_input_index
+    , output logic                        o_input_value
+    , output logic                        o_input_is_seq
+    , output logic                        o_input_update
+    // Control parameters (driven by node_control_t)
+    , output logic [NODE_PARAM_WIDTH-1:0] o_num_instr
+    , output logic [NODE_PARAM_WIDTH-1:0] o_num_output
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
-nx_msg_decoder #(
-      .INPUTS (INPUTS )
-    , .OUTPUTS(OUTPUTS)
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
-    , .*
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
+nx_node_decoder #(
+      .INPUTS          ( INPUTS          )
+    , .RAM_ADDR_W      ( RAM_ADDR_W      )
+    , .RAM_DATA_W      ( RAM_DATA_W      )
+) u_dut (
+      .i_clk           ( clk             )
+    , .i_rst           ( rst             )
+    // Control signals
+    , .o_idle          ( o_idle          )
+    // Inbound message stream
+    , .i_msg_data      ( i_msg_data      )
+    , .i_msg_valid     ( i_msg_valid     )
+    , .o_msg_ready     ( o_msg_ready     )
+    // Write interface to node's memory (driven by node_load_t)
+    , .o_ram_addr      ( o_ram_addr      )
+    , .o_ram_wr_data   ( o_ram_wr_data   )
+    , .o_ram_wr_en     ( o_ram_wr_en     )
+    // Loopback mask (driven by node_loopback_t)
+    , .o_loopback_mask ( o_loopback_mask )
+    // Input signal state (driven by node_signal_t)
+    , .o_input_index   ( o_input_index   )
+    , .o_input_value   ( o_input_value   )
+    , .o_input_is_seq  ( o_input_is_seq  )
+    , .o_input_update  ( o_input_update  )
+    // Control parameters (driven by node_control_t)
+    , .o_num_instr     ( o_num_instr     )
+    , .o_num_output    ( o_num_output    )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace

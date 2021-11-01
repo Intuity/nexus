@@ -14,13 +14,12 @@
 
 from random import choice, randint
 
-from drivers.instr.store import InstrStore
-
 from ..testbench import testcase
-from drivers.map_io.common import IOMapping
 from drivers.state.common import SignalState
+from drivers.memory.common import MemoryTransaction
 
-from nxconstants import Direction, NodeCommand, NodeMessage
+from nxconstants import (NodeCommand, NodeMessage, MESSAGE_WIDTH, LOAD_SEG_WIDTH,
+                         LB_SECTION_WIDTH, LB_SELECT_WIDTH, NodeParameter)
 
 @testcase()
 async def messages(dut):
@@ -28,58 +27,71 @@ async def messages(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    for msg_idx in range(1000):
-        # Choose a random direction
-        dirx = choice(list(Direction))
+    # State
+    load_addr  = 0
+    load_accum = 0
+    loopback   = 0
+    num_instr  = 0
+    num_output = 0
 
-        # Choose a random command type
-        command = choice(list(NodeCommand))
-
-        # Randomise message contents until legal
+    for msg_idx in range(10000):
+        # Generate a random message
         msg = NodeMessage()
         while True:
             try:
-                msg.unpack(randint(0, (1 << 31) - 1))
+                msg.unpack(randint(0, (1 << MESSAGE_WIDTH) - 1))
                 break
             except Exception:
                 continue
 
-        # Setup the correct command
-        msg.raw.header.command = command
+        # Logging
+        dut.debug(f"Message {msg_idx:4d} - {NodeCommand(msg.raw.header.command).name}")
 
-        # Generate a message
-        if command == NodeCommand.LOAD_INSTR:
-            dut.debug(
-                f"MSG {msg_idx:03d}: Loading instruction 0x{msg.load_instr.instr.pack():08X}"
-            )
-            dut.exp_instr.append(InstrStore(msg.load_instr.instr.pack()))
-        elif command == NodeCommand.MAP_OUTPUT:
-            dut.debug(
-                f"MSG {msg_idx:03d}: Map output - TR: {msg.map_output.target_row}, "
-                f"TC: {msg.map_output.target_column}, LI: {msg.map_output.source_index}, "
-                f"RI: {msg.map_output.target_index}, SEQ: {msg.map_output.target_is_seq}"
-            )
-            dut.exp_io.append(IOMapping(
-                msg.map_output.source_index, msg.map_output.target_row,
-                msg.map_output.target_column, msg.map_output.target_index,
-                msg.map_output.target_is_seq
-            ))
-        elif command == NodeCommand.SIG_STATE:
-            dut.debug(
-                f"MSG {msg_idx:03d}: I: {msg.sig_state.index}, "
-                f"SEQ: {msg.sig_state.is_seq}, STATE: {msg.sig_state.state}"
-            )
-            dut.exp_state.append(SignalState(
-                msg.sig_state.index, msg.sig_state.is_seq, msg.sig_state.state
-            ))
-        elif command == NodeCommand.NODE_CTRL:
-            dut.debug(f"MSG {msg_idx:03d}: Sending control 0x{msg.raw.payload:08X}")
+        # LOAD: Accumulate data, write to memory when LAST flag goes high
+        if msg.raw.header.command == NodeCommand.LOAD:
+            # Calculate mask
+            seg_mask = (1 << LOAD_SEG_WIDTH) - 1
+            # Mask and shift the accumulated value and OR in the new data
+            load_accum  = (load_accum & seg_mask) << LOAD_SEG_WIDTH
+            load_accum |= msg.load.data & seg_mask
+            # Write to memory if the LAST flag is set high
+            if msg.load.last:
+                dut.exp_ram.append(MemoryTransaction(
+                    addr=load_addr, wr_data=load_accum, wr_en=1
+                ))
+                load_addr  = (load_addr + 1) if (load_addr < 1023) else 0
+                load_accum = 0
 
-        # Create a message
-        dut.debug(
-            f"MSG - R: {msg.raw.header.row}, C: {msg.raw.header.column}, "
-            f"CMD: {command}  -> 0x{msg.pack():08X}"
-        )
+        # LOOPBACK: Accumulate loopback mask in chunks
+        elif msg.raw.header.command == NodeCommand.LOOPBACK:
+            # Calculate section offset
+            offset = LB_SECTION_WIDTH * (msg.loopback.select % 2)
+            # Calculate mask and inverse mask
+            mask      = ((1 << LB_SECTION_WIDTH) - 1) << offset
+            full_mask = (1 << (LB_SECTION_WIDTH * (1 << LB_SELECT_WIDTH))) - 1
+            inv_mask  = full_mask - mask
+            # Update loopback
+            updated = (loopback & inv_mask) | (msg.loopback.section << offset)
+            # Append to queue (if value changed)
+            if updated != loopback:
+                dut.exp_lb_mask.append(updated)
+            # Keep track of the previous value
+            loopback = updated
+
+        # SIGNAL: Signal state updates
+        elif msg.raw.header.command == NodeCommand.SIGNAL:
+            dut.exp_sig.append(SignalState(
+                msg.signal.index, msg.signal.is_seq, msg.signal.state
+            ))
+
+        # CONTROL: Parameter updates
+        elif msg.raw.header.command == NodeCommand.CONTROL:
+            if (msg.control.param == NodeParameter.INSTRUCTIONS) and (msg.control.value != num_instr):
+                dut.exp_num_instr.append(msg.control.value)
+                num_instr = msg.control.value
+            elif (msg.control.param == NodeParameter.OUTPUTS) and (msg.control.value != num_output):
+                dut.exp_num_output.append(msg.control.value)
+                num_output = msg.control.value
 
         # Queue up the message
-        dut.msg.append((msg.pack(), int(dirx)))
+        dut.msg.append((msg.pack(), 0))
