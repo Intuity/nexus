@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import randint
-
 from cocotb_bus.drivers import Driver
 from cocotb_bus.monitors import Monitor
 from cocotb.triggers import RisingEdge
@@ -53,7 +51,8 @@ class MemoryResponder(Driver, Monitor):
         """
         # Never synchronise - already synced by monitor
         # Drive the memory response
-        self.intf.rd_data <= transaction
+        self.intf.set("rd_data", transaction)
+        self.intf.set("stall", 0)
 
     async def _monitor_recv(self):
         """ Capture requests to the memory """
@@ -63,7 +62,7 @@ class MemoryResponder(Driver, Monitor):
             # Skip transactions when under reset
             if self.reset == 1: continue
             # Handle requests
-            if self.intf.wr_en == 1:
-                self.memory[int(self.intf.addr)] = int(self.intf.wr_data)
-            elif self.intf.rd_en == 1:
-                self.append(self.memory.get(int(self.intf.addr), 0))
+            if self.intf.get("wr_en"):
+                self.memory[int(self.intf.addr)] = self.intf.get("wr_data")
+            elif self.intf.get("rd_en"):
+                self.append(self.memory.get(self.intf.get("addr"), 0))
