@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Mon Nov  1 22:14:42 2021
+[*] Wed Nov  3 22:47:37 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node_control/sim.lxt"
-[dumpfile_mtime] "Mon Nov  1 22:13:55 2021"
-[dumpfile_size] 2411
+[dumpfile_mtime] "Wed Nov  3 22:45:50 2021"
+[dumpfile_size] 1928
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node_control/nx_node_control.gtkw"
 [timestart] 0
 [size] 2141 1269
-[pos] 1151 119
-*-14.403889 975000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] 1959 159
+*-14.403889 1000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [sst_width] 287
 [signals_width] 335
@@ -28,7 +28,27 @@ testbench.i_input_value[0]
 testbench.i_input_update[0]
 @200
 -
-@23
+@22
 testbench.o_core_inputs[31:0]
+@200
+-
+@22
+testbench.i_core_outputs[31:0]
+@200
+-
+@22
+testbench.o_ram_addr[9:0]
+@28
+testbench.o_ram_rd_en[0]
+@22
+testbench.i_ram_rd_data[31:0]
+@200
+-
+@22
+testbench.o_msg_data[30:0]
+@28
+testbench.o_msg_valid[0]
+@29
+testbench.i_msg_ready[0]
 [pattern_trace] 1
 [pattern_trace] 0

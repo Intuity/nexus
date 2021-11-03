@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint, random
+from random import choice, randint
 
-import cocotb
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import RisingEdge
 
 from drivers.state.common import SignalState
 
