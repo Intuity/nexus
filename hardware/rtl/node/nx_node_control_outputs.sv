@@ -69,6 +69,7 @@ logic               output_change;
 // RAM interface
 `DECLARE_DQT(output_lookup_t, pointers, i_clk, i_rst, 'd0)
 `DECLARE_DQ (RAM_ADDR_W,      rd_addr,  i_clk, i_rst, 'd0)
+`DECLARE_DQ (1,               last,     i_clk, i_rst, 'd0)
 
 // Message generation
 `DECLARE_DQ (1,             msg_valid, i_clk, i_rst, 'd0)
@@ -109,7 +110,7 @@ always_comb begin : comb_fsm
         SEND : begin
             // On the last read go to LOOKUP if another change is detected,
             // otherwise go to idle
-            if (rd_addr == pointers.stop) begin
+            if (last_q && !msg_stall) begin
                 if (output_change) fsm_state = LOOKUP;
                 else               fsm_state = IDLE;
             end
@@ -137,8 +138,12 @@ nx_clz #(
     , .o_leading     ( output_index )
 );
 
-// Mux to pickup the correct output value
-assign output_value = i_core_outputs[output_index[$clog2(OUTPUTS)-1:0]];
+// =============================================================================
+// Capture the Updated Output in Lookup
+// =============================================================================
+
+assign output_value = (fsm_state_q == LOOKUP) ? ~outputs_last_q[output_index_q[OUTPUT_WIDTH-2:0]]
+                                              : output_value_q;
 
 // =============================================================================
 // Update Held Output State in Lookup
@@ -148,7 +153,7 @@ generate
 for (genvar idx = 0; idx < OUTPUTS; idx++) begin : gen_update_state
     assign outputs_last[idx] = (
         (fsm_state_q == LOOKUP && output_index_q == idx[OUTPUT_WIDTH-1:0])
-            ? output_value_q : outputs_last_q[idx]
+            ? ~outputs_last_q[idx] : outputs_last_q[idx]
     );
 end
 endgenerate
@@ -179,6 +184,9 @@ assign o_ram_addr  = rd_addr;
 assign pointers = (fsm_state_q == QUERY) ? i_ram_rd_data[$bits(output_lookup_t)-1:0]
                                          : pointers_q;
 
+// Detect the last fetch
+assign last = (rd_addr == pointers.stop);
+
 // =============================================================================
 // Generate Messages
 // =============================================================================
@@ -198,7 +206,7 @@ assign msg_hdr.command = NODE_COMMAND_SIGNAL;
 assign msg_data.header     = msg_hdr;
 assign msg_data.index      = !msg_stall ? mapping.index  : msg_data_q.index;
 assign msg_data.is_seq     = !msg_stall ? mapping.is_seq : msg_data_q.is_seq;
-assign msg_data.state      = !msg_stall ? output_value_q : msg_data_q.state;
+assign msg_data.state      = output_value_q;
 assign msg_data._padding_0 = 'd0;
 
 // Drive message valid high when in SEND
