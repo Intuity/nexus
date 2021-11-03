@@ -74,7 +74,7 @@ class BaseIO:
         return (comp in self.__initiators) or (comp in self.__responders)
 
     def get(self, comp, default=None):
-        return getattr(self, comp).value if self.has(comp) else default
+        return int(getattr(self, comp).value) if self.has(comp) else default
 
     def set(self, comp, value):
         if not self.has(comp): return
