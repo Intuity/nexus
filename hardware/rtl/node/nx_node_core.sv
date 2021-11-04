@@ -38,8 +38,8 @@ import NXConstants::*;
     , output logic                        o_idle
     // Instruction fetch
     , output logic [RAM_ADDR_W-1:0]       o_instr_addr
-    , output logic                        o_instr_rd
-    , input  logic [RAM_DATA_W-1:0]       i_instr_data
+    , output logic                        o_instr_rd_en
+    , input  logic [RAM_DATA_W-1:0]       i_instr_rd_data
     , input  logic                        i_instr_stall
 );
 
@@ -95,11 +95,11 @@ assign start_fetch = (fetch_state_q == IDLE) && (held_trigger_q || i_trigger);
 assign fetch_state = (start_fetch || fetch_state_q) && (pc_q != i_populated[RAM_ADDR_W-1:0]);
 
 // Increment PC when active and not stalled
-assign pc = (fetch_state && !i_instr_stall) ? (pc_q + 'd1) : pc_q;
+assign pc = fetch_state ? (i_instr_stall ? pc_q : (pc_q + 'd1)) : 'd0;
 
 // Drive outputs
-assign o_instr_addr = pc_q;
-assign o_instr_rd   = (fetch_state == ACTIVE);
+assign o_instr_addr  = pc_q;
+assign o_instr_rd_en = (fetch_state == ACTIVE);
 
 // =============================================================================
 // Execution
@@ -112,7 +112,7 @@ assign exec_state = fetch_state_q;
 assign exec_active = (exec_state == ACTIVE) && !i_instr_stall;
 
 // Decode the instruction
-assign decoded = i_instr_data[$bits(instruction_t)-1:0];
+assign decoded = i_instr_rd_data[$bits(instruction_t)-1:0];
 
 // Mux the correct input values
 assign table_index = {

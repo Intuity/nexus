@@ -293,24 +293,24 @@ nx_node_store #(
 // =============================================================================
 
 nx_node_core #(
-      .INPUTS        ( INPUTS         )
-    , .OUTPUTS       ( OUTPUTS        )
-    , .REGISTERS     ( REGISTERS      )
+      .INPUTS          ( INPUTS         )
+    , .OUTPUTS         ( OUTPUTS        )
+    , .REGISTERS       ( REGISTERS      )
 ) u_core (
-      .i_clk         ( i_clk          )
-    , .i_rst         ( i_rst          )
+      .i_clk           ( i_clk          )
+    , .i_rst           ( i_rst          )
     // I/O from simulated logic
-    , .i_inputs      ( core_inputs    )
-    , .o_outputs     ( core_outputs   )
+    , .i_inputs        ( core_inputs    )
+    , .o_outputs       ( core_outputs   )
     // Execution controls
-    , .i_populated   ( dcd_num_instr  )
-    , .i_trigger     ( core_trigger   )
-    , .o_idle        ( comp_idle.core )
+    , .i_populated     ( dcd_num_instr  )
+    , .i_trigger       ( core_trigger   )
+    , .o_idle          ( comp_idle.core )
     // Instruction fetch
-    , .o_instr_addr  ( core_rd_addr   )
-    , .o_instr_rd    ( core_rd_en     )
-    , .i_instr_data  ( core_rd_data   )
-    , .i_instr_stall ( core_rd_stall  )
+    , .o_instr_addr    ( core_rd_addr   )
+    , .o_instr_rd_en   ( core_rd_en     )
+    , .i_instr_rd_data ( core_rd_data   )
+    , .i_instr_stall   ( core_rd_stall  )
 );
 
 endmodule : nx_node
