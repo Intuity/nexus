@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
+
 from cocotb_bus.drivers import Driver
 from cocotb_bus.monitors import Monitor
 from cocotb.triggers import RisingEdge
@@ -40,6 +42,10 @@ class MemoryResponder(Driver, Monitor):
         self.memory = {}
         Driver.__init__(self)
         Monitor.__init__(self)
+        self.stats.reads      = 0
+        self.stats.writes     = 0
+        self.stats.last_read  = 0
+        self.stats.last_write = 0
 
     async def _driver_send(self, transaction, sync=True, **kwargs):
         """ Send queued transactions onto the interface.
@@ -64,5 +70,9 @@ class MemoryResponder(Driver, Monitor):
             # Handle requests
             if self.intf.get("wr_en"):
                 self.memory[int(self.intf.addr)] = self.intf.get("wr_data")
+                self.stats.writes += 1
+                self.stats.last_write = int(self.intf.addr)
             elif self.intf.get("rd_en"):
                 self.append(self.memory.get(self.intf.get("addr"), 0))
+                self.stats.reads += 1
+                self.stats.last_read = int(self.intf.addr)
