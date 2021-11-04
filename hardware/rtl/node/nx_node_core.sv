@@ -122,18 +122,29 @@ assign table_index = {
 };
 
 // Lookup result in the truth table
-assign result = decoded.truth[table_index];
+assign result = (decoded.truth >> table_index) & 1'b1;
 
 // Update the working registers
-assign working[decoded.tgt_reg[REG_IDX_W-1:0]] = (
-    exec_active ? result : working_q[decoded.tgt_reg[REG_IDX_W-1:0]]
-);
+generate
+for (genvar idx = 0; idx < REGISTERS; idx++) begin : gen_working_reg
+    assign working[idx] = (
+        (exec_active && decoded.tgt_reg[REG_IDX_W-1:0] == idx)
+            ? result : working_q[idx]
+    );
+end
+endgenerate
 
 // Determine if an output should be generated
 assign exec_output = exec_active && decoded.gen_out;
 
 // Update the output vector if required
-assign outputs[output_idx_q] = exec_output ? result : outputs_q[output_idx_q];
+generate
+for (genvar idx = 0; idx < OUTPUTS; idx++) begin : gen_output
+    assign outputs[idx] = (
+        (exec_output && output_idx_q == idx) ? result : outputs_q[idx]
+    );
+end
+endgenerate
 
 // Increment the output index whenever an output is generated, reset to zero
 // when execution goes idle
