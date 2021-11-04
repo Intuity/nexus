@@ -16,8 +16,8 @@ import cocotb
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
-from drivers.instr.io import InstrFetchIO
-from drivers.instr.fetch import InstrFetchResponder
+from drivers.memory.io import MemoryIO
+from drivers.memory.resp import MemoryResponder
 
 class Testbench(TestbenchBase):
 
@@ -28,18 +28,24 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
+        # Basic interfaces
+        self.inputs    = self.dut.i_inputs
+        self.outputs   = self.dut.o_outputs
+        self.populated = self.dut.i_populated
+        self.trigger   = self.dut.i_trigger
+        self.idle      = self.dut.o_idle
         # Wrap complex interfaces
-        self.instr = InstrFetchIO(self.dut, "instr", IORole.INITIATOR)
-        # Setup drivers/monitors
-        self.instr_store = InstrFetchResponder(self, self.clk, self.rst, self.instr)
+        self.ram = MemoryResponder(
+            self, self.clk, self.rst, MemoryIO(self.dut, "instr", IORole.INITIATOR)
+        )
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.inputs_i      <= 0
-        self.populated_i   <= 0
-        self.trigger_i     <= 0
-        self.instr.initialise(IORole.RESPONDER)
+        self.inputs    <= 0
+        self.populated <= 0
+        self.trigger   <= 0
+        self.ram.intf.initialise(IORole.RESPONDER)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

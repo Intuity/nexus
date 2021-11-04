@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Include common Python for node
+PYTHON_PATHS += $(abspath ../common)
+
 # Common bench support
-include ../common/Makefile
+include ../../common/Makefile
 
 # CocoTB bench support
 include $(shell cocotb-config --makefiles)/Makefile.sim

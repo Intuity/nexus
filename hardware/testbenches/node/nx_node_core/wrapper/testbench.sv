@@ -15,48 +15,64 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter INPUTS    = 32
-    , parameter OUTPUTS   = 32
-    , parameter REGISTERS =  8
+      parameter INPUTS     = 32
+    , parameter OUTPUTS    = 32
+    , parameter REGISTERS  =  8
+    , parameter RAM_ADDR_W = 10
+    , parameter RAM_DATA_W = 32
 ) (
-      input  logic rst
+      input  logic                        rst
     // I/O from simulated logic
-    , input  logic [ INPUTS-1:0] inputs_i
-    , output logic [OUTPUTS-1:0] outputs_o
+    , input  logic [ INPUTS-1:0]          i_inputs
+    , output logic [OUTPUTS-1:0]          o_outputs
     // Execution controls
-    , input  logic [$clog2(MAX_NODE_INSTRS)-1:0] populated_i
-    , input  logic                               trigger_i
-    , output logic                               idle_o
+    , input  logic [NODE_PARAM_WIDTH-1:0] i_populated
+    , input  logic                        i_trigger
+    , output logic                        o_idle
     // Instruction fetch
-    , output logic [$clog2(MAX_NODE_INSTRS)-1:0] instr_addr_o
-    , output logic                               instr_rd_o
-    , input  instruction_t                       instr_data_i
-    , input  logic                               instr_stall_i
+    , output logic [RAM_ADDR_W-1:0]       o_instr_addr
+    , output logic                        o_instr_rd_en
+    , input  logic [RAM_DATA_W-1:0]       i_instr_rd_data
+    , input  logic                        i_instr_stall
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nx_node_core #(
-      .INPUTS   (INPUTS   )
-    , .OUTPUTS  (OUTPUTS  )
-    , .REGISTERS(REGISTERS)
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
+      .INPUTS          ( INPUTS          )
+    , .OUTPUTS         ( OUTPUTS         )
+    , .REGISTERS       ( REGISTERS       )
+    , .RAM_ADDR_W      ( RAM_ADDR_W      )
+    , .RAM_DATA_W      ( RAM_DATA_W      )
+) u_dut (
+      .i_clk           ( clk             )
+    , .i_rst           ( rst             )
     // I/O from simulated logic
-    , .inputs_i (inputs_i )
-    , .outputs_o(outputs_o)
+    , .i_inputs        ( i_inputs        )
+    , .o_outputs       ( o_outputs       )
     // Execution controls
-    , .populated_i(populated_i)
-    , .trigger_i  (trigger_i  )
-    , .idle_o     (idle_o     )
+    , .i_populated     ( i_populated     )
+    , .i_trigger       ( i_trigger       )
+    , .o_idle          ( o_idle          )
     // Instruction fetch
-    , .instr_addr_o (instr_addr_o )
-    , .instr_rd_o   (instr_rd_o   )
-    , .instr_data_i (instr_data_i )
-    , .instr_stall_i(instr_stall_i)
+    , .o_instr_addr    ( o_instr_addr    )
+    , .o_instr_rd_en   ( o_instr_rd_en   )
+    , .i_instr_rd_data ( i_instr_rd_data )
+    , .i_instr_stall   ( i_instr_stall   )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace
