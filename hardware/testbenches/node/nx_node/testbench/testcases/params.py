@@ -41,7 +41,7 @@ async def parameters(dut):
     # Scoreboard
     exp_num_instr  = []
     exp_num_output = []
-    prm_sb         = Scoreboard(dut)
+    prm_sb         = Scoreboard(dut, fail_immediately=True)
     prm_sb.add_interface(um_num_instr,  exp_num_instr )
     prm_sb.add_interface(um_num_output, exp_num_output)
 
