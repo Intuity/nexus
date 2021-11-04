@@ -39,51 +39,44 @@ async def fetching(dut):
     await dut.reset()
 
     # Without populating instructions, try triggering execution
-    dut.trigger_i <= 1
+    dut.trigger <= 1
     await RisingEdge(dut.clk)
-    dut.trigger_i <= 0
+    dut.trigger <= 0
 
     # Check DUT remains idle for 100 cycles
     for _ in range(100):
-        assert dut.idle_o == 1, "DUT did not remain idle"
+        assert dut.idle == 1, "DUT did not remain idle"
         await RisingEdge(dut.clk)
 
     # Check that no instruction fetches occurred
-    assert dut.instr_store.stats.received_transactions == 0, \
-        "Instruction store should not have received any transactions"
+    assert dut.ram.stats.reads == 0, "No reads from RAM should have occurred"
 
     # Randomise fetching of different numbers of instructions
     last = 0
     for _ in range(10):
         # Setup a random number of populated instructions
         populated = randint(10, 100)
-        dut.populated_i <= populated
+        dut.populated <= populated
         await RisingEdge(dut.clk)
 
         # Check still idle
-        assert dut.idle_o == 1, "DUT not idle"
+        assert dut.idle == 1, "DUT not idle"
 
         # Trigger execution
-        dut.trigger_i <= 1
+        dut.trigger <= 1
         await RisingEdge(dut.clk)
-        dut.trigger_i <= 0
+        dut.trigger <= 0
         await RisingEdge(dut.clk)
-        assert dut.idle_o == 0, "DUT is still idle"
+        assert dut.idle == 0, "DUT is still idle"
 
         # Wait until the DUT goes idle again
-        await First(ClockCycles(dut.clk, 1000), RisingEdge(dut.idle_o))
-        await RisingEdge(dut.clk)
-        assert dut.idle_o == 1, "DUT is not idle"
+        while dut.idle == 0: await RisingEdge(dut.clk)
+        assert dut.idle == 1, "DUT is not idle"
 
         # Check fetch delta
-        rcvd  = dut.instr_store.stats.received_transactions
+        rcvd  = dut.ram.stats.reads
         delta = rcvd - last
         assert delta == populated, f"Expected {populated} fetches, got {delta}"
-
-        # Check that the received transactions correctly increment
-        for idx in range(populated):
-            item = dut.instr_store._recvQ.popleft()
-            assert item.address == idx, f"Item {idx} has address {item.address}"
 
         # Update the last monitor count
         last = rcvd
@@ -99,54 +92,49 @@ async def restart(dut):
     for _ in range(10):
         # Setup a random number of populated instructions
         populated = randint(50, 100)
-        dut.populated_i <= populated
+        dut.populated <= populated
         await RisingEdge(dut.clk)
 
         # Check still idle
-        assert dut.idle_o == 1, "DUT not idle"
+        assert dut.idle == 1, "DUT not idle"
 
         # Trigger execution
-        dut.trigger_i <= 1
+        dut.trigger <= 1
         await RisingEdge(dut.clk)
-        dut.trigger_i <= 0
+        dut.trigger <= 0
         await RisingEdge(dut.clk)
-        assert dut.idle_o == 0, "DUT is still idle"
+        assert dut.idle == 0, "DUT is still idle"
 
         # Wait for some fetches to occur
         dut.info("Waiting for some of fetches to occur")
-        while (dut.instr_store.stats.received_transactions - last) < randint(
+        while (dut.ram.stats.reads - last) < randint(
             int(0.1 * populated), int(0.9 * populated)
         ): await RisingEdge(dut.clk)
 
         # Check DUT is still active
-        assert dut.idle_o == 0, "DUT is not active"
+        assert dut.idle == 0, "DUT is not active"
 
         # Restart execution
         dut.info("Restarting execution")
-        dut.trigger_i <= 1
+        dut.trigger <= 1
         await RisingEdge(dut.clk)
-        dut.trigger_i <= 0
+        dut.trigger <= 0
         await RisingEdge(dut.clk)
-        assert dut.idle_o == 0, "DUT is still idle"
+        assert dut.idle == 0, "DUT is still idle"
 
         # Wait until the DUT goes idle again
-        await First(ClockCycles(dut.clk, 1000), RisingEdge(dut.idle_o))
-        await RisingEdge(dut.clk)
-        assert dut.idle_o == 1, "DUT is not idle"
+        while dut.idle == 0: await RisingEdge(dut.clk)
+        assert dut.idle == 1, "DUT is not idle"
 
         # Check fetch delta
-        rcvd  = dut.instr_store.stats.received_transactions
+        rcvd  = dut.ram.stats.reads
         delta = rcvd - last
         exp   = populated * 2
         assert delta == exp, f"Expected ~{exp} fetches, got {delta}"
 
         # Check instruction fetches
-        seq  = [x for x in range(delta - populated)]
-        seq += [x for x in range(populated)]
-        for idx, addr in enumerate(seq):
-            item = dut.instr_store._recvQ.popleft()
-            assert item.address == addr, \
-                f"Item {idx} expecting address {addr}, got {item.address}"
+        assert dut.ram.stats.last_read == (populated - 1), \
+            f"Last fetch 0x{dut.ram.stats.last_read:08X} != expected 0x{populated-1:08X}"
 
         # Update the last monitor count
         last = rcvd
