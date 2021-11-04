@@ -16,8 +16,8 @@ from random import choice, randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
-import nxconstants
-from nxconstants import Instruction, Operation, NodeLoadInstr, NodeCommand
+from nxconstants import (NodeCommand, NodeLoad, NodeID, LOAD_SEG_WIDTH,
+                         MAX_ROW_COUNT, MAX_COLUMN_COUNT)
 
 from ..testbench import testcase
 
@@ -28,44 +28,43 @@ async def load(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.info(f"Setting row to {row} & column to {col}")
-    dut.node_row_i <= row
-    dut.node_col_i <= col
+    # Pickup parameters from the design
+    ram_addr_w = int(dut.RAM_ADDR_W)
+    ram_data_w = int(dut.RAM_DATA_W)
+
+    # Decide on a row and column
+    node_id = NodeID(
+        row   =randint(0, MAX_ROW_COUNT-1   ),
+        column=randint(0, MAX_COLUMN_COUNT-1),
+    )
+    dut.node_id <= node_id.pack()
 
     # Select an inbound pipe
     inbound = choice(dut.inbound)
 
-    # Load a random number of instructions
+    # Load random data into the node
     loaded = []
-    for _ in range(randint(10, 500)):
-        msg = NodeLoadInstr()
-        msg.header.row     = row
-        msg.header.column  = col
-        msg.header.command = NodeCommand.LOAD_INSTR
-        msg.instr.opcode   = choice(list(Operation))
-        msg.instr.src_a    = randint(0, nxconstants.MAX_NODE_IOR_COUNT-1)
-        msg.instr.src_a_ip = choice((0, 1))
-        msg.instr.src_b    = randint(0, nxconstants.MAX_NODE_IOR_COUNT-1)
-        msg.instr.src_b_ip = choice((0, 1))
-        msg.instr.tgt_reg  = randint(0, nxconstants.MAX_NODE_REGISTERS-1)
-        msg.instr.gen_out  = choice((0, 1))
-        inbound.append(msg.pack())
-        loaded.append(msg.instr.pack())
+    chunks = ram_data_w // LOAD_SEG_WIDTH
+    mask   = (1 << LOAD_SEG_WIDTH) - 1
+    for _ in range(randint(10, (1 << ram_addr_w) - 1)):
+        data = randint(0, (1 << ram_data_w) - 1)
+        loaded.append(data)
+        for chunk in range(ram_data_w // LOAD_SEG_WIDTH):
+            msg = NodeLoad()
+            msg.header.row     = node_id.row
+            msg.header.column  = node_id.column
+            msg.header.command = NodeCommand.LOAD
+            msg.data           = (data >> ((chunks - chunk - 1) * LOAD_SEG_WIDTH)) & mask
+            msg.last           = (chunk == (chunks - 1))
+            inbound.append(msg.pack())
 
-    # Wait for all inbound drivers to drain
-    dut.info(f"Waiting for {len(loaded)} loads")
-    for ib in dut.inbound:
-        while ib._sendQ: await RisingEdge(dut.clk)
-        while ib.intf.valid == 1: await RisingEdge(dut.clk)
+    # Wait for the driver to go idle
+    dut.info(f"Waiting for {len(loaded)} loads to complete")
+    await inbound.idle()
     await ClockCycles(dut.clk, 10)
 
-    # Check the instruction counters
-    assert dut.dut.dut.store.instr_count_o == len(loaded), \
-        f"Expected {len(loaded)}, got {int(dut.dut.dut.store.instr_count_o)}"
-
-    # Check the loaded instructions
-    for op_idx, op in enumerate(loaded):
-        got = int(dut.dut.dut.store.ram.memory[op_idx])
-        assert got == op, f"O{op_idx} - exp {hex(op)}, got {hex(got)}"
+    # Check the contents of the RAM
+    for idx, exp_data in enumerate(loaded):
+        rtl_data = int(dut.dut.u_dut.u_store.u_ram.memory[idx])
+        assert exp_data == rtl_data, \
+            f"Memory @ 0x{idx:08X}: RTL 0x{rtl_data:08X} != EXP 0x{exp_data:08X}"

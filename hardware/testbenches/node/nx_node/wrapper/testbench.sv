@@ -15,110 +15,141 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter INPUTS    =  32
-    , parameter OUTPUTS   =  32
-    , parameter REGISTERS =   8
+      parameter INPUTS     = 32
+    , parameter OUTPUTS    = 32
+    , parameter REGISTERS  =  8
+    , parameter RAM_ADDR_W = 10
+    , parameter RAM_DATA_W = 32
 ) (
-      input  logic rst
+      input  logic          rst
     // Control signals
-    , input  logic                      trigger_i
-    , output logic                      idle_o
-    , input  logic [ADDR_ROW_WIDTH-1:0] node_row_i
-    , input  logic [ADDR_COL_WIDTH-1:0] node_col_i
+    , input  logic          i_trigger
+    , output logic          o_idle
+    , input  node_id_t      i_node_id
     // Inbound interfaces
     // - North
-    , input  node_message_t ib_north_data_i
-    , input  logic          ib_north_valid_i
-    , output logic          ib_north_ready_o
+    , input  node_message_t i_ib_north_data
+    , input  logic          i_ib_north_valid
+    , output logic          o_ib_north_ready
     // - East
-    , input  node_message_t ib_east_data_i
-    , input  logic          ib_east_valid_i
-    , output logic          ib_east_ready_o
+    , input  node_message_t i_ib_east_data
+    , input  logic          i_ib_east_valid
+    , output logic          o_ib_east_ready
     // - South
-    , input  node_message_t ib_south_data_i
-    , input  logic          ib_south_valid_i
-    , output logic          ib_south_ready_o
+    , input  node_message_t i_ib_south_data
+    , input  logic          i_ib_south_valid
+    , output logic          o_ib_south_ready
     // - West
-    , input  node_message_t ib_west_data_i
-    , input  logic          ib_west_valid_i
-    , output logic          ib_west_ready_o
+    , input  node_message_t i_ib_west_data
+    , input  logic          i_ib_west_valid
+    , output logic          o_ib_west_ready
     // Outbound interfaces
     // - North
-    , output node_message_t ob_north_data_o
-    , output logic          ob_north_valid_o
-    , input  logic          ob_north_ready_i
-    , input  logic          ob_north_present_i
+    , output node_message_t o_ob_north_data
+    , output logic          o_ob_north_valid
+    , input  logic          i_ob_north_ready
+    , input  logic          i_ob_north_present
     // - East
-    , output node_message_t ob_east_data_o
-    , output logic          ob_east_valid_o
-    , input  logic          ob_east_ready_i
-    , input  logic          ob_east_present_i
+    , output node_message_t o_ob_east_data
+    , output logic          o_ob_east_valid
+    , input  logic          i_ob_east_ready
+    , input  logic          i_ob_east_present
     // - South
-    , output node_message_t ob_south_data_o
-    , output logic          ob_south_valid_o
-    , input  logic          ob_south_ready_i
-    , input  logic          ob_south_present_i
+    , output node_message_t o_ob_south_data
+    , output logic          o_ob_south_valid
+    , input  logic          i_ob_south_ready
+    , input  logic          i_ob_south_present
     // - West
-    , output node_message_t ob_west_data_o
-    , output logic          ob_west_valid_o
-    , input  logic          ob_west_ready_i
-    , input  logic          ob_west_present_i
+    , output node_message_t o_ob_west_data
+    , output logic          o_ob_west_valid
+    , input  logic          i_ob_west_ready
+    , input  logic          i_ob_west_present
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// Shims
+// =============================================================================
+
+logic [3:0][MESSAGE_WIDTH-1:0] inbound_data;
+logic [3:0]                    inbound_valid, inbound_ready;
+
+assign inbound_data[DIRECTION_NORTH]  = i_ib_north_data;
+assign inbound_valid[DIRECTION_NORTH] = i_ib_north_valid;
+assign o_ib_north_ready               = inbound_ready[DIRECTION_NORTH];
+
+assign inbound_data[DIRECTION_EAST]  = i_ib_east_data;
+assign inbound_valid[DIRECTION_EAST] = i_ib_east_valid;
+assign o_ib_east_ready                = inbound_ready[DIRECTION_EAST];
+
+assign inbound_data[DIRECTION_SOUTH]  = i_ib_south_data;
+assign inbound_valid[DIRECTION_SOUTH] = i_ib_south_valid;
+assign o_ib_south_ready               = inbound_ready[DIRECTION_SOUTH];
+
+assign inbound_data[DIRECTION_WEST]  = i_ib_west_data;
+assign inbound_valid[DIRECTION_WEST] = i_ib_west_valid;
+assign o_ib_west_ready                = inbound_ready[DIRECTION_WEST];
+
+logic [3:0][MESSAGE_WIDTH-1:0] outbound_data;
+logic [3:0]                    outbound_valid, outbound_ready, outbound_present;
+
+assign o_ob_north_data                   = outbound_data[DIRECTION_NORTH];
+assign o_ob_north_valid                  = outbound_valid[DIRECTION_NORTH];
+assign outbound_ready[DIRECTION_NORTH]   = i_ob_north_ready;
+assign outbound_present[DIRECTION_NORTH] = i_ob_north_present;
+
+assign o_ob_east_data                   = outbound_data[DIRECTION_EAST];
+assign o_ob_east_valid                  = outbound_valid[DIRECTION_EAST];
+assign outbound_ready[DIRECTION_EAST]   = i_ob_east_ready;
+assign outbound_present[DIRECTION_EAST] = i_ob_east_present;
+
+assign o_ob_south_data                   = outbound_data[DIRECTION_SOUTH];
+assign o_ob_south_valid                  = outbound_valid[DIRECTION_SOUTH];
+assign outbound_ready[DIRECTION_SOUTH]   = i_ob_south_ready;
+assign outbound_present[DIRECTION_SOUTH] = i_ob_south_present;
+
+assign o_ob_west_data                   = outbound_data[DIRECTION_WEST];
+assign o_ob_west_valid                  = outbound_valid[DIRECTION_WEST];
+assign outbound_ready[DIRECTION_WEST]   = i_ob_west_ready;
+assign outbound_present[DIRECTION_WEST] = i_ob_west_present;
+
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nx_node #(
-      .INPUTS   (INPUTS   )
-    , .OUTPUTS  (OUTPUTS  )
-    , .REGISTERS(REGISTERS)
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
+      .INPUTS             ( INPUTS           )
+    , .OUTPUTS            ( OUTPUTS          )
+    , .REGISTERS          ( REGISTERS        )
+    , .RAM_ADDR_W         ( RAM_ADDR_W       )
+    , .RAM_DATA_W         ( RAM_DATA_W       )
+) u_dut (
+      .i_clk              ( clk              )
+    , .i_rst              ( rst              )
     // Control signals
-    , .trigger_i (trigger_i )
-    , .idle_o    (idle_o    )
-    , .node_row_i(node_row_i)
-    , .node_col_i(node_col_i)
+    , .i_node_id          ( i_node_id        )
+    , .i_trigger          ( i_trigger        )
+    , .o_idle             ( o_idle           )
     // Inbound interfaces
-    // - North
-    , .ib_north_data_i (ib_north_data_i )
-    , .ib_north_valid_i(ib_north_valid_i)
-    , .ib_north_ready_o(ib_north_ready_o)
-    // - East
-    , .ib_east_data_i (ib_east_data_i )
-    , .ib_east_valid_i(ib_east_valid_i)
-    , .ib_east_ready_o(ib_east_ready_o)
-    // - South
-    , .ib_south_data_i (ib_south_data_i )
-    , .ib_south_valid_i(ib_south_valid_i)
-    , .ib_south_ready_o(ib_south_ready_o)
-    // - West
-    , .ib_west_data_i (ib_west_data_i )
-    , .ib_west_valid_i(ib_west_valid_i)
-    , .ib_west_ready_o(ib_west_ready_o)
+    , .i_inbound_data     ( inbound_data     )
+    , .i_inbound_valid    ( inbound_valid    )
+    , .o_inbound_ready    ( inbound_ready    )
     // Outbound interfaces
-    // - North
-    , .ob_north_data_o   (ob_north_data_o   )
-    , .ob_north_valid_o  (ob_north_valid_o  )
-    , .ob_north_ready_i  (ob_north_ready_i  )
-    , .ob_north_present_i(ob_north_present_i)
-    // - East
-    , .ob_east_data_o   (ob_east_data_o   )
-    , .ob_east_valid_o  (ob_east_valid_o  )
-    , .ob_east_ready_i  (ob_east_ready_i  )
-    , .ob_east_present_i(ob_east_present_i)
-    // - South
-    , .ob_south_data_o   (ob_south_data_o   )
-    , .ob_south_valid_o  (ob_south_valid_o  )
-    , .ob_south_ready_i  (ob_south_ready_i  )
-    , .ob_south_present_i(ob_south_present_i)
-    // - West
-    , .ob_west_data_o   (ob_west_data_o   )
-    , .ob_west_valid_o  (ob_west_valid_o  )
-    , .ob_west_ready_i  (ob_west_ready_i  )
-    , .ob_west_present_i(ob_west_present_i)
+    , .o_outbound_data    ( outbound_data    )
+    , .o_outbound_valid   ( outbound_valid   )
+    , .i_outbound_ready   ( outbound_ready   )
+    , .i_outbound_present ( outbound_present )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace

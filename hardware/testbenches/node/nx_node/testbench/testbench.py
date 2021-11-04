@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import cocotb
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
 
 from tb_base import TestbenchBase
@@ -32,9 +34,12 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Wrap I/Os
+        self.node_id = self.dut.i_node_id
+        self.trigger = self.dut.i_trigger
+        self.idle    = self.dut.o_idle
         self.present = [
-            self.dut.ob_north_present_i, self.dut.ob_east_present_i,
-            self.dut.ob_south_present_i, self.dut.ob_west_present_i,
+            self.dut.i_ob_north_present, self.dut.i_ob_east_present,
+            self.dut.i_ob_south_present, self.dut.i_ob_west_present,
         ]
         # Setup drivers/monitors
         self.inbound = [
@@ -52,7 +57,8 @@ class Testbench(TestbenchBase):
         # Create expected outbound queues
         self.expected = [[] for _ in self.outbound]
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self, fail_immediately=False)
+        imm_fail = (os.environ.get("FAIL_IMMEDIATELY", "no").lower() == "yes")
+        self.scoreboard = Scoreboard(self, fail_immediately=imm_fail)
         for resp, exp in zip(self.outbound, self.expected):
             self.scoreboard.add_interface(resp, exp, reorder_depth=100)
 
@@ -62,9 +68,8 @@ class Testbench(TestbenchBase):
         for init in self.inbound : init.intf.initialise(IORole.INITIATOR)
         for resp in self.outbound: resp.intf.initialise(IORole.RESPONDER)
         for flag in self.present : flag <= 1
-        self.trigger_i  <= 0
-        self.node_row_i <= 0
-        self.node_col_i <= 0
+        self.i_trigger <= 0
+        self.i_node_id <= 0
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
