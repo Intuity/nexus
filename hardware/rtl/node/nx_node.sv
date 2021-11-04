@@ -164,14 +164,23 @@ nx_stream_arbiter #(
 //  - Target row & column set the initial direction
 //  - If a particular direction is absent, routes to the next clockwise stream
 always_comb begin : comb_outbound_dir
-    if      (outbound_data.raw.header.row    < i_node_id.row   )
-        outbound_dir = i_outbound_present[DIRECTION_NORTH] ? DIRECTION_NORTH : DIRECTION_EAST;
-    else if (outbound_data.raw.header.row    > i_node_id.row   )
-        outbound_dir = i_outbound_present[DIRECTION_SOUTH] ? DIRECTION_SOUTH : DIRECTION_WEST;
-    else if (outbound_data.raw.header.column < i_node_id.column)
-        outbound_dir = i_outbound_present[DIRECTION_WEST ] ? DIRECTION_WEST  : DIRECTION_NORTH;
-    else
-        outbound_dir = i_outbound_present[DIRECTION_EAST ] ? DIRECTION_EAST  : DIRECTION_SOUTH;
+    logic lt_row, gt_row, lt_col, gt_col;
+    lt_row = (outbound_data.raw.header.row    < i_node_id.row   );
+    gt_row = (outbound_data.raw.header.row    > i_node_id.row   );
+    lt_col = (outbound_data.raw.header.column < i_node_id.column);
+    gt_col = (outbound_data.raw.header.column > i_node_id.column);
+    casex ({ lt_row, gt_row, lt_col, gt_col, i_outbound_present })
+    //     <R    >R    <C    >C   PRSNT
+        { 1'b1, 1'b0, 1'b0, 1'b0, 4'b???1 }: outbound_dir = DIRECTION_NORTH;
+        { 1'b1, 1'b0, 1'b0, 1'b0, 4'b???0 }: outbound_dir = DIRECTION_EAST;
+        { 1'b0, 1'b1, 1'b0, 1'b0, 4'b?1?? }: outbound_dir = DIRECTION_SOUTH;
+        { 1'b0, 1'b1, 1'b0, 1'b0, 4'b?0?? }: outbound_dir = DIRECTION_WEST;
+        { 1'b1, 1'b0, 1'b1, 1'b0, 4'b1??? }: outbound_dir = DIRECTION_WEST;
+        { 1'b1, 1'b0, 1'b1, 1'b0, 4'b0??? }: outbound_dir = DIRECTION_NORTH;
+        { 1'b0, 1'b0, 1'b0, 1'b1, 4'b??1? }: outbound_dir = DIRECTION_EAST;
+        { 1'b0, 1'b0, 1'b0, 1'b1, 4'b??0? }: outbound_dir = DIRECTION_SOUTH;
+        default: outbound_dir = DIRECTION_NORTH;
+    endcase
 end
 
 nx_stream_distributor #(
