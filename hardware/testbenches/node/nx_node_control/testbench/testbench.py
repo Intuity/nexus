@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import cocotb
 from cocotb_bus.scoreboard import Scoreboard
 from cocotb.triggers import ClockCycles, RisingEdge
@@ -56,7 +58,8 @@ class Testbench(TestbenchBase):
         # Create queues for expected transactions
         self.exp_msg = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self, fail_immediately=False)
+        imm_fail = (os.environ.get("FAIL_IMMEDIATELY", "no").lower() == "yes")
+        self.scoreboard = Scoreboard(self, fail_immediately=imm_fail)
         self.scoreboard.add_interface(self.msg, self.exp_msg)
 
     async def initialise(self):
