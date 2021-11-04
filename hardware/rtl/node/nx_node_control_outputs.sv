@@ -142,8 +142,10 @@ nx_clz #(
 // Capture the Updated Output in Lookup
 // =============================================================================
 
-assign output_value = (fsm_state_q == LOOKUP) ? ~outputs_last_q[output_index_q[OUTPUT_WIDTH-2:0]]
-                                              : output_value_q;
+assign output_value = (
+    (fsm_state_q == LOOKUP && !msg_stall) ? ~outputs_last_q[output_index_q[OUTPUT_WIDTH-2:0]]
+                                          : output_value_q
+);
 
 // =============================================================================
 // Update Held Output State in Lookup
@@ -152,7 +154,7 @@ assign output_value = (fsm_state_q == LOOKUP) ? ~outputs_last_q[output_index_q[O
 generate
 for (genvar idx = 0; idx < OUTPUTS; idx++) begin : gen_update_state
     assign outputs_last[idx] = (
-        (fsm_state_q == LOOKUP && output_index_q == idx[OUTPUT_WIDTH-1:0])
+        (fsm_state_q == LOOKUP && !msg_stall && output_index_q == idx[OUTPUT_WIDTH-1:0])
             ? ~outputs_last_q[idx] : outputs_last_q[idx]
     );
 end
