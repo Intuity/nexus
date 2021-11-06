@@ -1,28 +1,48 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Thu Nov  4 22:59:20 2021
+[*] Sat Nov  6 21:53:01 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node/sim.lxt"
-[dumpfile_mtime] "Thu Nov  4 22:59:07 2021"
-[dumpfile_size] 207029
+[dumpfile_mtime] "Sat Nov  6 21:51:28 2021"
+[dumpfile_size] 474871
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node/nx_node.gtkw"
 [timestart] 0
-[size] 1440 847
+[size] 1853 1401
 [pos] -1 -1
-*-19.946436 4079000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-20.038973 123000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [sst_width] 282
 [signals_width] 295
 [sst_expanded] 1
-[sst_vpaned_height] 257
+[sst_vpaned_height] 455
 @28
 testbench.u_dut.i_clk[0]
 testbench.u_dut.i_rst[0]
 @200
 -
-@22
+@800022
 testbench.u_dut.i_node_id[7:0]
+@c00024
+#{row} (4)testbench.u_dut.i_node_id[7:0] (5)testbench.u_dut.i_node_id[7:0] (6)testbench.u_dut.i_node_id[7:0] (7)testbench.u_dut.i_node_id[7:0]
+@28
+(4)testbench.u_dut.i_node_id[7:0]
+(5)testbench.u_dut.i_node_id[7:0]
+(6)testbench.u_dut.i_node_id[7:0]
+(7)testbench.u_dut.i_node_id[7:0]
+@1401200
+-group_end
+@c00024
+#{column} (0)testbench.u_dut.i_node_id[7:0] (1)testbench.u_dut.i_node_id[7:0] (2)testbench.u_dut.i_node_id[7:0] (3)testbench.u_dut.i_node_id[7:0]
+@28
+(0)testbench.u_dut.i_node_id[7:0]
+(1)testbench.u_dut.i_node_id[7:0]
+(2)testbench.u_dut.i_node_id[7:0]
+(3)testbench.u_dut.i_node_id[7:0]
+@1401200
+-group_end
+@1001200
+-group_end
 @200
 -
 @28
@@ -30,26 +50,497 @@ testbench.u_dut.i_trigger[0]
 testbench.u_dut.o_idle[0]
 @200
 -
-@22
-testbench.u_dut.i_inbound_data[123:0]
-testbench.u_dut.i_inbound_valid[3:0]
-testbench.u_dut.o_inbound_ready[3:0]
+@800200
+-Inbound
+@800022
+testbench.i_ib_north_data[30:0]
+@c00022
+#{row} (0)testbench.i_ib_north_data[30:0] (1)testbench.i_ib_north_data[30:0] (2)testbench.i_ib_north_data[30:0] (3)testbench.i_ib_north_data[30:0]
+@28
+(0)testbench.i_ib_north_data[30:0]
+(1)testbench.i_ib_north_data[30:0]
+(2)testbench.i_ib_north_data[30:0]
+(3)testbench.i_ib_north_data[30:0]
+@1401200
+-group_end
+@c00022
+#{column} (4)testbench.i_ib_north_data[30:0] (5)testbench.i_ib_north_data[30:0] (6)testbench.i_ib_north_data[30:0] (7)testbench.i_ib_north_data[30:0]
+@28
+(4)testbench.i_ib_north_data[30:0]
+(5)testbench.i_ib_north_data[30:0]
+(6)testbench.i_ib_north_data[30:0]
+(7)testbench.i_ib_north_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.i_ib_north_data[30:0] (9)testbench.i_ib_north_data[30:0]
+@28
+(8)testbench.i_ib_north_data[30:0]
+(9)testbench.i_ib_north_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.i_ib_north_data[30:0] (11)testbench.i_ib_north_data[30:0] (12)testbench.i_ib_north_data[30:0] (13)testbench.i_ib_north_data[30:0] (14)testbench.i_ib_north_data[30:0] (15)testbench.i_ib_north_data[30:0] (16)testbench.i_ib_north_data[30:0] (17)testbench.i_ib_north_data[30:0] (18)testbench.i_ib_north_data[30:0] (19)testbench.i_ib_north_data[30:0] (20)testbench.i_ib_north_data[30:0] (21)testbench.i_ib_north_data[30:0] (22)testbench.i_ib_north_data[30:0] (23)testbench.i_ib_north_data[30:0] (24)testbench.i_ib_north_data[30:0] (25)testbench.i_ib_north_data[30:0] (26)testbench.i_ib_north_data[30:0] (27)testbench.i_ib_north_data[30:0] (28)testbench.i_ib_north_data[30:0] (29)testbench.i_ib_north_data[30:0] (30)testbench.i_ib_north_data[30:0]
+@28
+(10)testbench.i_ib_north_data[30:0]
+(11)testbench.i_ib_north_data[30:0]
+(12)testbench.i_ib_north_data[30:0]
+(13)testbench.i_ib_north_data[30:0]
+(14)testbench.i_ib_north_data[30:0]
+(15)testbench.i_ib_north_data[30:0]
+(16)testbench.i_ib_north_data[30:0]
+(17)testbench.i_ib_north_data[30:0]
+(18)testbench.i_ib_north_data[30:0]
+(19)testbench.i_ib_north_data[30:0]
+(20)testbench.i_ib_north_data[30:0]
+(21)testbench.i_ib_north_data[30:0]
+(22)testbench.i_ib_north_data[30:0]
+(23)testbench.i_ib_north_data[30:0]
+(24)testbench.i_ib_north_data[30:0]
+(25)testbench.i_ib_north_data[30:0]
+(26)testbench.i_ib_north_data[30:0]
+(27)testbench.i_ib_north_data[30:0]
+(28)testbench.i_ib_north_data[30:0]
+(29)testbench.i_ib_north_data[30:0]
+(30)testbench.i_ib_north_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.i_ib_north_valid[0]
+testbench.o_ib_north_ready[0]
+@200
+-
+@800022
+testbench.i_ib_east_data[30:0]
+@c00024
+#{row} (0)testbench.i_ib_east_data[30:0] (1)testbench.i_ib_east_data[30:0] (2)testbench.i_ib_east_data[30:0] (3)testbench.i_ib_east_data[30:0]
+@28
+(0)testbench.i_ib_east_data[30:0]
+(1)testbench.i_ib_east_data[30:0]
+(2)testbench.i_ib_east_data[30:0]
+(3)testbench.i_ib_east_data[30:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.i_ib_east_data[30:0] (5)testbench.i_ib_east_data[30:0] (6)testbench.i_ib_east_data[30:0] (7)testbench.i_ib_east_data[30:0]
+@28
+(4)testbench.i_ib_east_data[30:0]
+(5)testbench.i_ib_east_data[30:0]
+(6)testbench.i_ib_east_data[30:0]
+(7)testbench.i_ib_east_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.i_ib_east_data[30:0] (9)testbench.i_ib_east_data[30:0]
+@28
+(8)testbench.i_ib_east_data[30:0]
+(9)testbench.i_ib_east_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.i_ib_east_data[30:0] (11)testbench.i_ib_east_data[30:0] (12)testbench.i_ib_east_data[30:0] (13)testbench.i_ib_east_data[30:0] (14)testbench.i_ib_east_data[30:0] (15)testbench.i_ib_east_data[30:0] (16)testbench.i_ib_east_data[30:0] (17)testbench.i_ib_east_data[30:0] (18)testbench.i_ib_east_data[30:0] (19)testbench.i_ib_east_data[30:0] (20)testbench.i_ib_east_data[30:0] (21)testbench.i_ib_east_data[30:0] (22)testbench.i_ib_east_data[30:0] (23)testbench.i_ib_east_data[30:0] (24)testbench.i_ib_east_data[30:0] (25)testbench.i_ib_east_data[30:0] (26)testbench.i_ib_east_data[30:0] (27)testbench.i_ib_east_data[30:0] (28)testbench.i_ib_east_data[30:0] (29)testbench.i_ib_east_data[30:0] (30)testbench.i_ib_east_data[30:0]
+@28
+(10)testbench.i_ib_east_data[30:0]
+(11)testbench.i_ib_east_data[30:0]
+(12)testbench.i_ib_east_data[30:0]
+(13)testbench.i_ib_east_data[30:0]
+(14)testbench.i_ib_east_data[30:0]
+(15)testbench.i_ib_east_data[30:0]
+(16)testbench.i_ib_east_data[30:0]
+(17)testbench.i_ib_east_data[30:0]
+(18)testbench.i_ib_east_data[30:0]
+(19)testbench.i_ib_east_data[30:0]
+(20)testbench.i_ib_east_data[30:0]
+(21)testbench.i_ib_east_data[30:0]
+(22)testbench.i_ib_east_data[30:0]
+(23)testbench.i_ib_east_data[30:0]
+(24)testbench.i_ib_east_data[30:0]
+(25)testbench.i_ib_east_data[30:0]
+(26)testbench.i_ib_east_data[30:0]
+(27)testbench.i_ib_east_data[30:0]
+(28)testbench.i_ib_east_data[30:0]
+(29)testbench.i_ib_east_data[30:0]
+(30)testbench.i_ib_east_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.i_ib_east_valid[0]
+testbench.o_ib_east_ready[0]
+@200
+-
+@800022
+testbench.i_ib_south_data[30:0]
+@c00022
+#{row} (0)testbench.i_ib_south_data[30:0] (1)testbench.i_ib_south_data[30:0] (2)testbench.i_ib_south_data[30:0] (3)testbench.i_ib_south_data[30:0]
+@28
+(0)testbench.i_ib_south_data[30:0]
+(1)testbench.i_ib_south_data[30:0]
+(2)testbench.i_ib_south_data[30:0]
+(3)testbench.i_ib_south_data[30:0]
+@1401200
+-group_end
+@c00022
+#{column} (4)testbench.i_ib_south_data[30:0] (5)testbench.i_ib_south_data[30:0] (6)testbench.i_ib_south_data[30:0] (7)testbench.i_ib_south_data[30:0]
+@28
+(4)testbench.i_ib_south_data[30:0]
+(5)testbench.i_ib_south_data[30:0]
+(6)testbench.i_ib_south_data[30:0]
+(7)testbench.i_ib_south_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.i_ib_south_data[30:0] (9)testbench.i_ib_south_data[30:0]
+@28
+(8)testbench.i_ib_south_data[30:0]
+(9)testbench.i_ib_south_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.i_ib_south_data[30:0] (11)testbench.i_ib_south_data[30:0] (12)testbench.i_ib_south_data[30:0] (13)testbench.i_ib_south_data[30:0] (14)testbench.i_ib_south_data[30:0] (15)testbench.i_ib_south_data[30:0] (16)testbench.i_ib_south_data[30:0] (17)testbench.i_ib_south_data[30:0] (18)testbench.i_ib_south_data[30:0] (19)testbench.i_ib_south_data[30:0] (20)testbench.i_ib_south_data[30:0] (21)testbench.i_ib_south_data[30:0] (22)testbench.i_ib_south_data[30:0] (23)testbench.i_ib_south_data[30:0] (24)testbench.i_ib_south_data[30:0] (25)testbench.i_ib_south_data[30:0] (26)testbench.i_ib_south_data[30:0] (27)testbench.i_ib_south_data[30:0] (28)testbench.i_ib_south_data[30:0] (29)testbench.i_ib_south_data[30:0] (30)testbench.i_ib_south_data[30:0]
+@28
+(10)testbench.i_ib_south_data[30:0]
+(11)testbench.i_ib_south_data[30:0]
+(12)testbench.i_ib_south_data[30:0]
+(13)testbench.i_ib_south_data[30:0]
+(14)testbench.i_ib_south_data[30:0]
+(15)testbench.i_ib_south_data[30:0]
+(16)testbench.i_ib_south_data[30:0]
+(17)testbench.i_ib_south_data[30:0]
+(18)testbench.i_ib_south_data[30:0]
+(19)testbench.i_ib_south_data[30:0]
+(20)testbench.i_ib_south_data[30:0]
+(21)testbench.i_ib_south_data[30:0]
+(22)testbench.i_ib_south_data[30:0]
+(23)testbench.i_ib_south_data[30:0]
+(24)testbench.i_ib_south_data[30:0]
+(25)testbench.i_ib_south_data[30:0]
+(26)testbench.i_ib_south_data[30:0]
+(27)testbench.i_ib_south_data[30:0]
+(28)testbench.i_ib_south_data[30:0]
+(29)testbench.i_ib_south_data[30:0]
+(30)testbench.i_ib_south_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.i_ib_south_valid[0]
+testbench.o_ib_south_ready[0]
+@200
+-
+@800022
+testbench.i_ib_west_data[30:0]
+@c00022
+#{row} (0)testbench.i_ib_west_data[30:0] (1)testbench.i_ib_west_data[30:0] (2)testbench.i_ib_west_data[30:0] (3)testbench.i_ib_west_data[30:0]
+@28
+(0)testbench.i_ib_west_data[30:0]
+(1)testbench.i_ib_west_data[30:0]
+(2)testbench.i_ib_west_data[30:0]
+(3)testbench.i_ib_west_data[30:0]
+@1401200
+-group_end
+@c00022
+#{column} (4)testbench.i_ib_west_data[30:0] (5)testbench.i_ib_west_data[30:0] (6)testbench.i_ib_west_data[30:0] (7)testbench.i_ib_west_data[30:0]
+@28
+(4)testbench.i_ib_west_data[30:0]
+(5)testbench.i_ib_west_data[30:0]
+(6)testbench.i_ib_west_data[30:0]
+(7)testbench.i_ib_west_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.i_ib_west_data[30:0] (9)testbench.i_ib_west_data[30:0]
+@28
+(8)testbench.i_ib_west_data[30:0]
+(9)testbench.i_ib_west_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.i_ib_west_data[30:0] (11)testbench.i_ib_west_data[30:0] (12)testbench.i_ib_west_data[30:0] (13)testbench.i_ib_west_data[30:0] (14)testbench.i_ib_west_data[30:0] (15)testbench.i_ib_west_data[30:0] (16)testbench.i_ib_west_data[30:0] (17)testbench.i_ib_west_data[30:0] (18)testbench.i_ib_west_data[30:0] (19)testbench.i_ib_west_data[30:0] (20)testbench.i_ib_west_data[30:0] (21)testbench.i_ib_west_data[30:0] (22)testbench.i_ib_west_data[30:0] (23)testbench.i_ib_west_data[30:0] (24)testbench.i_ib_west_data[30:0] (25)testbench.i_ib_west_data[30:0] (26)testbench.i_ib_west_data[30:0] (27)testbench.i_ib_west_data[30:0] (28)testbench.i_ib_west_data[30:0] (29)testbench.i_ib_west_data[30:0] (30)testbench.i_ib_west_data[30:0]
+@28
+(10)testbench.i_ib_west_data[30:0]
+(11)testbench.i_ib_west_data[30:0]
+(12)testbench.i_ib_west_data[30:0]
+(13)testbench.i_ib_west_data[30:0]
+(14)testbench.i_ib_west_data[30:0]
+(15)testbench.i_ib_west_data[30:0]
+(16)testbench.i_ib_west_data[30:0]
+(17)testbench.i_ib_west_data[30:0]
+(18)testbench.i_ib_west_data[30:0]
+(19)testbench.i_ib_west_data[30:0]
+(20)testbench.i_ib_west_data[30:0]
+(21)testbench.i_ib_west_data[30:0]
+(22)testbench.i_ib_west_data[30:0]
+(23)testbench.i_ib_west_data[30:0]
+(24)testbench.i_ib_west_data[30:0]
+(25)testbench.i_ib_west_data[30:0]
+(26)testbench.i_ib_west_data[30:0]
+(27)testbench.i_ib_west_data[30:0]
+(28)testbench.i_ib_west_data[30:0]
+(29)testbench.i_ib_west_data[30:0]
+(30)testbench.i_ib_west_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.i_ib_west_valid[0]
+testbench.o_ib_west_ready[0]
+@1000200
+-Inbound
+@200
+-
+@800200
+-Outbound
+@800022
+testbench.o_ob_north_data[30:0]
+@c00024
+#{row} (0)testbench.o_ob_north_data[30:0] (1)testbench.o_ob_north_data[30:0] (2)testbench.o_ob_north_data[30:0] (3)testbench.o_ob_north_data[30:0]
+@28
+(0)testbench.o_ob_north_data[30:0]
+(1)testbench.o_ob_north_data[30:0]
+(2)testbench.o_ob_north_data[30:0]
+(3)testbench.o_ob_north_data[30:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.o_ob_north_data[30:0] (5)testbench.o_ob_north_data[30:0] (6)testbench.o_ob_north_data[30:0] (7)testbench.o_ob_north_data[30:0]
+@28
+(4)testbench.o_ob_north_data[30:0]
+(5)testbench.o_ob_north_data[30:0]
+(6)testbench.o_ob_north_data[30:0]
+(7)testbench.o_ob_north_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.o_ob_north_data[30:0] (9)testbench.o_ob_north_data[30:0]
+@28
+(8)testbench.o_ob_north_data[30:0]
+(9)testbench.o_ob_north_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.o_ob_north_data[30:0] (11)testbench.o_ob_north_data[30:0] (12)testbench.o_ob_north_data[30:0] (13)testbench.o_ob_north_data[30:0] (14)testbench.o_ob_north_data[30:0] (15)testbench.o_ob_north_data[30:0] (16)testbench.o_ob_north_data[30:0] (17)testbench.o_ob_north_data[30:0] (18)testbench.o_ob_north_data[30:0] (19)testbench.o_ob_north_data[30:0] (20)testbench.o_ob_north_data[30:0] (21)testbench.o_ob_north_data[30:0] (22)testbench.o_ob_north_data[30:0] (23)testbench.o_ob_north_data[30:0] (24)testbench.o_ob_north_data[30:0] (25)testbench.o_ob_north_data[30:0] (26)testbench.o_ob_north_data[30:0] (27)testbench.o_ob_north_data[30:0] (28)testbench.o_ob_north_data[30:0] (29)testbench.o_ob_north_data[30:0] (30)testbench.o_ob_north_data[30:0]
+@28
+(10)testbench.o_ob_north_data[30:0]
+(11)testbench.o_ob_north_data[30:0]
+(12)testbench.o_ob_north_data[30:0]
+(13)testbench.o_ob_north_data[30:0]
+(14)testbench.o_ob_north_data[30:0]
+(15)testbench.o_ob_north_data[30:0]
+(16)testbench.o_ob_north_data[30:0]
+(17)testbench.o_ob_north_data[30:0]
+(18)testbench.o_ob_north_data[30:0]
+(19)testbench.o_ob_north_data[30:0]
+(20)testbench.o_ob_north_data[30:0]
+(21)testbench.o_ob_north_data[30:0]
+(22)testbench.o_ob_north_data[30:0]
+(23)testbench.o_ob_north_data[30:0]
+(24)testbench.o_ob_north_data[30:0]
+(25)testbench.o_ob_north_data[30:0]
+(26)testbench.o_ob_north_data[30:0]
+(27)testbench.o_ob_north_data[30:0]
+(28)testbench.o_ob_north_data[30:0]
+(29)testbench.o_ob_north_data[30:0]
+(30)testbench.o_ob_north_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.o_ob_north_valid[0]
+testbench.i_ob_north_ready[0]
+@200
+-
+@800022
+testbench.o_ob_east_data[30:0]
+@c00024
+#{row} (0)testbench.o_ob_east_data[30:0] (1)testbench.o_ob_east_data[30:0] (2)testbench.o_ob_east_data[30:0] (3)testbench.o_ob_east_data[30:0]
+@28
+(0)testbench.o_ob_east_data[30:0]
+(1)testbench.o_ob_east_data[30:0]
+(2)testbench.o_ob_east_data[30:0]
+(3)testbench.o_ob_east_data[30:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.o_ob_east_data[30:0] (5)testbench.o_ob_east_data[30:0] (6)testbench.o_ob_east_data[30:0] (7)testbench.o_ob_east_data[30:0]
+@28
+(4)testbench.o_ob_east_data[30:0]
+(5)testbench.o_ob_east_data[30:0]
+(6)testbench.o_ob_east_data[30:0]
+(7)testbench.o_ob_east_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.o_ob_east_data[30:0] (9)testbench.o_ob_east_data[30:0]
+@28
+(8)testbench.o_ob_east_data[30:0]
+(9)testbench.o_ob_east_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.o_ob_east_data[30:0] (11)testbench.o_ob_east_data[30:0] (12)testbench.o_ob_east_data[30:0] (13)testbench.o_ob_east_data[30:0] (14)testbench.o_ob_east_data[30:0] (15)testbench.o_ob_east_data[30:0] (16)testbench.o_ob_east_data[30:0] (17)testbench.o_ob_east_data[30:0] (18)testbench.o_ob_east_data[30:0] (19)testbench.o_ob_east_data[30:0] (20)testbench.o_ob_east_data[30:0] (21)testbench.o_ob_east_data[30:0] (22)testbench.o_ob_east_data[30:0] (23)testbench.o_ob_east_data[30:0] (24)testbench.o_ob_east_data[30:0] (25)testbench.o_ob_east_data[30:0] (26)testbench.o_ob_east_data[30:0] (27)testbench.o_ob_east_data[30:0] (28)testbench.o_ob_east_data[30:0] (29)testbench.o_ob_east_data[30:0] (30)testbench.o_ob_east_data[30:0]
+@28
+(10)testbench.o_ob_east_data[30:0]
+(11)testbench.o_ob_east_data[30:0]
+(12)testbench.o_ob_east_data[30:0]
+(13)testbench.o_ob_east_data[30:0]
+(14)testbench.o_ob_east_data[30:0]
+(15)testbench.o_ob_east_data[30:0]
+(16)testbench.o_ob_east_data[30:0]
+(17)testbench.o_ob_east_data[30:0]
+(18)testbench.o_ob_east_data[30:0]
+(19)testbench.o_ob_east_data[30:0]
+(20)testbench.o_ob_east_data[30:0]
+(21)testbench.o_ob_east_data[30:0]
+(22)testbench.o_ob_east_data[30:0]
+(23)testbench.o_ob_east_data[30:0]
+(24)testbench.o_ob_east_data[30:0]
+(25)testbench.o_ob_east_data[30:0]
+(26)testbench.o_ob_east_data[30:0]
+(27)testbench.o_ob_east_data[30:0]
+(28)testbench.o_ob_east_data[30:0]
+(29)testbench.o_ob_east_data[30:0]
+(30)testbench.o_ob_east_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.o_ob_east_valid[0]
+testbench.i_ob_east_ready[0]
+@200
+-
+@800022
+testbench.o_ob_south_data[30:0]
+@c00024
+#{row} (0)testbench.o_ob_south_data[30:0] (1)testbench.o_ob_south_data[30:0] (2)testbench.o_ob_south_data[30:0] (3)testbench.o_ob_south_data[30:0]
+@28
+(0)testbench.o_ob_south_data[30:0]
+(1)testbench.o_ob_south_data[30:0]
+(2)testbench.o_ob_south_data[30:0]
+(3)testbench.o_ob_south_data[30:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.o_ob_south_data[30:0] (5)testbench.o_ob_south_data[30:0] (6)testbench.o_ob_south_data[30:0] (7)testbench.o_ob_south_data[30:0]
+@28
+(4)testbench.o_ob_south_data[30:0]
+(5)testbench.o_ob_south_data[30:0]
+(6)testbench.o_ob_south_data[30:0]
+(7)testbench.o_ob_south_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.o_ob_south_data[30:0] (9)testbench.o_ob_south_data[30:0]
+@28
+(8)testbench.o_ob_south_data[30:0]
+(9)testbench.o_ob_south_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.o_ob_south_data[30:0] (11)testbench.o_ob_south_data[30:0] (12)testbench.o_ob_south_data[30:0] (13)testbench.o_ob_south_data[30:0] (14)testbench.o_ob_south_data[30:0] (15)testbench.o_ob_south_data[30:0] (16)testbench.o_ob_south_data[30:0] (17)testbench.o_ob_south_data[30:0] (18)testbench.o_ob_south_data[30:0] (19)testbench.o_ob_south_data[30:0] (20)testbench.o_ob_south_data[30:0] (21)testbench.o_ob_south_data[30:0] (22)testbench.o_ob_south_data[30:0] (23)testbench.o_ob_south_data[30:0] (24)testbench.o_ob_south_data[30:0] (25)testbench.o_ob_south_data[30:0] (26)testbench.o_ob_south_data[30:0] (27)testbench.o_ob_south_data[30:0] (28)testbench.o_ob_south_data[30:0] (29)testbench.o_ob_south_data[30:0] (30)testbench.o_ob_south_data[30:0]
+@28
+(10)testbench.o_ob_south_data[30:0]
+(11)testbench.o_ob_south_data[30:0]
+(12)testbench.o_ob_south_data[30:0]
+(13)testbench.o_ob_south_data[30:0]
+(14)testbench.o_ob_south_data[30:0]
+(15)testbench.o_ob_south_data[30:0]
+(16)testbench.o_ob_south_data[30:0]
+(17)testbench.o_ob_south_data[30:0]
+(18)testbench.o_ob_south_data[30:0]
+(19)testbench.o_ob_south_data[30:0]
+(20)testbench.o_ob_south_data[30:0]
+(21)testbench.o_ob_south_data[30:0]
+(22)testbench.o_ob_south_data[30:0]
+(23)testbench.o_ob_south_data[30:0]
+(24)testbench.o_ob_south_data[30:0]
+(25)testbench.o_ob_south_data[30:0]
+(26)testbench.o_ob_south_data[30:0]
+(27)testbench.o_ob_south_data[30:0]
+(28)testbench.o_ob_south_data[30:0]
+(29)testbench.o_ob_south_data[30:0]
+(30)testbench.o_ob_south_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@29
+testbench.o_ob_south_valid[0]
+@28
+testbench.i_ob_south_ready[0]
+@200
+-
+@800022
+testbench.o_ob_west_data[30:0]
+@c00024
+#{row} (0)testbench.o_ob_west_data[30:0] (1)testbench.o_ob_west_data[30:0] (2)testbench.o_ob_west_data[30:0] (3)testbench.o_ob_west_data[30:0]
+@28
+(0)testbench.o_ob_west_data[30:0]
+(1)testbench.o_ob_west_data[30:0]
+(2)testbench.o_ob_west_data[30:0]
+(3)testbench.o_ob_west_data[30:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.o_ob_west_data[30:0] (5)testbench.o_ob_west_data[30:0] (6)testbench.o_ob_west_data[30:0] (7)testbench.o_ob_west_data[30:0]
+@28
+(4)testbench.o_ob_west_data[30:0]
+(5)testbench.o_ob_west_data[30:0]
+(6)testbench.o_ob_west_data[30:0]
+(7)testbench.o_ob_west_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.o_ob_west_data[30:0] (9)testbench.o_ob_west_data[30:0]
+@28
+(8)testbench.o_ob_west_data[30:0]
+(9)testbench.o_ob_west_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.o_ob_west_data[30:0] (11)testbench.o_ob_west_data[30:0] (12)testbench.o_ob_west_data[30:0] (13)testbench.o_ob_west_data[30:0] (14)testbench.o_ob_west_data[30:0] (15)testbench.o_ob_west_data[30:0] (16)testbench.o_ob_west_data[30:0] (17)testbench.o_ob_west_data[30:0] (18)testbench.o_ob_west_data[30:0] (19)testbench.o_ob_west_data[30:0] (20)testbench.o_ob_west_data[30:0] (21)testbench.o_ob_west_data[30:0] (22)testbench.o_ob_west_data[30:0] (23)testbench.o_ob_west_data[30:0] (24)testbench.o_ob_west_data[30:0] (25)testbench.o_ob_west_data[30:0] (26)testbench.o_ob_west_data[30:0] (27)testbench.o_ob_west_data[30:0] (28)testbench.o_ob_west_data[30:0] (29)testbench.o_ob_west_data[30:0] (30)testbench.o_ob_west_data[30:0]
+@28
+(10)testbench.o_ob_west_data[30:0]
+(11)testbench.o_ob_west_data[30:0]
+(12)testbench.o_ob_west_data[30:0]
+(13)testbench.o_ob_west_data[30:0]
+(14)testbench.o_ob_west_data[30:0]
+(15)testbench.o_ob_west_data[30:0]
+(16)testbench.o_ob_west_data[30:0]
+(17)testbench.o_ob_west_data[30:0]
+(18)testbench.o_ob_west_data[30:0]
+(19)testbench.o_ob_west_data[30:0]
+(20)testbench.o_ob_west_data[30:0]
+(21)testbench.o_ob_west_data[30:0]
+(22)testbench.o_ob_west_data[30:0]
+(23)testbench.o_ob_west_data[30:0]
+(24)testbench.o_ob_west_data[30:0]
+(25)testbench.o_ob_west_data[30:0]
+(26)testbench.o_ob_west_data[30:0]
+(27)testbench.o_ob_west_data[30:0]
+(28)testbench.o_ob_west_data[30:0]
+(29)testbench.o_ob_west_data[30:0]
+(30)testbench.o_ob_west_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.o_ob_west_valid[0]
+testbench.i_ob_west_ready[0]
 @200
 -
 @22
-testbench.u_dut.o_outbound_data[123:0]
-testbench.u_dut.o_outbound_valid[3:0]
-@c00022
-testbench.u_dut.i_outbound_ready[3:0]
-@28
-(0)testbench.u_dut.i_outbound_ready[3:0]
-(1)testbench.u_dut.i_outbound_ready[3:0]
-(2)testbench.u_dut.i_outbound_ready[3:0]
-(3)testbench.u_dut.i_outbound_ready[3:0]
-@1401200
--group_end
-@22
-testbench.u_dut.i_outbound_present[3:0]
+testbench.outbound_present[3:0]
+@1000200
+-Outbound
 @200
 -
 @800200
@@ -71,11 +562,98 @@ testbench.u_dut.u_decoder.o_ram_wr_data[31:0]
 -
 @22
 testbench.u_dut.u_decoder.o_num_instr[15:0]
-@23
 testbench.u_dut.u_decoder.o_num_output[15:0]
 @1000200
 -Decoder
 @200
 -
+@401200
+-i_node_id[7:0]
+@800200
+-Routing
+@800022
+testbench.u_dut.outbound_data[30:0]
+@c00024
+#{row} (0)testbench.u_dut.outbound_data[30:0] (1)testbench.u_dut.outbound_data[30:0] (2)testbench.u_dut.outbound_data[30:0] (3)testbench.u_dut.outbound_data[30:0]
+@28
+(0)testbench.u_dut.outbound_data[30:0]
+(1)testbench.u_dut.outbound_data[30:0]
+(2)testbench.u_dut.outbound_data[30:0]
+(3)testbench.u_dut.outbound_data[30:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.u_dut.outbound_data[30:0] (5)testbench.u_dut.outbound_data[30:0] (6)testbench.u_dut.outbound_data[30:0] (7)testbench.u_dut.outbound_data[30:0]
+@28
+(4)testbench.u_dut.outbound_data[30:0]
+(5)testbench.u_dut.outbound_data[30:0]
+(6)testbench.u_dut.outbound_data[30:0]
+(7)testbench.u_dut.outbound_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.u_dut.outbound_data[30:0] (9)testbench.u_dut.outbound_data[30:0]
+@28
+(8)testbench.u_dut.outbound_data[30:0]
+(9)testbench.u_dut.outbound_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.u_dut.outbound_data[30:0] (11)testbench.u_dut.outbound_data[30:0] (12)testbench.u_dut.outbound_data[30:0] (13)testbench.u_dut.outbound_data[30:0] (14)testbench.u_dut.outbound_data[30:0] (15)testbench.u_dut.outbound_data[30:0] (16)testbench.u_dut.outbound_data[30:0] (17)testbench.u_dut.outbound_data[30:0] (18)testbench.u_dut.outbound_data[30:0] (19)testbench.u_dut.outbound_data[30:0] (20)testbench.u_dut.outbound_data[30:0] (21)testbench.u_dut.outbound_data[30:0] (22)testbench.u_dut.outbound_data[30:0] (23)testbench.u_dut.outbound_data[30:0] (24)testbench.u_dut.outbound_data[30:0] (25)testbench.u_dut.outbound_data[30:0] (26)testbench.u_dut.outbound_data[30:0] (27)testbench.u_dut.outbound_data[30:0] (28)testbench.u_dut.outbound_data[30:0] (29)testbench.u_dut.outbound_data[30:0] (30)testbench.u_dut.outbound_data[30:0]
+@28
+(10)testbench.u_dut.outbound_data[30:0]
+(11)testbench.u_dut.outbound_data[30:0]
+(12)testbench.u_dut.outbound_data[30:0]
+(13)testbench.u_dut.outbound_data[30:0]
+(14)testbench.u_dut.outbound_data[30:0]
+(15)testbench.u_dut.outbound_data[30:0]
+(16)testbench.u_dut.outbound_data[30:0]
+(17)testbench.u_dut.outbound_data[30:0]
+(18)testbench.u_dut.outbound_data[30:0]
+(19)testbench.u_dut.outbound_data[30:0]
+(20)testbench.u_dut.outbound_data[30:0]
+(21)testbench.u_dut.outbound_data[30:0]
+(22)testbench.u_dut.outbound_data[30:0]
+(23)testbench.u_dut.outbound_data[30:0]
+(24)testbench.u_dut.outbound_data[30:0]
+(25)testbench.u_dut.outbound_data[30:0]
+(26)testbench.u_dut.outbound_data[30:0]
+(27)testbench.u_dut.outbound_data[30:0]
+(28)testbench.u_dut.outbound_data[30:0]
+(29)testbench.u_dut.outbound_data[30:0]
+(30)testbench.u_dut.outbound_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@200
+-
+@c00024
+#{row} (4)testbench.u_dut.i_node_id[7:0] (5)testbench.u_dut.i_node_id[7:0] (6)testbench.u_dut.i_node_id[7:0] (7)testbench.u_dut.i_node_id[7:0]
+@28
+(4)testbench.u_dut.i_node_id[7:0]
+(5)testbench.u_dut.i_node_id[7:0]
+(6)testbench.u_dut.i_node_id[7:0]
+(7)testbench.u_dut.i_node_id[7:0]
+@1401200
+-group_end
+@c00024
+#{column} (0)testbench.u_dut.i_node_id[7:0] (1)testbench.u_dut.i_node_id[7:0] (2)testbench.u_dut.i_node_id[7:0] (3)testbench.u_dut.i_node_id[7:0]
+@28
+(0)testbench.u_dut.i_node_id[7:0]
+(1)testbench.u_dut.i_node_id[7:0]
+(2)testbench.u_dut.i_node_id[7:0]
+(3)testbench.u_dut.i_node_id[7:0]
+@1401200
+-group_end
+@200
+-
+@28
+testbench.u_dut.comb_outbound_dir.lt_row[0]
+testbench.u_dut.comb_outbound_dir.gt_row[0]
+testbench.u_dut.comb_outbound_dir.lt_col[0]
+testbench.u_dut.comb_outbound_dir.gt_col[0]
+@1000200
+-Routing
 [pattern_trace] 1
 [pattern_trace] 0

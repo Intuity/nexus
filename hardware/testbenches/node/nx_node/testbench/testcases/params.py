@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from math import ceil, log2
-from random import choice, randint, random
+from random import choice, randint
 
 from cocotb.triggers import RisingEdge
 from cocotb_bus.scoreboard import Scoreboard

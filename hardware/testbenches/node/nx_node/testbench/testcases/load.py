@@ -14,7 +14,7 @@
 
 from random import choice, randint
 
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import ClockCycles
 
 from nxconstants import (NodeCommand, NodeLoad, NodeID, LOAD_SEG_WIDTH,
                          MAX_ROW_COUNT, MAX_COLUMN_COUNT)

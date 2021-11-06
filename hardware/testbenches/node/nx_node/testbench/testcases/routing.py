@@ -13,8 +13,10 @@
 # limitations under the License.
 
 from random import choice, randint
+from common.work.nxconstants import NODE_CMD_WIDTH
 
-from nxconstants import NodeRaw, NodeCommand, Direction
+from nxconstants import (Direction, NodeID, NodeRaw, MAX_ROW_COUNT,
+                         MAX_COLUMN_COUNT, MESSAGE_WIDTH)
 
 from ..testbench import testcase
 
@@ -25,49 +27,40 @@ async def routing(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Setup a row & column
-    row, col = randint(1, 14), randint(1, 14)
-    dut.info(f"Setting row to {row} & column to {col}")
-    dut.node_row_i <= row
-    dut.node_col_i <= col
+    # Decide on a row and column
+    node_id = NodeID(
+        row   =randint(0, MAX_ROW_COUNT-1   ),
+        column=randint(0, MAX_COLUMN_COUNT-1),
+    )
+    dut.node_id <= node_id.pack()
 
+    # Select an inbound interface
+    inbound = choice(dut.inbound)
+
+    # Queue up many packets
     for _ in range(1000):
-        # Choose a random command type
-        command = choice((
-            NodeCommand.LOAD_INSTR, NodeCommand.MAP_OUTPUT,
-            NodeCommand.SIG_STATE,  NodeCommand.NODE_CTRL,
-        ))
+        # Generate a random message
+        msg = NodeRaw()
+        msg.unpack(randint(0, (1 << MESSAGE_WIDTH) - 1))
 
-        # Select a target row and column
-        # NOTE: When using SIG_STATE, always direct it to another node to avoid
-        #       it triggering an output
-        tgt_row, tgt_col = row, col
-        if command == NodeCommand.SIG_STATE or choice((0, 1)):
-            while tgt_row == row and tgt_col == col:
-                tgt_row, tgt_col = randint(0, 15), randint(0, 15)
+        # Select a different target row and column
+        while True:
+            msg.header.row    = randint(0, MAX_ROW_COUNT-1)
+            msg.header.column = randint(0, MAX_COLUMN_COUNT-1)
+            if (msg.header.row, msg.header.column) != (node_id.row, node_id.column):
+                break
 
-        # Check if this message is targeted at the node
-        tgt_match = (tgt_row == row) and (tgt_col == col)
+        # Queue up the inbound message
+        inbound.append((msg.pack(), 0))
 
-        # Generate a message
-        msg                = NodeRaw()
-        msg.header.row     = tgt_row
-        msg.header.column  = tgt_col
-        msg.header.command = command
-        msg.payload        = randint(0, (1 << 21) - 1)
-
-        # Create a message
-        dut.debug(
-            f"MSG - R: {tgt_row}, C: {tgt_col}, CMD: {command} -> 0x{msg.pack():08X}"
-        )
-
-        # Queue up the message
-        choice(dut.inbound).append(msg.pack())
-
-        # If not matching this target, expect message to be routed elsewhere
-        if not tgt_match:
-            if   tgt_row < row: tgt_dirx = Direction.NORTH
-            elif tgt_row > row: tgt_dirx = Direction.SOUTH
-            elif tgt_col < col: tgt_dirx = Direction.WEST
-            elif tgt_col > col: tgt_dirx = Direction.EAST
-            dut.expected[int(tgt_dirx)].append((msg.pack(), 0))
+        # Queue up the message onto the right outbound queue
+        if msg.header.row < node_id.row:
+            dut.expected[int(Direction.NORTH)].append((msg.pack(), 0))
+        elif msg.header.row > node_id.row:
+            dut.expected[int(Direction.SOUTH)].append((msg.pack(), 0))
+        elif msg.header.column < node_id.column:
+            dut.expected[int(Direction.WEST)].append((msg.pack(), 0))
+        elif msg.header.column > node_id.column:
+            dut.expected[int(Direction.EAST)].append((msg.pack(), 0))
+        else:
+            raise Exception("Could not route message")
