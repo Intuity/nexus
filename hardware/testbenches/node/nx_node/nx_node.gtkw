@@ -1,18 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sun Nov  7 11:40:31 2021
+[*] Sun Nov  7 21:32:37 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node/sim.lxt"
-[dumpfile_mtime] "Sun Nov  7 11:38:26 2021"
-[dumpfile_size] 490990
+[dumpfile_mtime] "Sun Nov  7 21:31:59 2021"
+[dumpfile_size] 28605586
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node/nx_node.gtkw"
-[timestart] 716000
+[timestart] 0
 [size] 1853 1401
-[pos] 348 -1
-*-17.102123 882700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-20.724030 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_control.
+[treeopen] testbench.u_dut.u_store.
 [sst_width] 282
 [signals_width] 295
 [sst_expanded] 1
@@ -565,6 +566,14 @@ testbench.u_dut.u_decoder.o_num_instr[15:0]
 testbench.u_dut.u_decoder.o_num_output[15:0]
 @22
 testbench.u_dut.u_decoder.o_loopback_mask[31:0]
+@200
+-
+@24
+testbench.u_dut.u_decoder.o_input_index[4:0]
+@28
+testbench.u_dut.u_decoder.o_input_is_seq[0]
+testbench.u_dut.u_decoder.o_input_value[0]
+testbench.u_dut.u_decoder.o_input_update[0]
 @1000200
 -Decoder
 @200
@@ -657,7 +666,7 @@ testbench.u_dut.comb_outbound_dir.lt_col[0]
 testbench.u_dut.comb_outbound_dir.gt_col[0]
 @1000200
 -Routing
-@200
+@201
 -
 @800200
 -Store
@@ -696,9 +705,8 @@ testbench.u_dut.u_core.o_idle[0]
 testbench.u_dut.u_core.held_trigger_q[0]
 @200
 -
-@29
-testbench.u_dut.u_core.fetch_state_q[0]
 @28
+testbench.u_dut.u_core.fetch_state_q[0]
 testbench.u_dut.u_core.exec_state_q[0]
 @200
 -
@@ -707,10 +715,118 @@ testbench.u_dut.u_core.pc_q[9:0]
 testbench.u_dut.u_core.output_idx_q[4:0]
 @200
 -
-@22
+@c00022
 testbench.u_dut.u_core.i_inputs[31:0]
+@28
+(0)testbench.u_dut.u_core.i_inputs[31:0]
+(1)testbench.u_dut.u_core.i_inputs[31:0]
+(2)testbench.u_dut.u_core.i_inputs[31:0]
+(3)testbench.u_dut.u_core.i_inputs[31:0]
+(4)testbench.u_dut.u_core.i_inputs[31:0]
+(5)testbench.u_dut.u_core.i_inputs[31:0]
+(6)testbench.u_dut.u_core.i_inputs[31:0]
+(7)testbench.u_dut.u_core.i_inputs[31:0]
+(8)testbench.u_dut.u_core.i_inputs[31:0]
+(9)testbench.u_dut.u_core.i_inputs[31:0]
+(10)testbench.u_dut.u_core.i_inputs[31:0]
+(11)testbench.u_dut.u_core.i_inputs[31:0]
+(12)testbench.u_dut.u_core.i_inputs[31:0]
+(13)testbench.u_dut.u_core.i_inputs[31:0]
+(14)testbench.u_dut.u_core.i_inputs[31:0]
+(15)testbench.u_dut.u_core.i_inputs[31:0]
+(16)testbench.u_dut.u_core.i_inputs[31:0]
+(17)testbench.u_dut.u_core.i_inputs[31:0]
+(18)testbench.u_dut.u_core.i_inputs[31:0]
+(19)testbench.u_dut.u_core.i_inputs[31:0]
+(20)testbench.u_dut.u_core.i_inputs[31:0]
+(21)testbench.u_dut.u_core.i_inputs[31:0]
+(22)testbench.u_dut.u_core.i_inputs[31:0]
+(23)testbench.u_dut.u_core.i_inputs[31:0]
+(24)testbench.u_dut.u_core.i_inputs[31:0]
+(25)testbench.u_dut.u_core.i_inputs[31:0]
+(26)testbench.u_dut.u_core.i_inputs[31:0]
+(27)testbench.u_dut.u_core.i_inputs[31:0]
+(28)testbench.u_dut.u_core.i_inputs[31:0]
+(29)testbench.u_dut.u_core.i_inputs[31:0]
+(30)testbench.u_dut.u_core.i_inputs[31:0]
+(31)testbench.u_dut.u_core.i_inputs[31:0]
+@1401200
+-group_end
+@22
 testbench.u_dut.u_core.working_q[7:0]
+@c00022
 testbench.u_dut.u_core.o_outputs[31:0]
+@28
+(0)testbench.u_dut.u_core.o_outputs[31:0]
+(1)testbench.u_dut.u_core.o_outputs[31:0]
+(2)testbench.u_dut.u_core.o_outputs[31:0]
+(3)testbench.u_dut.u_core.o_outputs[31:0]
+(4)testbench.u_dut.u_core.o_outputs[31:0]
+(5)testbench.u_dut.u_core.o_outputs[31:0]
+(6)testbench.u_dut.u_core.o_outputs[31:0]
+(7)testbench.u_dut.u_core.o_outputs[31:0]
+(8)testbench.u_dut.u_core.o_outputs[31:0]
+(9)testbench.u_dut.u_core.o_outputs[31:0]
+(10)testbench.u_dut.u_core.o_outputs[31:0]
+(11)testbench.u_dut.u_core.o_outputs[31:0]
+(12)testbench.u_dut.u_core.o_outputs[31:0]
+(13)testbench.u_dut.u_core.o_outputs[31:0]
+(14)testbench.u_dut.u_core.o_outputs[31:0]
+(15)testbench.u_dut.u_core.o_outputs[31:0]
+(16)testbench.u_dut.u_core.o_outputs[31:0]
+(17)testbench.u_dut.u_core.o_outputs[31:0]
+(18)testbench.u_dut.u_core.o_outputs[31:0]
+(19)testbench.u_dut.u_core.o_outputs[31:0]
+(20)testbench.u_dut.u_core.o_outputs[31:0]
+(21)testbench.u_dut.u_core.o_outputs[31:0]
+(22)testbench.u_dut.u_core.o_outputs[31:0]
+(23)testbench.u_dut.u_core.o_outputs[31:0]
+(24)testbench.u_dut.u_core.o_outputs[31:0]
+(25)testbench.u_dut.u_core.o_outputs[31:0]
+(26)testbench.u_dut.u_core.o_outputs[31:0]
+(27)testbench.u_dut.u_core.o_outputs[31:0]
+(28)testbench.u_dut.u_core.o_outputs[31:0]
+(29)testbench.u_dut.u_core.o_outputs[31:0]
+(30)testbench.u_dut.u_core.o_outputs[31:0]
+(31)testbench.u_dut.u_core.o_outputs[31:0]
+@c00022
+testbench.u_dut.u_control.i_loopback_mask[31:0]
+@28
+(0)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(1)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(2)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(3)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(4)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(5)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(6)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(7)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(8)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(9)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(10)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(11)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(12)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(13)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(14)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(15)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(16)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(17)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(18)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(19)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(20)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(21)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(22)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(23)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(24)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(25)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(26)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(27)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(28)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(29)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(30)testbench.u_dut.u_control.i_loopback_mask[31:0]
+(31)testbench.u_dut.u_control.i_loopback_mask[31:0]
+@1401200
+-group_end
+-group_end
 @1000200
 -Core
 [pattern_trace] 1
