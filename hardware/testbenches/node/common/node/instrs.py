@@ -19,20 +19,22 @@ from nxconstants import (Instruction, MAX_NODE_INPUTS, MAX_NODE_OUTPUTS,
                          MAX_NODE_REGISTERS, MAX_NODE_MEMORY, TT_WIDTH)
 
 def gen_instructions(
-    max_ops   : int = MAX_NODE_MEMORY,
-    inputs    : int = MAX_NODE_INPUTS,
-    outputs   : int = MAX_NODE_OUTPUTS,
-    registers : int = MAX_NODE_REGISTERS
+    max_ops    : int  = MAX_NODE_MEMORY,
+    inputs     : int  = MAX_NODE_INPUTS,
+    outputs    : int  = MAX_NODE_OUTPUTS,
+    registers  : int  = MAX_NODE_REGISTERS,
+    stop_early : bool = True,
 ) -> List[Instruction]:
     """
     Generate a random instruction stream for the node up to a maximum number,
     also limited by the number of possible outputs.
 
     Args:
-        max_ops  : Maximum number of operations to generate
-        inputs   : Number of available inputs
-        outputs  : Number of available outputs
-        registers: Number of working registers
+        max_ops   : Maximum number of operations to generate
+        inputs    : Number of available inputs
+        outputs   : Number of available outputs
+        registers : Number of working registers
+        stop_early: Stop once all of the outputs have been exhausted
     """
     stream    = []
     used_outs = 0
@@ -49,8 +51,12 @@ def gen_instructions(
             tgt_reg =randint(0, registers - 1),
             gen_out =(choice((0, 1)) if (used_outs < outputs) else 0)
         ))
+        # If all outputs exhausted, suppress output generation
+        if used_outs >= outputs: stream[-1].gen_out = 0
         # Count outputs being generated
         if stream[-1].gen_out: used_outs += 1
+        # Break out early if required
+        if used_outs >= outputs and stop_early: break
     return stream
 
 def eval_instruction(
