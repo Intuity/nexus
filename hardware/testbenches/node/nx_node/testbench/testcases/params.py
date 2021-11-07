@@ -20,6 +20,7 @@ from cocotb_bus.scoreboard import Scoreboard
 from nxconstants import (NodeCommand, NodeControl, NodeID, NodeParameter,
                          MAX_ROW_COUNT, MAX_COLUMN_COUNT, NODE_PARAM_WIDTH)
 from drivers.basic.unstrobed import UnstrobedMonitor
+from node.load import load_parameter
 
 from ..testbench import testcase
 
@@ -59,13 +60,12 @@ async def parameters(dut):
     last_num_output = 0
     for _ in range(1000):
         # Generate and queue message
-        msg = NodeControl()
-        msg.header.row     = node_id.row
-        msg.header.column  = node_id.column
-        msg.header.command = NodeCommand.CONTROL
-        msg.param          = choice(list(NodeParameter))
-        msg.value          = randint(0, (1 << NODE_PARAM_WIDTH) - 1)
-        inbound.append((msg.pack(), 0))
+        msg = load_parameter(
+            inbound  =inbound,
+            node_id  =node_id,
+            parameter=choice(list(NodeParameter)),
+            value    =randint(0, (1 << NODE_PARAM_WIDTH) - 1),
+        )
         # Track updates
         if msg.param == NodeParameter.INSTRUCTIONS and msg.value != last_num_instr:
             exp_num_instr.append(msg.value)

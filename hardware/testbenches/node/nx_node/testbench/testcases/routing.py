@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from random import choice, randint
-from common.work.nxconstants import NODE_CMD_WIDTH
 
+from drivers.stream.common import StreamTransaction
 from nxconstants import (Direction, NodeID, NodeRaw, MAX_ROW_COUNT,
                          MAX_COLUMN_COUNT, MESSAGE_WIDTH)
 
@@ -51,16 +51,16 @@ async def routing(dut):
                 break
 
         # Queue up the inbound message
-        inbound.append((msg.pack(), 0))
+        inbound.append(StreamTransaction(data=msg.pack()))
 
         # Queue up the message onto the right outbound queue
         if msg.header.row < node_id.row:
-            dut.expected[int(Direction.NORTH)].append((msg.pack(), 0))
+            dut.expected[int(Direction.NORTH)].append(StreamTransaction(data=msg.pack()))
         elif msg.header.row > node_id.row:
-            dut.expected[int(Direction.SOUTH)].append((msg.pack(), 0))
+            dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
         elif msg.header.column < node_id.column:
-            dut.expected[int(Direction.WEST)].append((msg.pack(), 0))
+            dut.expected[int(Direction.WEST)].append(StreamTransaction(data=msg.pack()))
         elif msg.header.column > node_id.column:
-            dut.expected[int(Direction.EAST)].append((msg.pack(), 0))
+            dut.expected[int(Direction.EAST)].append(StreamTransaction(data=msg.pack()))
         else:
             raise Exception("Could not route message")

@@ -1,17 +1,18 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sat Nov  6 21:53:01 2021
+[*] Sun Nov  7 11:40:31 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node/sim.lxt"
-[dumpfile_mtime] "Sat Nov  6 21:51:28 2021"
-[dumpfile_size] 474871
+[dumpfile_mtime] "Sun Nov  7 11:38:26 2021"
+[dumpfile_size] 490990
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node/nx_node.gtkw"
-[timestart] 0
+[timestart] 716000
 [size] 1853 1401
-[pos] -1 -1
-*-20.038973 123000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] 348 -1
+*-17.102123 882700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
+[treeopen] testbench.u_dut.u_control.
 [sst_width] 282
 [signals_width] 295
 [sst_expanded] 1
@@ -54,7 +55,7 @@ testbench.u_dut.o_idle[0]
 -Inbound
 @800022
 testbench.i_ib_north_data[30:0]
-@c00022
+@c00024
 #{row} (0)testbench.i_ib_north_data[30:0] (1)testbench.i_ib_north_data[30:0] (2)testbench.i_ib_north_data[30:0] (3)testbench.i_ib_north_data[30:0]
 @28
 (0)testbench.i_ib_north_data[30:0]
@@ -63,7 +64,7 @@ testbench.i_ib_north_data[30:0]
 (3)testbench.i_ib_north_data[30:0]
 @1401200
 -group_end
-@c00022
+@c00024
 #{column} (4)testbench.i_ib_north_data[30:0] (5)testbench.i_ib_north_data[30:0] (6)testbench.i_ib_north_data[30:0] (7)testbench.i_ib_north_data[30:0]
 @28
 (4)testbench.i_ib_north_data[30:0]
@@ -174,7 +175,7 @@ testbench.o_ib_east_ready[0]
 -
 @800022
 testbench.i_ib_south_data[30:0]
-@c00022
+@c00024
 #{row} (0)testbench.i_ib_south_data[30:0] (1)testbench.i_ib_south_data[30:0] (2)testbench.i_ib_south_data[30:0] (3)testbench.i_ib_south_data[30:0]
 @28
 (0)testbench.i_ib_south_data[30:0]
@@ -183,7 +184,7 @@ testbench.i_ib_south_data[30:0]
 (3)testbench.i_ib_south_data[30:0]
 @1401200
 -group_end
-@c00022
+@c00024
 #{column} (4)testbench.i_ib_south_data[30:0] (5)testbench.i_ib_south_data[30:0] (6)testbench.i_ib_south_data[30:0] (7)testbench.i_ib_south_data[30:0]
 @28
 (4)testbench.i_ib_south_data[30:0]
@@ -234,7 +235,7 @@ testbench.o_ib_south_ready[0]
 -
 @800022
 testbench.i_ib_west_data[30:0]
-@c00022
+@c00024
 #{row} (0)testbench.i_ib_west_data[30:0] (1)testbench.i_ib_west_data[30:0] (2)testbench.i_ib_west_data[30:0] (3)testbench.i_ib_west_data[30:0]
 @28
 (0)testbench.i_ib_west_data[30:0]
@@ -243,7 +244,7 @@ testbench.i_ib_west_data[30:0]
 (3)testbench.i_ib_west_data[30:0]
 @1401200
 -group_end
-@c00022
+@c00024
 #{column} (4)testbench.i_ib_west_data[30:0] (5)testbench.i_ib_west_data[30:0] (6)testbench.i_ib_west_data[30:0] (7)testbench.i_ib_west_data[30:0]
 @28
 (4)testbench.i_ib_west_data[30:0]
@@ -471,9 +472,8 @@ testbench.o_ob_south_data[30:0]
 -group_end
 @1001200
 -group_end
-@29
-testbench.o_ob_south_valid[0]
 @28
+testbench.o_ob_south_valid[0]
 testbench.i_ob_south_ready[0]
 @200
 -
@@ -560,9 +560,11 @@ testbench.u_dut.u_decoder.o_ram_wr_en[0]
 testbench.u_dut.u_decoder.o_ram_wr_data[31:0]
 @200
 -
-@22
+@24
 testbench.u_dut.u_decoder.o_num_instr[15:0]
 testbench.u_dut.u_decoder.o_num_output[15:0]
+@22
+testbench.u_dut.u_decoder.o_loopback_mask[31:0]
 @1000200
 -Decoder
 @200
@@ -655,5 +657,61 @@ testbench.u_dut.comb_outbound_dir.lt_col[0]
 testbench.u_dut.comb_outbound_dir.gt_col[0]
 @1000200
 -Routing
+@200
+-
+@800200
+-Store
+@22
+testbench.u_dut.u_store.i_wr_addr[9:0]
+testbench.u_dut.u_store.i_wr_data[31:0]
+@28
+testbench.u_dut.u_store.i_wr_en[0]
+@200
+-
+@22
+testbench.u_dut.u_store.i_a_rd_addr[9:0]
+@28
+testbench.u_dut.u_store.i_a_rd_en[0]
+@22
+testbench.u_dut.u_store.o_a_rd_data[31:0]
+@28
+testbench.u_dut.u_store.o_a_rd_stall[0]
+@200
+-
+@22
+testbench.u_dut.u_store.i_b_rd_addr[9:0]
+@28
+testbench.u_dut.u_store.i_b_rd_en[0]
+@22
+testbench.u_dut.u_store.o_b_rd_data[31:0]
+@1000200
+-Store
+@200
+-
+@800200
+-Core
+@28
+testbench.u_dut.u_core.i_trigger[0]
+testbench.u_dut.u_core.o_idle[0]
+testbench.u_dut.u_core.held_trigger_q[0]
+@200
+-
+@29
+testbench.u_dut.u_core.fetch_state_q[0]
+@28
+testbench.u_dut.u_core.exec_state_q[0]
+@200
+-
+@24
+testbench.u_dut.u_core.pc_q[9:0]
+testbench.u_dut.u_core.output_idx_q[4:0]
+@200
+-
+@22
+testbench.u_dut.u_core.i_inputs[31:0]
+testbench.u_dut.u_core.working_q[7:0]
+testbench.u_dut.u_core.o_outputs[31:0]
+@1000200
+-Core
 [pattern_trace] 1
 [pattern_trace] 0
