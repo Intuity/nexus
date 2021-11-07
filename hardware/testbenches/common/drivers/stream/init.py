@@ -15,6 +15,8 @@
 from cocotb_bus.drivers import Driver
 from cocotb.triggers import Lock, RisingEdge, ClockCycles
 
+from .common import StreamTransaction
+
 class StreamInitiator(Driver):
     """ Testbench driver acting as an initiator of a stream interface """
 
@@ -69,15 +71,19 @@ class StreamInitiator(Driver):
             sync       : Align to the rising clock edge before sending
             **kwargs   : Any other arguments
         """
+        # Check transaction type
+        assert type(transaction) in (int, StreamTransaction), \
+            f"Unsupported transaction type {type(transaction).__name__}"
+        # Sanitise
+        if isinstance(transaction, int):
+            transaction = StreamTransaction(data=transaction)
         # Synchronise to the rising edge
         if sync: await RisingEdge(self.clock)
         # Wait for reset to clear
         while self.reset == 1: await RisingEdge(self.clock)
         # Drive the transaction interface
-        data, dirx = transaction, 0
-        if not isinstance(transaction, int): data, dirx = transaction
-        self.intf.data <= data
-        if hasattr(self.intf, "dir"): self.intf.dir <= dirx
+        self.intf.data <= transaction.data
+        self.intf.set("dir", int(transaction.direction))
         self.intf.valid <= 1
         while True:
             await RisingEdge(self.clock)

@@ -16,6 +16,11 @@ from random import randint
 
 from cocotb_bus.monitors import Monitor
 from cocotb.triggers import RisingEdge, ClockCycles
+from cocotb.utils import get_sim_time
+
+from nxconstants import Direction
+
+from .common import StreamTransaction
 
 class StreamResponder(Monitor):
     """ Testbench driver acting as a responder to a stream interface """
@@ -55,10 +60,11 @@ class StreamResponder(Monitor):
                 continue
             # Capture a request
             if self.intf.valid == 1 and self.intf.ready == 1:
-                if hasattr(self.intf, "dir"):
-                    self._recv((int(self.intf.data), int(self.intf.dir)))
-                else:
-                    self._recv((int(self.intf.data), 0))
+                self._recv(StreamTransaction(
+                    data     =int(self.intf.data),
+                    direction=Direction(self.intf.get("dir", 0)),
+                    timestamp=get_sim_time(units="ns"),
+                ))
             # Generate random backpressure
             if self.delays and randint(0, 99) < int(100 * self.probability):
                 self.intf.ready <= 0
