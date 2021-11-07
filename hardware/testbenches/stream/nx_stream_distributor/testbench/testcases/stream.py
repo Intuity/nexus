@@ -17,6 +17,7 @@ from random import choice, randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import RisingEdge
 
+from drivers.stream.common import StreamTransaction
 from nxconstants import Direction
 
 from ..testbench import testcase
@@ -35,10 +36,10 @@ async def single_dir(dut):
     )):
         # Send a random message towards each interface
         msg = randint(0, (1 << intf_size) - 1)
-        dut.inbound.append((msg, Direction(dirx)))
+        dut.inbound.append(StreamTransaction(data=msg, direction=Direction(dirx)))
 
         # Queue up message on the expected output
-        exp.append((msg, 0))
+        exp.append(StreamTransaction(data=msg))
 
         # Wait for the expected queue to drain
         while exp: await RisingEdge(dut.clk)
@@ -68,10 +69,10 @@ async def multi_dir(dut, backpressure):
 
         # Send a random message towards each interface
         msg = randint(0, (1 << intf_size) - 1)
-        dut.inbound.append((msg, dirx))
+        dut.inbound.append(StreamTransaction(data=msg, direction=dirx))
 
         # Queue up message on the expected output
-        exp.append((msg, 0))
+        exp.append(StreamTransaction(data=msg))
 
 factory = TestFactory(multi_dir)
 factory.add_option("backpressure", [True, False])

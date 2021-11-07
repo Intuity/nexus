@@ -17,6 +17,8 @@ from random import randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles
 
+from drivers.stream.common import StreamTransaction
+
 from ..testbench import testcase
 
 @testcase()
@@ -50,8 +52,8 @@ async def stream(dut, backpressure, gaps):
     # Drive many messages
     for _ in range(1000):
         msg = randint(0, (1 << intf_size) - 1)
-        dut.expected.append((msg, 0))
-        dut.inbound.append(msg)
+        dut.expected.append(StreamTransaction(data=msg))
+        dut.inbound.append(StreamTransaction(data=msg))
         if gaps: await ClockCycles(dut.clk, randint(1, 50))
 
 factory = TestFactory(stream)

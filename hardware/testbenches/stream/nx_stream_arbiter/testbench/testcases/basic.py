@@ -17,6 +17,8 @@ from random import randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
+from drivers.stream.common import StreamTransaction
+
 from ..testbench import testcase
 
 @testcase()
@@ -54,11 +56,11 @@ async def single_dir(dut):
             randint(0, (1 << (intf_size - 8)) - 1)
             for _ in range(randint(50, 100))
         ]
-        for msg in msgs: intf.append(msg)
+        for msg in msgs: intf.append(StreamTransaction(data=msg))
         dut.info(f"Generated {len(msgs)} messages")
 
         # Queue up the expected responses
-        dut.expected += [(x, 0) for x in msgs]
+        dut.expected += [StreamTransaction(data=x) for x in msgs]
 
         # Wait for the expected queue to drain
         while dut.expected: await RisingEdge(dut.clk)
@@ -81,20 +83,24 @@ async def multi_dir(dut, backpressure):
     # Queue up random messages onto the different drivers
     north, east, south, west = gen_msg(), gen_msg(), gen_msg(), gen_msg()
 
-    for msg in north: dut.north.append(msg)
-    for msg in east : dut.east.append(msg)
-    for msg in south: dut.south.append(msg)
-    for msg in west : dut.west.append(msg)
+    for msg in north: dut.north.append(StreamTransaction(data=msg))
+    for msg in east : dut.east.append(StreamTransaction(data=msg))
+    for msg in south: dut.south.append(StreamTransaction(data=msg))
+    for msg in west : dut.west.append(StreamTransaction(data=msg))
 
     # Construct the expected arbitration (using round robin)
     last = 0
     while north or east or south or west:
         for idx in range(4):
             dirx = (idx + last + 1) % 4
-            if   dirx == 0 and north: dut.expected.append((north.pop(0), 0))
-            elif dirx == 1 and east : dut.expected.append((east.pop(0),  0))
-            elif dirx == 2 and south: dut.expected.append((south.pop(0), 0))
-            elif dirx == 3 and west : dut.expected.append((west.pop(0),  0))
+            if dirx == 0 and north:
+                dut.expected.append(StreamTransaction(data=north.pop(0)))
+            elif dirx == 1 and east:
+                dut.expected.append(StreamTransaction(data=east.pop(0)))
+            elif dirx == 2 and south:
+                dut.expected.append(StreamTransaction(data=south.pop(0)))
+            elif dirx == 3 and west:
+                dut.expected.append(StreamTransaction(data=west.pop(0)))
         # Capture the last direction
         last = dirx
 
