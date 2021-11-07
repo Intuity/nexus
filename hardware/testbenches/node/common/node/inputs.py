@@ -18,6 +18,7 @@ from drivers.stream.common import StreamTransaction
 from drivers.stream.init import StreamInitiator
 
 from nxconstants import NodeCommand, NodeID, NodeSignal
+from nxmodel import (NXMessagePipe, unpack_node_signal)
 
 async def update_inputs(
     inbound       : StreamInitiator,
@@ -29,6 +30,7 @@ async def update_inputs(
     only_com      : bool = False,
     only_changed  : bool = True,
     wait_for_idle : bool = True,
+    model         : NXMessagePipe = None,
 ) -> None:
     """
     Update the input state of a node, generating and submitting messages to an
@@ -44,6 +46,7 @@ async def update_inputs(
         only_com     : Only send combinatorial updates
         only_changed : Only send updates where a state has changed
         wait_for_idle: Whether to wait for the driver to return to idle
+        model        : Inbound message pipe to the model
     """
     # Queue up all of the messages
     for index, (prev, new, seq) in enumerate(zip(previous, updated, is_seq)):
@@ -61,6 +64,10 @@ async def update_inputs(
         msg.index          = index
         msg.is_seq         = (1 if seq else 0)
         msg.state          = (1 if new else 0)
-        inbound.append(StreamTransaction(data=msg.pack()))
+        # Queue up into the testbench driver
+        encoded = msg.pack()
+        inbound.append(StreamTransaction(data=encoded))
+        # Queue up into the C++ model if required
+        if model: model.enqueue(unpack_node_signal(encoded))
     # Wait for driver to return to idle
     if wait_for_idle: await inbound.idle()

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List
+from typing import Any, List, Optional
 
 from drivers.stream.common import StreamTransaction
 from drivers.stream.init import StreamInitiator
@@ -20,12 +20,15 @@ from drivers.stream.init import StreamInitiator
 from nxconstants import (NodeCommand, NodeControl, NodeID, NodeLoad,
                          NodeLoopback, NodeParameter, LOAD_SEG_WIDTH,
                          LB_SECTION_WIDTH)
+from nxmodel import (NXMessagePipe, unpack_node_control, unpack_node_load,
+                     unpack_node_loopback)
 
 def load_data(
     inbound    : StreamInitiator,
     node_id    : NodeID,
     ram_data_w : int,
     stream     : List[Any],
+    model      : Optional[NXMessagePipe] = None,
 ) -> None:
     """
     Load a stream of data into a node, supports either a stream of integer data
@@ -36,6 +39,7 @@ def load_data(
         node_id   : Identifier for the target node
         ram_data_w: Width of the RAM in the device
         stream    : Entries to load into the device
+        model     : Inbound message pipe to the model
     """
     chunks = ram_data_w // LOAD_SEG_WIDTH
     mask   = (1 << LOAD_SEG_WIDTH) - 1
@@ -50,13 +54,18 @@ def load_data(
             msg.data           = (
                 (data >> ((chunks - chunk - 1) * LOAD_SEG_WIDTH)) & mask
             )
-            inbound.append(StreamTransaction(data=msg.pack()))
+            # Queue up into the testbench driver
+            encoded = msg.pack()
+            inbound.append(StreamTransaction(data=encoded))
+            # Queue up into the C++ model if required
+            if model: model.enqueue(unpack_node_load(encoded))
 
 def load_loopback(
     inbound    : StreamInitiator,
     node_id    : NodeID,
     num_inputs : int,
-    mask       : int
+    mask       : int,
+    model      : Optional[NXMessagePipe] = None,
 ) -> None:
     """
     Load a loopback mask into a node.
@@ -66,6 +75,7 @@ def load_loopback(
         node_id   : Identifier for the target node
         num_inputs: Number of inputs supported by the node
         mask      : Loopback mask
+        model     : Inbound message pipe to the model
     """
     for select in range(num_inputs // LB_SECTION_WIDTH):
         msg = NodeLoopback()
@@ -76,13 +86,18 @@ def load_loopback(
         msg.section        = (
             (mask >> (select * LB_SECTION_WIDTH)) & ((1 << LB_SECTION_WIDTH) - 1)
         )
-        inbound.append(StreamTransaction(data=msg.pack()))
+        # Queue up into the testbench driver
+        encoded = msg.pack()
+        inbound.append(StreamTransaction(data=encoded))
+        # Queue up into the C++ model if required
+        if model: model.enqueue(unpack_node_loopback(encoded))
 
 def load_parameter(
     inbound   : StreamInitiator,
     node_id   : NodeID,
     parameter : NodeParameter,
     value     : int,
+    model      : Optional[NXMessagePipe] = None,
 ) -> NodeControl:
     """
     Load a parameter into a node
@@ -92,6 +107,7 @@ def load_parameter(
         node_id  : Identifier for the target node
         parameter: Parameter to configure
         value    : Value to set
+        model    : Inbound message pipe to the model
 
     Returns: The NodeControl message for submission to monitors/scoreboarding
     """
@@ -101,5 +117,10 @@ def load_parameter(
     msg.header.command = NodeCommand.CONTROL
     msg.param          = parameter
     msg.value          = value
-    inbound.append(StreamTransaction(data=msg.pack()))
+    # Queue up into the testbench driver
+    encoded = msg.pack()
+    inbound.append(StreamTransaction(data=encoded))
+    # Queue up into the C++ model if required
+    if model: model.enqueue(unpack_node_control(encoded))
+    # Return message for scoreboarding
     return msg
