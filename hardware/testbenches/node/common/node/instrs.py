@@ -37,20 +37,30 @@ def gen_instructions(
         stop_early: Stop once all of the outputs have been exhausted
     """
     stream    = []
+    reg_used  = [False] * registers
     used_outs = 0
+    # Closure function to allocate safe inputs
+    def random_source():
+        use_reg = (True in reg_used) and choice((True, False))
+        if use_reg:
+            return False, choice([i for i, x in enumerate(reg_used) if x])
+        else:
+            return True, randint(0, inputs-1)
+    # Generate up to the maximum number of operations
     for _ in range(max_ops):
-        a_ip, b_ip, c_ip = choice((0, 1)), choice((0, 1)), choice((0, 1))
+        a_ip, a_idx = random_source()
+        b_ip, b_idx = random_source()
+        c_ip, c_idx = random_source()
         stream.append(Instruction(
-            truth=randint(0, (1 << TT_WIDTH) - 1),
-            src_a_ip=a_ip,
-            src_a   =randint(0, (inputs if a_ip else registers) - 1),
-            src_b_ip=b_ip,
-            src_b   =randint(0, (inputs if b_ip else registers) - 1),
-            src_c_ip=c_ip,
-            src_c   =randint(0, (inputs if c_ip else registers) - 1),
+            truth   =randint(0, (1 << TT_WIDTH) - 1),
+            src_a_ip=a_ip, src_a=a_idx,
+            src_b_ip=b_ip, src_b=b_idx,
+            src_c_ip=c_ip, src_c=c_idx,
             tgt_reg =randint(0, registers - 1),
             gen_out =(choice((0, 1)) if (used_outs < outputs) else 0)
         ))
+        # Mark which registers are used
+        reg_used[stream[-1].tgt_reg] = True
         # If all outputs exhausted, suppress output generation
         if used_outs >= outputs: stream[-1].gen_out = 0
         # Count outputs being generated
@@ -58,6 +68,25 @@ def gen_instructions(
         # Break out early if required
         if used_outs >= outputs and stop_early: break
     return stream
+
+def print_instructions(stream : List[Instruction]) -> None:
+    """
+    Print out a listing of all of the instructions in a stream.
+
+    Args:
+        stream: The instruction stream
+    """
+    output_idx = 0
+    for idx, instr in enumerate(stream):
+        print(
+            f"{idx:04d} - T: {instr.truth:08b} "
+            f"A: {'I' if instr.src_a_ip else 'R'}[{instr.src_a:2d}] "
+            f"B: {'I' if instr.src_b_ip else 'R'}[{instr.src_b:2d}] "
+            f"C: {'I' if instr.src_c_ip else 'R'}[{instr.src_c:2d}] "
+            f"T: R[{instr.tgt_reg:2d}]"
+            + (f" -> O[{output_idx:2d}]" if instr.gen_out else "")
+        )
+        if instr.gen_out: output_idx += 1
 
 def eval_instruction(
     instruction : Instruction,
