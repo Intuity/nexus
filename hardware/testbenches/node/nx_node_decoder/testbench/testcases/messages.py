@@ -15,8 +15,9 @@
 from random import choice, randint
 
 from ..testbench import testcase
-from drivers.state.common import SignalState
 from drivers.memory.common import MemoryTransaction
+from drivers.state.common import SignalState
+from drivers.stream.common import StreamTransaction
 
 from nxconstants import (NodeCommand, NodeMessage, MESSAGE_WIDTH, LOAD_SEG_WIDTH,
                          LB_SECTION_WIDTH, LB_SELECT_WIDTH, NodeParameter)
@@ -94,4 +95,4 @@ async def messages(dut):
                 num_output = msg.control.value
 
         # Queue up the message
-        dut.msg.append((msg.pack(), 0))
+        dut.msg.append(StreamTransaction(data=msg.pack()))
