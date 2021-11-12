@@ -19,7 +19,7 @@ from cocotb.triggers import ClockCycles, RisingEdge
 from nxmodel import direction_t, NXMessagePipe, NXNode, pack_node_raw, node_raw_t
 
 from node.inputs import update_inputs
-from node.instrs import gen_instructions, print_instructions
+from node.instrs import gen_instructions
 from node.load import load_data, load_loopback, load_parameter
 from node.outputs import gen_output_mappings
 from nxconstants import (NodeCommand, NodeID, NodeParameter, NodeSignal,
