@@ -202,10 +202,19 @@ class ControlMessage:
     param  : ControlReadParam(desc="Read back parameter encoding")
     active : ControlSetActive(desc="Set active state encoding")
 
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
+@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value)
+class ControlStatus:
+    """ Status response from the control plane """
+    interval_set : Scalar(width=1, desc="Interval counter is set")
+    first_tick   : Scalar(width=1, desc="First tick pending")
+    idle_low     : Scalar(width=1, desc="Mesh idle has been seen low")
+    active       : Scalar(width=1, desc="Controller is generating ticks")
+
+@packtype.union(package=NXConstants)
 class ControlResponse:
     """ Response to a control message """
-    payload : Scalar(width=NXConstants.MESSAGE_WIDTH, desc="Response payload")
+    raw    : Scalar(width=NXConstants.MESSAGE_WIDTH, desc="Raw response")
+    status : ControlStatus(desc="Encoded status response")
 
 # ==============================================================================
 # Node Message Formats

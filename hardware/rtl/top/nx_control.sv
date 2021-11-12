@@ -21,11 +21,11 @@
 module nx_control
 import NXConstants::*;
 #(
-      parameter ROWS       = 3
-    , parameter COLUMNS    = 3
-    , parameter INPUTS     = 8
-    , parameter OUTPUTS    = 8
-    , parameter REGISTERS  = 8
+      parameter ROWS      = 3
+    , parameter COLUMNS   = 3
+    , parameter INPUTS    = 8
+    , parameter OUTPUTS   = 8
+    , parameter REGISTERS = 8
 ) (
       input  logic               i_clk
     , input  logic               i_rst
@@ -191,10 +191,11 @@ always_comb begin : comb_decode
             // Read back various status flags
             CONTROL_COMMAND_STATUS: begin
                 send_valid = 1'b1;
-                send_data  = {
-                    {(TX_PYLD_WIDTH-4){1'b0}}, active_q, seen_idle_low_q,
-                    first_tick_q, interval_set_q
-                };
+                send_data  = 'd0;
+                send_data.status.active       = active_q;
+                send_data.status.idle_low     = seen_idle_low_q;
+                send_data.status.first_tick   = first_tick_q;
+                send_data.status.interval_set = interval_set_q;
             end
             // Read back the number of elapsed cycles
             CONTROL_COMMAND_CYCLES: begin
