@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Include common Python for node
+PYTHON_PATHS += $(abspath ../../node/common)
+
 # Common bench support
-include ../common/Makefile
+include ../../common/Makefile
 
 # Set a higher than normal timeout
 TIMEOUT ?= 30m

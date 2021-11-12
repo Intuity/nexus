@@ -14,6 +14,7 @@
 
 from random import randint
 
+from drivers.stream.common import StreamTransaction
 from nxconstants import NodeMessage
 
 from ..testbench import testcase
@@ -26,8 +27,8 @@ async def routing(dut):
     await dut.reset()
 
     # Find the number of rows
-    num_rows = int(dut.dut.dut.ROWS)
-    num_cols = int(dut.dut.dut.COLUMNS)
+    num_rows = int(dut.ROWS)
+    num_cols = int(dut.COLUMNS)
 
     for _ in range(1000):
         # Keep randomising until it becomes a legal message
@@ -50,5 +51,5 @@ async def routing(dut):
         )
 
         # Queue up the message
-        dut.mesh_inbound.append(msg.pack())
-        dut.mesh_expected.append((msg.pack(), 0))
+        dut.mesh_inbound.append(StreamTransaction(msg.pack()))
+        dut.mesh_expected.append(StreamTransaction(msg.pack()))

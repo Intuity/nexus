@@ -16,7 +16,8 @@ from random import randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from nxconstants import NodeCommand, NodeLoadInstr
+from node.load import load_data
+from nxconstants import NodeID
 
 from ..testbench import testcase
 
@@ -28,48 +29,48 @@ async def load(dut):
     await dut.reset()
 
     # Determine parameters
-    num_rows = int(dut.dut.dut.ROWS)
-    num_cols = int(dut.dut.dut.COLUMNS)
+    num_rows   = int(dut.ROWS)
+    num_cols   = int(dut.COLUMNS)
+    ram_data_w = int(dut.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
-    # Load a random number of instructions into every node
+    # Load random data into every node
     loaded  = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
     counter = 0
     for row in range(num_rows):
         for col in range(num_cols):
-            for _ in range(randint(10, 30)):
-                msg                = NodeLoadInstr()
-                msg.header.row     = row
-                msg.header.column  = col
-                msg.header.command = NodeCommand.LOAD_INSTR
-                msg.instr          = randint(0, (1 << 21) - 1)
-                dut.mesh_inbound.append(msg.pack())
-                loaded[row][col].append(msg.instr.pack())
-                counter += 1
+            loaded[row][col] = [randint(0, (1 << 32) - 1) for _ in range(randint(50, 100))]
+            load_data(
+                inbound   =dut.mesh_inbound,
+                node_id   =NodeID(row=row, column=col),
+                ram_data_w=ram_data_w,
+                stream    =loaded[row][col]
+            )
+            counter += len(loaded[row][col])
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {counter} loads")
     await dut.mesh_inbound.idle()
 
     # Wait for the idle flag to go high
-    if dut.status_idle_o == 0: await RisingEdge(dut.status_idle_o)
+    while dut.status.idle == 0: await RisingEdge(dut.clk)
 
     # Wait for some extra time
     await ClockCycles(dut.clk, 10)
 
-    # Check the instruction counters for every core
+    # Check the next load address for every node
     for row in range(num_rows):
         for col in range(num_cols):
-            node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
-            pop  = int(node.store.instr_count_o)
+            node = dut.dut.u_dut.u_mesh.gen_rows[row].gen_columns[col].u_node
+            pop  = int(node.u_decoder.load_address_q)
             assert pop == len(loaded[row][col]), \
                 f"{row}, {col}: Expected {len(loaded[row][col])}, got {pop}"
 
-    # Check the loaded instructions
+    # Check the loaded data
     for row in range(num_rows):
         for col in range(num_cols):
-            node = dut.dut.dut.mesh.g_rows[row].g_columns[col].node
+            node = dut.dut.u_dut.u_mesh.gen_rows[row].gen_columns[col].u_node
             for op_idx, op in enumerate(loaded[row][col]):
-                got = int(node.store.ram.memory[op_idx])
+                got = int(node.u_store.u_ram.memory[op_idx])
                 assert got == op, \
                     f"{row}, {col}: O{op_idx} - exp {hex(op)}, got {hex(got)}"

@@ -15,71 +15,88 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter ROWS      =  6
-    , parameter COLUMNS   =  6
-    , parameter INPUTS    = 32
-    , parameter OUTPUTS   = 32
-    , parameter REGISTERS =  8
+      parameter ROWS       = 3
+    , parameter COLUMNS    = 3
+    , parameter INPUTS     = 32
+    , parameter OUTPUTS    = 32
+    , parameter REGISTERS  = 8
+    , parameter RAM_ADDR_W = 10
+    , parameter RAM_DATA_W = 32
 ) (
-      input  logic rst
+      input  logic              rst
     // Status signals
-    , output logic status_active_o
-    , output logic status_idle_o
-    , output logic status_trigger_o
+    , output logic              o_status_active
+    , output logic              o_status_idle
+    , output logic              o_status_trigger
     // Control message streams
     // - Inbound
-    , input  control_message_t ctrl_ib_data_i
-    , input  logic             ctrl_ib_valid_i
-    , output logic             ctrl_ib_ready_o
+    , input  control_message_t  i_ctrl_ib_data
+    , input  logic              i_ctrl_ib_valid
+    , output logic              o_ctrl_ib_ready
     // - Outbound
-    , output control_response_t ctrl_ob_data_o
-    , output logic              ctrl_ob_valid_o
-    , input  logic              ctrl_ob_ready_i
+    , output control_response_t o_ctrl_ob_data
+    , output logic              o_ctrl_ob_valid
+    , input  logic              i_ctrl_ob_ready
     // Mesh message streams
     // - Inbound
-    , input  node_message_t mesh_ib_data_i
-    , input  logic          mesh_ib_valid_i
-    , output logic          mesh_ib_ready_o
+    , input  node_message_t     i_mesh_ib_data
+    , input  logic              i_mesh_ib_valid
+    , output logic              o_mesh_ib_ready
     // - Outbound
-    , output node_message_t mesh_ob_data_o
-    , output logic          mesh_ob_valid_o
-    , input  logic          mesh_ob_ready_i
+    , output node_message_t     o_mesh_ob_data
+    , output logic              o_mesh_ob_valid
+    , input  logic              i_mesh_ob_ready
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nexus #(
-      .ROWS          (ROWS          )
-    , .COLUMNS       (COLUMNS       )
-    , .ADDR_ROW_WIDTH(ADDR_ROW_WIDTH)
-    , .ADDR_COL_WIDTH(ADDR_COL_WIDTH)
-    , .COMMAND_WIDTH (COMMAND_WIDTH )
-    , .INSTR_WIDTH   (INSTR_WIDTH   )
-    , .INPUTS        (INPUTS        )
-    , .OUTPUTS       (OUTPUTS       )
-    , .REGISTERS     (REGISTERS     )
-    , .MAX_INSTRS    (MAX_INSTRS    )
-    , .OPCODE_WIDTH  (OPCODE_WIDTH  )
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
-    , .*
+      .ROWS             ( ROWS             )
+    , .COLUMNS          ( COLUMNS          )
+    , .INPUTS           ( INPUTS           )
+    , .OUTPUTS          ( OUTPUTS          )
+    , .REGISTERS        ( REGISTERS        )
+    , .RAM_ADDR_W       ( RAM_ADDR_W       )
+    , .RAM_DATA_W       ( RAM_DATA_W       )
+) u_dut (
+      .i_clk            ( clk              )
+    , .i_rst            ( rst              )
+    // Status signals
+    , .o_status_active  ( o_status_active  )
+    , .o_status_idle    ( o_status_idle    )
+    , .o_status_trigger ( o_status_trigger )
+    // Control message streams
+    // - Inbound
+    , .i_ctrl_ib_data   ( i_ctrl_ib_data   )
+    , .i_ctrl_ib_valid  ( i_ctrl_ib_valid  )
+    , .o_ctrl_ib_ready  ( o_ctrl_ib_ready  )
+    // - Outbound
+    , .o_ctrl_ob_data   ( o_ctrl_ob_data   )
+    , .o_ctrl_ob_valid  ( o_ctrl_ob_valid  )
+    , .i_ctrl_ob_ready  ( i_ctrl_ob_ready  )
+    // Mesh message streams
+    // - Inbound
+    , .i_mesh_ib_data   ( i_mesh_ib_data   )
+    , .i_mesh_ib_valid  ( i_mesh_ib_valid  )
+    , .o_mesh_ib_ready  ( o_mesh_ib_ready  )
+    // - Outbound
+    , .o_mesh_ob_data   ( o_mesh_ob_data   )
+    , .o_mesh_ob_valid  ( o_mesh_ob_valid  )
+    , .i_mesh_ob_ready  ( i_mesh_ob_ready  )
 );
 
-// Debug probing signals
-logic [ROWS-1:0][COLUMNS-1:0] debug_valid;
-logic [ROWS-1:0][COLUMNS-1:0] debug_ready;
-
-generate
-genvar row, col;
-for (row = 0; row < ROWS; row = (row + 1)) begin
-    for (col = 0; col < COLUMNS; col = (col + 1)) begin
-        assign debug_valid[row][col] = dut.mesh.g_rows[row].g_columns[col].node.outbound_dist.dist_valid_i;
-        assign debug_ready[row][col] = dut.mesh.g_rows[row].g_columns[col].node.outbound_dist.dist_ready_o;
-    end
-end
-endgenerate
+// =============================================================================
+// Tracing
+// =============================================================================
 
 // Wave tracing
 `ifdef sim_icarus

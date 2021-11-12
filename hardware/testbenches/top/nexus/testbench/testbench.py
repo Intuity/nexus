@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
@@ -36,6 +37,12 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
+        # Wrap simple I/Os
+        self.status = SimpleNamespace(
+            active =dut.o_status_active,
+            idle   =dut.o_status_idle,
+            trigger=dut.o_status_trigger,
+        )
         # Setup drivers/monitors
         self.ctrl_inbound = StreamInitiator(
             self, self.clk, self.rst,

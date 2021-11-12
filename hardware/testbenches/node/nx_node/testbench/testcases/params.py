@@ -17,8 +17,8 @@ from random import choice, randint
 from cocotb.triggers import RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
 
-from nxconstants import (NodeCommand, NodeControl, NodeID, NodeParameter,
-                         MAX_ROW_COUNT, MAX_COLUMN_COUNT, NODE_PARAM_WIDTH)
+from nxconstants import (NodeID, NodeParameter, MAX_ROW_COUNT, MAX_COLUMN_COUNT,
+                         NODE_PARAM_WIDTH)
 from drivers.basic.unstrobed import UnstrobedMonitor
 from node.load import load_parameter
 
