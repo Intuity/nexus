@@ -1,184 +1,52 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Mon Jul 19 11:49:02 2021
+[*] Fri Nov 12 22:00:44 2021
 [*]
-[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_control/sim.lxt"
-[dumpfile_mtime] "Mon Jul 19 11:37:49 2021"
-[dumpfile_size] 5902
-[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbench/nx_control/nx_control.gtkw"
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control/sim.lxt"
+[dumpfile_mtime] "Fri Nov 12 21:59:49 2021"
+[dumpfile_size] 1011
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control/nx_control.gtkw"
 [timestart] 0
-[size] 1861 1240
+[size] 1440 847
 [pos] -1 -1
-*-18.145884 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.029520 65800 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
-[treeopen] testbench.dut.
 [sst_width] 193
 [signals_width] 301
 [sst_expanded] 1
 [sst_vpaned_height] 392
 @28
-testbench.dut.clk_i[0]
-testbench.dut.rst_i[0]
+testbench.clk[0]
+testbench.rst[0]
 @200
 -
-@800022
-testbench.dut.inbound_data_i[30:0]
-@c00024
-#{command} (0)testbench.dut.inbound_data_i[30:0] (1)testbench.dut.inbound_data_i[30:0] (2)testbench.dut.inbound_data_i[30:0]
 @28
-(0)testbench.dut.inbound_data_i[30:0]
-(1)testbench.dut.inbound_data_i[30:0]
-(2)testbench.dut.inbound_data_i[30:0]
-@1401200
--group_end
-@c00022
-#{payload} (3)testbench.dut.inbound_data_i[30:0] (4)testbench.dut.inbound_data_i[30:0] (5)testbench.dut.inbound_data_i[30:0] (6)testbench.dut.inbound_data_i[30:0] (7)testbench.dut.inbound_data_i[30:0] (8)testbench.dut.inbound_data_i[30:0] (9)testbench.dut.inbound_data_i[30:0] (10)testbench.dut.inbound_data_i[30:0] (11)testbench.dut.inbound_data_i[30:0] (12)testbench.dut.inbound_data_i[30:0] (13)testbench.dut.inbound_data_i[30:0] (14)testbench.dut.inbound_data_i[30:0] (15)testbench.dut.inbound_data_i[30:0] (16)testbench.dut.inbound_data_i[30:0] (17)testbench.dut.inbound_data_i[30:0] (18)testbench.dut.inbound_data_i[30:0] (19)testbench.dut.inbound_data_i[30:0] (20)testbench.dut.inbound_data_i[30:0] (21)testbench.dut.inbound_data_i[30:0] (22)testbench.dut.inbound_data_i[30:0] (23)testbench.dut.inbound_data_i[30:0] (24)testbench.dut.inbound_data_i[30:0] (25)testbench.dut.inbound_data_i[30:0] (26)testbench.dut.inbound_data_i[30:0] (27)testbench.dut.inbound_data_i[30:0] (28)testbench.dut.inbound_data_i[30:0] (29)testbench.dut.inbound_data_i[30:0] (30)testbench.dut.inbound_data_i[30:0]
-@28
-(3)testbench.dut.inbound_data_i[30:0]
-(4)testbench.dut.inbound_data_i[30:0]
-(5)testbench.dut.inbound_data_i[30:0]
-(6)testbench.dut.inbound_data_i[30:0]
-(7)testbench.dut.inbound_data_i[30:0]
-(8)testbench.dut.inbound_data_i[30:0]
-(9)testbench.dut.inbound_data_i[30:0]
-(10)testbench.dut.inbound_data_i[30:0]
-(11)testbench.dut.inbound_data_i[30:0]
-(12)testbench.dut.inbound_data_i[30:0]
-(13)testbench.dut.inbound_data_i[30:0]
-(14)testbench.dut.inbound_data_i[30:0]
-(15)testbench.dut.inbound_data_i[30:0]
-(16)testbench.dut.inbound_data_i[30:0]
-(17)testbench.dut.inbound_data_i[30:0]
-(18)testbench.dut.inbound_data_i[30:0]
-(19)testbench.dut.inbound_data_i[30:0]
-(20)testbench.dut.inbound_data_i[30:0]
-(21)testbench.dut.inbound_data_i[30:0]
-(22)testbench.dut.inbound_data_i[30:0]
-(23)testbench.dut.inbound_data_i[30:0]
-(24)testbench.dut.inbound_data_i[30:0]
-(25)testbench.dut.inbound_data_i[30:0]
-(26)testbench.dut.inbound_data_i[30:0]
-(27)testbench.dut.inbound_data_i[30:0]
-(28)testbench.dut.inbound_data_i[30:0]
-(29)testbench.dut.inbound_data_i[30:0]
-(30)testbench.dut.inbound_data_i[30:0]
-@1401200
--group_end
-@c00024
-#{req_param} (3)testbench.dut.inbound_data_i[30:0] (4)testbench.dut.inbound_data_i[30:0] (5)testbench.dut.inbound_data_i[30:0]
-@28
-(3)testbench.dut.inbound_data_i[30:0]
-(4)testbench.dut.inbound_data_i[30:0]
-(5)testbench.dut.inbound_data_i[30:0]
-@1401200
--group_end
-@1001200
--group_end
-@28
-testbench.dut.inbound_ready_o[0]
+testbench.i_mesh_idle[2:0]
+testbench.o_mesh_trigger[2:0]
 @200
 -
-@c00022
-testbench.dut.outbound_data_o[30:0]
 @28
-(0)testbench.dut.outbound_data_o[30:0]
-(1)testbench.dut.outbound_data_o[30:0]
-(2)testbench.dut.outbound_data_o[30:0]
-(3)testbench.dut.outbound_data_o[30:0]
-(4)testbench.dut.outbound_data_o[30:0]
-(5)testbench.dut.outbound_data_o[30:0]
-(6)testbench.dut.outbound_data_o[30:0]
-(7)testbench.dut.outbound_data_o[30:0]
-(8)testbench.dut.outbound_data_o[30:0]
-(9)testbench.dut.outbound_data_o[30:0]
-(10)testbench.dut.outbound_data_o[30:0]
-(11)testbench.dut.outbound_data_o[30:0]
-(12)testbench.dut.outbound_data_o[30:0]
-(13)testbench.dut.outbound_data_o[30:0]
-(14)testbench.dut.outbound_data_o[30:0]
-(15)testbench.dut.outbound_data_o[30:0]
-(16)testbench.dut.outbound_data_o[30:0]
-(17)testbench.dut.outbound_data_o[30:0]
-(18)testbench.dut.outbound_data_o[30:0]
-(19)testbench.dut.outbound_data_o[30:0]
-(20)testbench.dut.outbound_data_o[30:0]
-(21)testbench.dut.outbound_data_o[30:0]
-(22)testbench.dut.outbound_data_o[30:0]
-(23)testbench.dut.outbound_data_o[30:0]
-(24)testbench.dut.outbound_data_o[30:0]
-(25)testbench.dut.outbound_data_o[30:0]
-(26)testbench.dut.outbound_data_o[30:0]
-(27)testbench.dut.outbound_data_o[30:0]
-(28)testbench.dut.outbound_data_o[30:0]
-(29)testbench.dut.outbound_data_o[30:0]
-(30)testbench.dut.outbound_data_o[30:0]
-@1401200
--group_end
-@c00024
-testbench.dut.outbound_data_o[30:0]
+testbench.o_status_active[0]
+testbench.o_status_idle[0]
+testbench.o_status_trigger[0]
+@200
+-
 @28
-(0)testbench.dut.outbound_data_o[30:0]
-(1)testbench.dut.outbound_data_o[30:0]
-(2)testbench.dut.outbound_data_o[30:0]
-(3)testbench.dut.outbound_data_o[30:0]
-(4)testbench.dut.outbound_data_o[30:0]
-(5)testbench.dut.outbound_data_o[30:0]
-(6)testbench.dut.outbound_data_o[30:0]
-(7)testbench.dut.outbound_data_o[30:0]
-(8)testbench.dut.outbound_data_o[30:0]
-(9)testbench.dut.outbound_data_o[30:0]
-(10)testbench.dut.outbound_data_o[30:0]
-(11)testbench.dut.outbound_data_o[30:0]
-(12)testbench.dut.outbound_data_o[30:0]
-(13)testbench.dut.outbound_data_o[30:0]
-(14)testbench.dut.outbound_data_o[30:0]
-(15)testbench.dut.outbound_data_o[30:0]
-(16)testbench.dut.outbound_data_o[30:0]
-(17)testbench.dut.outbound_data_o[30:0]
-(18)testbench.dut.outbound_data_o[30:0]
-(19)testbench.dut.outbound_data_o[30:0]
-(20)testbench.dut.outbound_data_o[30:0]
-(21)testbench.dut.outbound_data_o[30:0]
-(22)testbench.dut.outbound_data_o[30:0]
-(23)testbench.dut.outbound_data_o[30:0]
-(24)testbench.dut.outbound_data_o[30:0]
-(25)testbench.dut.outbound_data_o[30:0]
-(26)testbench.dut.outbound_data_o[30:0]
-(27)testbench.dut.outbound_data_o[30:0]
-(28)testbench.dut.outbound_data_o[30:0]
-(29)testbench.dut.outbound_data_o[30:0]
-(30)testbench.dut.outbound_data_o[30:0]
-@1401200
--group_end
-@28
-testbench.dut.outbound_valid_o[0]
-testbench.dut.outbound_ready_i[0]
+testbench.o_soft_reset[0]
 @200
 -
 @22
-testbench.dut.ob_fifo.wr_data_i[30:0]
+testbench.i_inbound_data[30:0]
 @28
-testbench.dut.ob_fifo.wr_ptr[0]
-@401200
--wr_data_i[30:0]
--wr_push_i[0]
--wr_data_i[30:0]
--wr_push_i[0]
--wr_data_i[30:0]
--wr_push_i[0]
+testbench.i_inbound_valid[0]
+testbench.o_inbound_ready[0]
 @200
 -
+@22
+testbench.o_outbound_data[30:0]
 @28
-testbench.dut.active_q[0]
-@25
-testbench.dut.cycle_q[27:0]
-@28
-testbench.dut.first_tick_q[0]
-testbench.dut.seen_idle_low_q[0]
-testbench.dut.trigger_q[0]
-testbench.dut.token_grant_q[2:0]
-@200
--
--
+testbench.o_outbound_valid[0]
+@29
+testbench.i_outbound_ready[0]
 [pattern_trace] 1
 [pattern_trace] 0

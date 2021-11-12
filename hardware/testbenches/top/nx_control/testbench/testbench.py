@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from types import SimpleNamespace
+
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
@@ -31,6 +33,15 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
+        # Wrap I/Os
+        self.soft_reset   = self.dut.o_soft_reset
+        self.mesh_idle    = self.dut.i_mesh_idle
+        self.mesh_trigger = self.dut.o_mesh_trigger
+        self.status       = SimpleNamespace(
+            active =self.dut.o_status_active,
+            idle   =self.dut.o_status_idle,
+            trigger=self.dut.o_status_trigger,
+        )
         # Setup drivers/monitors
         self.inbound = StreamInitiator(
             self, self.clk, self.rst, StreamIO(self.dut, "inbound", IORole.RESPONDER),
@@ -49,8 +60,7 @@ class Testbench(TestbenchBase):
         await super().initialise()
         self.inbound.intf.initialise(IORole.INITIATOR)
         self.outbound.intf.initialise(IORole.RESPONDER)
-        self.mesh_idle_i     <= ((1 << int(self.dut.COLUMNS)) - 1)
-        self.token_release_i <= 0
+        self.mesh_idle <= ((1 << int(self.dut.COLUMNS)) - 1)
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

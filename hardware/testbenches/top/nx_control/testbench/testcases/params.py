@@ -14,7 +14,9 @@
 
 from random import random
 
-from nxconstants import ControlCommand, ControlReadParam, ControlParam
+from drivers.stream.common import StreamTransaction
+from nxconstants import (ControlCommand, ControlReadParam, ControlParam,
+                         MESSAGE_WIDTH)
 
 from ..testbench import testcase
 
@@ -26,16 +28,16 @@ async def read_params(dut):
 
     # Create a lookup between parameter and the true value
     lookup = {
-        ControlParam.COUNTER_WIDTH : int(dut.dut.dut.TX_PYLD_WIDTH),
-        ControlParam.ROWS          : int(dut.dut.dut.ROWS         ),
-        ControlParam.COLUMNS       : int(dut.dut.dut.COLUMNS      ),
-        ControlParam.NODE_INPUTS   : int(dut.dut.dut.INPUTS       ),
-        ControlParam.NODE_OUTPUTS  : int(dut.dut.dut.OUTPUTS      ),
-        ControlParam.NODE_REGISTERS: int(dut.dut.dut.REGISTERS    ),
+        ControlParam.COUNTER_WIDTH : MESSAGE_WIDTH,
+        ControlParam.ROWS          : int(dut.ROWS     ),
+        ControlParam.COLUMNS       : int(dut.COLUMNS  ),
+        ControlParam.NODE_INPUTS   : int(dut.INPUTS   ),
+        ControlParam.NODE_OUTPUTS  : int(dut.OUTPUTS  ),
+        ControlParam.NODE_REGISTERS: int(dut.REGISTERS),
     }
 
     # Request all parameters in a random order
     for param in sorted(list(ControlParam), key=lambda _: random()):
         dut.info(f"Requesting parameter {ControlParam(param).name}")
         dut.inbound.append(ControlReadParam(command=ControlCommand.PARAM, param=param).pack())
-        dut.expected.append((lookup[param], 0))
+        dut.expected.append(StreamTransaction(lookup[param]))

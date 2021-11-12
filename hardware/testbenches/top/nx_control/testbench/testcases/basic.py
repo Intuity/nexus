@@ -14,8 +14,9 @@
 
 from cocotb.triggers import ClockCycles
 
-import nxconstants
-from nxconstants import ControlCommand, ControlRaw
+from drivers.stream.common import StreamTransaction
+from nxconstants import (ControlCommand, ControlRaw, HW_DEV_ID, HW_VER_MAJOR,
+                         HW_VER_MINOR)
 
 from ..testbench import testcase
 
@@ -44,7 +45,7 @@ async def read_id(dut):
     dut.inbound.append(ControlRaw(command=ControlCommand.ID).pack())
 
     # Queue up expected response
-    dut.expected.append((nxconstants.HW_DEV_ID, 0))
+    dut.expected.append(StreamTransaction(HW_DEV_ID))
 
 @testcase()
 async def read_version(dut):
@@ -57,7 +58,7 @@ async def read_version(dut):
     dut.inbound.append(ControlRaw(command=ControlCommand.VERSION).pack())
 
     # Queue up expected response
-    dut.expected.append((
-        nxconstants.HW_VER_MAJOR << 8 | nxconstants.HW_VER_MINOR << 0, 0
+    dut.expected.append(StreamTransaction(
+        HW_VER_MAJOR << 8 | HW_VER_MINOR << 0, 0
     ))
 

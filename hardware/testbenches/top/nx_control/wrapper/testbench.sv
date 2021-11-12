@@ -15,48 +15,74 @@
 module testbench
 import NXConstants::*;
 #(
-      parameter ROWS       = 3
-    , parameter COLUMNS    = 3
-    , parameter INPUTS     = 8
-    , parameter OUTPUTS    = 8
-    , parameter REGISTERS  = 8
+      parameter ROWS      = 3
+    , parameter COLUMNS   = 3
+    , parameter INPUTS    = 8
+    , parameter OUTPUTS   = 8
+    , parameter REGISTERS = 8
 ) (
-      input  logic rst
+      input  logic               rst
     // Inbound message stream (from host)
-    , input  control_message_t inbound_data_i
-    , input  logic             inbound_valid_i
-    , output logic             inbound_ready_o
+    , input  control_message_t   i_inbound_data
+    , input  logic               i_inbound_valid
+    , output logic               o_inbound_ready
     // Outbound message stream (to host)
-    , output control_response_t outbound_data_o
-    , output logic              outbound_valid_o
-    , input  logic              outbound_ready_i
+    , output control_response_t  o_outbound_data
+    , output logic               o_outbound_valid
+    , input  logic               i_outbound_ready
     // Soft reset request
-    , output logic soft_reset_o
+    , output logic               o_soft_reset
     // Externally visible status
-    , output logic status_active_o  // High when the mesh is active
-    , output logic status_idle_o    // High when the mesh goes idle
-    , output logic status_trigger_o // Pulses high on every tick every
+    , output logic               o_status_active
+    , output logic               o_status_idle
+    , output logic               o_status_trigger
     // Interface to the mesh
-    , input  logic [COLUMNS-1:0] mesh_idle_i     // High when mesh fully idle
-    , output logic [COLUMNS-1:0] mesh_trigger_o  // Trigger for the next cycle
-    , output logic [COLUMNS-1:0] token_grant_o   // Per-column token emit
-    , input  logic [COLUMNS-1:0] token_release_i // Per-column token return
+    , input  logic [COLUMNS-1:0] i_mesh_idle
+    , output logic [COLUMNS-1:0] o_mesh_trigger
 );
+
+// =============================================================================
+// Clock Generation
+// =============================================================================
 
 reg clk = 1'b0;
 always #1 clk <= ~clk;
 
+// =============================================================================
+// DUT Instance
+// =============================================================================
+
 nx_control #(
-      .ROWS     (ROWS     )
-    , .COLUMNS  (COLUMNS  )
-    , .INPUTS   (INPUTS   )
-    , .OUTPUTS  (OUTPUTS  )
-    , .REGISTERS(REGISTERS)
-) dut (
-      .clk_i(clk)
-    , .rst_i(rst)
-    , .*
+      .ROWS             ( ROWS             )
+    , .COLUMNS          ( COLUMNS          )
+    , .INPUTS           ( INPUTS           )
+    , .OUTPUTS          ( OUTPUTS          )
+    , .REGISTERS        ( REGISTERS        )
+) u_dut (
+      .i_clk            ( clk              )
+    , .i_rst            ( rst              )
+    // Inbound message stream (from host)
+    , .i_inbound_data   ( i_inbound_data   )
+    , .i_inbound_valid  ( i_inbound_valid  )
+    , .o_inbound_ready  ( o_inbound_ready  )
+    // Outbound message stream (to host)
+    , .o_outbound_data  ( o_outbound_data  )
+    , .o_outbound_valid ( o_outbound_valid )
+    , .i_outbound_ready ( i_outbound_ready )
+    // Soft reset request
+    , .o_soft_reset     ( o_soft_reset     )
+    // Externally visible status
+    , .o_status_active  ( o_status_active  )
+    , .o_status_idle    ( o_status_idle    )
+    , .o_status_trigger ( o_status_trigger )
+    // Interface to the mesh
+    , .i_mesh_idle      ( i_mesh_idle      )
+    , .o_mesh_trigger   ( o_mesh_trigger   )
 );
+
+// =============================================================================
+// Tracing
+// =============================================================================
 
 `ifdef sim_icarus
 initial begin : i_trace
