@@ -44,20 +44,13 @@ import NXConstants::*;
 );
 
 // =============================================================================
-// Types
-// =============================================================================
-
-// Workaround for Icarus Verilog not liking multi-dimensional packed structs
-typedef logic [MESSAGE_WIDTH-1:0] raw_msg_t;
-
-// =============================================================================
 // Internal Signals
 // =============================================================================
 
 // I/O bundle for every node
-raw_msg_t [COLUMNS-1:0][ROWS-1:0][3:0] mesh_ob_data;
-logic     [COLUMNS-1:0][ROWS-1:0][3:0] mesh_ob_valid;
-logic     [COLUMNS-1:0][ROWS-1:0][3:0] mesh_ib_ready;
+logic [COLUMNS-1:0][ROWS-1:0][3:0][MESSAGE_WIDTH-1:0] mesh_ob_data;
+logic [COLUMNS-1:0][ROWS-1:0][3:0]                    mesh_ob_valid;
+logic [COLUMNS-1:0][ROWS-1:0][3:0]                    mesh_ib_ready;
 
 // Column grouped idle signals
 logic [COLUMNS-1:0][ROWS-1:0] node_idle;
@@ -85,8 +78,8 @@ assign o_idle = column_idle_q;
 assign o_inbound_ready = mesh_ib_ready[0][0][DIRECTION_NORTH];
 
 // Egress
-assign o_outbound_data  = mesh_ob_data[COLUMNS-1][ROWS-1][DIRECTION_SOUTH];
-assign o_outbound_valid = mesh_ob_valid[COLUMNS-1][ROWS-1][DIRECTION_SOUTH];
+assign o_outbound_data  = mesh_ob_data[0][ROWS-1][DIRECTION_SOUTH];
+assign o_outbound_valid = mesh_ob_valid[0][ROWS-1][DIRECTION_SOUTH];
 
 // =============================================================================
 // Generate the Mesh
@@ -102,10 +95,10 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
         assign node_id.column = idx_col;
 
         // Build bundles
-        raw_msg_t [3:0] node_ib_data;
-        logic [3:0]     node_ib_valid;
-        logic [3:0]     node_ob_ready;
-        logic [3:0]     node_ob_present;
+        logic [3:0][MESSAGE_WIDTH-1:0] node_ib_data;
+        logic [3:0]                    node_ib_valid;
+        logic [3:0]                    node_ob_ready;
+        logic [3:0]                    node_ob_present;
 
         // For the top row, only first column has northbound connection
         if (idx_row == 0) begin
