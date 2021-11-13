@@ -50,15 +50,13 @@ import NXConstants::*;
 localparam OUTPUT_IDX_W = $clog2(OUTPUTS);
 localparam REG_IDX_W    = $clog2(REGISTERS);
 
-typedef enum logic { IDLE, ACTIVE } state_t;
-
 // =============================================================================
 // Internal signals and state
 // =============================================================================
 
 // Pipeline state
-`DECLARE_DQT(state_t, fetch_state,  i_clk, i_rst, IDLE)
-`DECLARE_DQT(state_t, exec_state,   i_clk, i_rst, IDLE)
+`DECLARE_DQ(1, fetch_active, i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, exec_active,  i_clk, i_rst, 'd0)
 
 // Fetch state
 `DECLARE_DQ(RAM_ADDR_W, pc,           i_clk, i_rst, 'd0)
@@ -68,7 +66,7 @@ logic start_fetch;
 
 // Execute state
 instruction_t decoded;
-logic         exec_active, exec_output, result;
+logic         exec_run, exec_output, result;
 logic [2:0]   table_index;
 
 `DECLARE_DQ(REGISTERS,     working,     i_clk, i_rst, {REGISTERS{1'b0}})
@@ -79,37 +77,37 @@ logic [2:0]   table_index;
 // Determine idleness
 // =============================================================================
 
-assign o_idle = (fetch_state_q == IDLE) && (exec_state_q == IDLE) && !held_trigger_q;
+assign o_idle = !fetch_active_q && !exec_active_q && !held_trigger_q;
 
 // =============================================================================
 // Fetch handling
 // =============================================================================
 
 // Postpone a trigger arriving during active execution
-assign held_trigger = (i_trigger || held_trigger_q) && (fetch_state_q == ACTIVE);
+assign held_trigger = (i_trigger || held_trigger_q) && fetch_active_q;
 
-// Start fetch from IDLE if a trigger is presented (or one was postponed)
-assign start_fetch = (fetch_state_q == IDLE) && (held_trigger_q || i_trigger);
+// Start fetch from idle if a trigger is presented (or one was postponed)
+assign start_fetch = !fetch_active_q && (held_trigger_q || i_trigger);
 
 // Track fetch state
-assign fetch_state = (start_fetch || fetch_state_q) && (pc_q != i_populated[RAM_ADDR_W-1:0]);
+assign fetch_active = (start_fetch || fetch_active_q) && (pc_q != i_populated[RAM_ADDR_W-1:0]);
 
 // Increment PC when active and not stalled
-assign pc = fetch_state ? (i_instr_stall ? pc_q : (pc_q + 'd1)) : 'd0;
+assign pc = fetch_active ? (i_instr_stall ? pc_q : (pc_q + 'd1)) : 'd0;
 
 // Drive outputs
 assign o_instr_addr  = pc_q;
-assign o_instr_rd_en = (fetch_state == ACTIVE);
+assign o_instr_rd_en = fetch_active;
 
 // =============================================================================
 // Execution
 // =============================================================================
 
 // Pipeline state from fetch
-assign exec_state = fetch_state_q;
+assign exec_active = fetch_active_q;
 
 // Determine if execute is active
-assign exec_active = (exec_state == ACTIVE) && !i_instr_stall;
+assign exec_run = exec_active && !i_instr_stall;
 
 // Decode the instruction
 assign decoded = i_instr_rd_data[$bits(instruction_t)-1:0];
@@ -128,14 +126,14 @@ assign result = (decoded.truth >> table_index) & 1'b1;
 generate
 for (genvar idx = 0; idx < REGISTERS; idx++) begin : gen_working_reg
     assign working[idx] = (
-        (exec_active && decoded.tgt_reg[REG_IDX_W-1:0] == idx)
+        (exec_run && decoded.tgt_reg[REG_IDX_W-1:0] == idx)
             ? result : working_q[idx]
     );
 end
 endgenerate
 
 // Determine if an output should be generated
-assign exec_output = exec_active && decoded.gen_out;
+assign exec_output = exec_run && decoded.gen_out;
 
 // Update the output vector if required
 generate
@@ -148,9 +146,9 @@ endgenerate
 
 // Increment the output index whenever an output is generated, reset to zero
 // when execution goes idle
-assign output_idx = exec_output          ? (output_idx_q + 'd1) : (
-                    (exec_state == IDLE) ? 'd0
-                                         : output_idx_q);
+assign output_idx =  exec_output ? (output_idx_q + 'd1) : (
+                    !exec_active ? 'd0
+                                 : output_idx_q);
 
 // Drive outputs
 assign o_outputs = outputs_q;
