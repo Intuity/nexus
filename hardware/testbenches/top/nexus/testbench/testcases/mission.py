@@ -193,7 +193,6 @@ async def mission_mode(dut):
 
         # Check for mismatches
         assert mismatches == 0, f"Detected {mismatches} between RTL and model"
-        continue
 
     # Calculate simulation rate
     delta      = get_sim_time(units="ns") - start_time
