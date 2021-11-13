@@ -16,9 +16,10 @@ from random import choice, randint, random
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
+from nxconstants import NodeCommand, NodeSignal
+
+from drivers.stream.common import StreamTransaction
 from node.outputs import gen_output_mappings
-from nxconstants import (NodeCommand, NodeSignal, OutputLookup, OutputMapping,
-                         MAX_ROW_COUNT, MAX_COLUMN_COUNT)
 
 from ..testbench import testcase
 
@@ -68,7 +69,7 @@ async def output_single(dut):
                 msg.index          = mapping.index
                 msg.state          = 1
                 msg.is_seq         = mapping.is_seq
-                dut.exp_msg.append((msg.pack(), 0))
+                dut.exp_msg.append(StreamTransaction(msg.pack()))
         # Wait for the queue to drain
         while dut.exp_msg: await RisingEdge(dut.clk)
         await ClockCycles(dut.clk, 10)
@@ -124,7 +125,7 @@ async def output_multi(dut):
                 msg.index          = mapping.index
                 msg.state          = new_state[index]
                 msg.is_seq         = mapping.is_seq
-                dut.exp_msg.append((msg.pack(), 0))
+                dut.exp_msg.append(StreamTransaction(msg.pack()))
         # Update the tracked state
         state = new_state
         # Wait for the queue to drain
