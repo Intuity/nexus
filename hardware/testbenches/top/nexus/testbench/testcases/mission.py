@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from itertools import product
+
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
+from cocotb.utils import get_sim_time
 
-from nxconstants import ControlCommand, ControlSetActive, NodeCommand
+from nxconstants import (NodeCommand, NodeID, NodeMessage, NodeParameter,
+                         ControlCommand, ControlSetActive)
+from nxloader import NXLoader
+from nxmodel import Nexus
 
-from nxmodel import Nexus, NXLoader
-from nxloader import NXLoader as NXPyLoader
+from drivers.stream.common import StreamTransaction
+from node.load import load_data, load_loopback, load_parameter
 
 from ..testbench import testcase
 
@@ -29,10 +35,10 @@ async def mission_mode(dut):
     await dut.reset()
 
     # Determine parameters
-    num_rows = int(dut.dut.dut.ROWS)
-    num_cols = int(dut.dut.dut.COLUMNS)
-    nd_ips   = int(dut.dut.dut.INPUTS)
-    nd_ops   = int(dut.dut.dut.OUTPUTS)
+    num_rows    = int(dut.ROWS)
+    num_cols    = int(dut.COLUMNS)
+    node_inputs = int(dut.INPUTS)
+    ram_data_w  = int(dut.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
     # Disable scoreboarding of output
@@ -43,186 +49,162 @@ async def mission_mode(dut):
 
     # Create an instance of NXModel
     model = Nexus(num_rows, num_cols)
-    NXLoader(model, full_path.as_posix())
 
     # Load the design using the Python loader
-    design = NXPyLoader().load(full_path)
+    design = NXLoader(full_path)
 
-    # Push all of the queued messages into the design
-    linked, seq_in = {}, {}
-    for row in zip(design.instructions, design.mappings):
-        for instrs, mappings in zip(*row):
-            for msg in instrs:
-                dut.mesh_inbound.append(msg.pack())
-            for msg in mappings:
-                dut.mesh_inbound.append(msg.pack())
-                # Setup source if not already tracked
-                src_key = msg.header.row, msg.header.column, msg.source_index
-                if src_key not in linked: linked[src_key] = []
-                # Add a target entry
-                tgt_key = msg.target_row, msg.target_column, msg.target_index
-                linked[src_key].append(tgt_key)
-                # Track sequential inputs
-                assert tgt_key not in seq_in, f"Clash for target: {tgt_key}"
-                seq_in[tgt_key] = msg.target_is_seq
+    # Load data into the mesh
+    for idx_row, row_state in enumerate(design.state):
+        for idx_col, node in enumerate(row_state):
+            node_id = NodeID(row=idx_row, column=idx_col)
+            # Load instructions, lookup table, and output mappings
+            load_data(
+                inbound   =dut.mesh_inbound,
+                node_id   =node_id,
+                ram_data_w=ram_data_w,
+                stream    =[x.pack() for x in (node.instructions + node.lookup + node.mappings)],
+                model     =model.get_ingress(),
+            )
+            # Program the loopback
+            load_loopback(
+                inbound   =dut.mesh_inbound,
+                node_id   =node_id,
+                num_inputs=node_inputs,
+                mask      =node.loopback,
+                model     =model.get_ingress(),
+            )
+            # Set parameters
+            for key, value in (
+                (NodeParameter.INSTRUCTIONS, len(node.instructions)),
+                (NodeParameter.OUTPUTS,      len(node.lookup      )),
+            ):
+                load_parameter(
+                    dut.mesh_inbound, node_id, key, value, model.get_ingress()
+                )
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {len(dut.mesh_inbound._sendQ)} messages to drain")
-    while dut.mesh_inbound._sendQ: await RisingEdge(dut.clk)
-    while dut.mesh_inbound.intf.valid == 1: await RisingEdge(dut.clk)
+    await dut.mesh_inbound.idle()
 
     # Wait for the idle flag to go high
     if dut.status.idle == 0: await RisingEdge(dut.status.idle)
-
-    # Wait for some extra time
     await ClockCycles(dut.clk, 10)
 
-    # Start monitoring the mesh
-    dut.info("Starting node monitors")
-    dut.start_node_monitors()
-
-    # Check the instruction counters for every core
-    for row in range(num_rows):
-        for col in range(num_cols):
-            rtl_node  = dut.nodes[row][col].entity
-            mdl_node  = model.get_mesh().get_node(row, col)
-            mdl_instr = mdl_node.get_instructions()
-            i_count   = int(rtl_node.store.instr_count_o)
-            assert i_count == len(mdl_instr), \
-                f"{row}, {col}: Expected {len(mdl_instr)}, got {i_count}"
-            # Check the loaded instructions
-            dut.info(f"Checking {len(mdl_instr)} instructions for {row}, {col}")
-            for idx, instr in enumerate(mdl_instr):
-                got = int(rtl_node.store.ram.memory[idx])
-                assert instr == got, f"Instruction {idx} - R: {hex(instr)}, G: {hex(got)}"
+    # Check the next load address for every core
+    for row, col in product(range(num_rows), range(num_cols)):
+        state   = design.state[row][col]
+        exp_val = len(state.instructions + state.lookup + state.mappings)
+        rtl_val = int(dut.nodes[row][col].u_decoder.load_address_q)
+        dut.info(f"Checking node {row}, {col} has loaded {exp_val} entries")
+        assert rtl_val == exp_val, f"{row}, {col}: RTL {rtl_val} != EXP {exp_val}"
 
     # Raise active and let nexus tick
     dut.info("Enabling nexus")
-    dut.ctrl_inbound.append(ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack())
+    dut.ctrl_inbound.append(StreamTransaction(
+        ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack()
+    ))
 
-    # Print out how many nodes are blocked
+    # Capture start time
+    tick_count = 300
+    clk_period = 2
+    start_time = get_sim_time(units="ns")
+
+    # Compare RTL against the model tick by tick
     rtl_outputs, mdl_outputs = {}, {}
-    for cycle in range(256):
+    for cycle in range(tick_count):
+        def cycdebug(msg): dut.debug(f"[{cycle:4d}] {msg}")
+        def cycinfo(msg): dut.info(f"[{cycle:4d}] {msg}")
+        def cycwarn(msg): dut.warning(f"[{cycle:4d}] {msg}")
+
         # Run the model for one tick
-        dut.info("Running model until tick")
+        if (cycle % 10) == 0: cycinfo("Starting cycle")
         model.run(1)
-        dut.info("Model reached next tick")
 
         # Wait for activity
-        dut.info("Waiting for idle to fall")
+        cycdebug("Waiting for idle to fall")
         if dut.status.idle == 1: await FallingEdge(dut.status.idle)
 
         # Wait for idle (ensuring it is synchronous)
-        dut.info("Waiting for idle to rise")
-        while True:
-            await RisingEdge(dut.status.idle)
-            await RisingEdge(dut.clk)
-            if dut.status.idle == 1: break
+        cycdebug("Waiting for idle to rise")
+        while dut.status.idle == 0: await RisingEdge(dut.clk)
 
-        # Print out the input state for every node
-        for row, row_entries in enumerate(dut.nodes):
-            for col, node in enumerate(row_entries):
-                ctrl = node.entity.control
-                i_curr = int(ctrl.ctrl_inputs.input_curr_q)
-                i_next = int(ctrl.ctrl_inputs.input_next_q)
-                o_curr = int(ctrl.ctrl_outputs.output_state_q)
-                dut.info(
-                    f"[{cycle:04d}] {row:2d}, {col:2d} - IC: {i_curr:0{nd_ips}b}, "
-                    f"IN: {i_next:0{nd_ips}b}, OC: {o_curr:0{nd_ops}b} - Δ: "
-                    f"{i_curr != i_next}"
+        # Run through every node and column
+        mismatches = 0
+        for row, col in product(range(num_rows), range(num_cols)):
+            rtl_node = dut.nodes[row][col]
+            mdl_node = model.get_mesh().get_node(row, col)
+            # Pickup RTL node I/O
+            rtl_i_curr = int(rtl_node.u_control.u_inputs.inputs_curr_q)
+            rtl_i_next = int(rtl_node.u_control.u_inputs.inputs_next_q)
+            rtl_o_curr = int(rtl_node.u_core.o_outputs)
+            cycdebug(
+                f"{row}, {col} - Inputs Current: 0x{rtl_i_curr:08X}, "
+                f"Inputs Next: 0x{rtl_i_next:08X}, Outputs: 0x{rtl_o_curr:08X}"
+            )
+            # Pickup model node I/O
+            mdl_i_curr = sum((x << i) for i, x in mdl_node.get_current_inputs().items())
+            mdl_i_next = sum((x << i) for i, x in mdl_node.get_next_inputs().items())
+            mdl_o_curr = sum((x << i) for i, x in mdl_node.get_current_outputs().items())
+            # Mask input next with the loopback mask
+            mask        = ((1 << node_inputs) - 1) - design.state[row][col].loopback
+            rtl_i_next &= mask
+            mdl_i_next &= mask
+            # Compare RTL against model
+            for label, rtl_val, mdl_val in (
+                ("Input Current ", rtl_i_curr, mdl_i_curr),
+                ("Input Next    ", rtl_i_next, mdl_i_next),
+                ("Output Current", rtl_o_curr, mdl_o_curr),
+            ):
+                # Skip instances where RTL and model match
+                if rtl_val == mdl_val: continue
+                # Increment count of mismatches and log a warning
+                mismatches += 1
+                cycwarn(
+                    f"{row}, {col} - {label}: RTL 0x{rtl_val:08X} != MDL: 0x{mdl_val:08X}"
                 )
 
-        # Check for I/O consistency
-        io_error = 0
-        io_match = 0
-        for (src_row, src_col, src_pos), entries in linked.items():
-            src_node = dut.nodes[src_row][src_col]
-            src_out  = int(src_node.entity.control.ctrl_outputs.output_state_q[src_pos])
-            for tgt_row, tgt_col, tgt_pos in entries:
-                # Skip out-of-range rows (temporarily used for top-level outputs)
-                if tgt_row >= num_rows: continue
-                # Lookup the target node
-                tgt_node = dut.nodes[tgt_row][tgt_col]
-                tgt_in   = int(tgt_node.entity.control.ctrl_inputs.input_next_q[tgt_pos])
-                if src_out != tgt_in:
-                    is_seq_in = seq_in[tgt_row, tgt_col, tgt_pos]
-                    dut.error(
-                        f"I/O Mismatch: {src_row}, {src_col} O[{src_pos}] -> "
-                        f"{tgt_row}, {tgt_col} I[{tgt_pos}]: SRC: {src_out}, "
-                        f"TGT: {tgt_in} - Seq: {is_seq_in}"
-                    )
-                    io_error += 1
-                else:
-                    io_match += 1
-        assert io_error == 0, \
-            f"{io_error} I/O inconsistencies detected, while {io_match} matched"
-
-        # Check state against the model
-        mm_i_curr, mm_i_next, mm_o_curr = 0, 0, 0
-        for row, row_entries in enumerate(dut.nodes):
-            for col, rtl_node in enumerate(row_entries):
-                # Get the RTL state
-                ctrl       = rtl_node.entity.control
-                rtl_i_curr = int(ctrl.ctrl_inputs.input_curr_q)
-                rtl_i_next = int(ctrl.ctrl_inputs.input_next_q)
-                rtl_o_curr = int(ctrl.ctrl_outputs.output_state_q)
-                # Get the model state
-                mdl_node   = model.get_mesh().get_node(row, col)
-                mdl_i_curr = sum([(y << x) for x, y in mdl_node.get_current_inputs().items()])
-                mdl_i_next = sum([(y << x) for x, y in mdl_node.get_next_inputs().items()])
-                mdl_o_curr = sum([(y << x) for x, y in mdl_node.get_current_outputs().items()])
-                # Compare
-                if rtl_i_curr != mdl_i_curr:
-                    dut.error(
-                        f"{row}, {col} - RTL: {rtl_i_curr:0{nd_ips}b}, "
-                        f"MDL: {mdl_i_curr:0{nd_ips}b}"
-                    )
-                    mm_i_curr += 1
-                if rtl_i_next != mdl_i_next:
-                    dut.error(
-                        f"{row}, {col} - RTL: {rtl_i_next:0{nd_ips}b}, "
-                        f"MDL: {mdl_i_next:0{nd_ips}b}"
-                    )
-                    mm_i_next += 1
-                if rtl_o_curr != mdl_o_curr:
-                    dut.error(
-                        f"{row}, {col} - RTL: {rtl_o_curr:0{nd_ips}b}, "
-                        f"MDL: {mdl_o_curr:0{nd_ips}b}"
-                    )
-                    mm_o_curr += 1
-        assert mm_i_curr == 0, f"Detected {mm_i_curr} current input mismatches"
-        assert mm_i_next == 0, f"Detected {mm_i_next} next input mismatches"
-        assert mm_o_curr == 0, f"Detected {mm_o_curr} current output mismatches"
-
-        # Build up a final output state for RTL
-        # NOTE: Receive queue must be reversed in order to accumulate correctly
-        ob_trans = []
+        # Accumulate updated RTL output state
         while dut.mesh_outbound._recvQ:
-            ob_trans.append(dut.mesh_outbound._recvQ.pop())
-        for msg, _ in ob_trans[::-1]:
-            # Decode target row and column, and the command
-            rtl_row = (msg >> 27) & 0xF
-            rtl_col = (msg >> 23) & 0xF
-            command = (msg >> 21) & 0x3
-            # Capture signal state
-            if command == int(NodeCommand.SIG_STATE):
-                rtl_idx = (msg >> 16) & 0x1F
-                rtl_val = (msg >> 14) & 0x01
-                rtl_outputs[rtl_row, rtl_col, rtl_idx] = rtl_val
+            tran = dut.mesh_outbound._recvQ.popleft()
+            msg  = NodeMessage()
+            msg.unpack(tran.data)
+            if msg.raw.header.command != NodeCommand.SIGNAL: continue
+            rtl_outputs[
+                msg.signal.header.row,
+                msg.signal.header.column,
+                msg.signal.index
+            ] = msg.signal.state
 
-        # Capture model outputs
-        for key, mdl_val in model.pop_output().items():
-            mdl_outputs[key] = mdl_val
+        # Accumulate updated model output state
+        for key, val in model.pop_output().items():
+            mdl_outputs[key] = val
 
-        # Cross-check
-        # NOTE: Missing RTL/model outputs could just be because of different
-        #       settling behaviour - so just assume they are still at zero
-        errors = 0
-        for key in set(list(mdl_outputs.keys()) + list(rtl_outputs.keys())):
+        # Cross check RTL against model state
+        for key in set(list(rtl_outputs.keys()) + list(mdl_outputs.keys())):
             rtl_val = rtl_outputs.get(key, 0)
-            mdl_val = (1 if mdl_outputs.get(key, 0) else 0)
-            if rtl_val != mdl_val:
-                dut.error(f"Output {key} mismatch RTL: {rtl_val}, MDL: {mdl_val}")
-                errors += 1
-                continue
-        assert errors == 0, f"{errors} errors were detected in outputs"
+            mdl_val = mdl_outputs.get(key, 0)
+            # Skip instances where RTL and model match
+            if rtl_val == mdl_val: continue
+            # Increment count of mismatches and log a warning
+            mismatches += 1
+            cycwarn(
+                f"{row}, {col} - output {key}: RTL {rtl_val} != MDL {mdl_val}"
+            )
+
+        # Check for mismatches
+        assert mismatches == 0, f"Detected {mismatches} between RTL and model"
+        continue
+
+    # Calculate simulation rate
+    delta      = get_sim_time(units="ns") - start_time
+    num_cycles = delta / clk_period
+    cyc_per_tk = num_cycles / tick_count
+    dut.info(f"Achieved {cyc_per_tk:.02f} cycles/tick - if mesh clock...")
+    for tgt_period in (2, 4, 8):
+        clk_frequency  = (1 / (tgt_period * 1E-9)) / 1E6
+        time_per_tick  = cyc_per_tk * tgt_period
+        tick_frequency = (1 / (time_per_tick * 1E-9)) / 1E6
+        dut.info(
+            f" - @{clk_frequency:.02f} MHz -> {tick_frequency:.02f} MHz simulated"
+        )
+

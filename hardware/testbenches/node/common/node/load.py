@@ -97,7 +97,7 @@ def load_parameter(
     node_id   : NodeID,
     parameter : NodeParameter,
     value     : int,
-    model      : Optional[NXMessagePipe] = None,
+    model     : Optional[NXMessagePipe] = None,
 ) -> NodeControl:
     """
     Load a parameter into a node

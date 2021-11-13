@@ -14,6 +14,6 @@
 
 from .basic import *
 from .load import *
-# from .mission import *
+from .mission import *
 from .params import *
 from .routing import *
