@@ -18,8 +18,8 @@
 module nexus
 import NXConstants::*;
 #(
-      parameter ROWS       = 3
-    , parameter COLUMNS    = 3
+      parameter ROWS       =  3
+    , parameter COLUMNS    =  3
     , parameter INPUTS     = 32
     , parameter OUTPUTS    = 32
     , parameter REGISTERS  = 16
