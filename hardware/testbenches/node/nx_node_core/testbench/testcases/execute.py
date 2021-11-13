@@ -34,12 +34,12 @@ async def execute(dut):
 
     # Decide on a number of instructions to execute
     num_instr = randint(10, MAX_NODE_MEMORY)
-    dut.populated <= num_instr
 
     # Generate an instruction stream and write it to memory
     instrs = gen_instructions(num_instr, num_inputs, num_outputs, num_registers)
     for idx, instr in enumerate(instrs):
         dut.ram.memory[idx] = instr.pack()
+    dut.populated <= len(instrs)
 
     # Track input, output, and register state
     inputs  = [0] * num_inputs
@@ -71,6 +71,6 @@ async def execute(dut):
             rtl = int(dut.outputs[index])
             assert mdl == rtl, f"O[{index}] - Model: {mdl}, RTL: {rtl}"
         # Check the modelled register state against the RTL
-        for idx, mdl in enumerate(working):
-            rtl = int(dut.dut.u_dut.working_q[idx])
+        for index, mdl in enumerate(working):
+            rtl = int(dut.dut.u_dut.working_q[index])
             assert mdl == rtl, f"R[{index}] - Model: {mdl}, RTL: {rtl}"
