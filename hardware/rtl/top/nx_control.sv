@@ -21,11 +21,11 @@
 module nx_control
 import NXConstants::*;
 #(
-      parameter ROWS      = 3
-    , parameter COLUMNS   = 3
-    , parameter INPUTS    = 8
-    , parameter OUTPUTS   = 8
-    , parameter REGISTERS = 8
+      parameter ROWS      =  3
+    , parameter COLUMNS   =  3
+    , parameter INPUTS    = 32
+    , parameter OUTPUTS   = 32
+    , parameter REGISTERS = 16
 ) (
       input  logic               i_clk
     , input  logic               i_rst

@@ -23,7 +23,7 @@ import NXConstants::*;
 #(
       parameter INPUTS     = 32
     , parameter OUTPUTS    = 32
-    , parameter REGISTERS  =  8
+    , parameter REGISTERS  = 16
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
 ) (
