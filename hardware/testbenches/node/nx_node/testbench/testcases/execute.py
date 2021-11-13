@@ -62,7 +62,7 @@ async def execute(dut):
 
     # Generate output mappings
     lookup, mappings = gen_output_mappings(
-        num_outputs, num_inputs, base_off=len(instrs), max_tgts=4
+        num_outputs, num_inputs, base_off=len(instrs), max_tgts=4, exclude=node_id
     )
 
     # Choose an interface

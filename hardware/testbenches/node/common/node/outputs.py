@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from random import choice, randint
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
-from nxconstants import OutputLookup, OutputMapping, MAX_ROW_COUNT, MAX_COLUMN_COUNT
+from nxconstants import (OutputLookup, OutputMapping, MAX_ROW_COUNT,
+                         MAX_COLUMN_COUNT, NodeID)
 
 def gen_output_mappings(
     outputs  : int,
@@ -24,7 +25,8 @@ def gen_output_mappings(
     columns  : int = MAX_COLUMN_COUNT,
     base_off : int = 0,
     min_tgts : int = 1,
-    max_tgts : int = 1
+    max_tgts : int = 1,
+    exclude  : Optional[NodeID] = None,
 ) -> Tuple[List[OutputLookup], List[List[OutputMapping]]]:
     """
     Generate random output mappings for a node, returning the mappings for each
@@ -36,6 +38,7 @@ def gen_output_mappings(
         base_off: Base placement address for mappings and lookup
         min_tgts: Minimum number of targets to generate for each output
         max_tgts: Maximum number of targets to generate for each output
+        exclude : Optionally exclude a node from targets
 
     Returns: Mappings and lookup table
     """
@@ -54,6 +57,10 @@ def gen_output_mappings(
                 tgt_col = randint(0, columns-1)
                 tgt_idx = randint(0, inputs-1)
                 tgt_seq = choice((0, 1))
+                # If this targets an excluded node, skip
+                if exclude and exclude.row == tgt_row and exclude.column == tgt_col:
+                    continue
+                # Check if this target is unique
                 if (tgt_row, tgt_col, tgt_idx) not in used:
                     used.append((tgt_row, tgt_col, tgt_idx))
                     break
