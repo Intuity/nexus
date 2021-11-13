@@ -24,7 +24,7 @@ ifeq ($(IGNORE_FAILURE),yes)
 endif
 
 # Detect all test areas
-SUB_MAKEFILES := $(foreach f,$(wildcard ./*/Makefile),$(notdir $(patsubst %/,%,$(dir $(f)))))
+SUB_MAKEFILES := $(foreach f,$(wildcard ./*/*/Makefile),$(f))
 
 # Define pre-run rule
 .PHONY: __pre_run_generic
@@ -43,17 +43,17 @@ __pre_run:
 
 # Setup dispatch per sub-dir
 define DO_SUB_DIR
-# $(1) - Test directory name
-.PHONY: __$(subst _,,$(1))_%
-__$(subst _,,$(1))_%:
-	@echo "# Running $$(patsubst __$(subst _,,$(1))_%,%,$$@) for subfolder $(1)"
-	@make -C $(1) $$(patsubst __$(subst _,,$(1))_%,%,$$@) $(CMD_SUFFIX)
-.PHONY: __$(1)
-__$(1):
-	@echo "# Running subfolder $(1)"
-	@make -C $(1) $(CMD_SUFFIX)
-SUB_GENERIC_TARGETS  += __$(1)
-SUB_WILDCARD_TARGETS += __$(subst _,,$(1))_%
+# $(1) - Path to Makefile
+.PHONY: __$(subst _,,$(notdir $(patsubst %/,%,$(dir $(1)))))_%
+__$(subst _,,$(notdir $(patsubst %/,%,$(dir $(1)))))_%:
+	@echo "# Running $$(patsubst __$(subst _,,$(notdir $(patsubst %/,%,$(dir $(1)))))_%,%,$$@) for subfolder $(1)"
+	@make -C $(dir $(1)) $$(patsubst __$(subst _,,$(notdir $(patsubst %/,%,$(dir $(1)))))_%,%,$$@) $(CMD_SUFFIX)
+.PHONY: __$(notdir $(patsubst %/,%,$(dir $(1))))
+__$(notdir $(patsubst %/,%,$(dir $(1)))):
+	@echo "# Running subfolder $(notdir $(patsubst %/,%,$(dir $(1))))"
+	@make -C $(dir $(1)) $(CMD_SUFFIX)
+SUB_GENERIC_TARGETS  += __$(notdir $(patsubst %/,%,$(dir $(1))))
+SUB_WILDCARD_TARGETS += __$(subst _,,$(notdir $(patsubst %/,%,$(dir $(1)))))_%
 endef
 $(foreach t,$(SUB_MAKEFILES),$(eval $(call DO_SUB_DIR,$(t))))
 
