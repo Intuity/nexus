@@ -1,0 +1,133 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Sat Nov 13 15:35:05 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/fpga/nx_artix_200t/sim.lxt"
+[dumpfile_mtime] "Sat Nov 13 15:34:17 2021"
+[dumpfile_size] 17915156
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/fpga/nx_artix_200t/nx_artix_200t.gtkw"
+[timestart] 0
+[size] 1962 1019
+[pos] -1 -1
+*-23.896683 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[treeopen] testbench.u_dut.
+[treeopen] testbench.u_dut.u_nexus.
+[treeopen] testbench.u_dut.u_nexus.u_mesh.
+[treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[0].
+[treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[1].u_node.
+[treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[2].u_node.
+[treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[2].
+[treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[2].gen_columns[0].
+[sst_width] 274
+[signals_width] 565
+[sst_expanded] 1
+[sst_vpaned_height] 512
+@28
+testbench.clk[0]
+testbench.rst[0]
+@200
+-
+@28
+testbench.u_dut.u_nexus.u_mesh.o_idle[2:0]
+testbench.u_dut.u_nexus.u_mesh.i_trigger[2:0]
+@200
+-
+@28
+testbench.u_dut.status_idle[0]
+@200
+-
+@22
+testbench.i_inbound_ctrl_tdata[127:0]
+@28
+testbench.i_inbound_ctrl_tlast[0]
+testbench.i_inbound_ctrl_tvalid[0]
+testbench.o_inbound_ctrl_tready[0]
+@200
+-
+@22
+testbench.i_inbound_mesh_tdata[127:0]
+@28
+testbench.i_inbound_mesh_tlast[0]
+testbench.i_inbound_mesh_tvalid[0]
+testbench.o_inbound_mesh_tready[0]
+@200
+-
+@800022
+testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@c00022
+#{row} (0)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (1)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (2)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (3)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@28
+(0)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(1)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(2)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(3)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@1401200
+-group_end
+@c00022
+#{column} (4)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (5)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (6)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (7)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@28
+(4)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(5)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(6)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(7)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (9)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@28
+(8)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(9)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@1401200
+-group_end
+@c00022
+#{payload} (10)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (11)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (12)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (13)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (14)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (15)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (16)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (17)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (18)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (19)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (20)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (21)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (22)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (23)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (24)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (25)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (26)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (27)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (28)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (29)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0] (30)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@28
+(10)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(11)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(12)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(13)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(14)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(15)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(16)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(17)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(18)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(19)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(20)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(21)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(22)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(23)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(24)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(25)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(26)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(27)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(28)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(29)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+(30)testbench.u_dut.u_nexus.i_mesh_ib_data[30:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.u_dut.u_nexus.i_mesh_ib_valid[0]
+testbench.u_dut.u_nexus.i_mesh_ob_ready[0]
+@200
+-
+@22
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[0].u_node.u_decoder.load_address_q[9:0]
+@28
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[0].u_node.u_decoder.is_msg_load[0]
+@22
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[0].u_node.u_decoder.i_msg_data[30:0]
+@28
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[0].u_node.u_decoder.i_msg_valid[0]
+@200
+-
+@22
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[2].u_node.comp_idle[3:0]
+@28
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[2].u_node.idle[0]
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[2].u_node.idle_q[0]
+testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[2].u_node.o_idle[0]
+[pattern_trace] 1
+[pattern_trace] 0

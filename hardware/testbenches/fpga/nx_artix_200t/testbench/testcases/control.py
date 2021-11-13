@@ -20,7 +20,7 @@ from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.axi4stream.common import AXI4StreamTransaction
 import nxconstants
-from nxconstants import (ControlCommand, ControlReadParam, ControlSetActive,
+from nxconstants import (ControlCommand, ControlReadParam, ControlStatus,
                          ControlRaw, ControlParam)
 
 from ..testbench import testcase
@@ -50,32 +50,32 @@ async def control(dut, backpressure):
         # - Counter Width
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COUNTER_WIDTH).pack(),
-            int(dut.dut.dut.core.control.TX_PYLD_WIDTH)
+            int(dut.dut.u_dut.u_nexus.u_control.TX_PYLD_WIDTH)
         ),
         # - Rows
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.ROWS).pack(),
-            int(dut.dut.dut.core.control.ROWS)
+            int(dut.dut.u_dut.u_nexus.u_control.ROWS)
         ),
         # - Columns
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COLUMNS).pack(),
-            int(dut.dut.dut.core.control.COLUMNS)
+            int(dut.dut.u_dut.u_nexus.u_control.COLUMNS)
         ),
         # - Node_inputs
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_INPUTS).pack(),
-            int(dut.dut.dut.core.control.INPUTS)
+            int(dut.dut.u_dut.u_nexus.u_control.INPUTS)
         ),
         # - Node_outputs
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_OUTPUTS).pack(),
-            int(dut.dut.dut.core.control.OUTPUTS)
+            int(dut.dut.u_dut.u_nexus.u_control.OUTPUTS)
         ),
         # - Node_registers
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_REGISTERS).pack(),
-            int(dut.dut.dut.core.control.REGISTERS)
+            int(dut.dut.u_dut.u_nexus.u_control.REGISTERS)
         ),
         # Device status
         (
@@ -130,12 +130,12 @@ async def soft_reset(dut):
         (1 << 31) | ControlRaw(command=ControlCommand.STATUS).pack(), 32
     )))
     dut.exp_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | (
-            (0 << 3) | # ACTIVE       =0 -> inactive
-            (1 << 2) | # SEEN_IDLE_LOW=1 -> idle has been observed low
-            (1 << 1) | # FIRST_TICK   =1 -> fresh from reset
-            (1 << 0)   # INTERVAL_SET =1 -> an interval has been set
-        ), 128
+        (1 << 31) | ControlStatus(
+            active      =0, # Inactive
+            idle_low    =1, # Idle has been observed low
+            first_tick  =1, # Fresh from reset
+            interval_set=1  # An interval has been set
+        ).pack(), 128
     )))
 
     # Wait for response
@@ -148,19 +148,19 @@ async def soft_reset(dut):
     )))
 
     dut.info("Waiting for internal reset to rise")
-    while dut.dut.dut.core.rst_internal == 0: await RisingEdge(dut.clk)
+    while dut.dut.u_dut.u_nexus.rst_internal == 0: await RisingEdge(dut.clk)
     dut.info("Waiting for internal reset to fall")
-    while dut.dut.dut.core.rst_internal == 1: await RisingEdge(dut.clk)
+    while dut.dut.u_dut.u_nexus.rst_internal == 1: await RisingEdge(dut.clk)
 
     # Read back the status to check an interval has been cleared
     dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
         (1 << 31) | ControlRaw(command=ControlCommand.STATUS).pack(), 32
     )))
     dut.exp_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | (
-            (0 << 3) | # ACTIVE       =0 -> inactive
-            (1 << 2) | # SEEN_IDLE_LOW=1 -> idle has been observed low
-            (1 << 1) | # FIRST_TICK   =1 -> fresh from reset
-            (0 << 0)   # INTERVAL_SET =0 -> no interval has been set
-        ), 128
+        (1 << 31) | ControlStatus(
+            active      =0, # Inactive
+            idle_low    =1, # Idle has been observed low
+            first_tick  =1, # Fresh from reset
+            interval_set=0  # No interval has been set
+        ).pack(), 128
     )))

@@ -13,16 +13,14 @@
 # limitations under the License.
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
-import matplotlib.pyplot as plt
-import networkx as nx
 
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
-from drivers.node.monitor import NodeMonitor
 from drivers.axi4stream.io import AXI4StreamIO
 from drivers.axi4stream.init import AXI4StreamInitiator
 from drivers.axi4stream.resp import AXI4StreamResponder
@@ -36,6 +34,12 @@ class Testbench(TestbenchBase):
             dut: Pointer to the DUT
         """
         super().__init__(dut)
+        # Wrap simple I/Os
+        self.status = SimpleNamespace(
+            active =dut.o_status_active,
+            idle   =dut.o_status_idle,
+            trigger=dut.o_status_trigger,
+        )
         # Setup drivers/monitors
         self.ib_ctrl = AXI4StreamInitiator(
             self, self.clk, self.rst,
@@ -82,6 +86,13 @@ class Testbench(TestbenchBase):
         self.scoreboard.add_interface(
             self.ob_mesh, self.exp_mesh, compare_fn=compare_mesh
         )
+        # Setup rapid access to every node in the mesh
+        self.nodes = [
+            [
+                self.dut.u_dut.u_nexus.u_mesh.gen_rows[r].gen_columns[c].u_node
+                for c in range(int(dut.u_dut.u_nexus.COLUMNS))
+            ] for r in range(int(dut.u_dut.u_nexus.ROWS))
+        ]
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
@@ -90,91 +101,6 @@ class Testbench(TestbenchBase):
         self.ob_ctrl.intf.initialise(IORole.RESPONDER)
         self.ib_mesh.intf.initialise(IORole.INITIATOR)
         self.ob_mesh.intf.initialise(IORole.RESPONDER)
-
-    def start_node_monitors(self):
-        """ Create monitor for every node in the mesh on request """
-        # Check if node monitors already exist
-        if hasattr(self, "nodes") and self.nodes: return
-        # Create a monitor for every node in the mesh
-        self.nodes = []
-        for row in range(int(self.dut.dut.core.ROWS)):
-            entries = []
-            for col in range(int(self.dut.dut.core.COLUMNS)):
-                entries.append(NodeMonitor(
-                    self.dut.dut.core.mesh.g_rows[row].g_columns[col].node,
-                    self.clk, self.rst, name=f"row_{row}_col_{col}"
-                ))
-            self.nodes.append(entries)
-
-    def plot_mesh_state(self, path):
-        """ Plot the state of the mesh using NetworkX.
-
-        Args:
-            path: Path to write the rendered image to
-        """
-        # If node monitors don't exist, create them
-        if not hasattr(self, "nodes") or not self.nodes:
-            self.start_node_monitors()
-        # Create each node in the mesh
-        graph = nx.DiGraph()
-        for row, row_entries in enumerate(self.nodes):
-            for col, _ in enumerate(row_entries):
-                graph.add_node((row, col))
-        # Create the output message node
-        graph.add_node((len(self.nodes), 0))
-        # Add all of the edges (representing messages)
-        labels = {}
-        for row, row_entries in enumerate(self.nodes):
-            for col, node in enumerate(row_entries):
-                src  = (row, col)
-                tgt  = None
-                data = 0
-                if node.outbound[0].valid == 1:
-                    data = int(node.outbound[0].data)
-                    tgt  = (row - 1, col)
-                if node.outbound[1].valid == 1:
-                    data = int(node.outbound[1].data)
-                    tgt  = (row, col + 1)
-                if node.outbound[2].valid == 1:
-                    data = int(node.outbound[2].data)
-                    tgt  = (row + 1, col)
-                if node.outbound[3].valid == 1:
-                    data = int(node.outbound[3].data)
-                    tgt  = (row, col - 1)
-                if tgt != None:
-                    graph.add_edge(src, tgt)
-                    bc    = (data >> 31) & 0x1
-                    decay = (data >> 23) & 0xFF
-                    tgt_r = (data >> 27) & 0x0F
-                    tgt_c = (data >> 23) & 0x0F
-                    labels[(src, tgt)] = f"BC {decay}" if bc else f"R {tgt_r}, C {tgt_c}"
-        # Setup the Matplotlib plot
-        plt.figure(figsize=(8, 8), dpi=100)
-        # Draw the graph
-        nx.draw(
-            graph,
-            pos        ={ (x, y): (y, -x) for x, y in graph.nodes() },
-            with_labels=True,
-            node_shape ="s",
-            node_size  =1000,
-            node_color ="white",
-            edgecolors ="black",
-            linewidths =1,
-            width      =1,
-        )
-        # Label the edges
-        nx.draw_networkx_edge_labels(
-            graph,
-            pos        ={ (x, y): (y, -x) for x, y in graph.nodes() },
-            edge_labels=labels,
-            label_pos  =0.5,
-            font_color ="red",
-            font_size  =5,
-        )
-        # Write out to file
-        plt.savefig(path, dpi=100)
-        # Clean up
-        plt.close()
 
     @property
     def base_dir(self): return Path(__file__).absolute().parent
