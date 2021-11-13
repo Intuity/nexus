@@ -59,11 +59,12 @@ typedef enum logic [1:0] { IDLE, LOOKUP, QUERY, SEND } fsm_t;
 `DECLARE_DQT(fsm_t, fsm_state, i_clk, i_rst, IDLE)
 
 // Output change detection
+`DECLARE_DQ(OUTPUTS,      outputs_mask, i_clk, i_rst, 'd0)
 `DECLARE_DQ(OUTPUTS,      outputs_last, i_clk, i_rst, 'd0)
 `DECLARE_DQ(OUTPUT_WIDTH, output_index, i_clk, i_rst, 'd0)
 `DECLARE_DQ(1,            output_value, i_clk, i_rst, 'd0)
 
-logic [OUTPUTS-1:0] output_mask, output_xor;
+logic [OUTPUTS-1:0] output_xor;
 logic               output_change;
 
 // RAM interface
@@ -123,10 +124,10 @@ end
 // =============================================================================
 
 // Mask only the enabled outputs
-assign output_mask = (i_num_output == OUTPUTS) ? {OUTPUTS{1'b1}} : ((1 << i_num_output) - 1);
+assign outputs_mask = (i_num_output == OUTPUTS) ? {OUTPUTS{1'b1}} : ((1 << i_num_output) - 1);
 
 // Detect changes in the output array
-assign output_xor    = (i_core_outputs ^ outputs_last_q) & output_mask;
+assign output_xor    = (i_core_outputs ^ outputs_last_q) & outputs_mask_q;
 assign output_change = |output_xor;
 
 // Use a leading zero count to determine the output index
