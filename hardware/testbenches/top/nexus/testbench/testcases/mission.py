@@ -206,4 +206,3 @@ async def mission_mode(dut):
         dut.info(
             f" - @{clk_frequency:.02f} MHz -> {tick_frequency:.02f} MHz simulated"
         )
-

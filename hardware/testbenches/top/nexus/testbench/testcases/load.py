@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from itertools import product
 from random import randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
@@ -23,7 +24,7 @@ from ..testbench import testcase
 
 @testcase()
 async def load(dut):
-    """ Load instructions into every node via messages """
+    """ Load random data into every node via messages """
     # Reset the DUT
     dut.info("Resetting the DUT")
     await dut.reset()
@@ -39,7 +40,9 @@ async def load(dut):
     counter = 0
     for row in range(num_rows):
         for col in range(num_cols):
-            loaded[row][col] = [randint(0, (1 << 32) - 1) for _ in range(randint(50, 100))]
+            loaded[row][col] = [
+                randint(0, (1 << ram_data_w) - 1) for _ in range(randint(50, 100))
+            ]
             load_data(
                 inbound   =dut.mesh_inbound,
                 node_id   =NodeID(row=row, column=col),
@@ -54,23 +57,17 @@ async def load(dut):
 
     # Wait for the idle flag to go high
     while dut.status.idle == 0: await RisingEdge(dut.clk)
-
-    # Wait for some extra time
     await ClockCycles(dut.clk, 10)
 
     # Check the next load address for every node
-    for row in range(num_rows):
-        for col in range(num_cols):
-            node = dut.dut.u_dut.u_mesh.gen_rows[row].gen_columns[col].u_node
-            pop  = int(node.u_decoder.load_address_q)
-            assert pop == len(loaded[row][col]), \
-                f"{row}, {col}: Expected {len(loaded[row][col])}, got {pop}"
+    for row, col in product(range(num_rows), range(num_cols)):
+        pop  = int(dut.nodes[row][col].u_decoder.load_address_q)
+        assert pop == len(loaded[row][col]), \
+            f"{row}, {col}: Expected {len(loaded[row][col])}, got {pop}"
 
     # Check the loaded data
-    for row in range(num_rows):
-        for col in range(num_cols):
-            node = dut.dut.u_dut.u_mesh.gen_rows[row].gen_columns[col].u_node
-            for op_idx, op in enumerate(loaded[row][col]):
-                got = int(node.u_store.u_ram.memory[op_idx])
-                assert got == op, \
-                    f"{row}, {col}: O{op_idx} - exp {hex(op)}, got {hex(got)}"
+    for row, col in product(range(num_rows), range(num_cols)):
+        for op_idx, op in enumerate(loaded[row][col]):
+            got = int(dut.nodes[row][col].u_store.u_ram.memory[op_idx])
+            assert got == op, \
+                f"{row}, {col}: O{op_idx} - exp {hex(op)}, got {hex(got)}"
