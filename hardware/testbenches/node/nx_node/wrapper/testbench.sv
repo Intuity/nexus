@@ -23,9 +23,11 @@ import NXConstants::*;
 ) (
       input  logic          rst
     // Control signals
-    , input  logic          i_trigger
-    , output logic          o_idle
     , input  node_id_t      i_node_id
+    , input  logic          i_idle
+    , output logic          o_idle
+    , input  logic          i_trigger
+    , output logic          o_trigger
     // Inbound interfaces
     // - North
     , input  node_message_t i_ib_north_data
@@ -134,8 +136,10 @@ nx_node #(
     , .i_rst              ( rst              )
     // Control signals
     , .i_node_id          ( i_node_id        )
-    , .i_trigger          ( i_trigger        )
+    , .i_idle             ( i_idle           )
     , .o_idle             ( o_idle           )
+    , .i_trigger          ( i_trigger        )
+    , .o_trigger          ( o_trigger        )
     // Inbound interfaces
     , .i_inbound_data     ( inbound_data     )
     , .i_inbound_valid    ( inbound_valid    )

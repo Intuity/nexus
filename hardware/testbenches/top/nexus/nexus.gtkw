@@ -1,19 +1,21 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Fri Nov 12 23:02:05 2021
+[*] Sun Nov 14 17:19:06 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nexus/sim.lxt"
-[dumpfile_mtime] "Fri Nov 12 23:01:23 2021"
-[dumpfile_size] 4881944
+[dumpfile_mtime] "Sun Nov 14 17:18:20 2021"
+[dumpfile_size] 26584
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nexus/nexus.gtkw"
 [timestart] 0
 [size] 1440 847
 [pos] -1 -1
-*-20.687428 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.914783 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_mesh.
-[treeopen] testbench.u_dut.u_mesh.gen_rows[2].
+[treeopen] testbench.u_dut.u_mesh.gen_rows[0].
+[treeopen] testbench.u_dut.u_mesh.gen_rows[0].gen_columns[0].
+[treeopen] testbench.u_dut.u_mesh.gen_rows[1].
 [treeopen] testbench.u_dut.u_mesh.gen_rows[2].gen_columns[0].
 [treeopen] testbench.u_dut.u_mesh.gen_rows[2].gen_columns[0].u_node.
 [treeopen] testbench.u_dut.u_mesh.gen_rows[2].gen_columns[1].
@@ -110,9 +112,16 @@ testbench.o_mesh_ib_ready[0]
 testbench.o_mesh_ob_data[30:0]
 @28
 testbench.o_mesh_ob_valid[0]
-@29
 testbench.i_mesh_ob_ready[0]
 @200
 -
+@28
+testbench.u_dut.u_mesh.gen_rows[0].gen_columns[0].u_node.i_idle[0]
+testbench.u_dut.u_mesh.gen_rows[0].gen_columns[0].u_node.o_idle[0]
+@201
+-
+@28
+testbench.u_dut.u_mesh.gen_rows[0].gen_columns[0].u_node.i_trigger[0]
+testbench.u_dut.u_mesh.gen_rows[0].gen_columns[0].u_node.o_trigger[0]
 [pattern_trace] 1
 [pattern_trace] 0

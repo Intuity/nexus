@@ -52,8 +52,11 @@ logic [COLUMNS-1:0][ROWS-1:0][3:0][MESSAGE_WIDTH-1:0] mesh_ob_data;
 logic [COLUMNS-1:0][ROWS-1:0][3:0]                    mesh_ob_valid;
 logic [COLUMNS-1:0][ROWS-1:0][3:0]                    mesh_ib_ready;
 
-// Column grouped idle signals
-logic [COLUMNS-1:0][ROWS-1:0] node_idle;
+// Columnised idle/trigger chaining
+logic [COLUMNS-1:0][ROWS-1:0] chain_idle;
+logic [COLUMNS-1:0][ROWS-1:0] chain_trigger;
+
+// Register the fully chained idle signals
 `DECLARE_DQ(COLUMNS, column_idle, i_clk, i_rst, 'd0)
 
 // =============================================================================
@@ -63,7 +66,7 @@ logic [COLUMNS-1:0][ROWS-1:0] node_idle;
 // AND reduction for idle signals in each column
 generate
 for (genvar idx = 0; idx < COLUMNS; idx++) begin : gen_column_idles
-    assign column_idle[idx] = &node_idle[idx];
+    assign column_idle[idx] = chain_idle[idx][0];
 end
 endgenerate
 
@@ -144,6 +147,17 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
         assign node_ob_ready[DIRECTION_WEST]   = (idx_col != 0) ? mesh_ib_ready[idx_col-1][idx_row][DIRECTION_EAST] : 'd0;
         assign node_ob_present[DIRECTION_WEST] = (idx_col != 0);
 
+        // Chaining
+        logic inbound_idle, inbound_trigger;
+        assign inbound_idle = (
+            (idx_row == (COLUMNS - 1)) ? 'd1
+                                       : chain_idle[idx_col][idx_row+1]
+        );
+        assign inbound_trigger = (
+            (idx_row == 0) ? i_trigger[idx_col]
+                           : chain_trigger[idx_col][idx_row-1]
+        );
+
         // Node instance
         nx_node #(
               .INPUTS             ( INPUTS                          )
@@ -156,8 +170,10 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
             , .i_rst              ( i_rst                           )
             // Control signals
             , .i_node_id          ( node_id                         )
-            , .i_trigger          ( i_trigger[idx_col]              )
-            , .o_idle             ( node_idle[idx_col][idx_row]     )
+            , .i_idle             ( inbound_idle                    )
+            , .o_idle             ( chain_idle[idx_col][idx_row]    )
+            , .i_trigger          ( inbound_trigger                 )
+            , .o_trigger          ( chain_trigger[idx_col][idx_row] )
             // Inbound interfaces
             , .i_inbound_data     ( node_ib_data                    )
             , .i_inbound_valid    ( node_ib_valid                   )

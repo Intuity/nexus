@@ -68,6 +68,7 @@ class Testbench(TestbenchBase):
         for init in self.inbound : init.intf.initialise(IORole.INITIATOR)
         for resp in self.outbound: resp.intf.initialise(IORole.RESPONDER)
         for flag in self.present : flag <= 1
+        self.i_idle    <= 1
         self.i_trigger <= 0
         self.i_node_id <= 0
 

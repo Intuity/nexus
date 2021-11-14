@@ -33,8 +33,10 @@ import NXConstants::*,
     , input  logic                          i_rst
     // Control signals
     , input  node_id_t                      i_node_id
-    , input  logic                          i_trigger
+    , input  logic                          i_idle
     , output logic                          o_idle
+    , input  logic                          i_trigger
+    , output logic                          o_trigger
     // Inbound interfaces
     , input  logic [3:0][MESSAGE_WIDTH-1:0] i_inbound_data
     , input  logic [3:0]                    i_inbound_valid
@@ -49,6 +51,10 @@ import NXConstants::*,
 // =============================================================================
 // Signals & State
 // =============================================================================
+
+// Idle and trigger signal chaining
+`DECLARE_DQ(1, idle,    i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, trigger, i_clk, i_rst, 'd0)
 
 // Idle control
 struct packed { logic core, decode, ctrl, distrib; } comp_idle;
@@ -91,14 +97,18 @@ logic [RAM_DATA_W-1:0] core_rd_data;
 logic                  core_rd_en, core_rd_stall;
 
 // =============================================================================
-// Idle control
+// Trigger and Idle Chaining
 // =============================================================================
 
-`DECLARE_DQ(1, idle, i_clk, i_rst, 1'b0)
-
+// Determine local idleness
 assign idle = (&comp_idle) && !dcd_valid && !(|comb_valid);
 
-assign o_idle = idle_q;
+// Chain idle signal through the node
+assign o_idle = idle_q && i_idle;
+
+// Chain trigger signal
+assign trigger   = i_trigger;
+assign o_trigger = trigger_q;
 
 // =============================================================================
 // Inbound Stream Arbiter
