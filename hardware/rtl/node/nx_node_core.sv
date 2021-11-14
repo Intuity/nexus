@@ -56,6 +56,7 @@ localparam REG_IDX_W    = $clog2(REGISTERS);
 
 // Pipeline state
 `DECLARE_DQ(1, fetch_active, i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, delay_active, i_clk, i_rst, 'd0)
 `DECLARE_DQ(1, exec_active,  i_clk, i_rst, 'd0)
 
 // Fetch state
@@ -77,7 +78,7 @@ logic [2:0]   table_index;
 // Determine idleness
 // =============================================================================
 
-assign o_idle = !fetch_active_q && !exec_active_q && !held_trigger_q;
+assign o_idle = !fetch_active_q && !delay_active_q && !exec_active_q && !held_trigger_q;
 
 // =============================================================================
 // Fetch handling
@@ -100,11 +101,18 @@ assign o_instr_addr  = pc_q;
 assign o_instr_rd_en = fetch_active;
 
 // =============================================================================
+// Fetch delay
+// =============================================================================
+
+// Compensate for the pipelining of the RAM
+assign delay_active = fetch_active_q;
+
+// =============================================================================
 // Execution
 // =============================================================================
 
 // Pipeline state from fetch
-assign exec_active = fetch_active_q;
+assign exec_active = delay_active_q;
 
 // Determine if execute is active
 assign exec_run = exec_active && !i_instr_stall;

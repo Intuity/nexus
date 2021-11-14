@@ -22,8 +22,10 @@
 module nx_node_store
 import NXConstants::*;
 #(
-      parameter RAM_ADDR_W = 10
-    , parameter RAM_DATA_W = 32
+      parameter RAM_ADDR_W    = 10
+    , parameter RAM_DATA_W    = 32
+    , parameter REGISTER_A_RD = 0
+    , parameter REGISTER_B_RD = 0
 ) (
       input  logic                  i_clk
     , input  logic                  i_rst
@@ -53,25 +55,27 @@ assign o_a_rd_stall = i_wr_en;
 
 // Instance the RAM
 nx_ram #(
-      .ADDRESS_WIDTH ( RAM_ADDR_W )
-    , .DATA_WIDTH    ( RAM_DATA_W )
+      .ADDRESS_WIDTH ( RAM_ADDR_W    )
+    , .DATA_WIDTH    ( RAM_DATA_W    )
+    , .REGISTER_A_RD ( REGISTER_A_RD )
+    , .REGISTER_B_RD ( REGISTER_B_RD )
 ) u_ram (
     // Port A
-      .i_clk_a     ( i_clk       )
-    , .i_rst_a     ( i_rst       )
-    , .i_addr_a    ( muxed_addr  )
-    , .i_wr_data_a ( i_wr_data   )
-    , .i_wr_en_a   ( i_wr_en     )
-    , .i_en_a      ( muxed_en    )
-    , .o_rd_data_a ( o_a_rd_data )
+      .i_clk_a       ( i_clk         )
+    , .i_rst_a       ( i_rst         )
+    , .i_addr_a      ( muxed_addr    )
+    , .i_wr_data_a   ( i_wr_data     )
+    , .i_wr_en_a     ( i_wr_en       )
+    , .i_en_a        ( muxed_en      )
+    , .o_rd_data_a   ( o_a_rd_data   )
     // Port B
-    , .i_clk_b     ( i_clk       )
-    , .i_rst_b     ( i_rst       )
-    , .i_addr_b    ( i_b_rd_addr )
-    , .i_wr_data_b ( 'd0         )
-    , .i_wr_en_b   ( 'd0         )
-    , .i_en_b      ( i_b_rd_en   )
-    , .o_rd_data_b ( o_b_rd_data )
+    , .i_clk_b       ( i_clk         )
+    , .i_rst_b       ( i_rst         )
+    , .i_addr_b      ( i_b_rd_addr   )
+    , .i_wr_data_b   ( 'd0           )
+    , .i_wr_en_b     ( 'd0           )
+    , .i_en_b        ( i_b_rd_en     )
+    , .o_rd_data_b   ( o_b_rd_data   )
 );
 
 endmodule : nx_node_store

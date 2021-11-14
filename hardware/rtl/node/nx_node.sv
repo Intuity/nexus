@@ -286,25 +286,27 @@ nx_node_control #(
 // =============================================================================
 
 nx_node_store #(
-      .RAM_ADDR_W   ( RAM_ADDR_W    )
-    , .RAM_DATA_W   ( RAM_DATA_W    )
+      .RAM_ADDR_W    ( RAM_ADDR_W    )
+    , .RAM_DATA_W    ( RAM_DATA_W    )
+    , .REGISTER_A_RD ( 1             )
+    , .REGISTER_B_RD ( 0             )
 ) u_store (
-      .i_clk        ( i_clk         )
-    , .i_rst        ( i_rst         )
+      .i_clk         ( i_clk         )
+    , .i_rst         ( i_rst         )
     // Write port
-    , .i_wr_addr    ( dcd_wr_addr   )
-    , .i_wr_data    ( dcd_wr_data   )
-    , .i_wr_en      ( dcd_wr_en     )
+    , .i_wr_addr     ( dcd_wr_addr   )
+    , .i_wr_data     ( dcd_wr_data   )
+    , .i_wr_en       ( dcd_wr_en     )
     // Read ports
     // - A
-    , .i_a_rd_addr  ( core_rd_addr  )
-    , .i_a_rd_en    ( core_rd_en    )
-    , .o_a_rd_data  ( core_rd_data  )
-    , .o_a_rd_stall ( core_rd_stall )
+    , .i_a_rd_addr   ( core_rd_addr  )
+    , .i_a_rd_en     ( core_rd_en    )
+    , .o_a_rd_data   ( core_rd_data  )
+    , .o_a_rd_stall  ( core_rd_stall )
     // - B
-    , .i_b_rd_addr  ( ctrl_rd_addr  )
-    , .i_b_rd_en    ( ctrl_rd_en    )
-    , .o_b_rd_data  ( ctrl_rd_data  )
+    , .i_b_rd_addr   ( ctrl_rd_addr  )
+    , .i_b_rd_en     ( ctrl_rd_en    )
+    , .o_b_rd_data   ( ctrl_rd_data  )
 );
 
 // =============================================================================

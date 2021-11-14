@@ -19,6 +19,8 @@ module nx_ram #(
       parameter ADDRESS_WIDTH = 16
     , parameter DATA_WIDTH    = 36
     , parameter DEPTH         = 1024
+    , parameter REGISTER_A_RD = 0
+    , parameter REGISTER_B_RD = 0
 ) (
     // Port A
       input  logic                     i_clk_a
@@ -42,15 +44,24 @@ module nx_ram #(
 
 reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 
+logic [DATA_WIDTH-1:0] rd_a_data_q, rd_a_data_dly_q;
+logic [DATA_WIDTH-1:0] rd_b_data_q, rd_b_data_dly_q;
+
+// Optional pipelining of output
+assign o_rd_data_a = REGISTER_A_RD ? rd_a_data_dly_q : rd_a_data_q;
+assign o_rd_data_b = REGISTER_B_RD ? rd_b_data_dly_q : rd_b_data_q;
+
 always_ff @(posedge i_clk_a, posedge i_rst_a) begin : ff_read_a
     if (i_rst_a) begin
-        o_rd_data_a <= {DATA_WIDTH{1'b0}};
+        rd_a_data_q     <= 'd0;
+        rd_a_data_dly_q <= 'd0;
     end else begin
+        rd_a_data_dly_q <= rd_a_data_q;
         if (i_en_a) begin
             if (i_wr_en_a) begin
                 memory[i_addr_a] <= i_wr_data_a;
             end else begin
-                o_rd_data_a <= memory[i_addr_a];
+                rd_a_data_q <= memory[i_addr_a];
             end
         end
     end
@@ -58,13 +69,15 @@ end
 
 always_ff @(posedge i_clk_b, posedge i_rst_b) begin : ff_read_b
     if (i_rst_b) begin
-        o_rd_data_b <= {DATA_WIDTH{1'b0}};
+        rd_b_data_q     <= 'd0;
+        rd_b_data_dly_q <= 'd0;
     end else begin
+        rd_b_data_dly_q <= rd_b_data_q;
         if (i_en_b) begin
             if (i_wr_en_b) begin
                 memory[i_addr_b] <= i_wr_data_b;
             end else begin
-                o_rd_data_b <= memory[i_addr_b];
+                rd_b_data_q <= memory[i_addr_b];
             end
         end
     end
@@ -95,8 +108,8 @@ assign write_data[1] = { {(DATA_WIDTH-1){1'b0}}, i_wr_data_b };
 RAMB36E1 #(
       .RDADDR_COLLISION_HWCONFIG ( "PERFORMANCE" ) // No collision possible
     , .SIM_COLLISION_CHECK       ( "ALL"         ) // Warn about any collisions
-    , .DOA_REG                   ( 0             ) // Disable output A being pipelined
-    , .DOB_REG                   ( 0             ) // Disable output B being pipelined
+    , .DOA_REG                   ( REGISTER_A_RD ) // Read output A pipelining
+    , .DOB_REG                   ( REGISTER_B_RD ) // Read output B pipelining
     , .EN_ECC_READ               ( "FALSE"       ) // Disable ECC read decoder
     , .EN_ECC_WRITE              ( "FALSE"       ) // Disable ECC write encoder
     , .INIT_A                    ( 36'h000000000 ) // Initial output A port value
