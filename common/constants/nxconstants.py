@@ -41,7 +41,7 @@ class NXConstants:
     )
 
     # Interface and selector sizes
-    MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 31
+    MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 27
     ADDR_ROW_WIDTH   : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
     ADDR_COL_WIDTH   : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
     MAX_INPUT_WIDTH  : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
@@ -61,9 +61,9 @@ class NXConstants:
 
     # Node loopback
     LB_SECTION_WIDTH : Constant("Section width for loopback" ) = 16
-    LB_SELECT_WIDTH  : Constant("Selector width for loopback") = (
+    LB_SELECT_WIDTH  : Constant("Selector width for loopback") = ceil(log2(
         MAX_NODE_IOR_COUNT // LB_SECTION_WIDTH
-    )
+    ))
 
     # Node control
     NODE_PARAM_WIDTH : Constant("Maximum width of a node parameter") = 16
