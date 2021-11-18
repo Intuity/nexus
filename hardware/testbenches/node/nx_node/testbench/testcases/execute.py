@@ -152,7 +152,7 @@ async def execute(dut):
             exp    = (1 if inputs[index] else 0)
             rtl    = int(dut.dut.u_dut.u_core.i_inputs[index])
             mdl    = (1 if model.get_current_inputs().get(index, 0) else 0)
-            prefix = f"I[{index:2d}] {'S' if seq else ''}{'L' if lb else ' '}"
+            prefix = f"I[{index:2d}] {'S' if seq else ' '}{'L' if lb else ' '}"
             # For non-loopback ports, check for RTL match against expected
             if not lb: assert rtl == exp, f"{prefix} - RTL: {rtl} != EXP: {exp}"
             if rtl != mdl:
@@ -162,7 +162,7 @@ async def execute(dut):
             rtl = int(dut.dut.u_dut.u_core.o_outputs[index])
             mdl = (1 if model.get_current_outputs().get(index, 0) else 0)
             if rtl != mdl:
-                dut.error(f"O[{index}] - RTL: {rtl} != MDL: {mdl}")
+                dut.error(f"O[{index:2d}] - RTL: {rtl} != MDL: {mdl}")
                 output_err += 1
         assert input_err == 0, f"{input_err} input mismatches detected"
         assert output_err == 0, f"{output_err} output mismatches detected"

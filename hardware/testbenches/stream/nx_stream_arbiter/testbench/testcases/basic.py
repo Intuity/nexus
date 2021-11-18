@@ -17,6 +17,7 @@ from random import randint
 from cocotb.regression import TestFactory
 from cocotb.triggers import ClockCycles, RisingEdge
 
+from nxconstants import NodeRaw
 from drivers.stream.common import StreamTransaction
 
 from ..testbench import testcase
@@ -50,13 +51,14 @@ async def single_dir(dut):
 
     for intf in (dut.north, dut.east, dut.south, dut.west):
         # Drive a number of random messages from the selected interface
-        msgs = [
-            (row    << 27) |
-            (column << 23) |
-            randint(0, (1 << (intf_size - 8)) - 1)
-            for _ in range(randint(50, 100))
-        ]
-        for msg in msgs: intf.append(StreamTransaction(data=msg))
+        msgs = []
+        for _ in range(randint(50, 100)):
+            raw = NodeRaw()
+            raw.unpack(randint(0, (1 << intf_size) - 1))
+            raw.header.row    = row
+            raw.header.column = column
+            msgs.append(raw.pack())
+            intf.append(StreamTransaction(data=raw.pack()))
         dut.info(f"Generated {len(msgs)} messages")
 
         # Queue up the expected responses
