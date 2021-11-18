@@ -38,45 +38,50 @@ import NXConstants::*;
 );
 
 // Constants
-localparam STREAM_WIDTH = $clog2(STREAMS);
+localparam FIFO_WIDTH = $bits(node_message_t) + STREAMS;
 
-// Outbound FIFOs
-logic [STREAMS-1:0] fifo_full, fifo_empty;
+// Encode outbound direction one-hot
+logic [STREAMS-1:0] dir_valid;
+assign dir_valid = i_inbound_valid ? (1 << i_inbound_dir) : 'd0;
 
+// FIFO
+logic [FIFO_WIDTH-1:0] fifo_data_in, fifo_data_out;
+logic                  fifo_push, fifo_pop, fifo_full, fifo_empty;
+
+assign fifo_data_in  = { i_inbound_data, dir_valid };
+assign fifo_push     = i_inbound_valid && !fifo_full;
+assign fifo_pop      = !fifo_empty && (|(i_outbound_ready & fifo_data_out[STREAMS-1:0]));
+
+nx_fifo #(
+      .DEPTH     ( 2             )
+    , .WIDTH     ( FIFO_WIDTH    )
+) u_egress_fifo (
+      .i_clk     ( i_clk         )
+    , .i_rst     ( i_rst         )
+    // Write interface
+    , .i_wr_data ( fifo_data_in  )
+    , .i_wr_push ( fifo_push     )
+    // Read interface
+    , .o_rd_data ( fifo_data_out )
+    , .i_rd_pop  ( fifo_pop      )
+    // Status
+    , .o_level   (               )
+    , .o_empty   ( fifo_empty    )
+    , .o_full    ( fifo_full     )
+);
+
+// Drive inbound ready
+assign o_inbound_ready = !fifo_full;
+
+// Drive outbound interfaces
 generate
-for (genvar idx = 0; idx < STREAMS; idx++) begin : gen_egress_fifo
-    logic fifo_match, fifo_push, fifo_pop;
-
-    assign fifo_match = (i_inbound_dir == idx[STREAM_WIDTH-1:0]);
-    assign fifo_push  = fifo_match && i_inbound_valid && !fifo_full[idx];
-    assign fifo_pop   = !fifo_empty[idx] && i_outbound_ready[idx];
-
-    assign o_outbound_valid[idx] = !fifo_empty[idx];
-
-    nx_fifo #(
-          .DEPTH     ( 2                     )
-        , .WIDTH     ( $bits(node_message_t) )
-    ) egress_fifo (
-          .i_clk     ( i_clk                 )
-        , .i_rst     ( i_rst                 )
-        // Write interface
-        , .i_wr_data ( i_inbound_data        )
-        , .i_wr_push ( fifo_push             )
-        // Read interface
-        , .o_rd_data ( o_outbound_data[idx]  )
-        , .i_rd_pop  ( fifo_pop              )
-        // Status
-        , .o_level   (                       )
-        , .o_empty   ( fifo_empty[idx]       )
-        , .o_full    ( fifo_full[idx]        )
-    );
+for (genvar idx = 0; idx < STREAMS; idx++) begin : gen_outbound
+    assign o_outbound_data[idx]  = fifo_data_out[FIFO_WIDTH-1:STREAMS];
+    assign o_outbound_valid[idx] = !fifo_empty && fifo_data_out[idx];
 end
 endgenerate
 
-// Drive inbound stream ready
-assign o_inbound_ready = !fifo_full[i_inbound_dir];
-
 // Detect idleness
-assign o_idle = (&fifo_empty) && !i_inbound_valid;
+assign o_idle = fifo_empty && !i_inbound_valid;
 
 endmodule : nx_stream_distributor
