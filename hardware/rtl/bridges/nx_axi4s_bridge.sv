@@ -22,33 +22,34 @@ import NXConstants::*;
 #(
     parameter AXI4_DATA_WIDTH = 64
 ) (
-      input  logic                      i_clk
-    , input  logic                      i_rst
+      input  logic                       i_clk
+    , input  logic                       i_rst
     // Inbound AXI4-stream
-    , input  wire [AXI4_DATA_WIDTH-1:0] i_ib_axi4s_tdata
-    , input  wire                       i_ib_axi4s_tlast
-    , input  wire                       i_ib_axi4s_tvalid
-    , output wire                       o_ib_axi4s_tready
+    , input  logic [AXI4_DATA_WIDTH-1:0] i_ib_axi4s_tdata
+    , input  logic                       i_ib_axi4s_tlast
+    , input  logic                       i_ib_axi4s_tvalid
+    , output logic                       o_ib_axi4s_tready
     // Outbound Nexus message stream
-    , output node_message_t             o_ob_nx_data
-    , output logic                      o_ob_nx_valid
-    , input  logic                      i_ob_nx_ready
+    , output node_message_t              o_ob_nx_data
+    , output logic                       o_ob_nx_valid
+    , input  logic                       i_ob_nx_ready
     // Inbound Nexus message stream
-    , input  node_message_t             i_ib_nx_data
-    , input  logic                      i_ib_nx_valid
-    , output logic                      o_ib_nx_ready
+    , input  node_message_t              i_ib_nx_data
+    , input  logic                       i_ib_nx_valid
+    , output logic                       o_ib_nx_ready
     // Outbound AXI4-stream
-    , output wire [AXI4_DATA_WIDTH-1:0] o_ob_axi4s_tdata
-    , output wire                       o_ob_axi4s_tlast
-    , output wire                       o_ob_axi4s_tvalid
-    , input  wire                       i_ob_axi4s_tready
+    , output logic [AXI4_DATA_WIDTH-1:0] o_ob_axi4s_tdata
+    , output logic                       o_ob_axi4s_tlast
+    , output logic                       o_ob_axi4s_tvalid
+    , input  logic                       i_ob_axi4s_tready
 );
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-localparam SLOT_WIDTH  = MESSAGE_WIDTH + 1;
+localparam SLOT_WIDTH  = 32;
+localparam PAD_WIDTH   = SLOT_WIDTH - MESSAGE_WIDTH - 1;
 localparam A2N_RATIO   = AXI4_DATA_WIDTH / SLOT_WIDTH;
 localparam A2N_RATIO_W = $clog2(A2N_RATIO);
 
@@ -64,7 +65,7 @@ assign axi4s_push = i_ib_axi4s_tvalid && !axi4s_full;
 nx_fifo #(
       .DEPTH     ( 2                )
     , .WIDTH     ( AXI4_DATA_WIDTH  )
-) axi4s_fifo (
+) u_axi4s_fifo (
       .i_clk     ( i_clk            )
     , .i_rst     ( i_rst            )
     // Write interface
@@ -92,9 +93,9 @@ end
 endgenerate
 
 // Create state for output ports
-`DECLARE_DQ (A2N_RATIO_W,    ob_nx_slot,  i_clk, i_rst, {A2N_RATIO_W{1'b0}})
-`DECLARE_DQT(node_message_t, ob_nx_data,  i_clk, i_rst, {MESSAGE_WIDTH{1'b0}})
-`DECLARE_DQ (1,              ob_nx_valid, i_clk, i_rst, 1'b0)
+`DECLARE_DQ (A2N_RATIO_W,    ob_nx_slot,  i_clk, i_rst, 'd0)
+`DECLARE_DQT(node_message_t, ob_nx_data,  i_clk, i_rst, 'd0)
+`DECLARE_DQ (1,              ob_nx_valid, i_clk, i_rst, 'd0)
 
 assign o_ob_nx_data  = ob_nx_data_q;
 assign o_ob_nx_valid = ob_nx_valid_q;
@@ -172,6 +173,9 @@ generate
 for (genvar i = 0; i < A2N_RATIO; i = (i + 1)) begin
     assign o_ob_axi4s_tdata[(i+1)*SLOT_WIDTH-1]            = ob_axi4s_slot_valid_q[i];
     assign o_ob_axi4s_tdata[i*SLOT_WIDTH +: MESSAGE_WIDTH] = ob_axi4s_slot_data_q[i];
+    if (PAD_WIDTH > 0) begin
+        assign o_ob_axi4s_tdata[(i*SLOT_WIDTH)+MESSAGE_WIDTH +: PAD_WIDTH] = 'd0;
+    end
 end
 endgenerate
 

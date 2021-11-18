@@ -53,8 +53,7 @@ import NXConstants::*;
 // Constants
 // =============================================================================
 
-localparam LB_NUM_SEG   = (INPUTS + LB_SECTION_WIDTH - 1) / LB_SECTION_WIDTH;
-localparam LB_NUM_SEG_W = $clog2(LB_NUM_SEG);
+localparam LB_NUM_SEG = (INPUTS / LB_SECTION_WIDTH);
 
 // =============================================================================
 // Internal signals and state
@@ -118,7 +117,7 @@ assign load_segment = o_ram_wr_en ? 'd0 :
 generate
 for (genvar idx = 0; idx < LB_NUM_SEG; idx++) begin : gen_lb_seg
     assign loopback_mask[idx] = (
-        (is_msg_loopback && i_msg_data.loopback.select[LB_NUM_SEG_W-1:0] == idx)
+        (is_msg_loopback && i_msg_data.loopback.select == idx[LB_SELECT_WIDTH-1:0])
             ? i_msg_data.loopback.section : loopback_mask_q[idx]
     );
 end
