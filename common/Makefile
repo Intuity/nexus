@@ -32,13 +32,17 @@ PACKTYPE_RENDER += py
 PACKTYPE_RENDER += cpp
 PACKTYPE_RENDER += html
 
+# Accumulate options
+PACKTYPE_OPTS += $(addprefix --render ,$(PACKTYPE_RENDER))
+PACKTYPE_OPTS += $(if $(findstring yes,$(DEBUG)),--debug,)
+
 # ==============================================================================
 # Rules
 # ==============================================================================
 
 $(WORKING_DIR)/%.d: $(PACKTYPE_SPEC_DIR)/%.py | $(WORKING_DIR)
 	@echo "# Generating definitions from $<"
-	$(PACKTYPE) $< $(WORKING_DIR) $(addprefix --render ,$(PACKTYPE_RENDER))
+	$(PACKTYPE) $< $(WORKING_DIR) $(PACKTYPE_OPTS)
 	$(PREFIX)touch $@
 
 .PHONY: generate
