@@ -38,8 +38,6 @@ PYBIND11_MODULE(nxmodel, m) {
         .def(py::init([]() { node_control_t _; return _; }));
     py::class_<NXConstants::node_load_t>(m, "node_load_t")
         .def(py::init([]() { node_load_t _; return _; }));
-    py::class_<NXConstants::node_loopback_t>(m, "node_loopback_t")
-        .def(py::init([]() { node_loopback_t _; return _; }));
     py::class_<NXConstants::node_signal_t>(m, "node_signal_t")
         .def(py::init([]() { node_signal_t _; return _; }));
     py::class_<NXConstants::node_raw_t>(m, "node_raw_t")
@@ -54,11 +52,6 @@ PYBIND11_MODULE(nxmodel, m) {
     m.def("pack_node_load", [](NXConstants::node_load_t msg) -> uint32_t {
         uint32_t raw = 0;
         NXConstants::pack_node_load(msg, (uint8_t *)&raw);
-        return raw;
-    });
-    m.def("pack_node_loopback", [](NXConstants::node_loopback_t msg) -> uint32_t {
-        uint32_t raw = 0;
-        NXConstants::pack_node_loopback(msg, (uint8_t *)&raw);
         return raw;
     });
     m.def("pack_node_signal", [](NXConstants::node_signal_t msg) -> uint32_t {
@@ -79,9 +72,6 @@ PYBIND11_MODULE(nxmodel, m) {
     m.def("unpack_node_load", [](uint32_t raw) -> NXConstants::node_load_t {
         return NXConstants::unpack_node_load((uint8_t *)&raw);
     });
-    m.def("unpack_node_loopback", [](uint32_t raw) -> NXConstants::node_loopback_t {
-        return NXConstants::unpack_node_loopback((uint8_t *)&raw);
-    });
     m.def("unpack_node_signal", [](uint32_t raw) -> NXConstants::node_signal_t {
         return NXConstants::unpack_node_signal((uint8_t *)&raw);
     });
@@ -91,7 +81,7 @@ PYBIND11_MODULE(nxmodel, m) {
 
     // Expose classes
     py::class_<Nexus, std::shared_ptr<Nexus>>(m, "Nexus")
-        .def(py::init<uint32_t, uint32_t>())
+        .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
         .def("get_rows",            &Nexus::get_rows           )
         .def("get_columns",         &Nexus::get_columns        )
         .def("get_mesh",            &Nexus::get_mesh           )
@@ -103,13 +93,13 @@ PYBIND11_MODULE(nxmodel, m) {
         .def("pop_output",          &Nexus::pop_output         );
 
     py::class_<NXMesh, std::shared_ptr<NXMesh>>(m, "NXMesh")
-        .def(py::init<uint32_t, uint32_t>())
+        .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
         .def("get_node", &NXMesh::get_node)
         .def("is_idle",  &NXMesh::is_idle )
         .def("step",     &NXMesh::step    );
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
-        .def(py::init<uint32_t, uint32_t>())
+        .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
         .def("attach",                &NXNode::attach               )
         .def("get_pipe",              &NXNode::get_pipe             )
         .def("is_idle",               &NXNode::is_idle              )
@@ -124,12 +114,10 @@ PYBIND11_MODULE(nxmodel, m) {
     py::class_<NXMessagePipe, std::shared_ptr<NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())
         .def("enqueue", static_cast<void (NXMessagePipe::*)(node_load_t      )>(&NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_loopback_t  )>(&NXMessagePipe::enqueue))
         .def("enqueue", static_cast<void (NXMessagePipe::*)(node_signal_t    )>(&NXMessagePipe::enqueue))
         .def("enqueue", static_cast<void (NXMessagePipe::*)(node_control_t   )>(&NXMessagePipe::enqueue))
         .def("enqueue", static_cast<void (NXMessagePipe::*)(node_raw_t       )>(&NXMessagePipe::enqueue))
         .def("dequeue", static_cast<void (NXMessagePipe::*)(node_load_t     &)>(&NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_loopback_t &)>(&NXMessagePipe::dequeue))
         .def("dequeue", static_cast<void (NXMessagePipe::*)(node_signal_t   &)>(&NXMessagePipe::dequeue))
         .def("dequeue", static_cast<void (NXMessagePipe::*)(node_control_t  &)>(&NXMessagePipe::dequeue))
         .def("dequeue", static_cast<void (NXMessagePipe::*)(node_raw_t      &)>(&NXMessagePipe::dequeue))

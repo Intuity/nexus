@@ -34,6 +34,9 @@ int main (int argc, char * argv []) {
         // Mesh sizing
         ("r,rows",    "Number of rows",    cxxopts::value<uint32_t>()->default_value("3"))
         ("c,columns", "Number of columns", cxxopts::value<uint32_t>()->default_value("3"))
+        // Node parameters
+        ("i,inputs",  "Inputs per node",  cxxopts::value<uint32_t>()->default_value("32"))
+        ("o,outputs", "Outputs per node", cxxopts::value<uint32_t>()->default_value("32"))
         // Simulation
         ("cycles", "Number of cycles to run for", cxxopts::value<uint32_t>()->default_value("10"))
         // VCD dumping
@@ -71,12 +74,19 @@ int main (int argc, char * argv []) {
     uint32_t columns = options["columns"].as<uint32_t>();
     if (verbose) std::cout << "[NXModel] Requested " << rows << "x" << columns << std::endl;
 
+    // Pickup node parameters
+    uint32_t inputs  = options["inputs"].as<uint32_t>();
+    uint32_t outputs = options["outputs"].as<uint32_t>();
+    if (verbose) std::cout << "[NXModel] Node inputs " << inputs << " outputs " << outputs << std::endl;
+
     // Create the Nexus model
-    NXModel::Nexus * model = new NXModel::Nexus(rows, columns, verbose);
+    NXModel::Nexus * model = new NXModel::Nexus(
+        rows, columns, inputs, outputs, verbose
+    );
 
     // Load a design
     std::filesystem::path path = positional[0];
-    NXModel::NXLoader loader(model, std::filesystem::canonical(path));
+    NXModel::NXLoader loader(model, std::filesystem::canonical(path), verbose);
 
     // Run for the requested number of cycles
     uint32_t cycles = options["cycles"].as<uint32_t>();

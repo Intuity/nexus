@@ -39,9 +39,10 @@ void NXNode::reset (void)
     m_seen_first = false;
     m_accumulator = 0;
     m_memory.clear();
-    m_num_instr  = 0;
-    m_num_output = 0;
-    m_loopback   = 0;
+    m_num_instr   = 0;
+    m_num_inputs  = 0;
+    m_num_outputs = 0;
+    m_loopback    = 0;
     m_inputs_curr.clear();
     m_inputs_next.clear();
     m_outputs.clear();
@@ -139,27 +140,6 @@ bool NXNode::digest (void)
                         }
                         break;
                     }
-                    case NODE_COMMAND_LOOPBACK: {
-                        node_loopback_t msg;
-                        pipe->dequeue(msg);
-                        // Create a mask for this section
-                        uint64_t shift = msg.select * LB_SECTION_WIDTH;
-                        uint64_t mask  = ((1 << LB_SECTION_WIDTH) - 1) << shift;
-                        // Update the held loopback
-                        m_loopback = (
-                            (m_loopback & ~mask) |
-                            ((msg.section << shift) & mask)
-                        );
-                        if (m_verbose) {
-                            std::cout << "[NXNode " << m_row << ", " << m_column << "] "
-                                      << "Loading loopback select:  " << std::dec
-                                      << (int)msg.select << ", section: "
-                                      << std::bitset<16>(msg.section)
-                                      << ", full bitmap: "
-                                      << std::bitset<32>(m_loopback) << std::endl;
-                        }
-                        break;
-                    }
                     case NODE_COMMAND_SIGNAL: {
                         node_signal_t msg;
                         pipe->dequeue(msg);
@@ -185,8 +165,16 @@ bool NXNode::digest (void)
                             case NODE_PARAMETER_INSTRUCTIONS:
                                 m_num_instr = msg.value;
                                 break;
-                            case NODE_PARAMETER_OUTPUTS:
-                                m_num_output = msg.value;
+                            case NODE_PARAMETER_LOOPBACK:
+                                m_loopback = (
+                                    (m_loopback & ((1 << NODE_PARAM_WIDTH)-1)) << NODE_PARAM_WIDTH |
+                                    msg.value
+                                );
+                                if (m_verbose) {
+                                    std::cout << "[NXNode " << m_row << ", " << m_column << "] "
+                                                << "Loopback mask set to "
+                                                << std::bitset<32>(m_loopback) << std::endl;
+                                }
                                 break;
                             default:
                                 assert(!"Unsupported control parameter");
@@ -292,7 +280,7 @@ void NXNode::transmit (void)
         // Skip outputs where the value has not changed
         if (state == last) continue;
         // Skip outputs that are not enabled
-        if (index >= m_num_output) continue;
+        if (index >= m_num_outputs) continue;
         // Lookup the output mappings
         uint32_t raw_lookup    = m_memory[m_num_instr + index];
         output_lookup_t lookup = unpack_output_lookup((uint8_t *)&raw_lookup);

@@ -60,13 +60,13 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                       << ", column: " << column << ", loopback 0x"
                       << std::hex << (int)loopback << std::dec << std::endl;
         }
-        for (uint32_t idx = 0; idx < 2; idx++) {
-            node_loopback_t msg;
+        for (int idx = 1; idx >= 0; idx -= 1) {
+            node_control_t msg;
             msg.header.row     = row;
             msg.header.column  = column;
-            msg.header.command = NODE_COMMAND_LOOPBACK;
-            msg.select         = idx;
-            msg.section        = (loopback >> (16 * idx)) & 0xFFFF;
+            msg.header.command = NODE_COMMAND_CONTROL;
+            msg.param          = NODE_PARAMETER_LOOPBACK;
+            msg.value          = (loopback >> (16 * idx)) & 0xFFFF;
             model->get_ingress()->enqueue(msg);
         }
         // Load instructions
@@ -166,19 +166,6 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                 }
             }
         }
-        // Set the number of enabled outputs
-        node_control_t ctrl_output;
-        ctrl_output.header.row     = row;
-        ctrl_output.header.column  = column;
-        ctrl_output.header.command = NODE_COMMAND_CONTROL;
-        ctrl_output.param          = NODE_PARAMETER_OUTPUTS;
-        ctrl_output.value          = output_index;
-        if (verbose) {
-            std::cout << "[NXLoader] Setting output count row: " << row
-                      << ", column: " << column << ", count "
-                      << output_index << std::endl;
-        }
-        model->get_ingress()->enqueue(ctrl_output);
     }
     // Run the mesh until it sinks all of the queued messages
     uint32_t steps = 0;

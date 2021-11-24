@@ -44,14 +44,20 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        NXNode (uint32_t row, uint32_t column, bool verbose = false)
-            : m_row         ( row     )
+        NXNode (
+            uint32_t row,
+            uint32_t column,
+            uint32_t inputs,
+            uint32_t outputs,
+            bool     verbose = false
+        )   : m_row         ( row     )
             , m_column      ( column  )
+            , m_num_inputs  ( inputs  )
+            , m_num_outputs ( outputs )
             , m_verbose     ( verbose )
             , m_seen_first  ( false   )
             , m_accumulator ( 0       )
             , m_num_instr   ( 0       )
-            , m_num_output  ( 0       )
             , m_loopback    ( 0       )
         {
             for (int i = 0; i < 4; i++) {
@@ -129,7 +135,13 @@ namespace NXModel {
          *
          * @return integer count of outputs
          */
-        uint32_t get_output_count (void) { return m_num_output; }
+        uint32_t get_output_count (void) { return m_num_outputs; }
+
+        /** Return the number of inputs configured
+         *
+         * @return integer count of inputs
+         */
+        uint32_t get_input_count (void) { return m_num_inputs; }
 
     private:
 
@@ -199,7 +211,8 @@ namespace NXModel {
 
         // Node parameters
         uint32_t m_num_instr;
-        uint32_t m_num_output;
+        uint32_t m_num_inputs;
+        uint32_t m_num_outputs;
         uint64_t m_loopback;
 
         // Current state

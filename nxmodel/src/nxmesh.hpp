@@ -31,7 +31,13 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        NXMesh (uint32_t rows, uint32_t columns, bool verbose = false);
+        NXMesh (
+            uint32_t rows,
+            uint32_t columns,
+            uint32_t node_inputs,
+            uint32_t node_outputs,
+            bool     verbose = false
+        );
 
         // =====================================================================
         // Destructor

@@ -22,13 +22,20 @@
 
 using namespace NXModel;
 
-Nexus::Nexus (uint32_t rows, uint32_t columns, bool verbose /* = false */)
-    : m_rows    ( rows          )
+Nexus::Nexus (
+    uint32_t rows,
+    uint32_t columns,
+    uint32_t node_inputs,
+    uint32_t node_outputs,
+    bool     verbose /* = false */
+)   : m_rows    ( rows          )
     , m_columns ( columns       )
     , m_verbose ( verbose       )
 {
     // Link the ingress & egress pipes
-    m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns, verbose);
+    m_mesh    = std::make_shared<NXMesh>(
+        m_rows, m_columns, node_inputs, node_outputs, verbose
+    );
     m_ingress = m_mesh->get_node(0, 0)->get_pipe(DIRECTION_NORTH);
     m_egress  = std::make_shared<NXMessagePipe>();
     m_mesh->get_node(m_rows-1, 0)->attach(DIRECTION_SOUTH, m_egress);

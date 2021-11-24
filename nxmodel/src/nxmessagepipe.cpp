@@ -26,14 +26,6 @@ void NXMessagePipe::enqueue (node_load_t message)
     m_messages.push(entry);
 }
 
-void NXMessagePipe::enqueue (node_loopback_t message)
-{
-    entry_t entry;
-    entry.header = message.header;
-    pack_node_loopback(message, (uint8_t *)&entry.encoded);
-    m_messages.push(entry);
-}
-
 void NXMessagePipe::enqueue (node_signal_t message)
 {
     entry_t entry;
@@ -88,14 +80,6 @@ void NXMessagePipe::dequeue (node_load_t & message)
     entry_t front = m_messages.front();
     m_messages.pop();
     message = unpack_node_load((uint8_t *)&front.encoded);
-}
-
-void NXMessagePipe::dequeue (node_loopback_t & message)
-{
-    if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
-    entry_t front = m_messages.front();
-    m_messages.pop();
-    message = unpack_node_loopback((uint8_t *)&front.encoded);
 }
 
 void NXMessagePipe::dequeue (node_signal_t & message)
