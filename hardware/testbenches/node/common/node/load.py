@@ -18,10 +18,8 @@ from drivers.stream.common import StreamTransaction
 from drivers.stream.init import StreamInitiator
 
 from nxconstants import (NodeCommand, NodeControl, NodeID, NodeLoad,
-                         NodeLoopback, NodeParameter, LOAD_SEG_WIDTH,
-                         LB_SECTION_WIDTH)
-from nxmodel import (NXMessagePipe, unpack_node_control, unpack_node_load,
-                     unpack_node_loopback)
+                         NodeParameter, LOAD_SEG_WIDTH, NODE_PARAM_WIDTH)
+from nxmodel import NXMessagePipe, unpack_node_control, unpack_node_load
 
 def load_data(
     inbound    : StreamInitiator,
@@ -77,20 +75,20 @@ def load_loopback(
         mask      : Loopback mask
         model     : Inbound message pipe to the model
     """
-    for select in range(num_inputs // LB_SECTION_WIDTH):
-        msg = NodeLoopback()
+    for select in range(num_inputs // NODE_PARAM_WIDTH, -1, -1):
+        msg = NodeControl()
         msg.header.row     = node_id.row
         msg.header.column  = node_id.column
-        msg.header.command = NodeCommand.LOOPBACK
-        msg.select         = select
-        msg.section        = (
-            (mask >> (select * LB_SECTION_WIDTH)) & ((1 << LB_SECTION_WIDTH) - 1)
+        msg.header.command = NodeCommand.CONTROL
+        msg.param          = NodeParameter.LOOPBACK
+        msg.value          = (
+            (mask >> (select * NODE_PARAM_WIDTH)) & ((1 << NODE_PARAM_WIDTH) - 1)
         )
         # Queue up into the testbench driver
         encoded = msg.pack()
         inbound.append(StreamTransaction(data=encoded))
         # Queue up into the C++ model if required
-        if model: model.enqueue(unpack_node_loopback(encoded))
+        if model: model.enqueue(unpack_node_control(encoded))
 
 def load_parameter(
     inbound   : StreamInitiator,

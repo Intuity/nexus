@@ -49,7 +49,7 @@ async def execute(dut):
     dut.node_id <= node_id.pack()
 
     # Create an instance of the node model
-    model    = NXNode(node_id.row, node_id.column)
+    model    = NXNode(node_id.row, node_id.column, num_inputs, num_outputs)
     mdl_ins  = [model.get_pipe(direction_t(i)) for i in range(4)]
     mdl_outs = [NXMessagePipe() for _ in range(4)]
     for idx, pipe in enumerate(mdl_outs):
@@ -62,7 +62,8 @@ async def execute(dut):
 
     # Generate output mappings
     lookup, mappings = gen_output_mappings(
-        num_outputs, num_inputs, base_off=len(instrs), max_tgts=4, exclude=node_id
+        num_outputs, num_inputs, num_outputs, base_off=len(instrs), max_tgts=4,
+        exclude=node_id
     )
 
     # Choose an interface
@@ -79,9 +80,6 @@ async def execute(dut):
     # Setup the number of instructions and outputs
     load_parameter(
         rtl_in, node_id, NodeParameter.INSTRUCTIONS, len(instrs), model=mdl_in
-    )
-    load_parameter(
-        rtl_in, node_id, NodeParameter.OUTPUTS, len(lookup), model=mdl_in
     )
 
     # Setup the loopback mask

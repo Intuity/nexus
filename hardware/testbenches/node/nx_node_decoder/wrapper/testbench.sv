@@ -30,8 +30,6 @@ import NXConstants::*;
     , output logic [RAM_ADDR_W-1:0]       o_ram_addr
     , output logic [RAM_DATA_W-1:0]       o_ram_wr_data
     , output logic                        o_ram_wr_en
-    // Loopback mask (driven by node_loopback_t)
-    , output logic [INPUTS-1:0]           o_loopback_mask
     // Input signal state (driven by node_signal_t)
     , output logic [$clog2(INPUTS)-1:0]   o_input_index
     , output logic                        o_input_value
@@ -39,7 +37,7 @@ import NXConstants::*;
     , output logic                        o_input_update
     // Control parameters (driven by node_control_t)
     , output logic [NODE_PARAM_WIDTH-1:0] o_num_instr
-    , output logic [NODE_PARAM_WIDTH-1:0] o_num_output
+    , output logic [INPUTS-1:0]           o_loopback_mask
 );
 
 // =============================================================================
@@ -70,8 +68,6 @@ nx_node_decoder #(
     , .o_ram_addr      ( o_ram_addr      )
     , .o_ram_wr_data   ( o_ram_wr_data   )
     , .o_ram_wr_en     ( o_ram_wr_en     )
-    // Loopback mask (driven by node_loopback_t)
-    , .o_loopback_mask ( o_loopback_mask )
     // Input signal state (driven by node_signal_t)
     , .o_input_index   ( o_input_index   )
     , .o_input_value   ( o_input_value   )
@@ -79,7 +75,7 @@ nx_node_decoder #(
     , .o_input_update  ( o_input_update  )
     // Control parameters (driven by node_control_t)
     , .o_num_instr     ( o_num_instr     )
-    , .o_num_output    ( o_num_output    )
+    , .o_loopback_mask ( o_loopback_mask )
 );
 
 // =============================================================================

@@ -46,29 +46,24 @@ class Testbench(TestbenchBase):
             self, self.clk, self.rst, StateIO(self.dut, "input", IORole.INITIATOR)
         )
         # Pickup simple interfaces
-        self.idle       = self.dut.o_idle
-        self.lb_mask    = UnstrobedMonitor(
+        self.idle      = self.dut.o_idle
+        self.lb_mask   = UnstrobedMonitor(
             self, self.clk, self.rst, self.dut.o_loopback_mask, name="lb_mask"
         )
-        self.num_instr  = UnstrobedMonitor(
+        self.num_instr = UnstrobedMonitor(
             self, self.clk, self.rst, self.dut.o_num_instr, name="num_instr"
-        )
-        self.num_output = UnstrobedMonitor(
-            self, self.clk, self.rst, self.dut.o_num_output, name="num_output"
         )
         # Create queues for expected transactions
         self.exp_ram        = []
         self.exp_sig        = []
         self.exp_lb_mask    = []
         self.exp_num_instr  = []
-        self.exp_num_output = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self) # , fail_immediately=False)
+        self.scoreboard = Scoreboard(self, fail_immediately=False)
         self.scoreboard.add_interface(self.ram,        self.exp_ram       )
         self.scoreboard.add_interface(self.sig,        self.exp_sig       )
         self.scoreboard.add_interface(self.lb_mask,    self.exp_lb_mask   )
         self.scoreboard.add_interface(self.num_instr,  self.exp_num_instr )
-        self.scoreboard.add_interface(self.num_output, self.exp_num_output)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
@@ -82,11 +77,10 @@ class testcase(cocotb.test):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.exp_ram       : await RisingEdge(tb.clk)
-            while tb.exp_sig       : await RisingEdge(tb.clk)
-            while tb.exp_lb_mask   : await RisingEdge(tb.clk)
-            while tb.exp_num_instr : await RisingEdge(tb.clk)
-            while tb.exp_num_output: await RisingEdge(tb.clk)
+            while tb.exp_ram      : await RisingEdge(tb.clk)
+            while tb.exp_sig      : await RisingEdge(tb.clk)
+            while tb.exp_lb_mask  : await RisingEdge(tb.clk)
+            while tb.exp_num_instr: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

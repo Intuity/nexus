@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
+from random import randint
 
 from ..testbench import testcase
 from drivers.memory.common import MemoryTransaction
@@ -20,7 +20,7 @@ from drivers.state.common import SignalState
 from drivers.stream.common import StreamTransaction
 
 from nxconstants import (NodeCommand, NodeMessage, MESSAGE_WIDTH, LOAD_SEG_WIDTH,
-                         LB_SECTION_WIDTH, LB_SELECT_WIDTH, NodeParameter)
+                         NodeParameter, NODE_PARAM_WIDTH)
 
 @testcase()
 async def messages(dut):
@@ -33,7 +33,6 @@ async def messages(dut):
     load_accum = 0
     loopback   = 0
     num_instr  = 0
-    num_output = 0
 
     for msg_idx in range(10000):
         # Generate a random message
@@ -63,22 +62,6 @@ async def messages(dut):
                 load_addr  = (load_addr + 1) if (load_addr < 1023) else 0
                 load_accum = 0
 
-        # LOOPBACK: Accumulate loopback mask in chunks
-        elif msg.raw.header.command == NodeCommand.LOOPBACK:
-            # Calculate section offset
-            offset = LB_SECTION_WIDTH * (msg.loopback.select % 2)
-            # Calculate mask and inverse mask
-            mask      = ((1 << LB_SECTION_WIDTH) - 1) << offset
-            full_mask = (1 << (LB_SECTION_WIDTH * (1 << LB_SELECT_WIDTH))) - 1
-            inv_mask  = full_mask - mask
-            # Update loopback
-            updated = (loopback & inv_mask) | (msg.loopback.section << offset)
-            # Append to queue (if value changed)
-            if updated != loopback:
-                dut.exp_lb_mask.append(updated)
-            # Keep track of the previous value
-            loopback = updated
-
         # SIGNAL: Signal state updates
         elif msg.raw.header.command == NodeCommand.SIGNAL:
             dut.exp_sig.append(SignalState(
@@ -87,12 +70,15 @@ async def messages(dut):
 
         # CONTROL: Parameter updates
         elif msg.raw.header.command == NodeCommand.CONTROL:
+            prm_mask = (1 << NODE_PARAM_WIDTH) - 1
             if (msg.control.param == NodeParameter.INSTRUCTIONS) and (msg.control.value != num_instr):
                 dut.exp_num_instr.append(msg.control.value)
                 num_instr = msg.control.value
-            elif (msg.control.param == NodeParameter.OUTPUTS) and (msg.control.value != num_output):
-                dut.exp_num_output.append(msg.control.value)
-                num_output = msg.control.value
+            elif (msg.control.param == NodeParameter.LOOPBACK) and (msg.control.value != (loopback & prm_mask)):
+                loopback   = (loopback & prm_mask)
+                loopback <<= NODE_PARAM_WIDTH
+                loopback  |= (msg.control.value & prm_mask)
+                dut.exp_lb_mask.append(loopback)
 
         # Queue up the message
         dut.msg.append(StreamTransaction(data=msg.pack()))

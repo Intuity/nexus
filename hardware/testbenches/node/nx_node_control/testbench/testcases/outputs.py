@@ -36,7 +36,6 @@ async def output_single(dut):
 
     # Decide on the number of active outputs
     actv_outs = randint(1, outputs)
-    dut.num_output <= actv_outs
 
     # Decide on the number of loaded instructions
     num_instr = randint(1, (1 << ram_addr_w) // 2)
@@ -44,7 +43,7 @@ async def output_single(dut):
 
     # Generate mappings for each active output
     lookups, mappings = gen_output_mappings(
-        actv_outs, inputs, base_off=num_instr, min_tgts=1, max_tgts=5
+        outputs, inputs, actv_outs, base_off=num_instr, min_tgts=1, max_tgts=5
     )
 
     # Write lookup and mappings into simulated memory
@@ -59,17 +58,18 @@ async def output_single(dut):
         # Push the output high
         state[index] = 1
         dut.core_outputs <= sum(((x << i) for i, x in enumerate(state)))
+        # Skip inactive lookups
+        if not lookups[index].active: continue
         # If this output is active, queue up the expected messages
-        if index < actv_outs:
-            for mapping in mappings[index]:
-                msg = NodeSignal()
-                msg.header.row     = mapping.row
-                msg.header.column  = mapping.column
-                msg.header.command = NodeCommand.SIGNAL
-                msg.index          = mapping.index
-                msg.state          = 1
-                msg.is_seq         = mapping.is_seq
-                dut.exp_msg.append(StreamTransaction(msg.pack()))
+        for mapping in mappings[index]:
+            msg = NodeSignal()
+            msg.header.row     = mapping.row
+            msg.header.column  = mapping.column
+            msg.header.command = NodeCommand.SIGNAL
+            msg.index          = mapping.index
+            msg.state          = 1
+            msg.is_seq         = mapping.is_seq
+            dut.exp_msg.append(StreamTransaction(msg.pack()))
         # Wait for the queue to drain
         while dut.exp_msg: await RisingEdge(dut.clk)
         await ClockCycles(dut.clk, 10)
@@ -87,7 +87,7 @@ async def output_multi(dut):
 
     # Decide on the number of active outputs
     actv_outs = randint(1, outputs)
-    dut.num_output <= actv_outs
+    dut.info(f"Using {actv_outs=}")
 
     # Decide on the number of loaded instructions
     num_instr = randint(1, (1 << ram_addr_w) // 2)
@@ -95,7 +95,7 @@ async def output_multi(dut):
 
     # Generate mappings for each active output
     lookups, mappings = gen_output_mappings(
-        actv_outs, inputs, base_off=num_instr, min_tgts=0, max_tgts=5
+        outputs, inputs, actv_outs, base_off=num_instr, min_tgts=0, max_tgts=5
     )
 
     # Write lookup and mappings into simulated memory
@@ -106,16 +106,16 @@ async def output_multi(dut):
 
     # Run multiple passes
     state = ([0] * outputs)
-    for _ in range(100):
+    for _ in range(10):
         # Randomise and drive a new output state
         new_state = [choice((0, 1)) for _ in range(outputs)]
         dut.core_outputs <= sum(((x << i) for i, x in enumerate(new_state)))
         # Queue up all of the messages where there is a difference
-        for index in range(actv_outs):
+        for index in range(outputs):
+            # Skip inactive lookups
+            if not lookups[index].active: continue
             # Skip outputs that haven't changed
             if state[index] == new_state[index]: continue
-            # Skip inactive lookups
-            if lookup.active == 0: continue
             # Run through the mappings
             for mapping in mappings[index]:
                 msg = NodeSignal()

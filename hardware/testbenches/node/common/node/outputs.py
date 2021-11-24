@@ -21,6 +21,7 @@ from nxconstants import (OutputLookup, OutputMapping, MAX_ROW_COUNT,
 def gen_output_mappings(
     outputs  : int,
     inputs   : int,
+    active   : int,
     rows     : int = MAX_ROW_COUNT,
     columns  : int = MAX_COLUMN_COUNT,
     base_off : int = 0,
@@ -34,6 +35,7 @@ def gen_output_mappings(
 
     Args:
         outputs : How many outputs to generate
+        active  : How many outputs to mark as active
         inputs  : Number of inputs on target nodes
         base_off: Base placement address for mappings and lookup
         min_tgts: Minimum number of targets to generate for each output
@@ -48,7 +50,7 @@ def gen_output_mappings(
     offsets = [base_off+outputs]
     for index in range(outputs):
         targets.append([])
-        num_tgts = randint(min_tgts, max_tgts)
+        num_tgts = 0 if index >= active else randint(min_tgts, max_tgts)
         # Choose a number of unique targets
         for _ in range(num_tgts):
             tgt_row, tgt_col, tgt_idx = 0, 0, 0

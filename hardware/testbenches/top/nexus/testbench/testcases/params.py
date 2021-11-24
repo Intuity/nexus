@@ -43,20 +43,21 @@ async def parameters(dut):
         um_num_instr = UnstrobedMonitor(
             dut, node.i_clk, node.i_rst, node.u_decoder.o_num_instr, "um_num_instr"
         )
-        um_num_output = UnstrobedMonitor(
-            dut, node.i_clk, node.i_rst, node.u_decoder.o_num_output, "um_num_output"
+        um_loopback = UnstrobedMonitor(
+            dut, node.i_clk, node.i_rst, node.u_decoder.o_loopback_mask, "um_loopback"
         )
 
         # Scoreboard
         exp_num_instr  = []
-        exp_num_output = []
+        exp_loopback = []
         prm_sb         = Scoreboard(dut, fail_immediately=True)
         prm_sb.add_interface(um_num_instr,  exp_num_instr )
-        prm_sb.add_interface(um_num_output, exp_num_output)
+        prm_sb.add_interface(um_loopback, exp_loopback)
 
         # Send multiple update messages
-        last_num_instr  = 0
-        last_num_output = 0
+        last_num_instr = 0
+        last_loopback  = 0
+        param_mask     = (1 << NODE_PARAM_WIDTH) - 1
         for _ in range(1000):
             # Generate and queue message
             msg = load_parameter(
@@ -69,10 +70,12 @@ async def parameters(dut):
             if msg.param == NodeParameter.INSTRUCTIONS and msg.value != last_num_instr:
                 exp_num_instr.append(msg.value)
                 last_num_instr = msg.value
-            elif msg.param == NodeParameter.OUTPUTS and msg.value != last_num_output:
-                exp_num_output.append(msg.value)
-                last_num_output = msg.value
+            elif msg.param == NodeParameter.LOOPBACK and msg.value != (last_loopback & param_mask):
+                last_loopback  &= param_mask
+                last_loopback <<= NODE_PARAM_WIDTH
+                last_loopback  |= msg.value & param_mask
+                exp_loopback.append(last_loopback)
 
         # Wait for queues to drain
         while exp_num_instr : await RisingEdge(dut.clk)
-        while exp_num_output: await RisingEdge(dut.clk)
+        while exp_loopback: await RisingEdge(dut.clk)

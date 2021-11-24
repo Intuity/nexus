@@ -35,10 +35,11 @@ async def mission_mode(dut):
     await dut.reset()
 
     # Determine parameters
-    num_rows    = int(dut.ROWS)
-    num_cols    = int(dut.COLUMNS)
-    node_inputs = int(dut.INPUTS)
-    ram_data_w  = int(dut.RAM_DATA_W)
+    num_rows     = int(dut.ROWS)
+    num_cols     = int(dut.COLUMNS)
+    node_inputs  = int(dut.INPUTS)
+    node_outputs = int(dut.OUTPUTS)
+    ram_data_w   = int(dut.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
     # Disable scoreboarding of output
@@ -48,7 +49,7 @@ async def mission_mode(dut):
     full_path = dut.base_dir / "data" / "design.json"
 
     # Create an instance of NXModel
-    model = Nexus(num_rows, num_cols)
+    model = Nexus(num_rows, num_cols, node_inputs, node_outputs)
 
     # Load the design using the Python loader
     design = NXLoader(full_path)
@@ -74,13 +75,10 @@ async def mission_mode(dut):
                 model     =model.get_ingress(),
             )
             # Set parameters
-            for key, value in (
-                (NodeParameter.INSTRUCTIONS, len(node.instructions)),
-                (NodeParameter.OUTPUTS,      len(node.lookup      )),
-            ):
-                load_parameter(
-                    dut.mesh_inbound, node_id, key, value, model.get_ingress()
-                )
+            load_parameter(
+                dut.mesh_inbound, node_id, NodeParameter.INSTRUCTIONS,
+                len(node.instructions), model.get_ingress()
+            )
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {len(dut.mesh_inbound._sendQ)} messages to drain")

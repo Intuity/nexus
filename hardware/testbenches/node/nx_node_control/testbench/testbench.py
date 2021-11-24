@@ -41,7 +41,6 @@ class Testbench(TestbenchBase):
         self.idle         = self.dut.o_idle
         self.lb_mask      = self.dut.i_loopback_mask
         self.num_instr    = self.dut.i_num_instr
-        self.num_output   = self.dut.i_num_output
         self.core_inputs  = self.dut.o_core_inputs
         self.core_outputs = self.dut.i_core_outputs
         self.core_trigger = self.dut.o_core_trigger
@@ -69,7 +68,6 @@ class Testbench(TestbenchBase):
         self.trigger      <= 0
         self.lb_mask      <= 0
         self.num_instr    <= 0
-        self.num_output   <= 0
         self.core_outputs <= 0
         # Drivers/monitors
         self.input.intf.initialise(IORole.INITIATOR)
