@@ -59,12 +59,6 @@ class NXConstants:
     LOAD_SEG_WIDTH      : Constant("Segment width for accumulated load") = 16
     NODE_MEM_ADDR_WIDTH : Constant("Width of node memory address"      ) = ceil(log2(MAX_NODE_MEMORY))
 
-    # Node loopback
-    LB_SECTION_WIDTH : Constant("Section width for loopback" ) = 16
-    LB_SELECT_WIDTH  : Constant("Selector width for loopback") = ceil(log2(
-        MAX_NODE_IOR_COUNT // LB_SECTION_WIDTH
-    ))
-
     # Node control
     NODE_PARAM_WIDTH : Constant("Maximum width of a node parameter") = 16
 
@@ -96,15 +90,15 @@ class ControlCommand:
 class NodeCommand:
     """ Different message types for nodes in the mesh """
     LOAD     : Constant("Load data into the node's memory")
-    LOOPBACK : Constant("Setup output to input loopback mask")
     SIGNAL   : Constant("Carries signal state to and from a node")
-    CONTROL  : Constant("Control node behaviour")
+    CONTROL  : Constant("Set parameters for the node")
+    RESERVED : Constant("Reserved for future use")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeParameter:
     """ Different control parameters within the node """
     INSTRUCTIONS : Constant("Number of instructions")
-    OUTPUTS      : Constant("Number of enabled outputs")
+    LOOPBACK     : Constant("Loopback mask (existing value shifted up by 16 on write)")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class Operation:
@@ -241,13 +235,6 @@ class NodeLoad:
     data   : Scalar(width=NXConstants.LOAD_SEG_WIDTH, desc="Segment of data to load")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class NodeLoopback:
-    """ Configure the output to input loopback mask """
-    header  : NodeHeader(desc="Header carrying row, column, and command")
-    select  : Scalar(width=NXConstants.LB_SELECT_WIDTH,  desc="Section to update")
-    section : Scalar(width=NXConstants.LB_SECTION_WIDTH, desc="Updated value")
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
 class NodeSignal:
     """ Signal state carried to/from a node """
     header : NodeHeader(desc="Header carrying row, column, and command")
@@ -267,6 +254,5 @@ class NodeMessage:
     """ Union of different node message types """
     raw      : NodeRaw(desc="Raw message encoding")
     load     : NodeLoad(desc="Data load encoding")
-    loopback : NodeLoopback(desc="Loopback configuration encoding")
     signal   : NodeSignal(desc="Signal state encoding")
     control  : NodeControl(desc="Parameter control encoding")
