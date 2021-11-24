@@ -37,8 +37,10 @@ LINT_OPTS += --Wall
 LINT_OPTS += $(addprefix -I,$(SRC_DIRS))
 LINT_OPTS += $(addprefix -D,$(DEFINES))
 LINT_OPTS += $(LINT_CFG)
-LINT_OPTS += $(SRC_FILES)
+LINT_OPTS += $(filter-out $(abspath rtl/fpga/nx_artix_200t.v),$(SRC_FILES))
 LINT_OPTS += --top $(DESIGN_TOP)
+
+$(info SRC_FILES=$(SRC_FILES))
 
 # Construct arguments to SV2V
 SV2V_OUT  ?= $(WORKING_DIR)/$(DESIGN_TOP).v
