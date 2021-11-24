@@ -81,7 +81,7 @@ logic                        dcd_wr_en;
 logic [INPUTS-1:0]           dcd_loopback_mask;
 logic [$clog2(INPUTS)-1:0]   dcd_input_index;
 logic                        dcd_input_value, dcd_input_is_seq, dcd_input_update;
-logic [NODE_PARAM_WIDTH-1:0] dcd_num_instr, dcd_num_output;
+logic [NODE_PARAM_WIDTH-1:0] dcd_num_instr;
 
 // Controller
 logic [RAM_ADDR_W-1:0] ctrl_rd_addr;
@@ -179,7 +179,7 @@ always_comb begin : comb_outbound_dir
     gt_row = (outbound_data.raw.header.row    > i_node_id.row   );
     lt_col = (outbound_data.raw.header.column < i_node_id.column);
     gt_col = (outbound_data.raw.header.column > i_node_id.column);
-    casex ({ lt_row, gt_row, lt_col, gt_col, i_outbound_present })
+    casez ({ lt_row, gt_row, lt_col, gt_col, i_outbound_present })
     //     <R    >R    <C    >C   PRSNT
         { 1'b1, 1'b0, 1'b?, 1'b?, 4'b???1 }: outbound_dir = DIRECTION_NORTH;
         { 1'b1, 1'b0, 1'b?, 1'b?, 4'b???0 }: outbound_dir = DIRECTION_EAST;
@@ -232,8 +232,6 @@ nx_node_decoder #(
     , .o_ram_addr      ( dcd_wr_addr       )
     , .o_ram_wr_data   ( dcd_wr_data       )
     , .o_ram_wr_en     ( dcd_wr_en         )
-    // Loopback mask (driven by node_loopback_t)
-    , .o_loopback_mask ( dcd_loopback_mask )
     // Input signal state (driven by node_signal_t)
     , .o_input_index   ( dcd_input_index   )
     , .o_input_value   ( dcd_input_value   )
@@ -241,7 +239,7 @@ nx_node_decoder #(
     , .o_input_update  ( dcd_input_update  )
     // Control parameters (driven by node_control_t)
     , .o_num_instr     ( dcd_num_instr     )
-    , .o_num_output    ( dcd_num_output    )
+    , .o_loopback_mask ( dcd_loopback_mask )
 );
 
 // =============================================================================
@@ -266,7 +264,6 @@ nx_node_control #(
     , .i_input_is_seq  ( dcd_input_is_seq  )
     , .i_input_update  ( dcd_input_update  )
     , .i_num_instr     ( dcd_num_instr     )
-    , .i_num_output    ( dcd_num_output    )
     // Output message stream
     , .o_msg_data      ( comb_data[1]      )
     , .o_msg_valid     ( comb_valid[1]     )

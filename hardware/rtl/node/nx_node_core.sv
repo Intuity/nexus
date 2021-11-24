@@ -128,7 +128,7 @@ assign table_index = {
 };
 
 // Lookup result in the truth table
-assign result = (decoded.truth >> table_index) & 1'b1;
+assign result = |((decoded.truth >> table_index) & 'd1);
 
 // Update the working registers
 generate

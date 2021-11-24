@@ -30,7 +30,6 @@ import NXConstants::*;
     , output logic                        o_idle
     // Inputs from decoder
     , input  logic [NODE_PARAM_WIDTH-1:0] i_num_instr
-    , input  logic [NODE_PARAM_WIDTH-1:0] i_num_output
     // Output message stream
     , output node_message_t               o_msg_data
     , output logic                        o_msg_valid
@@ -59,7 +58,6 @@ typedef enum logic [1:0] { IDLE, LOOKUP, QUERY, SEND } fsm_t;
 `DECLARE_DQT(fsm_t, fsm_state, i_clk, i_rst, IDLE)
 
 // Output change detection
-`DECLARE_DQ(OUTPUTS,      outputs_mask, i_clk, i_rst, 'd0)
 `DECLARE_DQ(OUTPUTS,      outputs_last, i_clk, i_rst, 'd0)
 `DECLARE_DQ(OUTPUT_WIDTH, output_index, i_clk, i_rst, 'd0)
 `DECLARE_DQ(1,            output_value, i_clk, i_rst, 'd0)
@@ -123,11 +121,8 @@ end
 // Detect Output Changes
 // =============================================================================
 
-// Mask only the enabled outputs
-assign outputs_mask = (i_num_output == OUTPUTS) ? {OUTPUTS{1'b1}} : ((1 << i_num_output) - 1);
-
 // Detect changes in the output array
-assign output_xor    = (i_core_outputs ^ outputs_last_q) & outputs_mask_q;
+assign output_xor    = (i_core_outputs ^ outputs_last_q);
 assign output_change = |output_xor;
 
 // Use a leading zero count to determine the output index

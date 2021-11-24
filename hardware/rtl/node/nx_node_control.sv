@@ -38,7 +38,6 @@ import NXConstants::*;
     , input  logic                        i_input_is_seq
     , input  logic                        i_input_update
     , input  logic [NODE_PARAM_WIDTH-1:0] i_num_instr
-    , input  logic [NODE_PARAM_WIDTH-1:0] i_num_output
     // Output message stream
     , output node_message_t               o_msg_data
     , output logic                        o_msg_valid
@@ -101,7 +100,6 @@ nx_node_control_outputs #(
     , .o_idle         ( outputs_idle   )
     // Inputs from decoder
     , .i_num_instr    ( i_num_instr    )
-    , .i_num_output   ( i_num_output   )
     // Output message stream
     , .o_msg_data     ( o_msg_data     )
     , .o_msg_valid    ( o_msg_valid    )
