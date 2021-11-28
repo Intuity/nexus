@@ -27,6 +27,8 @@ import NXConstants::*;
       input  logic                        i_clk
     , input  logic                        i_rst
     // Control signals
+    , input  node_id_t                    i_node_id
+    , input  logic                        i_trace_en
     , output logic                        o_idle
     // Inputs from decoder
     , input  logic [NODE_PARAM_WIDTH-1:0] i_num_instr
@@ -39,6 +41,8 @@ import NXConstants::*;
     , output logic                        o_ram_rd_en
     , input  logic [RAM_DATA_W-1:0]       i_ram_rd_data
     // Interface to logic core
+    , input  logic                        i_core_trigger
+    , input  logic                        i_core_idle
     , input  logic [OUTPUTS-1:0]          i_core_outputs
 );
 
@@ -47,8 +51,9 @@ import NXConstants::*;
 // =============================================================================
 
 localparam OUTPUT_WIDTH = $clog2(OUTPUTS) + 1;
+localparam TRC_SECTIONS = (OUTPUTS + TRACE_SECTION_WIDTH - 1) / TRACE_SECTION_WIDTH;
 
-typedef enum logic [1:0] { IDLE, LOOKUP, QUERY, SEND } fsm_t;
+typedef enum logic [2:0] { IDLE, LOOKUP, QUERY, SEND, SEND_TRACE } fsm_t;
 
 // =============================================================================
 // Internal Signals and State
@@ -57,10 +62,13 @@ typedef enum logic [1:0] { IDLE, LOOKUP, QUERY, SEND } fsm_t;
 // FSM
 `DECLARE_DQT(fsm_t, fsm_state, i_clk, i_rst, IDLE)
 
+logic trace_pend;
+
 // Output change detection
 `DECLARE_DQ(OUTPUTS,      outputs_last, i_clk, i_rst, 'd0)
 `DECLARE_DQ(OUTPUT_WIDTH, output_index, i_clk, i_rst, 'd0)
 `DECLARE_DQ(1,            output_value, i_clk, i_rst, 'd0)
+`DECLARE_DQ(1,            any_change,   i_clk, i_rst, 'd0)
 
 logic [OUTPUTS-1:0] output_xor;
 logic               output_change;
@@ -70,26 +78,41 @@ logic               output_change;
 `DECLARE_DQ (RAM_ADDR_W,      rd_addr,  i_clk, i_rst, 'd0)
 `DECLARE_DQ (1,               last,     i_clk, i_rst, 'd0)
 
+// Signal message generation
+output_mapping_t mapping;
+node_header_t    sig_hdr;
+node_signal_t    sig_data;
+
+// Trace message generation
+`DECLARE_DQ(TRACE_SELECT_WIDTH, trc_select, i_clk, i_rst, 'd0)
+
+node_header_t trc_hdr;
+node_trace_t  trc_data;
+
 // Message generation
 `DECLARE_DQ (1,             msg_valid, i_clk, i_rst, 'd0)
 `DECLARE_DQT(node_signal_t, msg_data,  i_clk, i_rst, 'd0)
 
-node_header_t    msg_hdr;
-output_mapping_t mapping;
-logic            msg_stall;
+logic msg_stall;
 
 // =============================================================================
 // FSM
 // =============================================================================
 
-assign o_idle = (fsm_state_q == IDLE) && !output_change;
+// Determine if trace needs to be emitted
+assign trace_pend = any_change_q && i_trace_en && i_core_idle;
 
+// Determine if the control block is idle
+assign o_idle = (fsm_state_q == IDLE) && !output_change && !trace_pend;
+
+// Switch through FSM states
 always_comb begin : comb_fsm
     `INIT_D(fsm_state);
     case (fsm_state)
         // IDLE : Waiting for an output signal change
         IDLE : begin
-            if (output_change) fsm_state = LOOKUP;
+            if      (output_change) fsm_state = LOOKUP;
+            else if (trace_pend   ) fsm_state = SEND_TRACE;
         end
         // LOOKUP : Querying the store for the output vector lookup
         LOOKUP : begin
@@ -110,9 +133,18 @@ always_comb begin : comb_fsm
             // On the last read go to LOOKUP if another change is detected,
             // otherwise go to idle
             if (last_q && !msg_stall) begin
-                if (output_change) fsm_state = LOOKUP;
-                else               fsm_state = IDLE;
+                if      (output_change) fsm_state = LOOKUP;
+                else if (trace_pend   ) fsm_state = SEND_TRACE;
+                else                    fsm_state = IDLE;
             end
+        end
+        // SEND_TRACE : Emit output state trace messages
+        SEND_TRACE : begin
+            if (!msg_stall && trc_select_q == (TRC_SECTIONS - 1)) fsm_state = IDLE;
+        end
+        // Default : Return to IDLE state and wait for next cycle
+        default begin
+            fsm_state = IDLE;
         end
     endcase
 end
@@ -132,6 +164,11 @@ nx_clz #(
 ) u_clz (
       .i_scalar      ( output_xor   )
     , .o_leading     ( output_index )
+);
+
+// Track if any change has occurred this cycle
+assign any_change = (
+    (i_core_trigger || (fsm_state_q == SEND_TRACE)) ? 'd0 : (any_change_q || output_change)
 );
 
 // =============================================================================
@@ -186,29 +223,68 @@ assign pointers = (fsm_state_q == QUERY) ? i_ram_rd_data[$bits(output_lookup_t)-
 assign last = (rd_addr == pointers.stop);
 
 // =============================================================================
-// Generate Messages
+// Generate Signal Messages
 // =============================================================================
 
 // Decode RAM response
 assign mapping = i_ram_rd_data[$bits(output_mapping_t)-1:0];
 
-// Determine stall condition
-assign msg_stall = msg_valid_q && !i_msg_ready;
+// Generate the header
+assign sig_hdr.row     = mapping.row;
+assign sig_hdr.column  = mapping.column;
+assign sig_hdr.command = NODE_COMMAND_SIGNAL;
+
+// Generate the signal message
+assign sig_data.header     = sig_hdr;
+assign sig_data.index      = mapping.index;
+assign sig_data.is_seq     = mapping.is_seq;
+assign sig_data.state      = output_value_q;
+assign sig_data._padding_0 = 'd0;
+
+// =============================================================================
+// Generate Trace Messages
+// =============================================================================
+
+// Count up through the trace sections
+assign trc_select = (
+    (fsm_state_q == SEND_TRACE) ? (trc_select_q + (msg_stall ? 'd0 : 'd1)) : 'd0
+);
 
 // Generate the header
-assign msg_hdr.row     = !msg_stall ? mapping.row    : msg_data_q.header.row;
-assign msg_hdr.column  = !msg_stall ? mapping.column : msg_data_q.header.column;
-assign msg_hdr.command = NODE_COMMAND_SIGNAL;
+assign trc_hdr.row     = i_node_id.row;
+assign trc_hdr.column  = i_node_id.column;
+assign trc_hdr.command = NODE_COMMAND_TRACE;
 
-// Generate the output message
-assign msg_data.header     = msg_hdr;
-assign msg_data.index      = !msg_stall ? mapping.index  : msg_data_q.index;
-assign msg_data.is_seq     = !msg_stall ? mapping.is_seq : msg_data_q.is_seq;
-assign msg_data.state      = output_value_q;
-assign msg_data._padding_0 = 'd0;
+// Generate the trace message
+always_comb begin : comb_trace
+    trc_data = 'd0;
+    trc_data.header = trc_hdr;
+    trc_data.select = trc_select_q;
+    for (int idx = 0; idx < TRC_SECTIONS; idx++) begin
+        if (trc_select_q == idx[TRACE_SELECT_WIDTH-1:0]) begin
+            trc_data.trace = i_core_outputs[idx*TRACE_SECTION_WIDTH+:TRACE_SECTION_WIDTH];
+        end
+    end
+end
+
+// =============================================================================
+// Combine Message Streams
+// =============================================================================
+
+// Detect stall condition
+assign msg_stall = msg_valid_q && !i_msg_ready;
+
+// Mux between signal and trace messages
+assign msg_data = (
+    msg_stall ? msg_data_q : ((fsm_state_q == SEND) ? sig_data : trc_data)
+);
 
 // Drive message valid high when in SEND
-assign msg_valid = (msg_stall && msg_valid_q) || (fsm_state_q == SEND);
+assign msg_valid = (
+    (msg_stall && msg_valid_q ) ||
+    (fsm_state_q == SEND      ) ||
+    (fsm_state_q == SEND_TRACE)
+);
 
 // Drive outputs
 assign o_msg_data  = msg_data_q;

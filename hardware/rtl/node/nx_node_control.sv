@@ -29,6 +29,8 @@ import NXConstants::*;
       input  logic                        i_clk
     , input  logic                        i_rst
     // Control signals
+    , input  node_id_t                    i_node_id
+    , input  logic                        i_trace_en
     , input  logic                        i_trigger
     , output logic                        o_idle
     // Inputs from decoder
@@ -47,9 +49,10 @@ import NXConstants::*;
     , output logic                        o_ram_rd_en
     , input  logic [RAM_DATA_W-1:0]       i_ram_rd_data
     // Interface to logic core
+    , output logic                        o_core_trigger
+    , input  logic                        i_core_idle
     , output logic [INPUTS-1:0]           o_core_inputs
     , input  logic [OUTPUTS-1:0]          i_core_outputs
-    , output logic                        o_core_trigger
 );
 
 // =============================================================================
@@ -97,6 +100,8 @@ nx_node_control_outputs #(
       .i_clk          ( i_clk          )
     , .i_rst          ( i_rst          )
     // Control signals
+    , .i_node_id      ( i_node_id      )
+    , .i_trace_en     ( i_trace_en     )
     , .o_idle         ( outputs_idle   )
     // Inputs from decoder
     , .i_num_instr    ( i_num_instr    )
@@ -109,7 +114,9 @@ nx_node_control_outputs #(
     , .o_ram_rd_en    ( o_ram_rd_en    )
     , .i_ram_rd_data  ( i_ram_rd_data  )
     // Interface to core
+    , .i_core_trigger ( o_core_trigger )
     , .i_core_outputs ( i_core_outputs )
+    , .i_core_idle    ( i_core_idle    )
 );
 
 endmodule : nx_node_control

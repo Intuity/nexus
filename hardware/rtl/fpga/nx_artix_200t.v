@@ -55,7 +55,7 @@ module nx_artix_200t #(
 // AXI4-Stream Bridge for Control
 // =============================================================================
 
-wire [26:0] nx_ctrl_ib_data, nx_ctrl_ob_data;
+wire [27:0] nx_ctrl_ib_data, nx_ctrl_ob_data;
 wire        nx_ctrl_ib_valid, nx_ctrl_ib_ready, nx_ctrl_ob_valid, nx_ctrl_ob_ready;
 
 nx_axi4s_bridge #(
@@ -87,7 +87,7 @@ nx_axi4s_bridge #(
 // AXI4-Stream Bridge for Mesh
 // =============================================================================
 
-wire [26:0] nx_mesh_ib_data, nx_mesh_ob_data;
+wire [27:0] nx_mesh_ib_data, nx_mesh_ob_data;
 wire        nx_mesh_ib_valid, nx_mesh_ib_ready, nx_mesh_ob_valid, nx_mesh_ob_ready;
 
 nx_axi4s_bridge #(

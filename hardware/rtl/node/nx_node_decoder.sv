@@ -45,6 +45,7 @@ import NXConstants::*;
     // Control parameters (driven by node_control_t)
     , output logic [NODE_PARAM_WIDTH-1:0] o_num_instr
     , output logic [INPUTS-1:0]           o_loopback_mask
+    , output logic                        o_trace_en
 );
 
 // =============================================================================
@@ -59,9 +60,10 @@ logic is_msg_load, is_msg_signal, is_msg_control;
 `DECLARE_DQ(LOAD_SEG_WIDTH, load_segment, i_clk, i_rst, 'd0)
 
 // Control parameters
-logic is_ctrl_instr, is_ctrl_lb;
+logic is_ctrl_instr, is_ctrl_lb, is_ctrl_trace;
 `DECLARE_DQ(NODE_PARAM_WIDTH, ctrl_num_instr, i_clk, i_rst, 'd0)
 `DECLARE_DQ(INPUTS,           ctrl_lb_mask,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(1,                ctrl_trace_en,  i_clk, i_rst, 'd0)
 
 // =============================================================================
 // Control signals
@@ -114,7 +116,8 @@ assign o_input_update = is_msg_signal;
 
 // Detect different control writes
 assign is_ctrl_instr = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_INSTRUCTIONS);
-assign is_ctrl_lb    = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_LOOPBACK);
+assign is_ctrl_lb    = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_LOOPBACK    );
+assign is_ctrl_trace = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_TRACE       );
 
 // Update held instruction count
 assign ctrl_num_instr = (
@@ -127,8 +130,14 @@ assign ctrl_lb_mask = (
                : ctrl_lb_mask_q
 );
 
+// Update trace enable
+assign ctrl_trace_en = (
+    is_ctrl_trace ? i_msg_data.control.value[0] : ctrl_trace_en_q
+);
+
 // Expose parameters to the control block
 assign o_num_instr     = ctrl_num_instr_q;
 assign o_loopback_mask = ctrl_lb_mask_q;
+assign o_trace_en      = ctrl_trace_en_q;
 
 endmodule : nx_node_decoder

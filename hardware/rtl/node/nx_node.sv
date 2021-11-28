@@ -57,7 +57,7 @@ import NXConstants::*,
 `DECLARE_DQ(1, trigger, i_clk, i_rst, 'd0)
 
 // Idle control
-struct packed { logic core, decode, ctrl, distrib; } comp_idle;
+logic idle_core, idle_dcd, idle_ctrl, idle_dist;
 
 // Inbound stream arbiter
 node_message_t arb_data;
@@ -78,10 +78,11 @@ logic                        dcd_valid, dcd_ready;
 logic [RAM_ADDR_W-1:0]       dcd_wr_addr;
 logic [RAM_DATA_W-1:0]       dcd_wr_data;
 logic                        dcd_wr_en;
-logic [INPUTS-1:0]           dcd_loopback_mask;
 logic [$clog2(INPUTS)-1:0]   dcd_input_index;
 logic                        dcd_input_value, dcd_input_is_seq, dcd_input_update;
 logic [NODE_PARAM_WIDTH-1:0] dcd_num_instr;
+logic [INPUTS-1:0]           dcd_loopback_mask;
+logic                        dcd_trace_en;
 
 // Controller
 logic [RAM_ADDR_W-1:0] ctrl_rd_addr;
@@ -101,7 +102,9 @@ logic                  core_rd_en, core_rd_stall;
 // =============================================================================
 
 // Determine local idleness
-assign idle = (&comp_idle) && !dcd_valid && !(|comb_valid);
+assign idle = (
+    (&{ idle_core, idle_dcd, idle_ctrl, idle_dist }) && !dcd_valid && !(|comb_valid)
+);
 
 // Chain idle signal through the node
 assign o_idle = idle_q && i_idle;
@@ -135,8 +138,9 @@ assign comb_data[0] = arb_data;
 
 // Detect if the arbitrated stream targets this node
 assign arb_match = (
-    (arb_data.raw.header.row    == i_node_id.row   ) &&
-    (arb_data.raw.header.column == i_node_id.column)
+    (arb_data.raw.header.row     == i_node_id.row     ) &&
+    (arb_data.raw.header.column  == i_node_id.column  ) &&
+    (arb_data.raw.header.command != NODE_COMMAND_TRACE)
 );
 
 // Discern decode from bypass traffic
@@ -170,45 +174,49 @@ nx_stream_arbiter #(
 // Distributor
 // =============================================================================
 
-// Determine target direction based on two factors:
+// Determine target direction based on three factors:
+//  - EXTERNAL messages are always routed to the south (or west if absent)
 //  - Target row & column set the initial direction
 //  - If a particular direction is absent, routes to the next clockwise stream
 always_comb begin : comb_outbound_dir
-    logic lt_row, gt_row, lt_col, gt_col;
-    lt_row = (outbound_data.raw.header.row    < i_node_id.row   );
-    gt_row = (outbound_data.raw.header.row    > i_node_id.row   );
-    lt_col = (outbound_data.raw.header.column < i_node_id.column);
-    gt_col = (outbound_data.raw.header.column > i_node_id.column);
-    casez ({ lt_row, gt_row, lt_col, gt_col, i_outbound_present })
-    //     <R    >R    <C    >C   PRSNT
-        { 1'b1, 1'b0, 1'b?, 1'b?, 4'b???1 }: outbound_dir = DIRECTION_NORTH;
-        { 1'b1, 1'b0, 1'b?, 1'b?, 4'b???0 }: outbound_dir = DIRECTION_EAST;
-        { 1'b0, 1'b1, 1'b?, 1'b?, 4'b?1?? }: outbound_dir = DIRECTION_SOUTH;
-        { 1'b0, 1'b1, 1'b?, 1'b?, 4'b?0?? }: outbound_dir = DIRECTION_WEST;
-        { 1'b0, 1'b0, 1'b1, 1'b0, 4'b1??? }: outbound_dir = DIRECTION_WEST;
-        { 1'b0, 1'b0, 1'b1, 1'b0, 4'b0??? }: outbound_dir = DIRECTION_NORTH;
-        { 1'b0, 1'b0, 1'b0, 1'b1, 4'b??1? }: outbound_dir = DIRECTION_EAST;
-        { 1'b0, 1'b0, 1'b0, 1'b1, 4'b??0? }: outbound_dir = DIRECTION_SOUTH;
+    logic is_trc, lt_row, gt_row, lt_col, gt_col;
+    is_trc = (outbound_data.raw.header.command == NODE_COMMAND_TRACE);
+    lt_row = (outbound_data.raw.header.row      < i_node_id.row     );
+    gt_row = (outbound_data.raw.header.row      > i_node_id.row     );
+    lt_col = (outbound_data.raw.header.column   < i_node_id.column  );
+    gt_col = (outbound_data.raw.header.column   > i_node_id.column  );
+    casez ({ lt_row, gt_row, lt_col, gt_col, is_trc, i_outbound_present })
+    //     <R    >R    <C    >C   TRC   PRSNT
+        { 1'b?, 1'b?, 1'b?, 1'b?, 1'b1, 4'b?1?? }: outbound_dir = DIRECTION_SOUTH;
+        { 1'b?, 1'b?, 1'b?, 1'b?, 1'b1, 4'b?0?? }: outbound_dir = DIRECTION_WEST;
+        { 1'b1, 1'b0, 1'b?, 1'b?, 1'b0, 4'b???1 }: outbound_dir = DIRECTION_NORTH;
+        { 1'b1, 1'b0, 1'b?, 1'b?, 1'b0, 4'b???0 }: outbound_dir = DIRECTION_EAST;
+        { 1'b0, 1'b1, 1'b?, 1'b?, 1'b0, 4'b?1?? }: outbound_dir = DIRECTION_SOUTH;
+        { 1'b0, 1'b1, 1'b?, 1'b?, 1'b0, 4'b?0?? }: outbound_dir = DIRECTION_WEST;
+        { 1'b0, 1'b0, 1'b1, 1'b0, 1'b0, 4'b1??? }: outbound_dir = DIRECTION_WEST;
+        { 1'b0, 1'b0, 1'b1, 1'b0, 1'b0, 4'b0??? }: outbound_dir = DIRECTION_NORTH;
+        { 1'b0, 1'b0, 1'b0, 1'b1, 1'b0, 4'b??1? }: outbound_dir = DIRECTION_EAST;
+        { 1'b0, 1'b0, 1'b0, 1'b1, 1'b0, 4'b??0? }: outbound_dir = DIRECTION_SOUTH;
         default: outbound_dir = DIRECTION_NORTH;
     endcase
 end
 
 nx_stream_distributor #(
-      .STREAMS          ( 4                 )
+      .STREAMS          ( 4                )
 ) u_distributor (
-      .i_clk            ( i_clk             )
-    , .i_rst            ( i_rst             )
+      .i_clk            ( i_clk            )
+    , .i_rst            ( i_rst            )
     // Idle flag
-    , .o_idle           ( comp_idle.distrib )
+    , .o_idle           ( idle_dist        )
     // Inbound message stream
-    , .i_inbound_dir    ( outbound_dir      )
-    , .i_inbound_data   ( outbound_data     )
-    , .i_inbound_valid  ( outbound_valid    )
-    , .o_inbound_ready  ( outbound_ready    )
+    , .i_inbound_dir    ( outbound_dir     )
+    , .i_inbound_data   ( outbound_data    )
+    , .i_inbound_valid  ( outbound_valid   )
+    , .o_inbound_ready  ( outbound_ready   )
     // Outbound message streams
-    , .o_outbound_data  ( o_outbound_data   )
-    , .o_outbound_valid ( o_outbound_valid  )
-    , .i_outbound_ready ( i_outbound_ready  )
+    , .o_outbound_data  ( o_outbound_data  )
+    , .o_outbound_valid ( o_outbound_valid )
+    , .i_outbound_ready ( i_outbound_ready )
 );
 
 // =============================================================================
@@ -223,7 +231,7 @@ nx_node_decoder #(
       .i_clk           ( i_clk             )
     , .i_rst           ( i_rst             )
     // Control signals
-    , .o_idle          ( comp_idle.decode  )
+    , .o_idle          ( idle_dcd          )
     // Inbound message stream
     , .i_msg_data      ( comb_data[0]      )
     , .i_msg_valid     ( dcd_valid         )
@@ -240,6 +248,7 @@ nx_node_decoder #(
     // Control parameters (driven by node_control_t)
     , .o_num_instr     ( dcd_num_instr     )
     , .o_loopback_mask ( dcd_loopback_mask )
+    , .o_trace_en      ( dcd_trace_en      )
 );
 
 // =============================================================================
@@ -255,8 +264,10 @@ nx_node_control #(
       .i_clk           ( i_clk             )
     , .i_rst           ( i_rst             )
     // Control signals
+    , .i_node_id       ( i_node_id         )
+    , .i_trace_en      ( dcd_trace_en      )
     , .i_trigger       ( i_trigger         )
-    , .o_idle          ( comp_idle.ctrl    )
+    , .o_idle          ( idle_ctrl         )
     // Inputs from decoder
     , .i_loopback_mask ( dcd_loopback_mask )
     , .i_input_index   ( dcd_input_index   )
@@ -273,9 +284,10 @@ nx_node_control #(
     , .o_ram_rd_en     ( ctrl_rd_en        )
     , .i_ram_rd_data   ( ctrl_rd_data      )
     // Interface to logic core
+    , .o_core_trigger  ( core_trigger      )
+    , .i_core_idle     ( idle_core         )
     , .o_core_inputs   ( core_inputs       )
     , .i_core_outputs  ( core_outputs      )
-    , .o_core_trigger  ( core_trigger      )
 );
 
 // =============================================================================
@@ -323,7 +335,7 @@ nx_node_core #(
     // Execution controls
     , .i_populated     ( dcd_num_instr  )
     , .i_trigger       ( core_trigger   )
-    , .o_idle          ( comp_idle.core )
+    , .o_idle          ( idle_core      )
     // Instruction fetch
     , .o_instr_addr    ( core_rd_addr   )
     , .o_instr_rd_en   ( core_rd_en     )
