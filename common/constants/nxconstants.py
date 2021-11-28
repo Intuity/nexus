@@ -41,7 +41,7 @@ class NXConstants:
     )
 
     # Interface and selector sizes
-    MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 27
+    MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 28
     ADDR_ROW_WIDTH   : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
     ADDR_COL_WIDTH   : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
     MAX_INPUT_WIDTH  : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
@@ -61,6 +61,10 @@ class NXConstants:
 
     # Node control
     NODE_PARAM_WIDTH : Constant("Maximum width of a node parameter") = 16
+
+    # Trace
+    TRACE_SECTION_WIDTH : Constant("Bits carried per trace message"     ) = 16
+    TRACE_SELECT_WIDTH  : Constant("Width of the trace section selector") = ceil(log2(MAX_NODE_OUTPUTS / TRACE_SECTION_WIDTH))
 
 # ==============================================================================
 # Enumerations
@@ -89,16 +93,17 @@ class ControlCommand:
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
     """ Different message types for nodes in the mesh """
-    LOAD     : Constant("Load data into the node's memory")
-    SIGNAL   : Constant("Carries signal state to and from a node")
-    CONTROL  : Constant("Set parameters for the node")
-    RESERVED : Constant("Reserved for future use")
+    LOAD    : Constant("Load data into the node's memory")
+    SIGNAL  : Constant("Carries signal state to and from a node")
+    CONTROL : Constant("Set parameters for the node")
+    TRACE   : Constant("Trace from the output state of a node")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeParameter:
     """ Different control parameters within the node """
     INSTRUCTIONS : Constant("Number of instructions")
     LOOPBACK     : Constant("Loopback mask (existing value shifted up by 16 on write)")
+    TRACE        : Constant("Trace output values on every cycle")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class Operation:
@@ -249,6 +254,13 @@ class NodeControl:
     param  : NodeParameter(desc="Parameter to update")
     value  : Scalar(width=NXConstants.NODE_PARAM_WIDTH, desc="Updated value")
 
+@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
+class NodeTrace:
+    """ Trace output state of a node """
+    header : NodeHeader(desc="Header carrying row, column, and command")
+    select : Scalar(width=NXConstants.TRACE_SELECT_WIDTH,  desc="Trace section")
+    trace  : Scalar(width=NXConstants.TRACE_SECTION_WIDTH, desc="Section value")
+
 @packtype.union(package=NXConstants)
 class NodeMessage:
     """ Union of different node message types """
@@ -256,3 +268,4 @@ class NodeMessage:
     load     : NodeLoad(desc="Data load encoding")
     signal   : NodeSignal(desc="Signal state encoding")
     control  : NodeControl(desc="Parameter control encoding")
+    trace    : NodeControl(desc="Output trace encoding")
