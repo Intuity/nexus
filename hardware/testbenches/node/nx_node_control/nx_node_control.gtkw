@@ -1,16 +1,17 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Wed Nov  3 22:47:37 2021
+[*] Sun Nov 28 18:00:10 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node_control/sim.lxt"
-[dumpfile_mtime] "Wed Nov  3 22:45:50 2021"
-[dumpfile_size] 1928
+[dumpfile_mtime] "Sun Nov 28 17:53:17 2021"
+[dumpfile_size] 6298
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/node/nx_node_control/nx_node_control.gtkw"
-[timestart] 0
+[timestart] 213350
 [size] 2141 1269
-[pos] 1959 159
-*-14.403889 1000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-14.105577 323000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
+[treeopen] testbench.u_dut.
 [sst_width] 287
 [signals_width] 335
 [sst_expanded] 1
@@ -18,6 +19,10 @@
 @28
 testbench.clk[0]
 testbench.rst[0]
+@200
+-
+@22
+testbench.u_dut.u_outputs.i_node_id[7:0]
 @200
 -
 @22
@@ -45,10 +50,102 @@ testbench.i_ram_rd_data[31:0]
 @200
 -
 @22
-testbench.o_msg_data[30:0]
+testbench.u_dut.o_msg_data[27:0]
 @28
 testbench.o_msg_valid[0]
-@29
 testbench.i_msg_ready[0]
+@200
+-
+-Core State
+@28
+testbench.u_dut.u_outputs.i_core_idle[0]
+testbench.u_dut.u_outputs.i_core_trigger[0]
+@24
+testbench.u_dut.u_outputs.fsm_state_q[2:0]
+@200
+-
+-Signal
+@800022
+testbench.u_dut.u_outputs.sig_data[27:0]
+@c00025
+#{row} (0)testbench.u_dut.u_outputs.sig_data[27:0] (1)testbench.u_dut.u_outputs.sig_data[27:0] (2)testbench.u_dut.u_outputs.sig_data[27:0] (3)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(0)testbench.u_dut.u_outputs.sig_data[27:0]
+(1)testbench.u_dut.u_outputs.sig_data[27:0]
+(2)testbench.u_dut.u_outputs.sig_data[27:0]
+(3)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401205
+-group_end
+@c00025
+#{column} (4)testbench.u_dut.u_outputs.sig_data[27:0] (5)testbench.u_dut.u_outputs.sig_data[27:0] (6)testbench.u_dut.u_outputs.sig_data[27:0] (7)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(4)testbench.u_dut.u_outputs.sig_data[27:0]
+(5)testbench.u_dut.u_outputs.sig_data[27:0]
+(6)testbench.u_dut.u_outputs.sig_data[27:0]
+(7)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401205
+-group_end
+@c00028
+#{command} (8)testbench.u_dut.u_outputs.sig_data[27:0] (9)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(8)testbench.u_dut.u_outputs.sig_data[27:0]
+(9)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401200
+-group_end
+@c00025
+#{index} (10)testbench.u_dut.u_outputs.sig_data[27:0] (11)testbench.u_dut.u_outputs.sig_data[27:0] (12)testbench.u_dut.u_outputs.sig_data[27:0] (13)testbench.u_dut.u_outputs.sig_data[27:0] (14)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(10)testbench.u_dut.u_outputs.sig_data[27:0]
+(11)testbench.u_dut.u_outputs.sig_data[27:0]
+(12)testbench.u_dut.u_outputs.sig_data[27:0]
+(13)testbench.u_dut.u_outputs.sig_data[27:0]
+(14)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401205
+-group_end
+@c00028
+#{is_seq} (15)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(15)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401200
+-group_end
+@c00028
+#{state} (16)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(16)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401200
+-group_end
+@c00022
+#{padding} (17)testbench.u_dut.u_outputs.sig_data[27:0] (18)testbench.u_dut.u_outputs.sig_data[27:0] (19)testbench.u_dut.u_outputs.sig_data[27:0] (20)testbench.u_dut.u_outputs.sig_data[27:0] (21)testbench.u_dut.u_outputs.sig_data[27:0] (22)testbench.u_dut.u_outputs.sig_data[27:0] (23)testbench.u_dut.u_outputs.sig_data[27:0] (24)testbench.u_dut.u_outputs.sig_data[27:0] (25)testbench.u_dut.u_outputs.sig_data[27:0] (26)testbench.u_dut.u_outputs.sig_data[27:0] (27)testbench.u_dut.u_outputs.sig_data[27:0]
+@28
+(17)testbench.u_dut.u_outputs.sig_data[27:0]
+(18)testbench.u_dut.u_outputs.sig_data[27:0]
+(19)testbench.u_dut.u_outputs.sig_data[27:0]
+(20)testbench.u_dut.u_outputs.sig_data[27:0]
+(21)testbench.u_dut.u_outputs.sig_data[27:0]
+(22)testbench.u_dut.u_outputs.sig_data[27:0]
+(23)testbench.u_dut.u_outputs.sig_data[27:0]
+(24)testbench.u_dut.u_outputs.sig_data[27:0]
+(25)testbench.u_dut.u_outputs.sig_data[27:0]
+(26)testbench.u_dut.u_outputs.sig_data[27:0]
+(27)testbench.u_dut.u_outputs.sig_data[27:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@200
+-
+-Trace
+@28
+testbench.u_dut.u_outputs.i_trace_en[0]
+testbench.u_dut.u_outputs.trace_pend[0]
+@200
+-
+@28
+testbench.u_dut.u_outputs.any_change_q[0]
+#{trc_select_q[1:0]} testbench.u_dut.u_outputs.trc_select_q[0]
+@200
+-
+@22
+testbench.u_dut.u_outputs.trc_data[27:0]
 [pattern_trace] 1
 [pattern_trace] 0

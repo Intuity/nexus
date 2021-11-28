@@ -15,3 +15,4 @@
 from .basic import *
 from .inputs import *
 from .outputs import *
+from .trace import *

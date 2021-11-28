@@ -16,6 +16,7 @@ import os
 
 import cocotb
 from cocotb_bus.scoreboard import Scoreboard
+from cocotb.result import TestFailure
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from tb_base import TestbenchBase
@@ -37,13 +38,16 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Basic interfaces
+        self.node_id      = self.dut.i_node_id
+        self.trace_en     = self.dut.i_trace_en
         self.trigger      = self.dut.i_trigger
         self.idle         = self.dut.o_idle
         self.lb_mask      = self.dut.i_loopback_mask
         self.num_instr    = self.dut.i_num_instr
+        self.core_trigger = self.dut.o_core_trigger
+        self.core_idle    = self.dut.i_core_idle
         self.core_inputs  = self.dut.o_core_inputs
         self.core_outputs = self.dut.i_core_outputs
-        self.core_trigger = self.dut.o_core_trigger
         # Setup drivers/monitors
         self.input = StateInitiator(
             self, self.clk, self.rst, StateIO(self.dut, "input", IORole.RESPONDER),
@@ -55,19 +59,37 @@ class Testbench(TestbenchBase):
             self, self.clk, self.rst, MemoryIO(self.dut, "ram", IORole.INITIATOR),
         )
         # Create queues for expected transactions
-        self.exp_msg = []
+        self.exp_signal = []
+        self.exp_trace  = []
+        # Interleave responses from the signal and trace queues
+        def expected_interleave(tran):
+            next_signal = self.exp_signal[0].data if self.exp_signal else 0
+            next_trace  = self.exp_trace[0].data  if self.exp_trace else 0
+            if self.exp_signal and tran.data == next_signal:
+                return self.exp_signal.pop(0)
+            elif self.exp_trace and tran.data == next_trace:
+                return self.exp_trace.pop(0)
+            else:
+                raise TestFailure(
+                    f"0x{tran.data:08X} did not match the next item in either the "
+                    f"signal (0x{next_signal:08X}) or trace (0x{next_trace:08X}) "
+                    f"queues"
+                )
         # Create a scoreboard
         imm_fail = (os.environ.get("FAIL_IMMEDIATELY", "no").lower() == "yes")
         self.scoreboard = Scoreboard(self, fail_immediately=imm_fail)
-        self.scoreboard.add_interface(self.msg, self.exp_msg)
+        self.scoreboard.add_interface(self.msg, expected_interleave)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
         # Basic interfaces
+        self.node_id      <= 0
+        self.trace_en     <= 0
         self.trigger      <= 0
         self.lb_mask      <= 0
         self.num_instr    <= 0
+        self.core_idle    <= 0
         self.core_outputs <= 0
         # Drivers/monitors
         self.input.intf.initialise(IORole.INITIATOR)
@@ -79,7 +101,8 @@ class testcase(cocotb.test):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.exp_msg: await RisingEdge(tb.clk)
+            while tb.exp_signal: await RisingEdge(tb.clk)
+            while tb.exp_trace : await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)
