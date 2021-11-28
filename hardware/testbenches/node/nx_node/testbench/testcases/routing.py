@@ -15,7 +15,7 @@
 from random import choice, randint
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import (Direction, NodeID, NodeRaw, MAX_ROW_COUNT,
+from nxconstants import (Direction, NodeCommand, NodeID, NodeRaw, MAX_ROW_COUNT,
                          MAX_COLUMN_COUNT, MESSAGE_WIDTH)
 
 from ..testbench import testcase
@@ -54,7 +54,9 @@ async def routing(dut):
         inbound.append(StreamTransaction(data=msg.pack()))
 
         # Queue up the message onto the right outbound queue
-        if msg.header.row < node_id.row:
+        if msg.header.command == NodeCommand.TRACE:
+            dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
+        elif msg.header.row < node_id.row:
             dut.expected[int(Direction.NORTH)].append(StreamTransaction(data=msg.pack()))
         elif msg.header.row > node_id.row:
             dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
