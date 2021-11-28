@@ -28,6 +28,7 @@ def gen_output_mappings(
     min_tgts : int = 1,
     max_tgts : int = 1,
     exclude  : Optional[NodeID] = None,
+    debug    : bool = False,
 ) -> Tuple[List[OutputLookup], List[List[OutputMapping]]]:
     """
     Generate random output mappings for a node, returning the mappings for each
@@ -41,6 +42,7 @@ def gen_output_mappings(
         min_tgts: Minimum number of targets to generate for each output
         max_tgts: Maximum number of targets to generate for each output
         exclude : Optionally exclude a node from targets
+        debug   : Print out mappings as they are generated
 
     Returns: Mappings and lookup table
     """
@@ -59,6 +61,11 @@ def gen_output_mappings(
                 tgt_col = randint(0, columns-1)
                 tgt_idx = randint(0, inputs-1)
                 tgt_seq = choice((0, 1))
+                if debug:
+                    print(
+                        f"O[{index:2d}] -> {tgt_row:2d}, {tgt_col:2d}, "
+                        f"I[{tgt_idx:2d}], S: {tgt_seq}"
+                    )
                 # If this targets an excluded node, skip
                 if exclude and exclude.row == tgt_row and exclude.column == tgt_col:
                     continue
