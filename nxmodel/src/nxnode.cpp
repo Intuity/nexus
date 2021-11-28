@@ -43,6 +43,7 @@ void NXNode::reset (void)
     m_num_inputs  = 0;
     m_num_outputs = 0;
     m_loopback    = 0;
+    m_trace_en    = false;
     m_inputs_curr.clear();
     m_inputs_next.clear();
     m_outputs.clear();
@@ -176,6 +177,9 @@ bool NXNode::digest (void)
                                                 << std::bitset<32>(m_loopback) << std::endl;
                                 }
                                 break;
+                            case NODE_PARAMETER_TRACE:
+                                m_trace_en = ((msg.value & 0x1) != 0);
+                                break;
                             default:
                                 assert(!"Unsupported control parameter");
                                 break;
@@ -187,7 +191,7 @@ bool NXNode::digest (void)
 
             // Otherwise, route it towards the correct node
             } else {
-                route(header.row, header.column)->enqueue_raw(
+                route(header.row, header.column, header.command)->enqueue_raw(
                     m_inbound[idx_pipe]->dequeue_raw()
                 );
             }
@@ -273,10 +277,14 @@ bool NXNode::evaluate (void)
 
 void NXNode::transmit (void)
 {
+    // Generate signal state updates
+    uint32_t bitmap = 0;
     for (io_state_t::iterator it = m_outputs.begin(); it != m_outputs.end(); it++) {
         uint32_t index = it->first;
         bool     state = it->second;
         bool     last  = m_outputs_last.count(index) ? m_outputs_last[index] : false;
+        // Accumulate bitmap for trace
+        bitmap |= (state ? 1 : 0) << index;
         // Skip outputs where the value has not changed
         if (state == last) continue;
         // Skip outputs that are not enabled
@@ -320,10 +328,39 @@ void NXNode::transmit (void)
                           << " SEQ: " << std::dec << (int)msg.is_seq << std::endl;
             }
             // Dispatch the message
-            route(mapping.row, mapping.column)->enqueue(msg);
+            route(mapping.row, mapping.column, NODE_COMMAND_SIGNAL)->enqueue(msg);
         }
         // Always update the last sent state
         m_outputs_last[index] = state;
+    }
+    // Generate trace messages if required
+    if (m_trace_en) {
+        for (
+            uint32_t idx = 0;
+            idx < ((m_num_outputs + TRACE_SECTION_WIDTH - 1) / TRACE_SECTION_WIDTH);
+            idx++
+        ) {
+            // Build the message
+            node_trace_t msg;
+            msg.header.row     = m_row;
+            msg.header.column  = m_column;
+            msg.header.command = NODE_COMMAND_TRACE;
+            msg.select         = idx;
+            msg.trace          = (
+                (bitmap >> (idx * TRACE_SECTION_WIDTH)) &
+                ((1 << TRACE_SECTION_WIDTH) - 1)
+            );
+            // Debug logging
+            if (m_verbose) {
+                std::cout << "[NXNode " << m_row << ", " << m_column << "]"
+                          << " Sending trace section " << std::dec << (int)msg.select
+                          << " with value 0x" << std::hex << (int)msg.trace
+                          << std::endl;
+            }
+            // Dispatch the message
+            route(m_row, m_column, NODE_COMMAND_TRACE)->enqueue(msg);
+        }
+
     }
 }
 
@@ -337,17 +374,19 @@ bool NXNode::get_output (uint32_t index)
     return m_outputs.count(index) ? m_outputs[index] : false;
 }
 
-std::shared_ptr<NXMessagePipe> NXNode::route (uint32_t row, uint32_t column)
-{
+std::shared_ptr<NXMessagePipe> NXNode::route (
+    uint32_t row, uint32_t column, node_command_t command
+) {
     // NOTE: Messages routed towards unconnected pipes will be directed to
     //       adjacent pipes in a clockwise order
-    assert(row != m_row || column != m_column);
+    assert(row != m_row || column != m_column || command == NODE_COMMAND_TRACE);
     std::shared_ptr<NXMessagePipe> tgt_pipe = NULL;
     uint32_t start;
-    if      (row    < m_row   ) start = (int)DIRECTION_NORTH;
-    else if (row    > m_row   ) start = (int)DIRECTION_SOUTH;
-    else if (column < m_column) start = (int)DIRECTION_WEST;
-    else                        start = (int)DIRECTION_EAST;
+    if      (command == NODE_COMMAND_TRACE) start = (int)DIRECTION_SOUTH;
+    else if (row    < m_row               ) start = (int)DIRECTION_NORTH;
+    else if (row    > m_row               ) start = (int)DIRECTION_SOUTH;
+    else if (column < m_column            ) start = (int)DIRECTION_WEST;
+    else                                    start = (int)DIRECTION_EAST;
     for (int idx_off = 0; idx_off < 4; idx_off++) {
         uint32_t trial = (start + idx_off) % 4;
         if (m_outbound[trial] == NULL) continue;

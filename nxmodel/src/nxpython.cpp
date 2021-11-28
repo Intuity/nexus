@@ -40,6 +40,8 @@ PYBIND11_MODULE(nxmodel, m) {
         .def(py::init([]() { node_load_t _; return _; }));
     py::class_<NXConstants::node_signal_t>(m, "node_signal_t")
         .def(py::init([]() { node_signal_t _; return _; }));
+    py::class_<NXConstants::node_trace_t>(m, "node_trace_t")
+        .def(py::init([]() { node_trace_t _; return _; }));
     py::class_<NXConstants::node_raw_t>(m, "node_raw_t")
         .def(py::init([]() { node_raw_t _; return _; }));
 
@@ -59,6 +61,11 @@ PYBIND11_MODULE(nxmodel, m) {
         NXConstants::pack_node_signal(msg, (uint8_t *)&raw);
         return raw;
     });
+    m.def("pack_node_trace", [](NXConstants::node_trace_t msg) -> uint32_t {
+        uint32_t raw = 0;
+        NXConstants::pack_node_trace(msg, (uint8_t *)&raw);
+        return raw;
+    });
     m.def("pack_node_raw", [](NXConstants::node_raw_t msg) -> uint32_t {
         uint32_t raw = 0;
         NXConstants::pack_node_raw(msg, (uint8_t *)&raw);
@@ -74,6 +81,9 @@ PYBIND11_MODULE(nxmodel, m) {
     });
     m.def("unpack_node_signal", [](uint32_t raw) -> NXConstants::node_signal_t {
         return NXConstants::unpack_node_signal((uint8_t *)&raw);
+    });
+    m.def("unpack_node_trace", [](uint32_t raw) -> NXConstants::node_trace_t {
+        return NXConstants::unpack_node_trace((uint8_t *)&raw);
     });
     m.def("unpack_node_raw", [](uint32_t raw) -> NXConstants::node_raw_t {
         return NXConstants::unpack_node_raw((uint8_t *)&raw);
@@ -113,14 +123,16 @@ PYBIND11_MODULE(nxmodel, m) {
 
     py::class_<NXMessagePipe, std::shared_ptr<NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_load_t      )>(&NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_signal_t    )>(&NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_control_t   )>(&NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_raw_t       )>(&NXMessagePipe::enqueue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_load_t     &)>(&NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_signal_t   &)>(&NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_control_t  &)>(&NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_raw_t      &)>(&NXMessagePipe::dequeue))
+        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_load_t     )>(&NXMessagePipe::enqueue))
+        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_signal_t   )>(&NXMessagePipe::enqueue))
+        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_control_t  )>(&NXMessagePipe::enqueue))
+        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_trace_t    )>(&NXMessagePipe::enqueue))
+        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_raw_t      )>(&NXMessagePipe::enqueue))
+        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_load_t    &)>(&NXMessagePipe::dequeue))
+        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_signal_t  &)>(&NXMessagePipe::dequeue))
+        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_control_t &)>(&NXMessagePipe::dequeue))
+        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_trace_t   &)>(&NXMessagePipe::dequeue))
+        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_raw_t     &)>(&NXMessagePipe::dequeue))
         .def("enqueue_raw", &NXMessagePipe::enqueue_raw)
         .def("dequeue_raw", &NXMessagePipe::dequeue_raw)
         .def("is_idle",     &NXMessagePipe::is_idle)

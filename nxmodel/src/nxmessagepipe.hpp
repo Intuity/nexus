@@ -56,6 +56,7 @@ namespace NXModel {
         void enqueue (node_load_t    message);
         void enqueue (node_signal_t  message);
         void enqueue (node_control_t message);
+        void enqueue (node_trace_t   message);
         void enqueue (node_raw_t     message);
 
         /** Append an already encoded entry
@@ -89,6 +90,7 @@ namespace NXModel {
         void dequeue (node_load_t    & message);
         void dequeue (node_signal_t  & message);
         void dequeue (node_control_t & message);
+        void dequeue (node_trace_t   & message);
         void dequeue (node_raw_t     & message);
 
         /** Dequeue an entry without decoding it

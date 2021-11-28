@@ -185,7 +185,9 @@ namespace NXModel {
          * @param column target column
          * @return pointer to NXMessagePipe
          */
-        std::shared_ptr<NXMessagePipe> route (uint32_t row, uint32_t column);
+        std::shared_ptr<NXMessagePipe> route (
+            uint32_t row, uint32_t column, node_command_t command
+        );
 
         // =====================================================================
         // Private Members
@@ -214,6 +216,7 @@ namespace NXModel {
         uint32_t m_num_inputs;
         uint32_t m_num_outputs;
         uint64_t m_loopback;
+        bool     m_trace_en;
 
         // Current state
         io_state_t m_inputs_curr;
