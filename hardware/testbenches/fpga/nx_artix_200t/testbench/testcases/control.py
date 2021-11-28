@@ -80,12 +80,7 @@ async def control(dut, backpressure):
         # Device status
         (
             ControlRaw(command=ControlCommand.STATUS).pack(),
-            (
-                (0 << 3) | # ACTIVE       =0 -> inactive
-                (1 << 2) | # SEEN_IDLE_LOW=1 -> idle has been observed low
-                (1 << 1) | # FIRST_TICK   =1 -> fresh from reset
-                (0 << 0)   # INTERVAL_SET =0 -> no interval has been set
-            )
+            ControlStatus(interval_set=0, first_tick=1, idle_low=1, active=0).pack()
         ),
     ]
 
