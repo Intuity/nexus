@@ -22,14 +22,14 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "nx_pipe.hpp"
+#include "nxpipe.hpp"
 
 #define NXPIPE_DEBUG(...) // printf(__VA_ARGS__)
 
 // tx_to_device
 // Queue up an item to send to the device
 //
-void Nexus::NXPipe::tx_to_device (uint32_t data)
+void NXLink::NXPipe::tx_to_device (uint32_t data)
 {
     m_tx_q.enqueue(data);
 }
@@ -37,7 +37,7 @@ void Nexus::NXPipe::tx_to_device (uint32_t data)
 // rx_available
 // See if any items are present in the receive queue
 //
-bool Nexus::NXPipe::rx_available (void)
+bool NXLink::NXPipe::rx_available (void)
 {
     return m_rx_q.size_approx() > 0;
 }
@@ -45,7 +45,7 @@ bool Nexus::NXPipe::rx_available (void)
 // rx_from_device
 // Dequeue an item received from the device
 //
-uint32_t Nexus::NXPipe::rx_from_device (void)
+uint32_t NXLink::NXPipe::rx_from_device (void)
 {
     uint32_t data = 0;
     m_rx_q.wait_dequeue(data);
@@ -55,7 +55,7 @@ uint32_t Nexus::NXPipe::rx_from_device (void)
 // tx_process
 // Send queued up items to the device
 //
-void Nexus::NXPipe::tx_process (void)
+void NXLink::NXPipe::tx_process (void)
 {
     // Open a file handle (O_SYNC used to ensure flush between writes)
     int fh = open(m_h2c_path.c_str(), O_RDWR | O_SYNC);
@@ -106,7 +106,7 @@ void Nexus::NXPipe::tx_process (void)
 // rx_process
 // Receive items from the device and queue them up
 //
-void Nexus::NXPipe::rx_process (void)
+void NXLink::NXPipe::rx_process (void)
 {
     // Open a file handle
     int fh = open(m_c2h_path.c_str(), O_RDWR | O_SYNC);

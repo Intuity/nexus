@@ -14,13 +14,10 @@
 
 #include <cxxopts.hpp>
 
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/health_check_service_interface.h>
+#include "nxdevice.hpp"
+#include "nxpipe.hpp"
 
-#include "nx_device.hpp"
-#include "nx_pipe.hpp"
-#include "nx_remote.hpp"
+using namespace NXLink;
 
 int main (int argc, char * argv [])
 {
@@ -73,11 +70,11 @@ int main (int argc, char * argv [])
     tmp.str("");
 
     // Create pipes for control & mesh
-    Nexus::NXPipe * ctrl_pipe = new Nexus::NXPipe(ctrl_h2c, ctrl_c2h);
-    Nexus::NXPipe * mesh_pipe = new Nexus::NXPipe(mesh_h2c, mesh_c2h);
+    NXPipe * ctrl_pipe = new NXPipe(ctrl_h2c, ctrl_c2h);
+    NXPipe * mesh_pipe = new NXPipe(mesh_h2c, mesh_c2h);
 
     // Create a wrapper around the device
-    Nexus::NXDevice * device = new Nexus::NXDevice(ctrl_pipe, mesh_pipe);
+    NXDevice * device = new NXDevice(ctrl_pipe, mesh_pipe);
 
     // Check the identity
     if (!device->identify()) {
@@ -94,20 +91,5 @@ int main (int argc, char * argv [])
     // Read back the current status
     device->log_status(device->read_status());
 
-    // Run gRPC server
-    std::string server_address("0.0.0.0:51234");
-
-    grpc::EnableDefaultHealthCheckService(true);
-    grpc::reflection::InitProtoReflectionServerBuilderPlugin();
-    grpc::ServerBuilder builder;
-    Nexus::NXRemote service(device);
-
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&service);
-    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-    std::cout << "Server listening on " << server_address << std::endl;
-    server->Wait();
-
     return 0;
 }
-

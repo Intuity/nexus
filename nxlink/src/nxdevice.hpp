@@ -21,10 +21,11 @@
 
 #include <blockingconcurrentqueue.h>
 
-#include "nx_pipe.hpp"
-#include "nx_constants.hpp"
+#include "nxconstants.hpp"
+#include "nxlink.hpp"
+#include "nxpipe.hpp"
 
-namespace Nexus {
+namespace NXLink {
 
     // NXDevice
     // Abstracted interface for interacting with Nexus hardware
@@ -68,28 +69,27 @@ namespace Nexus {
         // =====================================================================
 
         // Control plane
-        uint32_t        read_device_id (void);
-        nx_version_t    read_version (void);
-        bool            identify (bool quiet=false);
-        nx_parameters_t read_parameters (void);
-        nx_status_t     read_status (void);
-        uint32_t        read_cycles (void);
-        void            set_interval (uint32_t interval);
-        void            clear_interval (void);
-        void            reset (void);
-        void            set_active (bool active);
+        uint32_t                      read_device_id (void);
+        nx_version_t                  read_version (void);
+        bool                          identify (bool quiet=false);
+        nx_parameters_t               read_parameters (void);
+        NXConstants::control_status_t read_status (void);
+        uint32_t                      read_cycles (void);
+        void                          set_interval (uint32_t interval);
+        void                          clear_interval (void);
+        void                          reset (void);
+        void                          set_active (bool active);
 
         // Mesh interface
-        void     send_to_mesh (nx_message_t msg);
         void     send_to_mesh (uint32_t raw);
-        bool     receive_from_mesh (nx_message_t & msg, bool blocking);
+        bool     receive_from_mesh (uint32_t & msg, bool blocking);
         void     monitor_mesh (void);
         uint64_t get_output_state (void);
 
         // Helper methods
         void log_parameters (nx_parameters_t params);
-        void log_status (nx_status_t status);
-        void log_mesh_message (nx_message_t msg);
+        void log_status (NXConstants::control_status_t status);
+        void log_mesh_message (NXConstants::node_raw_t msg);
 
     private:
         // =====================================================================
@@ -104,7 +104,7 @@ namespace Nexus {
 
         std::thread m_rx_thread;
 
-        moodycamel::BlockingConcurrentQueue<nx_message_t> m_received;
+        moodycamel::BlockingConcurrentQueue<uint32_t> m_received;
 
         std::map<nx_bit_addr_t, uint32_t> m_mesh_state;
 

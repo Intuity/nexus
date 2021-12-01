@@ -20,7 +20,7 @@
 
 #include <blockingconcurrentqueue.h>
 
-namespace Nexus {
+namespace NXLink {
 
     // NXPipe
     // Manages a single pipe (e.g. control or mesh) into Nexus, queueing

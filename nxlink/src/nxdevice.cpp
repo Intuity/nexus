@@ -17,17 +17,24 @@
 #include <iostream>
 #include <thread>
 
-#include "nx_device.hpp"
+#include "nxdevice.hpp"
 
 using namespace std::chrono_literals;
+using namespace NXConstants;
 
 // read_device_id
 // Read back the unsigned 32-bit device identifier
 //
-uint32_t Nexus::NXDevice::read_device_id (void)
+uint32_t NXLink::NXDevice::read_device_id (void)
 {
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_raw(
+        (control_raw_t){ .command = CONTROL_COMMAND_ID, .payload = 0},
+        (uint8_t *)&raw
+    );
     // Send a request for the device identifier
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_ID, 0));
+    m_ctrl_pipe->tx_to_device(raw);
     // Return the response
     return m_ctrl_pipe->rx_from_device();
 }
@@ -35,12 +42,22 @@ uint32_t Nexus::NXDevice::read_device_id (void)
 // read_version
 // Read back the version information from the device
 //
-Nexus::nx_version_t Nexus::NXDevice::read_version (void)
+NXLink::nx_version_t NXLink::NXDevice::read_version (void)
 {
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_raw(
+        (control_raw_t){ .command = CONTROL_COMMAND_VERSION, .payload = 0},
+        (uint8_t *)&raw
+    );
     // Send a request for the device version
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_VERSION, 0));
+    m_ctrl_pipe->tx_to_device(raw);
     // Decode and return the response
-    return nx_decode_version(m_ctrl_pipe->rx_from_device());
+    uint32_t resp = m_ctrl_pipe->rx_from_device();
+    return (nx_version_t){
+        .major = ((resp >> 8) & 0xFF),
+        .minor = ((resp >> 0) & 0xFF)
+    };
 }
 
 // identify
@@ -48,7 +65,7 @@ Nexus::nx_version_t Nexus::NXDevice::read_version (void)
 // values match expectation, FALSE if not. If quiet is active, log message will
 // be suppressed.
 //
-bool Nexus::NXDevice::identify (bool quiet)
+bool NXLink::NXDevice::identify (bool quiet)
 {
     // Get ID and version
     uint32_t     device_id = read_device_id();
@@ -62,9 +79,9 @@ bool Nexus::NXDevice::identify (bool quiet)
     }
     // Check against expected values
     return (
-        (device_id     == NX_DEVICE_ID    ) &&
-        (version.major == NX_VERSION_MAJOR) &&
-        (version.minor == NX_VERSION_MINOR)
+        (device_id     == HW_DEV_ID   ) &&
+        (version.major == HW_VER_MAJOR) &&
+        (version.minor == HW_VER_MINOR)
     );
 }
 
@@ -72,15 +89,23 @@ bool Nexus::NXDevice::identify (bool quiet)
 // Read back all of the parameters from the device, returns a populated instance
 // of the nx_parameters_t struct
 //
-Nexus::nx_parameters_t Nexus::NXDevice::read_parameters (void)
+NXLink::nx_parameters_t NXLink::NXDevice::read_parameters (void)
 {
     // Request each of the parameters in turn
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_req_param(NX_PARAM_COUNTER_WIDTH));
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_req_param(NX_PARAM_ROWS));
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_req_param(NX_PARAM_COLUMNS));
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_req_param(NX_PARAM_NODE_INPUTS));
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_req_param(NX_PARAM_NODE_OUTPUTS));
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_req_param(NX_PARAM_NODE_REGISTERS));
+    for (
+        uint32_t param = CONTROL_PARAM_COUNTER_WIDTH;
+        param <= CONTROL_PARAM_NODE_REGISTERS;
+        param++
+    ) {
+        uint32_t raw = 0;
+        pack_control_read_param(
+            (control_read_param_t){
+                .command = CONTROL_COMMAND_PARAM,
+                .param   = (control_param_t)param
+            },
+            (uint8_t *)&raw
+        );
+    }
 
     // Populate the parameters struct with each returned value
     nx_parameters_t params = {
@@ -100,22 +125,37 @@ Nexus::nx_parameters_t Nexus::NXDevice::read_parameters (void)
 // Read the current status of the device, returns a populated instance of the
 // nx_status_t struct
 //
-Nexus::nx_status_t Nexus::NXDevice::read_status (void)
+control_status_t NXLink::NXDevice::read_status (void)
 {
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_raw(
+        (control_raw_t){ .command = CONTROL_COMMAND_STATUS, .payload = 0},
+        (uint8_t *)&raw
+    );
+
     // Request the status
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_STATUS, 0));
+    m_ctrl_pipe->tx_to_device(raw);
 
     // Decode the result
-    return nx_decode_status(m_ctrl_pipe->rx_from_device());
+    uint32_t raw_resp = m_ctrl_pipe->rx_from_device();
+    return unpack_control_status((uint8_t *)&raw_resp);
 }
 
 // read_cycles
 // Read the current cycle count of the device, returns uint32_t
 //
-uint32_t Nexus::NXDevice::read_cycles (void)
+uint32_t NXLink::NXDevice::read_cycles (void)
 {
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_raw(
+        (control_raw_t){ .command = CONTROL_COMMAND_CYCLES, .payload = 0},
+        (uint8_t *)&raw
+    );
+
     // Request the status
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_CYCLES, 0));
+    m_ctrl_pipe->tx_to_device(raw);
 
     // Decode the result
     return m_ctrl_pipe->rx_from_device();
@@ -124,15 +164,23 @@ uint32_t Nexus::NXDevice::read_cycles (void)
 // set_interval
 // Setup the simulation interval (in clock cycles)
 //
-void Nexus::NXDevice::set_interval (uint32_t interval)
+void NXLink::NXDevice::set_interval (uint32_t interval)
 {
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_set_interval(interval));
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_raw(
+        (control_raw_t){ .command = CONTROL_COMMAND_INTERVAL, .payload = interval },
+        (uint8_t *)&raw
+    );
+
+    // Send the message
+    m_ctrl_pipe->tx_to_device(raw);
 }
 
 // clear_interval
 // Clear the simulation interval (by setting it to 0)
 //
-void Nexus::NXDevice::clear_interval (void)
+void NXLink::NXDevice::clear_interval (void)
 {
     set_interval(0);
 }
@@ -140,16 +188,22 @@ void Nexus::NXDevice::clear_interval (void)
 // reset
 // Send a soft reset request to the device, then wait until safe to resume
 //
-void Nexus::NXDevice::reset (void)
+void NXLink::NXDevice::reset (void)
 {
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_raw(
+        (control_raw_t){ .command = CONTROL_COMMAND_RESET, .payload = 1 },
+        (uint8_t *)&raw
+    );
     // Send the reset request
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl(NX_CTRL_RESET, 1));
+    m_ctrl_pipe->tx_to_device(raw);
     // Wait for 100ms
     std::this_thread::sleep_for(100ms);
     // Check the identity of the device
     assert(identify(true));
     // Check that the reset status is expected
-    nx_status_t status = read_status();
+    control_status_t status = read_status();
     assert(!status.active && status.first_tick && !status.interval_set);
     // Empty the mesh state map
     m_mesh_state.clear();
@@ -157,23 +211,25 @@ void Nexus::NXDevice::reset (void)
 
 // set_active
 // Activate/deactivate the mesh - will start/pause the simulation
-void Nexus::NXDevice::set_active (bool active)
+void NXLink::NXDevice::set_active (bool active)
 {
-    m_ctrl_pipe->tx_to_device(nx_build_ctrl_set_active(active));
-}
-
-// send_to_mesh
-// Send a message into the mesh
-//
-void Nexus::NXDevice::send_to_mesh (Nexus::nx_message_t msg)
-{
-    m_mesh_pipe->tx_to_device(nx_build_mesh(msg));
+    // Generate the message
+    uint32_t raw = 0;
+    pack_control_set_active(
+        (control_set_active_t){
+            .command = CONTROL_COMMAND_ACTIVE,
+            .active  = (uint8_t)(active ? 1 : 0)
+        },
+        (uint8_t *)&raw
+    );
+    // Send the message
+    m_ctrl_pipe->tx_to_device(raw);
 }
 
 // send_to_mesh
 // Send a raw message into the mesh
 //
-void Nexus::NXDevice::send_to_mesh (uint32_t raw)
+void NXLink::NXDevice::send_to_mesh (uint32_t raw)
 {
     m_mesh_pipe->tx_to_device(raw);
 }
@@ -183,9 +239,8 @@ void Nexus::NXDevice::send_to_mesh (uint32_t raw)
 // returns false unless blocking is set in which case it will wait until data is
 // available.
 //
-bool Nexus::NXDevice::receive_from_mesh (
-    Nexus::nx_message_t & msg, bool blocking
-) {
+bool NXLink::NXDevice::receive_from_mesh (uint32_t & msg, bool blocking)
+{
     // If nothing available to dequeue, return false
     if (!blocking && m_received.size_approx() == 0) return false;
     // Otherwise pop the next entry
@@ -197,25 +252,26 @@ bool Nexus::NXDevice::receive_from_mesh (
 // monitor_mesh
 // Continuously consume data from the mesh, tracking the state of the device
 //
-void Nexus::NXDevice::monitor_mesh (void)
+void NXLink::NXDevice::monitor_mesh (void)
 {
-    nx_message_t msg;
+    uint32_t      raw;
+    node_signal_t msg;
     while (true) {
         // Receive the next message from the mesh
-        msg = nx_decode_mesh(m_mesh_pipe->rx_from_device());
+        raw = m_mesh_pipe->rx_from_device();
         // Decode appropriately
+        msg = unpack_node_signal((uint8_t *)&raw);
         switch (msg.header.command) {
-            case NX_CMD_SIG_STATE: {
-                nx_signal_state_t state = nx_decode_mesh_signal_state(msg);
+            case NODE_COMMAND_SIGNAL: {
                 nx_bit_addr_t bit = {
                     .row    = msg.header.row,
                     .column = msg.header.column,
-                    .index  = state.index
+                    .index  = msg.index
                 };
-                m_mesh_state[bit] = state.value;
+                m_mesh_state[bit] = msg.state;
             }
             default: {
-                m_received.enqueue(msg);
+                m_received.enqueue(raw);
             }
         }
     }
@@ -224,7 +280,7 @@ void Nexus::NXDevice::monitor_mesh (void)
 // get_output_state
 // Read back the full state of the output
 //
-uint64_t Nexus::NXDevice::get_output_state (void)
+uint64_t NXLink::NXDevice::get_output_state (void)
 {
     nx_parameters_t params = read_parameters();
     std::map<nx_bit_addr_t, uint32_t>::iterator it;
@@ -245,7 +301,7 @@ uint64_t Nexus::NXDevice::get_output_state (void)
 // log_parameters
 // Log parameters read back from the device
 //
-void Nexus::NXDevice::log_parameters (Nexus::nx_parameters_t params)
+void NXLink::NXDevice::log_parameters (NXLink::nx_parameters_t params)
 {
     std::cout << "Device Parameters:" << std::endl;
     std::cout << " - Counter Width : " << std::dec << params.counter_width  << std::endl;
@@ -259,19 +315,19 @@ void Nexus::NXDevice::log_parameters (Nexus::nx_parameters_t params)
 // log_status
 // Log components of status read back from the device
 //
-void Nexus::NXDevice::log_status (Nexus::nx_status_t status)
+void NXLink::NXDevice::log_status (control_status_t status)
 {
     std::cout << "Device Status:" << std::endl;
-    std::cout << " - Active        : " << (status.active        ? "YES" : "NO") << std::endl;
-    std::cout << " - Seen Idle Low : " << (status.seen_idle_low ? "YES" : "NO") << std::endl;
-    std::cout << " - First Tick    : " << (status.first_tick    ? "YES" : "NO") << std::endl;
-    std::cout << " - Interval Set  : " << (status.interval_set  ? "YES" : "NO") << std::endl;
+    std::cout << " - Active        : " << (status.active       ? "YES" : "NO") << std::endl;
+    std::cout << " - Seen Idle Low : " << (status.idle_low     ? "YES" : "NO") << std::endl;
+    std::cout << " - First Tick    : " << (status.first_tick   ? "YES" : "NO") << std::endl;
+    std::cout << " - Interval Set  : " << (status.interval_set ? "YES" : "NO") << std::endl;
 }
 
 // log_mesh_message
 // Log parts of a message routed into/out of the mesh
 //
-void Nexus::NXDevice::log_mesh_message (Nexus::nx_message_t msg)
+void NXLink::NXDevice::log_mesh_message (node_raw_t msg)
 {
     std::cout << "Mesh Message:" << std::endl;
     std::cout << " - Row    : " << std::dec << msg.header.row     << std::endl;
