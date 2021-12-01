@@ -43,7 +43,7 @@ CXX_OPTS += $(if $(findstring yes,$(COMPILE_DEBUG)),-g3,-O3)
 CXX_OPTS += -fPIC
 CXX_OPTS += -std=c++17
 CXX_OPTS += $(foreach d,$(CPP_INC_DIRS),-I $(d))
-CXX_OPTS += $(shell python3 -m pybind11 --includes)
+# CXX_OPTS += $(shell python3 -m pybind11 --includes)
 CXX_OPTS += -pthread
 CXX_OPTS += -MMD -MP
 CXX_OPTS += -fpermissive
@@ -110,3 +110,12 @@ $(MKDIRS):
 clean:
 	@echo "# Removing directories"
 	$(PREFIX)rm -rf $(MKDIRS)
+
+# Setup DMA IP drivers
+.PHONY: setup
+setup:
+	@echo "# Setting up DMA IP drivers"
+	$(PREFIX)sudo make -C ../common/thirdparty/dma_ip_drivers/XDMA/linux-kernel/xdma install -j
+	$(PREFIX)chmod +x ../common/thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests/load_driver.sh
+	$(PREFIX)cd ../common/thirdparty/dma_ip_drivers/XDMA/linux-kernel/tests && sudo ./load_driver.sh
+	$(PREFIX)lspci | grep Xilinx
