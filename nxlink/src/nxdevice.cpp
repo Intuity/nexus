@@ -105,6 +105,7 @@ NXLink::nx_parameters_t NXLink::NXDevice::read_parameters (void)
             },
             (uint8_t *)&raw
         );
+        m_ctrl_pipe->tx_to_device(raw);
     }
 
     // Populate the parameters struct with each returned value
