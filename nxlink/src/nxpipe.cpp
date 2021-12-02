@@ -24,7 +24,11 @@
 
 #include "nxpipe.hpp"
 
-#define NXPIPE_DEBUG(...) // printf(__VA_ARGS__)
+#ifdef NX_EN_DEBUG
+    #define NXPIPE_DEBUG(...) printf(__VA_ARGS__)
+#else
+    #define NXPIPE_DEBUG(...)
+#endif // NX_EN_DEBUG
 
 // tx_to_device
 // Queue up an item to send to the device
@@ -89,6 +93,11 @@ void NXLink::NXPipe::tx_process (void)
         slot += 1;
         // If the buffer is full or the queue is empty, send to the device!
         if (slot >= max_slot || (m_tx_q.size_approx() == 0)) {
+            // Log the send buffer
+            NXPIPE_DEBUG(
+                "Send %u: 0x%08x_%08x_%08x_%08x\n",
+                slot, tx_slots[3], tx_slots[2], tx_slots[1], tx_slots[0]
+            );
             // Write the entire 16 byte buffer to avoid uninitialised data
             ssize_t rc = write(fh, tx_buffer, buffer_size);
             if (rc < 0) {
@@ -123,11 +132,15 @@ void NXLink::NXPipe::rx_process (void)
         memset((void *)rx_slots, 0, 16);
         ssize_t rc = read(fh, (uint8_t *)rx_slots, 16);
         if (rc < 0) continue;
+        NXPIPE_DEBUG(
+            "Receive %li: 0x%08x_%08x_%08x_%08x\n",
+            rc, rx_slots[3], rx_slots[2], rx_slots[1], rx_slots[0]
+        );
         // Start digesting messages
         for (uint32_t slot = 0; slot < 4; slot++) {
             // Skip empty slots
             if (!(rx_slots[slot] & 0x80000000)) continue;
-            NXPIPE_DEBUG("Receive %3d: 0x%08x\n", slot, rx_slots[slot]);
+            NXPIPE_DEBUG(" - Rx SLOT[%3d] = 0x%08x\n", slot, rx_slots[slot]);
             // Decode message
             uint32_t masked = rx_slots[slot] & 0x7FFFFFFF;
             m_rx_q.enqueue(masked);

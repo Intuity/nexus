@@ -83,12 +83,15 @@ int main (int argc, char * argv [])
     }
 
     // Reset the device
+    std::cout << "Resetting the device" << std::endl;
     device->reset();
 
     // Read back the parameters
+    std::cout << "Reading back parameters" << std::endl;
     device->log_parameters(device->read_parameters());
 
     // Read back the current status
+    std::cout << "Reading back status" << std::endl;
     device->log_status(device->read_status());
 
     return 0;

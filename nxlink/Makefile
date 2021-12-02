@@ -47,6 +47,7 @@ CXX_OPTS += $(foreach d,$(CPP_INC_DIRS),-I $(d))
 CXX_OPTS += -pthread
 CXX_OPTS += -MMD -MP
 CXX_OPTS += -fpermissive
+CXX_OPTS += $(if $(findstring yes,$(COMPILE_DEBUG)),-DNX_EN_DEBUG,)
 
 # Linker options
 LD_OPTS += $(CXX_OPTS)
