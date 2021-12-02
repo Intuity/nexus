@@ -70,9 +70,10 @@ localparam TX_PYLD_WIDTH = MESSAGE_WIDTH;
 `DECLARE_DQ (                 1, all_idle,       i_clk, i_rst, 'd0)
 
 // Trigger generation
-`DECLARE_DQ(      1, active,     i_clk, i_rst, 'd0)
-`DECLARE_DQ(      1, first_tick, i_clk, i_rst, 'd1)
-`DECLARE_DQ(COLUMNS, trigger,    i_clk, i_rst, 'd0)
+`DECLARE_DQ(      1, active,       i_clk, i_rst, 'd0)
+`DECLARE_DQ(      1, first_tick,   i_clk, i_rst, 'd1)
+`DECLARE_DQ(COLUMNS, trigger,      i_clk, i_rst, 'd0)
+`DECLARE_DQ(COLUMNS, trigger_mask, i_clk, i_rst, {COLUMNS{1'b1}})
 
 // Cycle counter
 `DECLARE_DQ(TX_PYLD_WIDTH, cycle, i_clk, i_rst, 'd0)
@@ -130,6 +131,7 @@ always_comb begin : comb_decode
     `INIT_D(interval_set);
     `INIT_D(send_data);
     `INIT_D(send_valid);
+    `INIT_D(trigger_mask);
 
     // Clear pop
     ib_fifo_pop = 1'b0;
@@ -150,37 +152,33 @@ always_comb begin : comb_decode
 
     // Handle an incoming message
     if (!send_valid && !ib_fifo_empty) begin
+        // Clear the send data
+        send_data = 'd0;
         // Decode command
         case (ib_fifo_data.raw.command)
-            // Respond with the device identifier (NXS)
-            CONTROL_COMMAND_ID: begin
-                send_valid = 1'b1;
-                send_data  = { {(MESSAGE_WIDTH-24){1'b0}}, HW_DEV_ID[23:0] };
-            end
-            // Respond with the major and minor versions of the mesh
-            CONTROL_COMMAND_VERSION: begin
-                send_valid = 1'b1;
-                send_data  = {
-                    {(MESSAGE_WIDTH-16){1'b0}}, HW_VER_MAJOR[7:0], HW_VER_MINOR[7:0]
-                };
-            end
             // Respond with the different parameters of the mesh
             CONTROL_COMMAND_PARAM: begin
                 case (ib_fifo_data.param.param)
+                    CONTROL_PARAM_ID:
+                        send_data.raw = { {(MESSAGE_WIDTH-24){1'b0}}, HW_DEV_ID[23:0] };
+                    CONTROL_PARAM_VERSION:
+                        send_data.raw = {
+                            {(MESSAGE_WIDTH-16){1'b0}}, HW_VER_MAJOR[7:0], HW_VER_MINOR[7:0]
+                        };
                     CONTROL_PARAM_COUNTER_WIDTH:
-                        send_data = TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0];
+                        send_data.raw = TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0];
                     CONTROL_PARAM_ROWS:
-                        send_data = ROWS[TX_PYLD_WIDTH-1:0];
+                        send_data.raw = ROWS[TX_PYLD_WIDTH-1:0];
                     CONTROL_PARAM_COLUMNS:
-                        send_data = COLUMNS[TX_PYLD_WIDTH-1:0];
+                        send_data.raw = COLUMNS[TX_PYLD_WIDTH-1:0];
                     CONTROL_PARAM_NODE_INPUTS:
-                        send_data = INPUTS[TX_PYLD_WIDTH-1:0];
+                        send_data.raw = INPUTS[TX_PYLD_WIDTH-1:0];
                     CONTROL_PARAM_NODE_OUTPUTS:
-                        send_data = OUTPUTS[TX_PYLD_WIDTH-1:0];
+                        send_data.raw = OUTPUTS[TX_PYLD_WIDTH-1:0];
                     CONTROL_PARAM_NODE_REGISTERS:
-                        send_data = REGISTERS[TX_PYLD_WIDTH-1:0];
+                        send_data.raw = REGISTERS[TX_PYLD_WIDTH-1:0];
                     default:
-                        send_data = {TX_PYLD_WIDTH{1'b0}};
+                        send_data.raw = 'd0;
                 endcase
                 send_valid = 1'b1;
             end
@@ -191,7 +189,6 @@ always_comb begin : comb_decode
             // Read back various status flags
             CONTROL_COMMAND_STATUS: begin
                 send_valid = 1'b1;
-                send_data  = 'd0;
                 send_data.status.active       = active_q;
                 send_data.status.idle_low     = seen_idle_low_q;
                 send_data.status.first_tick   = first_tick_q;
@@ -199,8 +196,8 @@ always_comb begin : comb_decode
             end
             // Read back the number of elapsed cycles
             CONTROL_COMMAND_CYCLES: begin
-                send_valid = 1'b1;
-                send_data  = cycle_q;
+                send_valid    = 1'b1;
+                send_data.raw = cycle_q;
             end
             // Set/clear the interval (number of cycles to run for)
             CONTROL_COMMAND_INTERVAL: begin
@@ -211,6 +208,10 @@ always_comb begin : comb_decode
             // Soft reset request
             CONTROL_COMMAND_RESET: begin
                 soft_reset = ib_fifo_data.raw.payload[0];
+            end
+            // Trigger mask
+            CONTROL_COMMAND_TRIGMASK: begin
+                trigger_mask = ib_fifo_data.raw.payload[COLUMNS-1:0];
             end
             // Catch-all
             default: begin
@@ -233,7 +234,7 @@ assign all_idle = &i_mesh_idle;
 assign seen_idle_low = (|trigger) ? 1'b0 : (seen_idle_low_q || !all_idle_q);
 
 // Generate column triggers
-assign trigger = {COLUMNS{active_q && seen_idle_low_q && all_idle_q}};
+assign trigger = {COLUMNS{active_q && seen_idle_low_q && all_idle_q}} & trigger_mask_q;
 
 // Track the first trigger into the mesh
 assign first_tick = first_tick_q && (trigger == 'd0);
