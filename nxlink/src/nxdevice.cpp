@@ -29,8 +29,11 @@ uint32_t NXLink::NXDevice::read_device_id (void)
 {
     // Generate the message
     uint32_t raw = 0;
-    pack_control_raw(
-        (control_raw_t){ .command = CONTROL_COMMAND_ID, .payload = 0},
+    pack_control_read_param(
+        (control_read_param_t){
+            .command = CONTROL_COMMAND_PARAM,
+            .param   = CONTROL_PARAM_ID
+        },
         (uint8_t *)&raw
     );
     // Send a request for the device identifier
@@ -46,8 +49,11 @@ NXLink::nx_version_t NXLink::NXDevice::read_version (void)
 {
     // Generate the message
     uint32_t raw = 0;
-    pack_control_raw(
-        (control_raw_t){ .command = CONTROL_COMMAND_VERSION, .payload = 0},
+    pack_control_read_param(
+        (control_read_param_t){
+            .command = CONTROL_COMMAND_PARAM,
+            .param   = CONTROL_PARAM_VERSION
+        },
         (uint8_t *)&raw
     );
     // Send a request for the device version
