@@ -16,7 +16,7 @@ from random import random
 
 from drivers.stream.common import StreamTransaction
 from nxconstants import (ControlCommand, ControlReadParam, ControlParam,
-                         MESSAGE_WIDTH)
+                         HW_DEV_ID, MESSAGE_WIDTH, HW_VER_MAJOR, HW_VER_MINOR)
 
 from ..testbench import testcase
 
@@ -28,6 +28,8 @@ async def read_params(dut):
 
     # Create a lookup between parameter and the true value
     lookup = {
+        ControlParam.ID            : HW_DEV_ID,
+        ControlParam.VERSION       : (HW_VER_MAJOR << 8) | HW_VER_MINOR,
         ControlParam.COUNTER_WIDTH : MESSAGE_WIDTH,
         ControlParam.ROWS          : int(dut.ROWS     ),
         ControlParam.COLUMNS       : int(dut.COLUMNS  ),

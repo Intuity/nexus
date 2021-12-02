@@ -21,7 +21,8 @@ from cocotb.triggers import ClockCycles, RisingEdge
 from drivers.axi4stream.common import AXI4StreamTransaction
 import nxconstants
 from nxconstants import (ControlCommand, ControlReadParam, ControlStatus,
-                         ControlRaw, ControlParam)
+                         ControlRaw, ControlParam, HW_DEV_ID, HW_VER_MAJOR,
+                         HW_VER_MINOR)
 
 from ..testbench import testcase
 
@@ -39,14 +40,17 @@ async def control(dut, backpressure):
 
     # Build requests and expected responses
     req_resp = [
-        # Device ID
-        (ControlRaw(command=ControlCommand.ID).pack(), nxconstants.HW_DEV_ID),
-        # Version
-        (
-            ControlRaw(command=ControlCommand.VERSION).pack(),
-            (nxconstants.HW_VER_MAJOR << 8) | nxconstants.HW_VER_MINOR
-        ),
         # Parameters
+        # - Device ID
+        (
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.ID).pack(),
+            HW_DEV_ID
+        ),
+        # - Version
+        (
+            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.VERSION).pack(),
+            (HW_VER_MAJOR << 8) | HW_VER_MINOR
+        ),
         # - Counter Width
         (
             ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COUNTER_WIDTH).pack(),
@@ -90,10 +94,12 @@ async def control(dut, backpressure):
         # Choose the requests to send
         chosen = sorted(req_resp, key=lambda _: random())[:randint(1, len(req_resp))]
         # Send all of the requests and build expected responses
+        req_bytes  = bytearray([])
         resp_bytes = bytearray([])
         for req, resp in chosen:
-            dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes((1 << 31) | req, 31)))
+            req_bytes  += to_bytes((1 << 31) | req,  31)
             resp_bytes += to_bytes((1 << 31) | resp, 32)
+        dut.ib_ctrl.append(AXI4StreamTransaction(data=req_bytes))
         # Pad to the nearest 16 bytes
         if len(resp_bytes) % 16 != 0:
             resp_bytes += bytearray([0] * (16 - (len(resp_bytes) % 16)))

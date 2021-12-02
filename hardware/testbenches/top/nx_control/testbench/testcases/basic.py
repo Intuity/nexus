@@ -33,32 +33,3 @@ async def sanity(dut):
 
     # All done!
     dut.info("Finished counting cycles")
-
-@testcase()
-async def read_id(dut):
-    """ Read the device identifier """
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
-    # Request the identifier
-    dut.info("Requesting the identifier")
-    dut.inbound.append(ControlRaw(command=ControlCommand.ID).pack())
-
-    # Queue up expected response
-    dut.expected.append(StreamTransaction(HW_DEV_ID))
-
-@testcase()
-async def read_version(dut):
-    """ Read the device version information """
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
-    # Request the identifier
-    dut.info("Requesting the version")
-    dut.inbound.append(ControlRaw(command=ControlCommand.VERSION).pack())
-
-    # Queue up expected response
-    dut.expected.append(StreamTransaction(
-        HW_VER_MAJOR << 8 | HW_VER_MINOR << 0, 0
-    ))
-
