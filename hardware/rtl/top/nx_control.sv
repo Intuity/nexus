@@ -60,14 +60,14 @@ localparam TX_PYLD_WIDTH = MESSAGE_WIDTH;
 // =============================================================================
 
 // Controller State
-`DECLARE_DQ (                 1, soft_reset,     i_clk, i_rst, 'd0)
-`DECLARE_DQ (                 1, seen_idle_low,  i_clk, i_rst, 'd0)
-`DECLARE_DQ (     RX_PYLD_WIDTH, interval,       i_clk, i_rst, 'd0)
-`DECLARE_DQ (     RX_PYLD_WIDTH, interval_count, i_clk, i_rst, 'd0)
-`DECLARE_DQ (                 1, interval_set,   i_clk, i_rst, 'd0)
-`DECLARE_DQT(control_response_t, send_data,      i_clk, i_rst, 'd0)
-`DECLARE_DQ (                 1, send_valid,     i_clk, i_rst, 'd0)
-`DECLARE_DQ (                 1, all_idle,       i_clk, i_rst, 'd0)
+`DECLARE_DQ(            1, soft_reset,     i_clk, i_rst, 'd0)
+`DECLARE_DQ(            1, seen_idle_low,  i_clk, i_rst, 'd0)
+`DECLARE_DQ(RX_PYLD_WIDTH, interval,       i_clk, i_rst, 'd0)
+`DECLARE_DQ(RX_PYLD_WIDTH, interval_count, i_clk, i_rst, 'd0)
+`DECLARE_DQ(            1, interval_set,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(TX_PYLD_WIDTH, send_data,      i_clk, i_rst, 'd0)
+`DECLARE_DQ(            1, send_valid,     i_clk, i_rst, 'd0)
+`DECLARE_DQ(            1, all_idle,       i_clk, i_rst, 'd0)
 
 // Trigger generation
 `DECLARE_DQ(      1, active,       i_clk, i_rst, 'd0)
@@ -80,7 +80,16 @@ localparam TX_PYLD_WIDTH = MESSAGE_WIDTH;
 
 // Inbound FIFO
 control_message_t ib_fifo_data;
-logic             ib_fifo_empty, ib_fifo_full, ib_fifo_push, ib_fifo_pop;
+logic             ib_fifo_empty, ib_fifo_full, ib_fifo_push;
+
+// Message decoding
+logic                     msg_stall, msg_next;
+logic                     is_cmd_param, is_cmd_active, is_cmd_status,
+                          is_cmd_cycles, is_cmd_interval, is_cmd_reset,
+                          is_cmd_trigmask;
+control_param_t           req_param;
+logic [TX_PYLD_WIDTH-1:0] resp_param, resp_cycles;
+control_status_t          resp_status;
 
 // Drive soft reset request
 assign o_soft_reset = soft_reset_q;
@@ -106,7 +115,7 @@ nx_fifo #(
     , .i_wr_push ( ib_fifo_push   )
     // Read interface
     , .o_rd_data ( ib_fifo_data   )
-    , .i_rd_pop  ( ib_fifo_pop    )
+    , .i_rd_pop  ( msg_next       )
     // Status
     , .o_level   (                )
     , .o_empty   ( ib_fifo_empty  )
@@ -117,111 +126,80 @@ nx_fifo #(
 // Message Handling
 // =============================================================================
 
+// Detect a stall
+assign msg_stall = o_outbound_valid && !i_outbound_ready;
+assign msg_next  = !msg_stall && !ib_fifo_empty;
+
+// Detect each message type
+assign is_cmd_param    = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_PARAM   );
+assign is_cmd_active   = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_ACTIVE  );
+assign is_cmd_status   = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_STATUS  );
+assign is_cmd_cycles   = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_CYCLES  );
+assign is_cmd_interval = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_INTERVAL);
+assign is_cmd_reset    = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_RESET   );
+assign is_cmd_trigmask = msg_next && (ib_fifo_data.raw.command == CONTROL_COMMAND_TRIGMASK);
+
+// Handle interval updates
+assign interval     = is_cmd_interval ? ib_fifo_data.raw.payload : interval_q;
+assign interval_set = is_cmd_interval ? (ib_fifo_data.raw.payload != 'd0) : interval_set_q;
+
+// Handle active
+assign active = (
+    is_cmd_active
+        ? ib_fifo_data.active.active
+        : ((interval_set_q && interval_count_q == interval_q) ? 'd0 : active_q)
+);
+
+// Handle interval counting
+assign interval_count = (
+    (is_cmd_interval || (interval_set_q && interval_count_q == interval_q))
+        ? 'd0
+        : interval_count_q + ((|trigger_q) ? 'd1 : 'd0)
+);
+
+// Handle soft reset
+assign soft_reset = is_cmd_reset ? ib_fifo_data.raw.payload[0] : soft_reset_q;
+
+// Handle trigger mask
+assign trigger_mask = is_cmd_trigmask ? ib_fifo_data.raw.payload[COLUMNS-1:0] : trigger_mask_q;
+
+// Build parameter response
+assign req_param  = ib_fifo_data.param.param;
+assign resp_param = (
+    (req_param == CONTROL_PARAM_ID            ) ? { {(MESSAGE_WIDTH-24){1'b0}}, HW_DEV_ID[23:0] } :
+    (req_param == CONTROL_PARAM_VERSION       ) ? { {(MESSAGE_WIDTH-16){1'b0}}, HW_VER_MAJOR[7:0], HW_VER_MINOR[7:0] } :
+    (req_param == CONTROL_PARAM_COUNTER_WIDTH ) ? TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0] :
+    (req_param == CONTROL_PARAM_ROWS          ) ? ROWS[TX_PYLD_WIDTH-1:0] :
+    (req_param == CONTROL_PARAM_COLUMNS       ) ? COLUMNS[TX_PYLD_WIDTH-1:0] :
+    (req_param == CONTROL_PARAM_NODE_INPUTS   ) ? INPUTS[TX_PYLD_WIDTH-1:0] :
+    (req_param == CONTROL_PARAM_NODE_OUTPUTS  ) ? OUTPUTS[TX_PYLD_WIDTH-1:0] :
+    (req_param == CONTROL_PARAM_NODE_REGISTERS) ? REGISTERS[TX_PYLD_WIDTH-1:0]
+                                                : 'd0
+);
+
+// Build status response
+assign resp_status.active       = active_q;
+assign resp_status.idle_low     = seen_idle_low_q;
+assign resp_status.first_tick   = first_tick_q;
+assign resp_status.interval_set = interval_set_q;
+assign resp_status._padding_0   = 'd0;
+
+// Build cycle response
+assign resp_cycles = cycle_q;
+
+// Select the correct response
+assign send_data = (
+    msg_stall ? send_data_q
+              : (is_cmd_param  ? resp_param  :
+                 is_cmd_status ? resp_status :
+                 is_cmd_cycles ? resp_cycles
+                               : 'd0)
+);
+assign send_valid = (is_cmd_param || is_cmd_status || is_cmd_cycles || msg_stall);
+
 // Drive outputs with send data
 assign o_outbound_data  = send_data_q;
 assign o_outbound_valid = send_valid_q;
-
-// Perform decode
-always_comb begin : comb_decode
-    // Internal state
-    `INIT_D(soft_reset);
-    `INIT_D(active);
-    `INIT_D(interval);
-    `INIT_D(interval_count);
-    `INIT_D(interval_set);
-    `INIT_D(send_data);
-    `INIT_D(send_valid);
-    `INIT_D(trigger_mask);
-
-    // Clear pop
-    ib_fifo_pop = 1'b0;
-
-    // Clear valid if accepted
-    if (i_outbound_ready) send_valid = 1'b0;
-
-    // On counter elapse, deactivate automatically & clear counter for next run
-    if (interval_set && interval_count == interval) begin
-        active         = 1'b0;
-        interval_count = 'd0;
-    end
-
-    // Increment interval counter on trigger high
-    if (|trigger_q) begin
-        interval_count = interval_count + 'd1;
-    end
-
-    // Handle an incoming message
-    if (!send_valid && !ib_fifo_empty) begin
-        // Clear the send data
-        send_data = 'd0;
-        // Decode command
-        case (ib_fifo_data.raw.command)
-            // Respond with the different parameters of the mesh
-            CONTROL_COMMAND_PARAM: begin
-                case (ib_fifo_data.param.param)
-                    CONTROL_PARAM_ID:
-                        send_data.raw = { {(MESSAGE_WIDTH-24){1'b0}}, HW_DEV_ID[23:0] };
-                    CONTROL_PARAM_VERSION:
-                        send_data.raw = {
-                            {(MESSAGE_WIDTH-16){1'b0}}, HW_VER_MAJOR[7:0], HW_VER_MINOR[7:0]
-                        };
-                    CONTROL_PARAM_COUNTER_WIDTH:
-                        send_data.raw = TX_PYLD_WIDTH[TX_PYLD_WIDTH-1:0];
-                    CONTROL_PARAM_ROWS:
-                        send_data.raw = ROWS[TX_PYLD_WIDTH-1:0];
-                    CONTROL_PARAM_COLUMNS:
-                        send_data.raw = COLUMNS[TX_PYLD_WIDTH-1:0];
-                    CONTROL_PARAM_NODE_INPUTS:
-                        send_data.raw = INPUTS[TX_PYLD_WIDTH-1:0];
-                    CONTROL_PARAM_NODE_OUTPUTS:
-                        send_data.raw = OUTPUTS[TX_PYLD_WIDTH-1:0];
-                    CONTROL_PARAM_NODE_REGISTERS:
-                        send_data.raw = REGISTERS[TX_PYLD_WIDTH-1:0];
-                    default:
-                        send_data.raw = 'd0;
-                endcase
-                send_valid = 1'b1;
-            end
-            // Set/clear the active switch for the mesh
-            CONTROL_COMMAND_ACTIVE: begin
-                active = ib_fifo_data.active.active;
-            end
-            // Read back various status flags
-            CONTROL_COMMAND_STATUS: begin
-                send_valid = 1'b1;
-                send_data.status.active       = active_q;
-                send_data.status.idle_low     = seen_idle_low_q;
-                send_data.status.first_tick   = first_tick_q;
-                send_data.status.interval_set = interval_set_q;
-            end
-            // Read back the number of elapsed cycles
-            CONTROL_COMMAND_CYCLES: begin
-                send_valid    = 1'b1;
-                send_data.raw = cycle_q;
-            end
-            // Set/clear the interval (number of cycles to run for)
-            CONTROL_COMMAND_INTERVAL: begin
-                interval       = ib_fifo_data.raw.payload;
-                interval_count = 'd0;
-                interval_set   = (ib_fifo_data.raw.payload != 0);
-            end
-            // Soft reset request
-            CONTROL_COMMAND_RESET: begin
-                soft_reset = ib_fifo_data.raw.payload[0];
-            end
-            // Trigger mask
-            CONTROL_COMMAND_TRIGMASK: begin
-                trigger_mask = ib_fifo_data.raw.payload[COLUMNS-1:0];
-            end
-            // Catch-all
-            default: begin
-                send_valid = 1'b0;
-            end
-        endcase
-        // Pop the FIFO
-        ib_fifo_pop = 1'b1;
-    end
-end
 
 // =============================================================================
 // Trigger Generation
