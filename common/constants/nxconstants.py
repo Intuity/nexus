@@ -81,14 +81,13 @@ class Direction:
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class ControlCommand:
     """ Different message types for the control plane """
-    ID       : Constant("Read the hardware identifier")
-    VERSION  : Constant("Read the major and minor hardware revision")
     PARAM    : Constant("Read back different parameters")
     ACTIVE   : Constant("Set the active status of the device")
     STATUS   : Constant("Read the current status of the device")
     CYCLES   : Constant("Read the current cycle counter")
     INTERVAL : Constant("Set the number of cycles to run for")
     RESET    : Constant("Write a 1 to trigger a soft reset")
+    TRIGMASK : Constant("Alter the column trigger mask")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
@@ -119,6 +118,8 @@ class Operation:
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class ControlParam:
+    ID             : Constant(desc="Hardware identifier")
+    VERSION        : Constant(desc="Major and minor hardware revision")
     COUNTER_WIDTH  : Constant(desc="Width of counters in the control block")
     ROWS           : Constant(desc="Number of rows in the mesh")
     COLUMNS        : Constant(desc="Number of columns in the mesh")
