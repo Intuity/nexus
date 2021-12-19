@@ -1,0 +1,134 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Sun Dec 19 20:26:14 2021
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/mesh/nx_aggregator/sim.lxt"
+[dumpfile_mtime] "Sun Dec 19 20:25:20 2021"
+[dumpfile_size] 18835
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/mesh/nx_aggregator/nx_aggregator.gtkw"
+[timestart] 0
+[size] 1812 1042
+[pos] -1 -1
+*-17.499306 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[treeopen] testbench.u_dut.
+[sst_width] 193
+[signals_width] 236
+[sst_expanded] 1
+[sst_vpaned_height] 322
+@28
+testbench.clk[0]
+testbench.rst[0]
+@200
+-
+@800022
+testbench.i_node_id[7:0]
+@c00024
+#{row} (0)testbench.i_node_id[7:0] (1)testbench.i_node_id[7:0] (2)testbench.i_node_id[7:0] (3)testbench.i_node_id[7:0]
+@28
+(0)testbench.i_node_id[7:0]
+(1)testbench.i_node_id[7:0]
+(2)testbench.i_node_id[7:0]
+(3)testbench.i_node_id[7:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.i_node_id[7:0] (5)testbench.i_node_id[7:0] (6)testbench.i_node_id[7:0] (7)testbench.i_node_id[7:0]
+@28
+(4)testbench.i_node_id[7:0]
+(5)testbench.i_node_id[7:0]
+(6)testbench.i_node_id[7:0]
+(7)testbench.i_node_id[7:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.o_idle[0]
+@200
+-
+@800022
+testbench.i_inbound_data[27:0]
+@c00024
+#{row} (0)testbench.i_inbound_data[27:0] (1)testbench.i_inbound_data[27:0] (2)testbench.i_inbound_data[27:0] (3)testbench.i_inbound_data[27:0]
+@28
+(0)testbench.i_inbound_data[27:0]
+(1)testbench.i_inbound_data[27:0]
+(2)testbench.i_inbound_data[27:0]
+(3)testbench.i_inbound_data[27:0]
+@1401200
+-group_end
+@c00024
+#{column} (4)testbench.i_inbound_data[27:0] (5)testbench.i_inbound_data[27:0] (6)testbench.i_inbound_data[27:0] (7)testbench.i_inbound_data[27:0]
+@28
+(4)testbench.i_inbound_data[27:0]
+(5)testbench.i_inbound_data[27:0]
+(6)testbench.i_inbound_data[27:0]
+(7)testbench.i_inbound_data[27:0]
+@1401200
+-group_end
+@c00028
+#{command} (8)testbench.i_inbound_data[27:0] (9)testbench.i_inbound_data[27:0]
+@28
+(8)testbench.i_inbound_data[27:0]
+(9)testbench.i_inbound_data[27:0]
+@1401200
+-group_end
+@c00024
+#{index} (10)testbench.i_inbound_data[27:0] (11)testbench.i_inbound_data[27:0] (12)testbench.i_inbound_data[27:0] (13)testbench.i_inbound_data[27:0] (14)testbench.i_inbound_data[27:0]
+@28
+(10)testbench.i_inbound_data[27:0]
+(11)testbench.i_inbound_data[27:0]
+(12)testbench.i_inbound_data[27:0]
+(13)testbench.i_inbound_data[27:0]
+(14)testbench.i_inbound_data[27:0]
+@1401200
+-group_end
+@28
++{is_seq} (15)testbench.i_inbound_data[27:0]
++{state} (16)testbench.i_inbound_data[27:0]
+@c00022
+#{padding} (17)testbench.i_inbound_data[27:0] (18)testbench.i_inbound_data[27:0] (19)testbench.i_inbound_data[27:0] (20)testbench.i_inbound_data[27:0] (21)testbench.i_inbound_data[27:0] (22)testbench.i_inbound_data[27:0] (23)testbench.i_inbound_data[27:0] (24)testbench.i_inbound_data[27:0] (25)testbench.i_inbound_data[27:0] (26)testbench.i_inbound_data[27:0] (27)testbench.i_inbound_data[27:0]
+@28
+(17)testbench.i_inbound_data[27:0]
+(18)testbench.i_inbound_data[27:0]
+(19)testbench.i_inbound_data[27:0]
+(20)testbench.i_inbound_data[27:0]
+(21)testbench.i_inbound_data[27:0]
+(22)testbench.i_inbound_data[27:0]
+(23)testbench.i_inbound_data[27:0]
+(24)testbench.i_inbound_data[27:0]
+(25)testbench.i_inbound_data[27:0]
+(26)testbench.i_inbound_data[27:0]
+(27)testbench.i_inbound_data[27:0]
+@1401200
+-group_end
+@1001200
+-group_end
+@28
+testbench.i_inbound_valid[0]
+testbench.o_inbound_ready[0]
+@200
+-
+@22
+testbench.i_passthrough_data[27:0]
+@28
+testbench.i_passthrough_valid[0]
+testbench.o_passthrough_ready[0]
+@200
+-
+@22
+testbench.o_outbound_data[27:0]
+@28
+testbench.o_outbound_valid[0]
+testbench.i_outbound_ready[0]
+@200
+-
+@22
+testbench.o_outputs[31:0]
+@200
+-
+@28
+testbench.u_dut.is_signal[0]
+[pattern_trace] 1
+[pattern_trace] 0
