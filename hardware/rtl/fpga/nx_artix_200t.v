@@ -27,131 +27,48 @@ module nx_artix_200t #(
     , output wire                       status_active
     , output wire                       status_idle
     , output wire                       status_trigger
-    // Control AXI4-streams
-    // - Inbound
-    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_ctrl_tdata
-    , input  wire                       inbound_ctrl_tlast
-    , input  wire                       inbound_ctrl_tvalid
-    , output wire                       inbound_ctrl_tready
-    // - Outbound
-    , output wire [AXI4_DATA_WIDTH-1:0] outbound_ctrl_tdata
-    , output wire                       outbound_ctrl_tlast
-    , output wire                       outbound_ctrl_tvalid
-    , input  wire                       outbound_ctrl_tready
-    // Mesh AXI4-streams
-    // - Inbound
-    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_mesh_tdata
-    , input  wire                       inbound_mesh_tlast
-    , input  wire                       inbound_mesh_tvalid
-    , output wire                       inbound_mesh_tready
-    // - Outbound
-    , output wire [AXI4_DATA_WIDTH-1:0] outbound_mesh_tdata
-    , output wire                       outbound_mesh_tlast
-    , output wire                       outbound_mesh_tvalid
-    , input  wire                       outbound_mesh_tready
-);
-
-// =============================================================================
-// AXI4-Stream Bridge for Control
-// =============================================================================
-
-wire [27:0] nx_ctrl_ib_data, nx_ctrl_ob_data;
-wire        nx_ctrl_ib_valid, nx_ctrl_ib_ready, nx_ctrl_ob_valid, nx_ctrl_ob_ready;
-
-nx_axi4s_bridge #(
-      .AXI4_DATA_WIDTH   ( AXI4_DATA_WIDTH      )
-) u_ctrl_bridge (
-      .i_clk             (  clk                 )
-    , .i_rst             ( ~rstn                )
     // Inbound AXI4-stream
-    , .i_ib_axi4s_tdata  ( inbound_ctrl_tdata   )
-    , .i_ib_axi4s_tlast  ( inbound_ctrl_tlast   )
-    , .i_ib_axi4s_tvalid ( inbound_ctrl_tvalid  )
-    , .o_ib_axi4s_tready ( inbound_ctrl_tready  )
-    // Outbound Nexus message stream
-    , .o_ob_nx_data      ( nx_ctrl_ib_data      )
-    , .o_ob_nx_valid     ( nx_ctrl_ib_valid     )
-    , .i_ob_nx_ready     ( nx_ctrl_ib_ready     )
-    // Inbound Nexus message stream
-    , .i_ib_nx_data      ( nx_ctrl_ob_data      )
-    , .i_ib_nx_valid     ( nx_ctrl_ob_valid     )
-    , .o_ib_nx_ready     ( nx_ctrl_ob_ready     )
+    , input  wire [AXI4_DATA_WIDTH-1:0] inbound_tdata
+    , input  wire                       inbound_tlast
+    , input  wire                       inbound_tvalid
+    , output wire                       inbound_tready
     // Outbound AXI4-stream
-    , .o_ob_axi4s_tdata  ( outbound_ctrl_tdata  )
-    , .o_ob_axi4s_tlast  ( outbound_ctrl_tlast  )
-    , .o_ob_axi4s_tvalid ( outbound_ctrl_tvalid )
-    , .i_ob_axi4s_tready ( outbound_ctrl_tready )
+    , output wire [AXI4_DATA_WIDTH-1:0] outbound_tdata
+    , output wire                       outbound_tlast
+    , output wire                       outbound_tvalid
+    , input  wire                       outbound_tready
 );
-
-// =============================================================================
-// AXI4-Stream Bridge for Mesh
-// =============================================================================
-
-wire [27:0] nx_mesh_ib_data, nx_mesh_ob_data;
-wire        nx_mesh_ib_valid, nx_mesh_ib_ready, nx_mesh_ob_valid, nx_mesh_ob_ready;
-
-nx_axi4s_bridge #(
-      .AXI4_DATA_WIDTH   ( AXI4_DATA_WIDTH      )
-) u_mesh_bridge (
-      .i_clk             (  clk                 )
-    , .i_rst             ( ~rstn                )
-    // Inbound AXI4-stream
-    , .i_ib_axi4s_tdata  ( inbound_mesh_tdata   )
-    , .i_ib_axi4s_tlast  ( inbound_mesh_tlast   )
-    , .i_ib_axi4s_tvalid ( inbound_mesh_tvalid  )
-    , .o_ib_axi4s_tready ( inbound_mesh_tready  )
-    // Outbound Nexus message stream
-    , .o_ob_nx_data      ( nx_mesh_ib_data      )
-    , .o_ob_nx_valid     ( nx_mesh_ib_valid     )
-    , .i_ob_nx_ready     ( nx_mesh_ib_ready     )
-    // Inbound Nexus message stream
-    , .i_ib_nx_data      ( nx_mesh_ob_data      )
-    , .i_ib_nx_valid     ( nx_mesh_ob_valid     )
-    , .o_ib_nx_ready     ( nx_mesh_ob_ready     )
-    // Outbound AXI4-stream
-    , .o_ob_axi4s_tdata  ( outbound_mesh_tdata  )
-    , .o_ob_axi4s_tlast  ( outbound_mesh_tlast  )
-    , .o_ob_axi4s_tvalid ( outbound_mesh_tvalid )
-    , .i_ob_axi4s_tready ( outbound_mesh_tready )
-);
-
-// =============================================================================
-// Nexus Instance
-// =============================================================================
 
 nexus #(
-      .ROWS             ( ROWS             )
-    , .COLUMNS          ( COLUMNS          )
-    , .INPUTS           ( 32               )
-    , .OUTPUTS          ( 32               )
-    , .REGISTERS        ( 16               )
-    , .RAM_ADDR_W       ( 10               )
-    , .RAM_DATA_W       ( 32               )
+      .ROWS             ( ROWS            )
+    , .COLUMNS          ( COLUMNS         )
+    , .INPUTS           ( 32              )
+    , .OUTPUTS          ( 32              )
+    , .REGISTERS        ( 16              )
+    , .RAM_ADDR_W       ( 10              )
+    , .RAM_DATA_W       ( 32              )
 ) u_nexus (
-      .i_clk            ( clk              )
-    , .i_rst            ( ~rstn            )
+      .i_clk            ( clk             )
+    , .i_rst            ( ~rstn           )
     // Status signals
-    , .o_status_active  ( status_active    )
-    , .o_status_idle    ( status_idle      )
-    , .o_status_trigger ( status_trigger   )
-    // Control message streams
-    // - Inbound
-    , .i_ctrl_ib_data   ( nx_ctrl_ib_data  )
-    , .i_ctrl_ib_valid  ( nx_ctrl_ib_valid )
-    , .o_ctrl_ib_ready  ( nx_ctrl_ib_ready )
-    // - Outbound
-    , .o_ctrl_ob_data   ( nx_ctrl_ob_data  )
-    , .o_ctrl_ob_valid  ( nx_ctrl_ob_valid )
-    , .i_ctrl_ob_ready  ( nx_ctrl_ob_ready )
-    // Mesh message streams
-    // - Inbound
-    , .i_mesh_ib_data   ( nx_mesh_ib_data  )
-    , .i_mesh_ib_valid  ( nx_mesh_ib_valid )
-    , .o_mesh_ib_ready  ( nx_mesh_ib_ready )
-    // - Outbound
-    , .o_mesh_ob_data   ( nx_mesh_ob_data  )
-    , .o_mesh_ob_valid  ( nx_mesh_ob_valid )
-    , .i_mesh_ob_ready  ( nx_mesh_ob_ready )
+    , .o_status_active  ( status_active   )
+    , .o_status_idle    ( status_idle     )
+    , .o_status_trigger ( status_trigger  )
+    // Inbound control stream
+    , .i_ctrl_in_data   ( inbound_tdata   )
+    , .i_ctrl_in_valid  ( inbound_tvalid  )
+    , .o_ctrl_in_ready  ( inbound_tready  )
+    // Outbound control stream
+    , .o_ctrl_out_data  ( outbound_tdata  )
+    , .o_ctrl_out_valid ( outbound_tvalid )
+    , .i_ctrl_out_ready ( outbound_tready )
 );
+
+// Nexus does not provide a last flag, so tie-off
+assign outbound_tlast = 1'b1;
+
+// Tie-off unused signals
+wire _unused;
+assign _unused = &{ 1'b0, inbound_tlast };
 
 endmodule : nx_artix_200t
