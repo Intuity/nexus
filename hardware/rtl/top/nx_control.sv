@@ -83,15 +83,18 @@ typedef enum logic [1:0] {
 `DECLARE_DQT(ctrl_state_t, state, i_clk, i_rst, CTRL_IDLE)
 
 // Control request handling
-`DECLARE_DQ(          1, soft_reset,    i_clk, i_rst, 'd0)
-`DECLARE_DQ(TIMER_WIDTH, interval,      i_clk, i_rst, 'd0)
-`DECLARE_DQ(    COLUMNS, trigger_mask,  i_clk, i_rst, 'd0)
-`DECLARE_DQ(          1, active,        i_clk, i_rst, 'd0)
+`DECLARE_DQ (             1, soft_reset,    i_clk, i_rst, 'd0)
+`DECLARE_DQ (   TIMER_WIDTH, interval,      i_clk, i_rst, 'd0)
+`DECLARE_DQ (       COLUMNS, trigger_mask,  i_clk, i_rst, 'd0)
+`DECLARE_DQ (             1, active,        i_clk, i_rst, 'd0)
+`DECLARE_DQT(node_message_t, mesh_in_data,  i_clk, i_rst, 'd0)
+`DECLARE_DQ (             1, mesh_in_valid, i_clk, i_rst, 'd0)
 
 logic              ctrl_req;
 control_req_type_t ctrl_cmd;
 logic              req_rd_params, req_rd_status, req_soft_rst, req_trigger,
                    req_to_mesh;
+logic              mesh_in_stall;
 
 // Control response generation
 `DECLARE_DQT(control_response_t, ctrl_out_data,  i_clk, i_rst, 'd0)
@@ -228,11 +231,15 @@ assign active = req_trigger                    ? i_ctrl_in_data.trigger.active :
                                                : active_q;
 
 // Forward messages into the mesh
-assign o_mesh_in_data  = i_ctrl_in_data.to_mesh.message;
-assign o_mesh_in_valid = req_to_mesh;
+assign mesh_in_stall = mesh_in_valid_q && !i_mesh_in_ready;
+assign mesh_in_data  = mesh_in_stall ? mesh_in_data_q : i_ctrl_in_data.to_mesh.message;
+assign mesh_in_valid = mesh_in_stall || req_to_mesh;
+
+assign o_mesh_in_data  = mesh_in_data_q;
+assign o_mesh_in_valid = mesh_in_valid_q;
 
 // Drive ready signal
-assign o_ctrl_in_ready = i_mesh_in_ready && (state_q != CTRL_OUTPUTS);
+assign o_ctrl_in_ready = !ctrl_out_stall && !mesh_in_stall && (state_q != CTRL_OUTPUTS);
 
 // =============================================================================
 // Control Response Generation
@@ -318,7 +325,7 @@ assign o_ctrl_out_valid = ctrl_out_valid_q;
 // =============================================================================
 
 assign o_status_active  = (state_q != CTRL_IDLE);
-assign o_status_idle    = (state_q == CTRL_IDLE);
+assign o_status_idle    = all_idle_q;
 assign o_status_trigger = trigger_q;
 
 endmodule : nx_control
