@@ -17,11 +17,14 @@ from random import randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
+from nxconstants import ControlReqType, ControlRequest, NodeID
+
 from drivers.axi4stream.common import AXI4StreamTransaction
 from nxconstants import NodeID
 
 from node.load import load_data
 
+from ..common import to_bytes
 from ..testbench import testcase
 
 @testcase()
@@ -37,11 +40,16 @@ async def load(dut):
     ram_data_w = int(dut.dut.u_dut.u_nexus.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
-    # Inbound shim
-    class AXIShim:
+    # Create a proxy for loading into the mesh
+    class InboundProxy:
         def append(self, tran):
-            dut.ib_mesh.append(AXI4StreamTransaction(data=[(1 << 31) | tran.data]))
-    axi_shim = AXIShim()
+            req                 = ControlRequest()
+            req.to_mesh.command = ControlReqType.TO_MESH
+            req.to_mesh.message = tran.data
+            dut.inbound.append(AXI4StreamTransaction(data=to_bytes(req.pack(), 128)))
+        async def idle(self):
+            await dut.inbound.idle()
+    proxy = InboundProxy()
 
     # Load random data into every node
     loaded  = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
@@ -52,7 +60,7 @@ async def load(dut):
                 randint(0, (1 << ram_data_w) - 1) for _ in range(randint(100, 200))
             ]
             load_data(
-                inbound   =axi_shim,
+                inbound   =proxy,
                 node_id   =NodeID(row=row, column=col),
                 ram_data_w=ram_data_w,
                 stream    =loaded[row][col]
@@ -61,7 +69,7 @@ async def load(dut):
 
     # Wait for all data to be sent
     dut.info(f"Waiting for AXI4-stream to send {counter} messages")
-    await dut.ib_mesh.idle()
+    await dut.inbound.idle()
     dut.info("AXI4-stream initiator returned to idle")
 
     # Wait for the idle flag to go high

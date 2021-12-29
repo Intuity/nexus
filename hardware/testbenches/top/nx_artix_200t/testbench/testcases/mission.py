@@ -13,18 +13,20 @@
 # limitations under the License.
 
 from itertools import product
+from math import ceil
 
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 from cocotb.utils import get_sim_time
 
-from nxconstants import (NodeCommand, NodeID, NodeMessage, NodeParameter,
-                         ControlCommand, ControlRaw, ControlSetActive)
+from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
+                         ControlResponse, NodeID, NodeParameter, OUT_BITS_PER_MSG)
 from nxloader import NXLoader
 from nxmodel import Nexus
 
 from drivers.axi4stream.common import AXI4StreamTransaction
 from node.load import load_data, load_loopback, load_parameter
 
+from ..common import to_bytes
 from ..testbench import testcase
 
 @testcase()
@@ -42,9 +44,6 @@ async def mission_mode(dut):
     ram_data_w   = int(dut.dut.u_dut.u_nexus.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
-    # Disable scoreboarding of output
-    dut.ob_mesh._callbacks = []
-
     # Work out the full path
     full_path = dut.base_dir / "data" / "design.json"
 
@@ -55,10 +54,15 @@ async def mission_mode(dut):
     design = NXLoader(full_path)
 
     # Inbound shim
-    class AXIShim:
+    class InboundProxy:
         def append(self, tran):
-            dut.ib_mesh.append(AXI4StreamTransaction(data=[(1 << 31) | tran.data]))
-    axi_shim = AXIShim()
+            req                 = ControlRequest()
+            req.to_mesh.command = ControlReqType.TO_MESH
+            req.to_mesh.message = tran.data
+            dut.inbound.append(AXI4StreamTransaction(data=to_bytes(req.pack(), 128)))
+        async def idle(self):
+            await dut.inbound.idle()
+    proxy = InboundProxy()
 
     # Load data into the mesh
     for idx_row, row_state in enumerate(design.state):
@@ -66,7 +70,7 @@ async def mission_mode(dut):
             node_id = NodeID(row=idx_row, column=idx_col)
             # Load instructions, lookup table, and output mappings
             load_data(
-                inbound   =axi_shim,
+                inbound   =proxy,
                 node_id   =node_id,
                 ram_data_w=ram_data_w,
                 stream    =[x.pack() for x in (node.instructions + node.lookup + node.mappings)],
@@ -74,7 +78,7 @@ async def mission_mode(dut):
             )
             # Program the loopback
             load_loopback(
-                inbound   =axi_shim,
+                inbound   =proxy,
                 node_id   =node_id,
                 num_inputs=node_inputs,
                 mask      =node.loopback,
@@ -82,13 +86,13 @@ async def mission_mode(dut):
             )
             # Set parameters
             load_parameter(
-                axi_shim, node_id, NodeParameter.INSTRUCTIONS,
+                proxy, node_id, NodeParameter.INSTRUCTIONS,
                 len(node.instructions), model.get_ingress()
             )
 
     # Wait for the inbound driver to drain
-    dut.info(f"Waiting for {len(dut.ib_mesh._sendQ)} messages to drain")
-    await dut.ib_mesh.idle()
+    dut.info(f"Waiting for {len(dut.inbound._sendQ)} messages to drain")
+    await dut.inbound.idle()
 
     # Wait for the idle flag to go high
     if dut.status.idle == 0: await RisingEdge(dut.status.idle)
@@ -102,11 +106,14 @@ async def mission_mode(dut):
         dut.info(f"Checking node {row}, {col} has loaded {exp_val} entries")
         assert rtl_val == exp_val, f"{row}, {col}: RTL {rtl_val} != EXP {exp_val}"
 
-    # Setup control to tick one cycle at a time
-    dut.info("Setting up single step")
-    dut.ib_ctrl.append(AXI4StreamTransaction(data=[(1 << 31) |
-        ControlRaw(command=ControlCommand.INTERVAL, payload=1).pack()
-    ]))
+    # Raise active and let nexus tick
+    dut.info("Enabling nexus")
+    trig                  = ControlRequest()
+    trig.trigger.command  = ControlReqType.TRIGGER
+    trig.trigger.col_mask = (1 << num_cols) - 1
+    trig.trigger.active   = 1
+    trig.trigger.cycles   = 0
+    dut.inbound.append(AXI4StreamTransaction(data=to_bytes(trig.trigger.pack(), 128)))
 
     # Capture start time
     tick_count = 300
@@ -114,7 +121,7 @@ async def mission_mode(dut):
     start_time = get_sim_time(units="ns")
 
     # Compare RTL against the model tick by tick
-    rtl_outputs, mdl_outputs = {}, {}
+    mdl_outputs = {}
     for cycle in range(tick_count):
         def cycdebug(msg): dut.debug(f"[{cycle:4d}] {msg}")
         def cycinfo(msg): dut.info(f"[{cycle:4d}] {msg}")
@@ -124,10 +131,26 @@ async def mission_mode(dut):
         if (cycle % 10) == 0: cycinfo("Starting cycle")
         model.run(1)
 
-        # Run the RTL for one tick
-        dut.ib_ctrl.append(AXI4StreamTransaction(data=[(1 << 31) |
-            ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack()
-        ]))
+        # Accumulate updated model output state
+        for (tgt_row, tgt_col, tgt_idx), val in model.pop_output().items():
+            # Work out the output index
+            full_idx  = (tgt_row - num_rows) * num_cols * node_outputs
+            full_idx += tgt_col * node_outputs
+            full_idx += tgt_idx
+            # Store the latest value
+            mdl_outputs[full_idx] = 1 if val else 0
+
+        # Queue up output messages
+        for idx_out in range(ceil((num_cols * node_outputs) / OUT_BITS_PER_MSG)):
+            resp                 = ControlResponse()
+            resp.outputs.format  = ControlRespType.OUTPUTS
+            resp.outputs.stamp   = cycle
+            resp.outputs.index   = idx_out
+            resp.outputs.section = sum([
+                (mdl_outputs.get((idx_out * OUT_BITS_PER_MSG) + x, 0) << x)
+                for x in range(OUT_BITS_PER_MSG)
+            ])
+            dut.expected.append(AXI4StreamTransaction(data=to_bytes(resp.outputs.pack(), 128)))
 
         # Wait for activity
         cycdebug("Waiting for idle to fall")
@@ -136,9 +159,6 @@ async def mission_mode(dut):
         # Wait for idle (ensuring it is synchronous)
         cycdebug("Waiting for idle to rise")
         while dut.status.idle == 0: await RisingEdge(dut.clk)
-
-        # Wait for the outbound interface to go idle
-        while dut.ob_mesh.intf.tvalid == 1: await RisingEdge(dut.clk)
 
         # Run through every node and column
         mismatches = 0
@@ -174,39 +194,6 @@ async def mission_mode(dut):
                 cycwarn(
                     f"{row}, {col} - {label}: RTL 0x{rtl_val:08X} != MDL: 0x{mdl_val:08X}"
                 )
-
-        # Accumulate updated RTL output state
-        while dut.ob_mesh._recvQ:
-            tran = dut.ob_mesh._recvQ.popleft()
-            # Pack stream data into 4-byte words
-            for chunk, _ in tran.pack(4):
-                # Skip unpopulated entries
-                if ((chunk >> 31) & 0x1) == 0: continue
-                # Decode the message
-                msg  = NodeMessage()
-                msg.unpack(chunk)
-                if msg.raw.header.command != NodeCommand.SIGNAL: continue
-                rtl_outputs[
-                    msg.signal.header.row,
-                    msg.signal.header.column,
-                    msg.signal.index
-                ] = msg.signal.state
-
-        # Accumulate updated model output state
-        for key, val in model.pop_output().items():
-            mdl_outputs[key] = val
-
-        # Cross check RTL against model state
-        for key in set(list(rtl_outputs.keys()) + list(mdl_outputs.keys())):
-            rtl_val = rtl_outputs.get(key, 0)
-            mdl_val = mdl_outputs.get(key, 0)
-            # Skip instances where RTL and model match
-            if rtl_val == mdl_val: continue
-            # Increment count of mismatches and log a warning
-            mismatches += 1
-            cycwarn(
-                f"{row}, {col} - output {key}: RTL {rtl_val} != MDL {mdl_val}"
-            )
 
         # Check for mismatches
         assert mismatches == 0, f"Detected {mismatches} between RTL and model"

@@ -41,28 +41,19 @@ class Testbench(TestbenchBase):
             trigger=dut.o_status_trigger,
         )
         # Setup drivers/monitors
-        self.ib_ctrl = AXI4StreamInitiator(
+        self.inbound = AXI4StreamInitiator(
             self, self.clk, self.rst,
-            AXI4StreamIO(self.dut, "inbound_ctrl", IORole.RESPONDER)
+            AXI4StreamIO(self.dut, "inbound", IORole.RESPONDER)
         )
-        self.ob_ctrl = AXI4StreamResponder(
+        self.outbound = AXI4StreamResponder(
             self, self.clk, self.rst,
-            AXI4StreamIO(self.dut, "outbound_ctrl", IORole.INITIATOR),
-        )
-        self.ib_mesh = AXI4StreamInitiator(
-            self, self.clk, self.rst,
-            AXI4StreamIO(self.dut, "inbound_mesh", IORole.RESPONDER)
-        )
-        self.ob_mesh = AXI4StreamResponder(
-            self, self.clk, self.rst,
-            AXI4StreamIO(self.dut, "outbound_mesh", IORole.INITIATOR),
+            AXI4StreamIO(self.dut, "outbound", IORole.INITIATOR),
         )
         # Create expected outbound queues
-        self.exp_ctrl = []
-        self.exp_mesh = []
+        self.expected = []
         # Create a scoreboard
         def compare_ctrl(got):
-            exp    = self.exp_ctrl.pop(0)
+            exp    = self.expected.pop(0)
             all_ok = True
             if len(got.data) != len(exp.data):
                 self.error(f"Length differs - G: {len(got.data)}, E: {len(exp.data)}")
@@ -72,19 +63,9 @@ class Testbench(TestbenchBase):
                     self.error(f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}")
                     all_ok = False
             assert all_ok, "Comparison error occurred"
-        def compare_mesh(got):
-            exp = self.exp_mesh.pop(0)
-            assert len(got.data) == len(exp.data), \
-                f"Length differs - G: {len(got.data)}, E: {len(exp.data)}"
-            for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
-                assert got_byte == exp_byte, \
-                    f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}"
         self.scoreboard = Scoreboard(self, fail_immediately=False)
         self.scoreboard.add_interface(
-            self.ob_ctrl, self.exp_ctrl, compare_fn=compare_ctrl
-        )
-        self.scoreboard.add_interface(
-            self.ob_mesh, self.exp_mesh, compare_fn=compare_mesh
+            self.outbound, self.expected, compare_fn=compare_ctrl
         )
         # Setup rapid access to every node in the mesh
         self.nodes = [
@@ -97,10 +78,8 @@ class Testbench(TestbenchBase):
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.ib_ctrl.intf.initialise(IORole.INITIATOR)
-        self.ob_ctrl.intf.initialise(IORole.RESPONDER)
-        self.ib_mesh.intf.initialise(IORole.INITIATOR)
-        self.ob_mesh.intf.initialise(IORole.RESPONDER)
+        self.inbound.intf.initialise(IORole.INITIATOR)
+        self.outbound.intf.initialise(IORole.RESPONDER)
 
     @property
     def base_dir(self): return Path(__file__).absolute().parent
@@ -110,8 +89,7 @@ class testcase(cocotb.test):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.exp_ctrl: await RisingEdge(tb.clk)
-            while tb.exp_mesh: await RisingEdge(tb.clk)
+            while tb.expected: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

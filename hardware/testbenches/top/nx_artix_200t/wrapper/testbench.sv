@@ -22,28 +22,16 @@ module testbench #(
     , output wire                       o_status_active
     , output wire                       o_status_idle
     , output wire                       o_status_trigger
-    // Control AXI4-streams
-    // - Inbound
-    , input  wire [AXI4_DATA_WIDTH-1:0] i_inbound_ctrl_tdata
-    , input  wire                       i_inbound_ctrl_tlast
-    , input  wire                       i_inbound_ctrl_tvalid
-    , output wire                       o_inbound_ctrl_tready
-    // - Outbound
-    , output wire [AXI4_DATA_WIDTH-1:0] o_outbound_ctrl_tdata
-    , output wire                       o_outbound_ctrl_tlast
-    , output wire                       o_outbound_ctrl_tvalid
-    , input  wire                       i_outbound_ctrl_tready
-    // Mesh AXI4-streams
-    // - Inbound
-    , input  wire [AXI4_DATA_WIDTH-1:0] i_inbound_mesh_tdata
-    , input  wire                       i_inbound_mesh_tlast
-    , input  wire                       i_inbound_mesh_tvalid
-    , output wire                       o_inbound_mesh_tready
-    // - Outbound
-    , output wire [AXI4_DATA_WIDTH-1:0] o_outbound_mesh_tdata
-    , output wire                       o_outbound_mesh_tlast
-    , output wire                       o_outbound_mesh_tvalid
-    , input  wire                       i_outbound_mesh_tready
+    // Inbound AXI4-stream
+    , input  wire [AXI4_DATA_WIDTH-1:0] i_inbound_tdata
+    , input  wire                       i_inbound_tlast
+    , input  wire                       i_inbound_tvalid
+    , output wire                       o_inbound_tready
+    // Outbound AXI4-stream
+    , output wire [AXI4_DATA_WIDTH-1:0] o_outbound_tdata
+    , output wire                       o_outbound_tlast
+    , output wire                       o_outbound_tvalid
+    , input  wire                       i_outbound_tready
 );
 
 // =============================================================================
@@ -58,38 +46,26 @@ always #1 clk <= ~clk;
 // =============================================================================
 
 nx_artix_200t #(
-      .AXI4_DATA_WIDTH      ( AXI4_DATA_WIDTH        )
-    , .ROWS                 ( ROWS                   )
-    , .COLUMNS              ( COLUMNS                )
+      .AXI4_DATA_WIDTH ( AXI4_DATA_WIDTH   )
+    , .ROWS            ( ROWS              )
+    , .COLUMNS         ( COLUMNS           )
 ) u_dut (
-      .clk                  (  clk                   )
-    , .rstn                 ( ~rst                   )
+      .clk             (  clk              )
+    , .rstn            ( ~rst              )
     // Status
-    , .status_active        ( o_status_active        )
-    , .status_idle          ( o_status_idle          )
-    , .status_trigger       ( o_status_trigger       )
-    // Control AXI4-streams
-    // - Inbound
-    , .inbound_ctrl_tdata   ( i_inbound_ctrl_tdata   )
-    , .inbound_ctrl_tlast   ( i_inbound_ctrl_tlast   )
-    , .inbound_ctrl_tvalid  ( i_inbound_ctrl_tvalid  )
-    , .inbound_ctrl_tready  ( o_inbound_ctrl_tready  )
-    // - Outbound
-    , .outbound_ctrl_tdata  ( o_outbound_ctrl_tdata  )
-    , .outbound_ctrl_tlast  ( o_outbound_ctrl_tlast  )
-    , .outbound_ctrl_tvalid ( o_outbound_ctrl_tvalid )
-    , .outbound_ctrl_tready ( i_outbound_ctrl_tready )
-    // Mesh AXI4-streams
-    // - Inbound
-    , .inbound_mesh_tdata   ( i_inbound_mesh_tdata   )
-    , .inbound_mesh_tlast   ( i_inbound_mesh_tlast   )
-    , .inbound_mesh_tvalid  ( i_inbound_mesh_tvalid  )
-    , .inbound_mesh_tready  ( o_inbound_mesh_tready  )
-    // - Outbound
-    , .outbound_mesh_tdata  ( o_outbound_mesh_tdata  )
-    , .outbound_mesh_tlast  ( o_outbound_mesh_tlast  )
-    , .outbound_mesh_tvalid ( o_outbound_mesh_tvalid )
-    , .outbound_mesh_tready ( i_outbound_mesh_tready )
+    , .status_active   ( o_status_active   )
+    , .status_idle     ( o_status_idle     )
+    , .status_trigger  ( o_status_trigger  )
+    // Inbound AXI4-stream
+    , .inbound_tdata   ( i_inbound_tdata   )
+    , .inbound_tlast   ( i_inbound_tlast   )
+    , .inbound_tvalid  ( i_inbound_tvalid  )
+    , .inbound_tready  ( o_inbound_tready  )
+    // Outbound AXI4-stream
+    , .outbound_tdata  ( o_outbound_tdata  )
+    , .outbound_tlast  ( o_outbound_tlast  )
+    , .outbound_tvalid ( o_outbound_tvalid )
+    , .outbound_tready ( i_outbound_tready )
 );
 
 // =============================================================================

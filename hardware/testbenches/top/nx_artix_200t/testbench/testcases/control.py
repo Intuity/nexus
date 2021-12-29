@@ -13,101 +13,72 @@
 # limitations under the License.
 
 from math import ceil
-from random import random, randint
+from random import choice, randint
 
 from cocotb.regression import TestFactory
+from cocotb.handle import Force, Release
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.axi4stream.common import AXI4StreamTransaction
-import nxconstants
-from nxconstants import (ControlCommand, ControlReadParam, ControlStatus,
-                         ControlRaw, ControlParam, HW_DEV_ID, HW_VER_MAJOR,
-                         HW_VER_MINOR)
+from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
+                         ControlResponse, HW_DEV_ID, HW_VER_MAJOR,
+                         HW_VER_MINOR, TIMER_WIDTH)
 
+from ..common import check_status, request_reset, to_bytes, trigger
 from ..testbench import testcase
 
-def to_bytes(data, bits):
-    return bytearray([((data >> (x * 8)) & 0xFF) for x in range(int(ceil(bits / 8)))])
-
 async def control(dut, backpressure):
-    """ Issue control block requests and collect responses """
+    """ Read back parameters and status from the controller """
     # Reset the DUT
     dut.info("Resetting the DUT")
     await dut.reset()
 
     # Enable/disable backpressure
-    dut.ob_ctrl.delays = backpressure
+    dut.outbound.delays = backpressure
 
-    # Build requests and expected responses
-    req_resp = [
-        # Parameters
-        # - Device ID
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.ID).pack(),
-            HW_DEV_ID
-        ),
-        # - Version
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.VERSION).pack(),
-            (HW_VER_MAJOR << 8) | HW_VER_MINOR
-        ),
-        # - Counter Width
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COUNTER_WIDTH).pack(),
-            int(dut.dut.u_dut.u_nexus.u_control.TX_PYLD_WIDTH)
-        ),
-        # - Rows
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.ROWS).pack(),
-            int(dut.dut.u_dut.u_nexus.u_control.ROWS)
-        ),
-        # - Columns
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.COLUMNS).pack(),
-            int(dut.dut.u_dut.u_nexus.u_control.COLUMNS)
-        ),
-        # - Node_inputs
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_INPUTS).pack(),
-            int(dut.dut.u_dut.u_nexus.u_control.INPUTS)
-        ),
-        # - Node_outputs
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_OUTPUTS).pack(),
-            int(dut.dut.u_dut.u_nexus.u_control.OUTPUTS)
-        ),
-        # - Node_registers
-        (
-            ControlReadParam(command=ControlCommand.PARAM, param=ControlParam.NODE_REGISTERS).pack(),
-            int(dut.dut.u_dut.u_nexus.u_control.REGISTERS)
-        ),
-        # Device status
-        (
-            ControlRaw(command=ControlCommand.STATUS).pack(),
-            ControlStatus(interval_set=0, first_tick=1, idle_low=1, active=0).pack()
-        ),
-    ]
+    # Build a parameter request and expected response
+    req_param             = ControlRequest()
+    req_param.raw.command = ControlReqType.READ_PARAMS
+    req_param             = req_param.raw.pack()
 
-    # Run many iterations
-    for idx in range(100):
-        if (idx % 10) == 0: dut.info(f"Running iteration {idx}")
-        # Choose the requests to send
-        chosen = sorted(req_resp, key=lambda _: random())[:randint(1, len(req_resp))]
-        # Send all of the requests and build expected responses
-        req_bytes  = bytearray([])
-        resp_bytes = bytearray([])
-        for req, resp in chosen:
-            req_bytes  += to_bytes((1 << 31) | req,  31)
-            resp_bytes += to_bytes((1 << 31) | resp, 32)
-        dut.ib_ctrl.append(AXI4StreamTransaction(data=req_bytes))
-        # Pad to the nearest 16 bytes
-        if len(resp_bytes) % 16 != 0:
-            resp_bytes += bytearray([0] * (16 - (len(resp_bytes) % 16)))
-        # Queue the expected response
-        dut.exp_ctrl.append(AXI4StreamTransaction(data=resp_bytes))
-        # Wait for responses to drain
-        while dut.exp_ctrl: await RisingEdge(dut.clk)
-        await ClockCycles(dut.clk, 10)
+    resp_param                    = ControlResponse()
+    resp_param.params.format      = ControlRespType.PARAMS
+    resp_param.params.id          = HW_DEV_ID
+    resp_param.params.ver_major   = HW_VER_MAJOR
+    resp_param.params.ver_minor   = HW_VER_MINOR
+    resp_param.params.timer_width = TIMER_WIDTH
+    resp_param.params.rows        = int(dut.dut.u_dut.u_nexus.ROWS)
+    resp_param.params.columns     = int(dut.dut.u_dut.u_nexus.COLUMNS)
+    resp_param.params.node_ins    = int(dut.dut.u_dut.u_nexus.INPUTS)
+    resp_param.params.node_outs   = int(dut.dut.u_dut.u_nexus.OUTPUTS)
+    resp_param.params.node_regs   = int(dut.dut.u_dut.u_nexus.REGISTERS)
+    resp_param                    = resp_param.params.pack()
+
+    # Build a status request and expected response
+    req_status             = ControlRequest()
+    req_status.raw.command = ControlReqType.READ_STATUS
+    req_status             = req_status.raw.pack()
+
+    resp_status                   = ControlResponse()
+    resp_status.status.format     = ControlRespType.STATUS
+    resp_status.status.active     = 0
+    resp_status.status.mesh_idle  = 1
+    resp_status.status.agg_idle   = 1
+    resp_status.status.seen_low   = 1
+    resp_status.status.first_tick = 1
+    resp_status.status.cycle      = 0
+    resp_status.status.countdown  = 0
+    resp_status                   = resp_status.status.pack()
+
+    # Run a number of iterations
+    for _ in range(1000):
+        name, req, resp = choice((
+            ("PARAM",  req_param,  resp_param),
+            ("STATUS", req_status, resp_status)
+        ))
+        dut.inbound.append(AXI4StreamTransaction(data=to_bytes(req, 128)))
+        dut.expected.append(AXI4StreamTransaction(data=to_bytes(resp, 128)))
+        await dut.inbound.idle()
 
 factory = TestFactory(control)
 factory.add_option("backpressure", [True, False])
@@ -120,48 +91,42 @@ async def soft_reset(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Set the interval to a non-zero value
+    # Apply force to mesh idles to stop them from falling
+    ctrl = dut.dut.u_dut.u_nexus.u_control
+    ctrl.i_mesh_node_idle <= Force((1 << int(dut.COLUMNS)) - 1)
+    ctrl.i_mesh_agg_idle  <= Force(1)
+
+    # Check the initial state
+    dut.info("Checking initial state")
+    await check_status(
+        dut, active=0, mesh_idle=1, agg_idle=1, seen_low=1, first_tick=1,
+        cycle=0, countdown=0,
+    )
+
+    # Trigger the mesh with a given interval
     interval = randint(1, 1000)
-    dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | ControlRaw(command=ControlCommand.INTERVAL, payload=interval).pack(), 32
-    )))
+    dut.info(f"Activating mesh for {interval} cycles")
+    await trigger(dut, active=1, cycles=interval)
 
-    # Read back the status to check an interval has been set
-    dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | ControlRaw(command=ControlCommand.STATUS).pack(), 32
-    )))
-    dut.exp_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | ControlStatus(
-            active      =0, # Inactive
-            idle_low    =1, # Idle has been observed low
-            first_tick  =1, # Fresh from reset
-            interval_set=1  # An interval has been set
-        ).pack(), 128
-    )))
-
-    # Wait for response
-    while dut.exp_ctrl: await RisingEdge(dut.clk)
-    await ClockCycles(dut.clk, 10)
+    # Check the status
+    dut.info("Checking status")
+    await check_status(
+        dut, active=1, mesh_idle=1, agg_idle=1, seen_low=0, first_tick=0,
+        cycle=0, countdown=(interval - 1),
+    )
 
     # Trigger a soft reset
-    dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | ControlRaw(command=ControlCommand.RESET, payload=1).pack(), 32
-    )))
-
-    dut.info("Waiting for internal reset to rise")
-    while dut.dut.u_dut.u_nexus.rst_internal == 0: await RisingEdge(dut.clk)
-    dut.info("Waiting for internal reset to fall")
-    while dut.dut.u_dut.u_nexus.rst_internal == 1: await RisingEdge(dut.clk)
+    dut.info("Triggering soft reset")
+    await request_reset(dut)
 
     # Read back the status to check an interval has been cleared
-    dut.ib_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | ControlRaw(command=ControlCommand.STATUS).pack(), 32
-    )))
-    dut.exp_ctrl.append(AXI4StreamTransaction(data=to_bytes(
-        (1 << 31) | ControlStatus(
-            active      =0, # Inactive
-            idle_low    =1, # Idle has been observed low
-            first_tick  =1, # Fresh from reset
-            interval_set=0  # No interval has been set
-        ).pack(), 128
-    )))
+    # NOTE: 'seen_low' is zero here because the forces are applied
+    dut.info("Checking state after reset")
+    await check_status(
+        dut, active=0, mesh_idle=1, agg_idle=1, seen_low=0, first_tick=1,
+        cycle=0, countdown=0,
+    )
+
+    # Release forces
+    ctrl.i_mesh_node_idle <= Release()
+    ctrl.i_mesh_agg_idle  <= Release()

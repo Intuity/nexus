@@ -121,7 +121,7 @@ async def mission_mode(dut):
     start_time = get_sim_time(units="ns")
 
     # Compare RTL against the model tick by tick
-    rtl_outputs, mdl_outputs = {}, {}
+    mdl_outputs = {}
     for cycle in range(tick_count):
         def cycdebug(msg): dut.debug(f"[{cycle:4d}] {msg}")
         def cycinfo(msg): dut.info(f"[{cycle:4d}] {msg}")
@@ -194,6 +194,9 @@ async def mission_mode(dut):
                 cycwarn(
                     f"{row}, {col} - {label}: RTL 0x{rtl_val:08X} != MDL: 0x{mdl_val:08X}"
                 )
+
+        # Check for mismatches
+        assert mismatches == 0, f"Detected {mismatches} between RTL and model"
 
     # Calculate simulation rate
     delta      = get_sim_time(units="ns") - start_time

@@ -1,18 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sun Nov 28 19:16:40 2021
+[*] Wed Dec 29 17:30:11 2021
 [*]
-[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/fpga/nx_artix_200t/sim.lxt"
-[dumpfile_mtime] "Sun Nov 28 19:15:04 2021"
-[dumpfile_size] 32855
-[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/fpga/nx_artix_200t/nx_artix_200t.gtkw"
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_artix_200t/sim.lxt"
+[dumpfile_mtime] "Wed Dec 29 17:27:53 2021"
+[dumpfile_size] 32601
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_artix_200t/nx_artix_200t.gtkw"
 [timestart] 0
 [size] 1962 1019
 [pos] -1 -1
-*-15.224392 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.224392 115000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_nexus.
+[treeopen] testbench.u_dut.u_nexus.u_control.
 [treeopen] testbench.u_dut.u_nexus.u_mesh.
 [treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[0].
 [treeopen] testbench.u_dut.u_nexus.u_mesh.gen_rows[0].gen_columns[1].u_node.
@@ -25,42 +26,56 @@
 [sst_vpaned_height] 512
 @28
 testbench.clk[0]
+@29
 testbench.rst[0]
 @200
 -
+@800200
+-CTRL IN/OUT
+@22
+testbench.u_dut.inbound_tdata[127:0]
 @28
-testbench.u_dut.u_nexus.u_mesh.o_idle[2:0]
-testbench.u_dut.u_nexus.u_mesh.i_trigger[2:0]
-@200
--
-@28
-testbench.u_dut.status_idle[0]
+testbench.u_dut.inbound_tlast[0]
+testbench.u_dut.inbound_tvalid[0]
+testbench.u_dut.inbound_tready[0]
 @200
 -
 @22
-testbench.i_inbound_ctrl_tdata[127:0]
+testbench.u_dut.outbound_tdata[127:0]
 @28
-testbench.i_inbound_ctrl_tlast[0]
-testbench.i_inbound_ctrl_tvalid[0]
-testbench.o_inbound_ctrl_tready[0]
+testbench.u_dut.outbound_tlast[0]
+testbench.u_dut.outbound_tvalid[0]
+testbench.u_dut.outbound_tready[0]
+@1000200
+-CTRL IN/OUT
 @200
 -
-@22
-testbench.u_dut.outbound_ctrl_tdata[127:0]
+@800200
+-CTRL DECODE
 @28
-testbench.u_dut.outbound_ctrl_tlast[0]
-testbench.u_dut.outbound_ctrl_tvalid[0]
-@29
-testbench.u_dut.outbound_ctrl_tready[0]
+testbench.u_dut.u_nexus.u_control.req_rd_params[0]
+testbench.u_dut.u_nexus.u_control.req_rd_status[0]
+testbench.u_dut.u_nexus.u_control.req_soft_rst[0]
+testbench.u_dut.u_nexus.u_control.req_to_mesh[0]
+testbench.u_dut.u_nexus.u_control.req_trigger[0]
+@1000200
+-CTRL DECODE
 @200
 -
-@22
-testbench.i_inbound_mesh_tdata[127:0]
+@800200
+-CTRL STATE
 @28
-testbench.i_inbound_mesh_tlast[0]
-testbench.i_inbound_mesh_tvalid[0]
-testbench.o_inbound_mesh_tready[0]
-@200
--
+testbench.u_dut.u_nexus.u_control.active_q[0]
+testbench.u_dut.u_nexus.u_control.i_mesh_node_idle[2:0]
+testbench.u_dut.u_nexus.u_control.i_mesh_agg_idle[0]
+testbench.u_dut.u_nexus.u_control.seen_idle_low_q[0]
+testbench.u_dut.u_nexus.u_control.first_tick_q[0]
+@24
+testbench.u_dut.u_nexus.u_control.cycle_q[23:0]
+testbench.u_dut.u_nexus.u_control.interval_q[23:0]
+@28
+testbench.u_dut.u_nexus.u_control.soft_reset_q[0]
+@1000200
+-CTRL STATE
 [pattern_trace] 1
 [pattern_trace] 0
