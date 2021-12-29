@@ -12,16 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import randint
+from random import choice, randint
+
+from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import NodeMessage
+from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
+                         ControlResponse, NodeCommand, NodeMessage)
 
 from ..testbench import testcase
 
 @testcase()
 async def routing(dut):
-    """ Exercise message routing through a node """
+    """ Exercise message routing through the mesh """
     # Reset the DUT
     dut.info("Resetting the DUT")
     await dut.reset()
@@ -44,12 +47,29 @@ async def routing(dut):
         msg.raw.header.row    = num_rows
         msg.raw.header.column = randint(0, num_cols-1)
 
+        # Don't use SIGNAL messages as aggregators will capture them
+        msg.raw.header.command = choice([x for x in NodeCommand if x != NodeCommand.SIGNAL])
+
         # Create a message
         dut.debug(
             f"MSG - R: {msg.raw.header.row}, C: {msg.raw.header.column}, "
             f"CMD: {msg.raw.header.command} -> 0x{msg.pack():08X}"
         )
 
-        # Queue up the message
-        dut.mesh_inbound.append(StreamTransaction(msg.pack()))
-        dut.mesh_expected.append(StreamTransaction(msg.pack()))
+        # Forward the message into the mesh
+        req                 = ControlRequest()
+        req.to_mesh.command = ControlReqType.TO_MESH
+        req.to_mesh.message = msg.pack()
+        dut.ctrl_in.append(StreamTransaction(req.to_mesh.pack()))
+
+        # Queue up the expected forwarded response
+        resp                   = ControlResponse()
+        resp.from_mesh.format  = ControlRespType.FROM_MESH
+        resp.from_mesh.message = msg.pack()
+        dut.expected.append(StreamTransaction(resp.from_mesh.pack()))
+
+    # Wait for the mesh to go busy, then return to idle
+    dut.info("Waiting for mesh to return to idle")
+    while dut.status.idle == 1: await RisingEdge(dut.clk)
+    await ClockCycles(dut.clk, 100)
+    while dut.status.idle == 0: await RisingEdge(dut.clk)

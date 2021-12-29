@@ -18,8 +18,11 @@ from random import choice, randint, random
 from cocotb.triggers import RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
 
-from nxconstants import NodeID, NodeParameter, NODE_PARAM_WIDTH
+from nxconstants import (ControlReqType, ControlRequest, NodeID, NodeParameter,
+                         NODE_PARAM_WIDTH)
+
 from drivers.basic.unstrobed import UnstrobedMonitor
+from drivers.stream.common import StreamTransaction
 from node.load import load_parameter
 
 from ..testbench import testcase
@@ -34,9 +37,21 @@ async def parameters(dut):
     num_rows = int(dut.ROWS)
     num_cols = int(dut.COLUMNS)
 
-    # Select random nodes to test
-    coords = sorted(product(range(num_rows), range(num_cols)), key=lambda _: random())[:4]
-    for row, col in coords:
+    # Create a proxy for loading into the mesh
+    class InboundProxy:
+        def append(self, tran):
+            req                 = ControlRequest()
+            req.to_mesh.command = ControlReqType.TO_MESH
+            req.to_mesh.message = tran.data
+            dut.ctrl_in.append(StreamTransaction(req.pack()))
+        async def idle(self):
+            await dut.ctrl_in.idle()
+    proxy = InboundProxy()
+
+    # Test nodes in a random order
+    for row, col in sorted(
+        product(range(num_rows), range(num_cols)), key=lambda _: random()
+    ):
         node = dut.u_dut.u_mesh.gen_rows[row].gen_columns[col].u_node
 
         # Create monitors to track parameter updates
@@ -48,20 +63,20 @@ async def parameters(dut):
         )
 
         # Scoreboard
-        exp_num_instr  = []
-        exp_loopback = []
-        prm_sb         = Scoreboard(dut, fail_immediately=True)
-        prm_sb.add_interface(um_num_instr,  exp_num_instr )
-        prm_sb.add_interface(um_loopback, exp_loopback)
+        exp_num_instr = []
+        exp_loopback  = []
+        prm_sb        = Scoreboard(dut, fail_immediately=True)
+        prm_sb.add_interface(um_num_instr, exp_num_instr)
+        prm_sb.add_interface(um_loopback,  exp_loopback )
 
         # Send multiple update messages
         last_num_instr = 0
         last_loopback  = 0
         param_mask     = (1 << NODE_PARAM_WIDTH) - 1
-        for _ in range(1000):
+        for _ in range(100):
             # Generate and queue message
             msg = load_parameter(
-                inbound  =dut.mesh_inbound,
+                inbound  =proxy,
                 node_id  =NodeID(row=row, column=col),
                 parameter=choice(list(NodeParameter)),
                 value    =randint(0, (1 << NODE_PARAM_WIDTH) - 1),
@@ -77,5 +92,5 @@ async def parameters(dut):
                 exp_loopback.append(last_loopback)
 
         # Wait for queues to drain
-        while exp_num_instr : await RisingEdge(dut.clk)
-        while exp_loopback: await RisingEdge(dut.clk)
+        while exp_num_instr: await RisingEdge(dut.clk)
+        while exp_loopback : await RisingEdge(dut.clk)

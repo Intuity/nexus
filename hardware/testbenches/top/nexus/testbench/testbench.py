@@ -41,29 +41,19 @@ class Testbench(TestbenchBase):
             trigger=dut.o_status_trigger,
         )
         # Setup drivers/monitors
-        self.ctrl_inbound = StreamInitiator(
+        self.ctrl_in = StreamInitiator(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "ctrl_ib", IORole.RESPONDER)
+            StreamIO(self.dut, "ctrl_in", IORole.RESPONDER)
         )
-        self.ctrl_outbound = StreamResponder(
+        self.ctrl_out = StreamResponder(
             self, self.clk, self.rst,
-            StreamIO(self.dut, "ctrl_ob", IORole.INITIATOR),
-        )
-        self.mesh_inbound = StreamInitiator(
-            self, self.clk, self.rst,
-            StreamIO(self.dut, "mesh_ib", IORole.RESPONDER)
-        )
-        self.mesh_outbound = StreamResponder(
-            self, self.clk, self.rst,
-            StreamIO(self.dut, "mesh_ob", IORole.INITIATOR),
+            StreamIO(self.dut, "ctrl_out", IORole.INITIATOR),
         )
         # Create expected outbound queues
-        self.ctrl_expected = []
-        self.mesh_expected = []
+        self.expected = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self, fail_immediately=False)
-        self.scoreboard.add_interface(self.ctrl_outbound, self.ctrl_expected, reorder_depth=100)
-        self.scoreboard.add_interface(self.mesh_outbound, self.mesh_expected, reorder_depth=100)
+        self.scoreboard = Scoreboard(self, fail_immediately=True)
+        self.scoreboard.add_interface(self.ctrl_out, self.expected, reorder_depth=100)
         # Setup rapid access to every node in the mesh
         self.nodes = [
             [
@@ -75,10 +65,8 @@ class Testbench(TestbenchBase):
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.ctrl_inbound.intf.initialise(IORole.INITIATOR)
-        self.ctrl_outbound.intf.initialise(IORole.RESPONDER)
-        self.mesh_inbound.intf.initialise(IORole.INITIATOR)
-        self.mesh_outbound.intf.initialise(IORole.RESPONDER)
+        self.ctrl_in.intf.initialise(IORole.INITIATOR)
+        self.ctrl_out.intf.initialise(IORole.RESPONDER)
 
     @property
     def base_dir(self): return Path(__file__).absolute().parent
@@ -88,8 +76,7 @@ class testcase(cocotb.test):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.ctrl_expected: await RisingEdge(tb.clk)
-            while tb.mesh_expected: await RisingEdge(tb.clk)
+            while tb.expected: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

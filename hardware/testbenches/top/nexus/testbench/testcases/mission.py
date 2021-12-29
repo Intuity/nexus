@@ -13,12 +13,14 @@
 # limitations under the License.
 
 from itertools import product
+from math import ceil
 
 from cocotb.triggers import ClockCycles, RisingEdge, FallingEdge
 from cocotb.utils import get_sim_time
+from common.work.nxconstants import ControlRespType, ControlResponse
 
-from nxconstants import (NodeCommand, NodeID, NodeMessage, NodeParameter,
-                         ControlCommand, ControlSetActive)
+from nxconstants import (NodeID, NodeParameter, ControlReqType, ControlRequest,
+                         OUT_BITS_PER_MSG)
 from nxloader import NXLoader
 from nxmodel import Nexus
 
@@ -42,8 +44,16 @@ async def mission_mode(dut):
     ram_data_w   = int(dut.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
-    # Disable scoreboarding of output
-    dut.mesh_outbound._callbacks = []
+    # Create a proxy for loading into the mesh
+    class InboundProxy:
+        def append(self, tran):
+            req                 = ControlRequest()
+            req.to_mesh.command = ControlReqType.TO_MESH
+            req.to_mesh.message = tran.data
+            dut.ctrl_in.append(StreamTransaction(req.pack()))
+        async def idle(self):
+            await dut.ctrl_in.idle()
+    proxy = InboundProxy()
 
     # Work out the full path
     full_path = dut.base_dir / "data" / "design.json"
@@ -60,7 +70,7 @@ async def mission_mode(dut):
             node_id = NodeID(row=idx_row, column=idx_col)
             # Load instructions, lookup table, and output mappings
             load_data(
-                inbound   =dut.mesh_inbound,
+                inbound   =proxy,
                 node_id   =node_id,
                 ram_data_w=ram_data_w,
                 stream    =[x.pack() for x in (node.instructions + node.lookup + node.mappings)],
@@ -68,7 +78,7 @@ async def mission_mode(dut):
             )
             # Program the loopback
             load_loopback(
-                inbound   =dut.mesh_inbound,
+                inbound   =proxy,
                 node_id   =node_id,
                 num_inputs=node_inputs,
                 mask      =node.loopback,
@@ -76,13 +86,13 @@ async def mission_mode(dut):
             )
             # Set parameters
             load_parameter(
-                dut.mesh_inbound, node_id, NodeParameter.INSTRUCTIONS,
+                proxy, node_id, NodeParameter.INSTRUCTIONS,
                 len(node.instructions), model.get_ingress()
             )
 
     # Wait for the inbound driver to drain
-    dut.info(f"Waiting for {len(dut.mesh_inbound._sendQ)} messages to drain")
-    await dut.mesh_inbound.idle()
+    dut.info(f"Waiting for {len(dut.ctrl_in._sendQ)} messages to drain")
+    await proxy.idle()
 
     # Wait for the idle flag to go high
     if dut.status.idle == 0: await RisingEdge(dut.status.idle)
@@ -98,9 +108,12 @@ async def mission_mode(dut):
 
     # Raise active and let nexus tick
     dut.info("Enabling nexus")
-    dut.ctrl_inbound.append(StreamTransaction(
-        ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack()
-    ))
+    trig                  = ControlRequest()
+    trig.trigger.command  = ControlReqType.TRIGGER
+    trig.trigger.col_mask = (1 << num_cols) - 1
+    trig.trigger.active   = 1
+    trig.trigger.cycles   = 0
+    dut.ctrl_in.append(StreamTransaction(trig.trigger.pack()))
 
     # Capture start time
     tick_count = 300
@@ -117,6 +130,27 @@ async def mission_mode(dut):
         # Run the model for one tick
         if (cycle % 10) == 0: cycinfo("Starting cycle")
         model.run(1)
+
+        # Accumulate updated model output state
+        for (tgt_row, tgt_col, tgt_idx), val in model.pop_output().items():
+            # Work out the output index
+            full_idx  = (tgt_row - num_rows) * num_cols * node_outputs
+            full_idx += tgt_col * node_outputs
+            full_idx += tgt_idx
+            # Store the latest value
+            mdl_outputs[full_idx] = 1 if val else 0
+
+        # Queue up output messages
+        for idx_out in range(ceil((num_cols * node_outputs) / OUT_BITS_PER_MSG)):
+            resp                 = ControlResponse()
+            resp.outputs.format  = ControlRespType.OUTPUTS
+            resp.outputs.stamp   = cycle
+            resp.outputs.index   = idx_out
+            resp.outputs.section = sum([
+                (mdl_outputs.get((idx_out * OUT_BITS_PER_MSG) + x, 0) << x)
+                for x in range(OUT_BITS_PER_MSG)
+            ])
+            dut.expected.append(StreamTransaction(resp.outputs.pack()))
 
         # Wait for activity
         cycdebug("Waiting for idle to fall")
@@ -160,37 +194,6 @@ async def mission_mode(dut):
                 cycwarn(
                     f"{row}, {col} - {label}: RTL 0x{rtl_val:08X} != MDL: 0x{mdl_val:08X}"
                 )
-
-        # Accumulate updated RTL output state
-        while dut.mesh_outbound._recvQ:
-            tran = dut.mesh_outbound._recvQ.popleft()
-            msg  = NodeMessage()
-            msg.unpack(tran.data)
-            if msg.raw.header.command != NodeCommand.SIGNAL: continue
-            rtl_outputs[
-                msg.signal.header.row,
-                msg.signal.header.column,
-                msg.signal.index
-            ] = msg.signal.state
-
-        # Accumulate updated model output state
-        for key, val in model.pop_output().items():
-            mdl_outputs[key] = val
-
-        # Cross check RTL against model state
-        for key in set(list(rtl_outputs.keys()) + list(mdl_outputs.keys())):
-            rtl_val = rtl_outputs.get(key, 0)
-            mdl_val = mdl_outputs.get(key, 0)
-            # Skip instances where RTL and model match
-            if rtl_val == mdl_val: continue
-            # Increment count of mismatches and log a warning
-            mismatches += 1
-            cycwarn(
-                f"{row}, {col} - output {key}: RTL {rtl_val} != MDL {mdl_val}"
-            )
-
-        # Check for mismatches
-        assert mismatches == 0, f"Detected {mismatches} between RTL and model"
 
     # Calculate simulation rate
     delta      = get_sim_time(units="ns") - start_time

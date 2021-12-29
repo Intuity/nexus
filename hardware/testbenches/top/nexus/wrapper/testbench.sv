@@ -28,24 +28,14 @@ import NXConstants::*;
     , output logic              o_status_active
     , output logic              o_status_idle
     , output logic              o_status_trigger
-    // Control message streams
-    // - Inbound
-    , input  control_message_t  i_ctrl_ib_data
-    , input  logic              i_ctrl_ib_valid
-    , output logic              o_ctrl_ib_ready
-    // - Outbound
-    , output control_response_t o_ctrl_ob_data
-    , output logic              o_ctrl_ob_valid
-    , input  logic              i_ctrl_ob_ready
-    // Mesh message streams
-    // - Inbound
-    , input  node_message_t     i_mesh_ib_data
-    , input  logic              i_mesh_ib_valid
-    , output logic              o_mesh_ib_ready
-    // - Outbound
-    , output node_message_t     o_mesh_ob_data
-    , output logic              o_mesh_ob_valid
-    , input  logic              i_mesh_ob_ready
+    // Inbound control stream
+    , input  control_request_t  i_ctrl_in_data
+    , input  logic              i_ctrl_in_valid
+    , output logic              o_ctrl_in_ready
+    // Outbound control stream
+    , output control_response_t o_ctrl_out_data
+    , output logic              o_ctrl_out_valid
+    , input  logic              i_ctrl_out_ready
 );
 
 // =============================================================================
@@ -74,24 +64,14 @@ nexus #(
     , .o_status_active  ( o_status_active  )
     , .o_status_idle    ( o_status_idle    )
     , .o_status_trigger ( o_status_trigger )
-    // Control message streams
-    // - Inbound
-    , .i_ctrl_ib_data   ( i_ctrl_ib_data   )
-    , .i_ctrl_ib_valid  ( i_ctrl_ib_valid  )
-    , .o_ctrl_ib_ready  ( o_ctrl_ib_ready  )
-    // - Outbound
-    , .o_ctrl_ob_data   ( o_ctrl_ob_data   )
-    , .o_ctrl_ob_valid  ( o_ctrl_ob_valid  )
-    , .i_ctrl_ob_ready  ( i_ctrl_ob_ready  )
-    // Mesh message streams
-    // - Inbound
-    , .i_mesh_ib_data   ( i_mesh_ib_data   )
-    , .i_mesh_ib_valid  ( i_mesh_ib_valid  )
-    , .o_mesh_ib_ready  ( o_mesh_ib_ready  )
-    // - Outbound
-    , .o_mesh_ob_data   ( o_mesh_ob_data   )
-    , .o_mesh_ob_valid  ( o_mesh_ob_valid  )
-    , .i_mesh_ob_ready  ( i_mesh_ob_ready  )
+    // Inbound control stream
+    , .i_ctrl_in_data   ( i_ctrl_in_data   )
+    , .i_ctrl_in_valid  ( i_ctrl_in_valid  )
+    , .o_ctrl_in_ready  ( o_ctrl_in_ready  )
+    // Outbound control stream
+    , .o_ctrl_out_data  ( o_ctrl_out_data  )
+    , .o_ctrl_out_valid ( o_ctrl_out_valid )
+    , .i_ctrl_out_ready ( i_ctrl_out_ready )
 );
 
 // =============================================================================

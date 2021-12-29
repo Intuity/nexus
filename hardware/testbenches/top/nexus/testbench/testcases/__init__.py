@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .aggregation import *
 from .basic import *
 from .load import *
 from .mission import *

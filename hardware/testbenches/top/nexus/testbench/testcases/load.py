@@ -17,8 +17,10 @@ from random import randint
 
 from cocotb.triggers import ClockCycles, RisingEdge
 
+from nxconstants import ControlReqType, ControlRequest, NodeID
+
+from drivers.stream.common import StreamTransaction
 from node.load import load_data
-from nxconstants import NodeID
 
 from ..testbench import testcase
 
@@ -35,6 +37,17 @@ async def load(dut):
     ram_data_w = int(dut.RAM_DATA_W)
     dut.info(f"Mesh size - rows {num_rows}, columns {num_cols}")
 
+    # Create a proxy for loading into the mesh
+    class InboundProxy:
+        def append(self, tran):
+            req                 = ControlRequest()
+            req.to_mesh.command = ControlReqType.TO_MESH
+            req.to_mesh.message = tran.data
+            dut.ctrl_in.append(StreamTransaction(req.pack()))
+        async def idle(self):
+            await dut.ctrl_in.idle()
+    proxy = InboundProxy()
+
     # Load random data into every node
     loaded  = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
     counter = 0
@@ -44,7 +57,7 @@ async def load(dut):
                 randint(0, (1 << ram_data_w) - 1) for _ in range(randint(50, 100))
             ]
             load_data(
-                inbound   =dut.mesh_inbound,
+                inbound   =proxy,
                 node_id   =NodeID(row=row, column=col),
                 ram_data_w=ram_data_w,
                 stream    =loaded[row][col]
@@ -53,7 +66,7 @@ async def load(dut):
 
     # Wait for the inbound driver to drain
     dut.info(f"Waiting for {counter} loads")
-    await dut.mesh_inbound.idle()
+    await proxy.idle()
 
     # Wait for the idle flag to go high
     while dut.status.idle == 0: await RisingEdge(dut.clk)
