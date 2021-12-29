@@ -261,7 +261,7 @@ always_comb begin : comb_outputs
     resp_outputs._padding_0 = 'd0;
     for (int idx = 0; idx < MAX_OUTPUT_INDEX; idx++) begin : gen_outputs
         if (out_idx_q == idx[OUTPUT_IDX_WIDTH-1:0]) begin
-            assign resp_outputs.section = padded_outputs[idx*OUT_BITS_PER_MSG+:OUT_BITS_PER_MSG];
+            resp_outputs.section = padded_outputs[idx*OUT_BITS_PER_MSG+:OUT_BITS_PER_MSG];
         end
     end
 end
