@@ -28,19 +28,22 @@ import NXConstants::*;
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
 ) (
-      input  logic               i_clk
-    , input  logic               i_rst
+      input  logic                         i_clk
+    , input  logic                         i_rst
     // Control signals
-    , input  logic [COLUMNS-1:0] i_trigger
-    , output logic [COLUMNS-1:0] o_idle
+    , input  logic [COLUMNS-1:0]           i_trigger
+    , output logic [COLUMNS-1:0]           o_node_idle
+    , output logic                         o_agg_idle
     // Inbound stream
-    , input  node_message_t      i_inbound_data
-    , input  logic               i_inbound_valid
-    , output logic               o_inbound_ready
+    , input  node_message_t                i_inbound_data
+    , input  logic                         i_inbound_valid
+    , output logic                         o_inbound_ready
     // Outbound stream
-    , output node_message_t      o_outbound_data
-    , output logic               o_outbound_valid
-    , input  logic               i_outbound_ready
+    , output node_message_t                o_outbound_data
+    , output logic                         o_outbound_valid
+    , input  logic                         i_outbound_ready
+    // Aggregated outputs
+    , output logic [(COLUMNS*OUTPUTS)-1:0] o_outputs
 );
 
 // =============================================================================
@@ -50,14 +53,16 @@ import NXConstants::*;
 // I/O bundle for every node
 logic [COLUMNS-1:0][ROWS-1:0][3:0][MESSAGE_WIDTH-1:0] mesh_ob_data;
 logic [COLUMNS-1:0][ROWS-1:0][3:0]                    mesh_ob_valid;
+logic [COLUMNS-1:0]                                   mesh_ob_ready;
 logic [COLUMNS-1:0][ROWS-1:0][3:0]                    mesh_ib_ready;
 
 // Columnised idle/trigger chaining
 logic [COLUMNS-1:0][ROWS-1:0] chain_idle;
 logic [COLUMNS-1:0][ROWS-1:0] chain_trigger;
 
-// Register the fully chained idle signals
-`DECLARE_DQ(COLUMNS, column_idle, i_clk, i_rst, 'd0)
+// Register the fully chained and aggregator idle signals
+`DECLARE_DQ(COLUMNS, column_idle,  i_clk, i_rst, 'd0)
+`DECLARE_DQ(      1, all_agg_idle, i_clk, i_rst, 'd0)
 
 // =============================================================================
 // Per-Column Idle Signals
@@ -70,19 +75,9 @@ for (genvar idx = 0; idx < COLUMNS; idx++) begin : gen_column_idles
 end
 endgenerate
 
-// Drive output idle
-assign o_idle = column_idle_q;
-
-// =============================================================================
-// Link Mesh Ingress/Egress
-// =============================================================================
-
-// Ingress
-assign o_inbound_ready = mesh_ib_ready[0][0][DIRECTION_NORTH];
-
-// Egress
-assign o_outbound_data  = mesh_ob_data[0][ROWS-1][DIRECTION_SOUTH];
-assign o_outbound_valid = mesh_ob_valid[0][ROWS-1][DIRECTION_SOUTH];
+// Drive idle outputs
+assign o_node_idle = column_idle_q;
+assign o_agg_idle  = all_agg_idle_q;
 
 // =============================================================================
 // Generate the Mesh
@@ -119,12 +114,12 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
 
         end
 
-        // For the bottom row, only first column has southbound connection
+        // For the bottom row, only outbound connections exist
         if (idx_row == (ROWS - 1)) begin
             assign node_ib_data[DIRECTION_SOUTH]    = 'd0;
             assign node_ib_valid[DIRECTION_SOUTH]   = 'd0;
-            assign node_ob_ready[DIRECTION_SOUTH]   = (idx_col == 0) ? i_outbound_ready : 'd0;
-            assign node_ob_present[DIRECTION_SOUTH] = (idx_col == 0);
+            assign node_ob_ready[DIRECTION_SOUTH]   = mesh_ob_ready[idx_col];
+            assign node_ob_present[DIRECTION_SOUTH] = 'd1;
 
         // All other rows have a southbound connection to the neighbour below
         end else begin
@@ -188,5 +183,78 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
     end
 end
 endgenerate
+
+// Mesh ingress ready controlled by node 0, 0
+assign o_inbound_ready = mesh_ib_ready[0][0][DIRECTION_NORTH];
+
+// =============================================================================
+// Generate the Aggregators
+// =============================================================================
+
+logic [COLUMNS-1:0]                    agg_idle;
+logic [COLUMNS-1:0][MESSAGE_WIDTH-1:0] agg_data;
+logic [COLUMNS-1:0]                    agg_valid, agg_ready;
+
+for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_aggregators
+
+    // Construct ID
+    node_id_t agg_id;
+    assign agg_id.row    = ROWS;
+    assign agg_id.column = idx_col;
+
+    // Pickup neighbour's passthrough interface
+    logic [MESSAGE_WIDTH-1:0] thru_data;
+    logic                     thru_valid;
+    logic                     thru_ready;
+
+    // - Final column is tied off
+    if (idx_col == (COLUMNS - 1)) begin
+        logic _unused;
+        assign thru_data  = 'd0;
+        assign thru_valid = 'd0;
+        assign _unused    = &{ 1'b0, thru_ready };
+
+    // - All other columns are linked to their neighbour
+    end else begin
+        assign thru_data            = agg_data[idx_col+1];
+        assign thru_valid           = agg_valid[idx_col+1];
+        assign agg_ready[idx_col+1] = thru_ready;
+
+    end
+
+    // Instance the aggregator
+    nx_aggregator #(
+          .OUTPUTS             ( OUTPUTS                                         )
+    ) u_agg (
+          .i_clk               ( i_clk                                           )
+        , .i_rst               ( i_rst                                           )
+        // Control signals
+        , .i_node_id           ( agg_id                                          )
+        , .o_idle              ( agg_idle[idx_col]                               )
+        // Output signals
+        , .o_outputs           ( o_outputs[idx_col*OUTPUTS+:OUTPUTS]             )
+        // Inbound interface from mesh
+        , .i_inbound_data      ( mesh_ob_data[idx_col][ROWS-1][DIRECTION_SOUTH]  )
+        , .i_inbound_valid     ( mesh_ob_valid[idx_col][ROWS-1][DIRECTION_SOUTH] )
+        , .o_inbound_ready     ( mesh_ob_ready[idx_col]                          )
+        // Passthrough interface from neighbouring aggregator
+        , .i_passthrough_data  ( thru_data                                       )
+        , .i_passthrough_valid ( thru_valid                                      )
+        , .o_passthrough_ready ( thru_ready                                      )
+        // Outbound interfaces
+        , .o_outbound_data     ( agg_data[idx_col]                               )
+        , .o_outbound_valid    ( agg_valid[idx_col]                              )
+        , .i_outbound_ready    ( agg_ready[idx_col]                              )
+    );
+
+end
+
+// Accumulate aggregator idles
+assign all_agg_idle = &agg_idle;
+
+// Link the aggregator in column 0 to the main outbound connection
+assign o_outbound_data  = agg_data[0];
+assign o_outbound_valid = agg_valid[0];
+assign agg_ready[0]     = i_outbound_ready;
 
 endmodule : nx_mesh
