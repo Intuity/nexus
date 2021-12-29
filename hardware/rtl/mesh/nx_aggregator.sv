@@ -127,4 +127,11 @@ nx_stream_arbiter #(
 
 assign o_idle = (!i_inbound_valid && !i_passthrough_valid && !o_outbound_valid);
 
+// =============================================================================
+// Tie-Off Unused Signals
+// =============================================================================
+
+logic _unused;
+assign _unused = &{ 1'b0, i_node_id.row };
+
 endmodule : nx_aggregator
