@@ -17,6 +17,12 @@ from math import ceil, log2
 import packtype
 from packtype import Constant, Enum, Scalar, Struct
 
+def clog2(obj):
+    if isinstance(obj, Constant):
+        return int(ceil(log2(obj.value))) if obj.value > 0 else 1
+    else:
+        return int(ceil(log2(obj))) if obj > 0 else 1
+
 # ==============================================================================
 # Package Declaration
 # ==============================================================================
@@ -39,18 +45,19 @@ class NXConstants:
     MAX_NODE_IOR_COUNT : Constant("Max input, output, or register count"  ) = max(
         MAX_NODE_INPUTS, MAX_NODE_OUTPUTS, MAX_NODE_REGISTERS
     )
+    MAX_MESH_OUTPUTS   : Constant("Maximum outputs of the mesh"           ) = (
+        MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS
+    )
 
     # Interface and selector sizes
+    CONTROL_WIDTH    : Constant("Width of the control stream" ) = 128
     MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 28
     ADDR_ROW_WIDTH   : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
     ADDR_COL_WIDTH   : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
     MAX_INPUT_WIDTH  : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
     MAX_OUTPUT_WIDTH : Constant("Width of output selector"    ) = ceil(log2(MAX_NODE_OUTPUTS))
     MAX_IOR_WIDTH    : Constant("Width of in/out/reg selector") = ceil(log2(MAX_NODE_IOR_COUNT))
-
-    # Different command type widths (control plane versus nodes in mesh)
-    CTRL_CMD_WIDTH : Constant("Control message command width") = 3
-    NODE_CMD_WIDTH : Constant("Node message command width"   ) = 2
+    TIMER_WIDTH      : Constant("Width of the control timers" ) = 24
 
     # Truth table
     TT_WIDTH : Constant("Width of a three input truth table") = 8
@@ -78,16 +85,22 @@ class Direction:
     SOUTH : Constant("Sending to/arriving from the south")
     WEST  : Constant("Sending to/arriving from the west" )
 
-@packtype.enum(package=NXConstants, mode=Enum.INDEXED)
-class ControlCommand:
-    """ Different message types for the control plane """
-    PARAM    : Constant("Read back different parameters")
-    ACTIVE   : Constant("Set the active status of the device")
-    STATUS   : Constant("Read the current status of the device")
-    CYCLES   : Constant("Read the current cycle counter")
-    INTERVAL : Constant("Set the number of cycles to run for")
-    RESET    : Constant("Write a 1 to trigger a soft reset")
-    TRIGMASK : Constant("Alter the column trigger mask")
+@packtype.enum(package=NXConstants)
+class ControlReqType:
+    """ Control request type enumeration """
+    READ_PARAMS : Constant("Read back the device's parameters")
+    READ_STATUS : Constant("Read back the device's status"    )
+    SOFT_RESET  : Constant("Request a soft reset"             )
+    TRIGGER     : Constant("Trigger the device to run"        )
+    TO_MESH     : Constant("Forward message into the mesh"    )
+
+@packtype.enum(package=NXConstants)
+class ControlRespType:
+    """ Control response type enumeration """
+    OUTPUTS   : Constant("Reporting the current outputs"    )
+    FROM_MESH : Constant("Message forwarded from the mesh"  )
+    PARAMS    : Constant("Device parameters"                )
+    STATUS    : Constant("Status of the controller and mesh")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
@@ -115,17 +128,6 @@ class Operation:
     XOR      : Constant("X =  (A ^ B)")
     XNOR     : Constant("X = !(A ^ B)")
     RESERVED : Constant("Reserved instruction")
-
-@packtype.enum(package=NXConstants, mode=Enum.INDEXED)
-class ControlParam:
-    ID             : Constant(desc="Hardware identifier")
-    VERSION        : Constant(desc="Major and minor hardware revision")
-    COUNTER_WIDTH  : Constant(desc="Width of counters in the control block")
-    ROWS           : Constant(desc="Number of rows in the mesh")
-    COLUMNS        : Constant(desc="Number of columns in the mesh")
-    NODE_INPUTS    : Constant(desc="Number of inputs per node")
-    NODE_OUTPUTS   : Constant(desc="Number of outputs per node")
-    NODE_REGISTERS : Constant(desc="Number of internal registers per node")
 
 # ==============================================================================
 # Node Identifier
@@ -172,49 +174,6 @@ class OutputMapping:
     column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Target column")
     index  : Scalar(width=NXConstants.MAX_IOR_WIDTH,  desc="Target index")
     is_seq : Scalar(width=1,                          desc="Is target sequential")
-
-# ==============================================================================
-# Control Plane Message Formats
-# ==============================================================================
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class ControlRaw:
-    """ Raw payload message format for the control plane """
-    command : ControlCommand(desc="Command to perform")
-    payload : Scalar(width=(NXConstants.MESSAGE_WIDTH.value - ControlCommand._pt_width), desc="Payload")
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class ControlReadParam:
-    """ Request a parameter to be read back from the hardware """
-    command : ControlCommand(desc="Command to perform")
-    param   : ControlParam(desc="Parameter to query")
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class ControlSetActive:
-    """ Set the active state of Nexus """
-    command : ControlCommand(desc="Command to perform")
-    active  : Scalar(width=1, desc="Active state")
-
-@packtype.union(package=NXConstants)
-class ControlMessage:
-    """ Union of different control message types """
-    raw    : ControlRaw(desc="Raw message encoding")
-    param  : ControlReadParam(desc="Read back parameter encoding")
-    active : ControlSetActive(desc="Set active state encoding")
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value)
-class ControlStatus:
-    """ Status response from the control plane """
-    interval_set : Scalar(width=1, desc="Interval counter is set")
-    first_tick   : Scalar(width=1, desc="First tick pending")
-    idle_low     : Scalar(width=1, desc="Mesh idle has been seen low")
-    active       : Scalar(width=1, desc="Controller is generating ticks")
-
-@packtype.union(package=NXConstants)
-class ControlResponse:
-    """ Response to a control message """
-    raw    : Scalar(width=NXConstants.MESSAGE_WIDTH, desc="Raw response")
-    status : ControlStatus(desc="Encoded status response")
 
 # ==============================================================================
 # Node Message Formats
@@ -270,3 +229,85 @@ class NodeMessage:
     signal   : NodeSignal(desc="Signal state encoding")
     control  : NodeControl(desc="Parameter control encoding")
     trace    : NodeControl(desc="Output trace encoding")
+
+
+# ==============================================================================
+# Control Plane Message Formats
+# ==============================================================================
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlRequestRaw:
+    """ Control request with command and raw payload """
+    command : ControlReqType(desc="Command to perform")
+    payload : Scalar(width=(NXConstants.CONTROL_WIDTH.value - ControlReqType._pt_width), desc="Payload")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlRequestTrigger:
+    """ Control request to trigger the mesh """
+    command  : ControlReqType(desc="Command to perform")
+    col_mask : Scalar(width=NXConstants.MAX_COLUMN_COUNT.value, desc="Columns to trigger")
+    cycles   : Scalar(width=NXConstants.TIMER_WIDTH.value,      desc="Cycles to run for" )
+    active   : Scalar(width=1,                                  desc="Enable/disable"    )
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlRequestToMesh:
+    """ Control request to forward message into the mesh """
+    command : ControlReqType(desc="Command to perform")
+    message : Scalar(width=NXConstants.MESSAGE_WIDTH.value, desc="Message to forward into the mesh")
+
+@packtype.union(package=NXConstants)
+class ControlRequest:
+    """ Control requests sent by the host """
+    raw     : ControlRequestRaw(desc="Raw control format")
+    trigger : ControlRequestTrigger(desc="Trigger control format")
+    to_mesh : ControlRequestToMesh(desc="Forward message into mesh format")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseOutputs:
+    """ Control response carrying sections of the output vector """
+    format  : ControlRespType(desc="Control response format")
+    stamp   : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Simulation cycle")
+    index   : Scalar(width=ceil(log2(
+        (NXConstants.MAX_COLUMN_COUNT.value * NXConstants.MAX_NODE_OUTPUTS.value) / 96)
+    ), desc="Which section of the full outputs is included")
+    section : Scalar(width=96, desc="Section of the outputs")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseFromMesh:
+    """ Forwarded message from the mesh """
+    format  : ControlRespType(desc="Control response format")
+    message : Scalar(width=NXConstants.MESSAGE_WIDTH.value, desc="Forwarded message")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseParameters:
+    """ Parameters of the device """
+    format      : ControlRespType(desc="Control response format")
+    id          : Scalar(width=clog2(NXConstants.HW_DEV_ID),          desc="Hardware identifier")
+    ver_major   : Scalar(width=clog2(NXConstants.HW_VER_MAJOR),       desc="Major version"      )
+    ver_minor   : Scalar(width=clog2(NXConstants.HW_VER_MINOR),       desc="Minor version"      )
+    timer_width : Scalar(width=clog2(NXConstants.TIMER_WIDTH),        desc="Timer width"        )
+    rows        : Scalar(width=clog2(NXConstants.MAX_ROW_COUNT),      desc="Number of rows"     )
+    columns     : Scalar(width=clog2(NXConstants.MAX_COLUMN_COUNT),   desc="Number of columns"  )
+    node_ins    : Scalar(width=clog2(NXConstants.MAX_NODE_INPUTS),    desc="Inputs per node"    )
+    node_outs   : Scalar(width=clog2(NXConstants.MAX_NODE_OUTPUTS),   desc="Outputs per node"   )
+    node_regs   : Scalar(width=clog2(NXConstants.MAX_NODE_REGISTERS), desc="Registers per node" )
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseStatus:
+    """ Status of the device """
+    format     : ControlRespType(desc="Control response format")
+    active     : Scalar(width=1, desc="If the controller is active")
+    mesh_idle  : Scalar(width=1, desc="Is the mesh idle?")
+    agg_idle   : Scalar(width=1, desc="Are the aggregators idle?")
+    seen_low   : Scalar(width=1, desc="Has the idle signal been seen low?")
+    first_tick : Scalar(width=1, desc="Is this the first tick after reset?")
+    cycle      : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Current cycle")
+    countdown  : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Remaining cycles")
+
+@packtype.union(package=NXConstants)
+class ControlResponse:
+    """ Control responses sent by the device """
+    params    : ControlResponseParameters(desc="Parameters of the device")
+    status    : ControlResponseStatus(desc="Status of the device")
+    outputs   : ControlResponseOutputs(desc="Reports the current outputs")
+    from_mesh : ControlResponseFromMesh(desc="Forwards messages from the mesh")
