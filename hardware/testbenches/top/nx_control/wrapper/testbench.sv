@@ -16,29 +16,41 @@ module testbench
 import NXConstants::*;
 #(
       parameter ROWS      =  3
-    , parameter COLUMNS   =  3
+    , parameter COLUMNS   = 10
     , parameter INPUTS    = 32
     , parameter OUTPUTS   = 32
     , parameter REGISTERS = 16
 ) (
-      input  logic               rst
-    // Inbound message stream (from host)
-    , input  control_message_t   i_inbound_data
-    , input  logic               i_inbound_valid
-    , output logic               o_inbound_ready
-    // Outbound message stream (to host)
-    , output control_response_t  o_outbound_data
-    , output logic               o_outbound_valid
-    , input  logic               i_outbound_ready
+      input  logic                         rst
     // Soft reset request
-    , output logic               o_soft_reset
+    , output logic                         o_soft_reset
+    // Host message streams
+    // - Inbound
+    , input  control_request_t             i_ctrl_in_data
+    , input  logic                         i_ctrl_in_valid
+    , output logic                         o_ctrl_in_ready
+    // - Outbound
+    , output control_response_t            o_ctrl_out_data
+    , output logic                         o_ctrl_out_valid
+    , input  logic                         i_ctrl_out_ready
+    // Mesh message streams
+    // - Inbound
+    , output node_message_t                o_mesh_in_data
+    , output logic                         o_mesh_in_valid
+    , input  logic                         i_mesh_in_ready
+    // - Outbound
+    , input  node_message_t                i_mesh_out_data
+    , input  logic                         i_mesh_out_valid
+    , output logic                         o_mesh_out_ready
     // Externally visible status
-    , output logic               o_status_active
-    , output logic               o_status_idle
-    , output logic               o_status_trigger
+    , output logic                         o_status_active
+    , output logic                         o_status_idle
+    , output logic                         o_status_trigger
     // Interface to the mesh
-    , input  logic [COLUMNS-1:0] i_mesh_idle
-    , output logic [COLUMNS-1:0] o_mesh_trigger
+    , input  logic [COLUMNS-1:0]           i_mesh_node_idle
+    , input  logic                         i_mesh_agg_idle
+    , output logic [COLUMNS-1:0]           o_mesh_trigger
+    , input  logic [(COLUMNS*OUTPUTS)-1:0] i_mesh_outputs
 );
 
 // =============================================================================
@@ -61,23 +73,35 @@ nx_control #(
 ) u_dut (
       .i_clk            ( clk              )
     , .i_rst            ( rst              )
-    // Inbound message stream (from host)
-    , .i_inbound_data   ( i_inbound_data   )
-    , .i_inbound_valid  ( i_inbound_valid  )
-    , .o_inbound_ready  ( o_inbound_ready  )
-    // Outbound message stream (to host)
-    , .o_outbound_data  ( o_outbound_data  )
-    , .o_outbound_valid ( o_outbound_valid )
-    , .i_outbound_ready ( i_outbound_ready )
     // Soft reset request
     , .o_soft_reset     ( o_soft_reset     )
+    // Host message streams
+    // - Inbound
+    , .i_ctrl_in_data   ( i_ctrl_in_data   )
+    , .i_ctrl_in_valid  ( i_ctrl_in_valid  )
+    , .o_ctrl_in_ready  ( o_ctrl_in_ready  )
+    // - Outbound
+    , .o_ctrl_out_data  ( o_ctrl_out_data  )
+    , .o_ctrl_out_valid ( o_ctrl_out_valid )
+    , .i_ctrl_out_ready ( i_ctrl_out_ready )
+    // Mesh message streams
+    // - Inbound
+    , .o_mesh_in_data   ( o_mesh_in_data   )
+    , .o_mesh_in_valid  ( o_mesh_in_valid  )
+    , .i_mesh_in_ready  ( i_mesh_in_ready  )
+    // - Outbound
+    , .i_mesh_out_data  ( i_mesh_out_data  )
+    , .i_mesh_out_valid ( i_mesh_out_valid )
+    , .o_mesh_out_ready ( o_mesh_out_ready )
     // Externally visible status
     , .o_status_active  ( o_status_active  )
     , .o_status_idle    ( o_status_idle    )
     , .o_status_trigger ( o_status_trigger )
     // Interface to the mesh
-    , .i_mesh_idle      ( i_mesh_idle      )
+    , .i_mesh_node_idle ( i_mesh_node_idle )
+    , .i_mesh_agg_idle  ( i_mesh_agg_idle  )
     , .o_mesh_trigger   ( o_mesh_trigger   )
+    , .i_mesh_outputs   ( i_mesh_outputs   )
 );
 
 // =============================================================================

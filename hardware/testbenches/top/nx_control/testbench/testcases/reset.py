@@ -19,14 +19,14 @@ import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import ControlRespType, ControlResponse
+from nxconstants import ControlReqType, ControlRequest
 
 from ..common import trigger, check_status
 from ..testbench import testcase
 
 @testcase()
-async def set_active(dut):
-    """ Read the device parameters """
+async def soft_reset(dut):
+    """ Request a soft reset from the device """
     dut.info("Resetting the DUT")
     await dut.reset()
 
@@ -49,6 +49,7 @@ async def set_active(dut):
 
     # Check outputs from control
     assert triggered          == 0
+    assert dut.soft_reset     == 0
     assert dut.status.active  == 0
     assert dut.status.idle    == 1
     assert dut.status.trigger == 0
@@ -82,38 +83,13 @@ async def set_active(dut):
         cycle=0, countdown=0,
     )
 
-    # Cycle idle a few times
-    num_cycles = randint(5, 20)
-    dut.info(f"Running for {num_cycles} cycles")
-    for cycle in range(num_cycles):
-        # Lower idle (faking mesh being busy)
-        dut.node_idle <= 0
-        dut.agg_idle  <= 0
-        await ClockCycles(dut.clk, randint(10, 20))
-        # Queue the output messages
-        for idx in range(ceil(int(dut.COLUMNS) * int(dut.OUTPUTS) / 96)):
-            resp                 = ControlResponse()
-            resp.outputs.format  = ControlRespType.OUTPUTS
-            resp.outputs.stamp   = cycle
-            resp.outputs.index   = idx
-            resp.outputs.section = 0
-            dut.exp_ctrl.append(StreamTransaction(resp.pack()))
-        # Raise idle (faking mesh completion)
-        dut.node_idle <= ((1 << int(dut.dut.COLUMNS)) - 1)
-        dut.agg_idle  <= 1
-        # Wait for trigger
-        while dut.mesh_trigger == 0: await RisingEdge(dut.clk)
-
-    # Wait a few cycles to settle
+    # Trigger a soft reset
+    req             = ControlRequest()
+    req.raw.command = ControlReqType.SOFT_RESET
+    req.raw.payload = 1
+    dut.ctrl_in.append(StreamTransaction(req.pack()))
+    await dut.ctrl_in.idle()
     await ClockCycles(dut.clk, 10)
 
-    # Check the number of triggers
-    assert triggered == (1 + num_cycles), \
-        f"Expecting {1 + num_cycles} triggers, got {triggered}"
-
-    # Request the active state
-    dut.info("Checking active state")
-    await check_status(
-        dut, active=1, mesh_idle=1, agg_idle=1, seen_low=0,
-        first_tick=0, cycle=num_cycles, countdown=0,
-    )
+    # Check soft reset is asserted
+    assert dut.soft_reset == 1

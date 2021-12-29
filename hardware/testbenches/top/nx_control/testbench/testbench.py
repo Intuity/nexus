@@ -35,39 +35,54 @@ class Testbench(TestbenchBase):
         super().__init__(dut)
         # Wrap I/Os
         self.soft_reset   = self.dut.o_soft_reset
-        self.mesh_idle    = self.dut.i_mesh_idle
+        self.node_idle    = self.dut.i_mesh_node_idle
+        self.agg_idle     = self.dut.i_mesh_agg_idle
         self.mesh_trigger = self.dut.o_mesh_trigger
+        self.mesh_outputs = self.dut.i_mesh_outputs
         self.status       = SimpleNamespace(
             active =self.dut.o_status_active,
             idle   =self.dut.o_status_idle,
             trigger=self.dut.o_status_trigger,
         )
         # Setup drivers/monitors
-        self.inbound = StreamInitiator(
-            self, self.clk, self.rst, StreamIO(self.dut, "inbound", IORole.RESPONDER),
+        self.ctrl_in = StreamInitiator(
+            self, self.clk, self.rst, StreamIO(self.dut, "ctrl_in", IORole.RESPONDER),
         )
-        self.outbound = StreamResponder(
-            self, self.clk, self.rst, StreamIO(self.dut, "outbound", IORole.INITIATOR),
+        self.ctrl_out = StreamResponder(
+            self, self.clk, self.rst, StreamIO(self.dut, "ctrl_out", IORole.INITIATOR),
+        )
+        self.mesh_in = StreamResponder(
+            self, self.clk, self.rst, StreamIO(self.dut, "mesh_in", IORole.INITIATOR),
+        )
+        self.mesh_out = StreamInitiator(
+            self, self.clk, self.rst, StreamIO(self.dut, "mesh_out", IORole.RESPONDER),
         )
         # Create queues for expected transactions
-        self.expected = []
+        self.exp_ctrl = []
+        self.exp_mesh = []
         # Create a scoreboard
-        self.scoreboard = Scoreboard(self, fail_immediately=False)
-        self.scoreboard.add_interface(self.outbound, self.expected)
+        self.scoreboard = Scoreboard(self, fail_immediately=True)
+        self.scoreboard.add_interface(self.ctrl_out, self.exp_ctrl)
+        self.scoreboard.add_interface(self.mesh_in, self.exp_mesh)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.inbound.intf.initialise(IORole.INITIATOR)
-        self.outbound.intf.initialise(IORole.RESPONDER)
-        self.mesh_idle <= ((1 << int(self.dut.COLUMNS)) - 1)
+        self.ctrl_in.intf.initialise(IORole.INITIATOR)
+        self.ctrl_out.intf.initialise(IORole.RESPONDER)
+        self.mesh_in.intf.initialise(IORole.RESPONDER)
+        self.mesh_out.intf.initialise(IORole.INITIATOR)
+        self.node_idle    <= ((1 << int(self.dut.COLUMNS)) - 1)
+        self.agg_idle     <= 1
+        self.mesh_outputs <= 0
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):
         async def __run_test():
             tb = Testbench(dut)
             await self._func(tb, *args, **kwargs)
-            while tb.expected: await RisingEdge(tb.clk)
+            while tb.exp_ctrl: await RisingEdge(tb.clk)
+            while tb.exp_mesh: await RisingEdge(tb.clk)
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)

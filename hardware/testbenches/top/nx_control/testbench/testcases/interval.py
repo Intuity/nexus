@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from math import ceil
 from random import randint
 
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import ControlCommand, ControlRaw, ControlSetActive, ControlStatus
+from nxconstants import ControlRespType, ControlResponse
 
+from ..common import trigger, check_status
 from ..testbench import testcase
 
 @testcase()
@@ -29,6 +31,7 @@ async def set_interval(dut):
     await dut.reset()
 
     # Monitor for trigger pulses
+    en_mesh   = False
     triggered = 0
     async def fake_mesh():
         nonlocal triggered
@@ -36,24 +39,20 @@ async def set_interval(dut):
             await RisingEdge(dut.clk)
             if dut.mesh_trigger == ((1 << int(dut.dut.COLUMNS)) - 1):
                 triggered += 1
-                dut.mesh_idle <= 0
+                while not en_mesh: await RisingEdge(dut.clk)
+                dut.node_idle <= 0
+                dut.agg_idle  <= 0
                 await ClockCycles(dut.clk, randint(10, 20))
-                dut.mesh_idle <= ((1 << int(dut.dut.COLUMNS)) - 1)
+                dut.node_idle <= ((1 << int(dut.dut.COLUMNS)) - 1)
+                dut.agg_idle  <= 1
     cocotb.fork(fake_mesh())
 
     # Request the initial state
     dut.info("Checking initial state")
-    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
-    dut.expected.append(StreamTransaction(ControlStatus(
-        idle_low=1, first_tick=1
-    ).pack()))
-    while dut.expected: await RisingEdge(dut.clk)
-
-    # Request the initial cycle count
-    dut.info("Checking initial cycle count")
-    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
-    dut.expected.append(StreamTransaction(0))
-    while dut.expected: await RisingEdge(dut.clk)
+    await check_status(
+        dut, active=0, mesh_idle=1, agg_idle=1, seen_low=0, first_tick=1,
+        cycle=0, countdown=0,
+    )
 
     # Check outputs from control
     assert triggered          == 0
@@ -63,36 +62,43 @@ async def set_interval(dut):
     assert dut.mesh_trigger   == 0
 
     # Bounce idle (as if we were loading up a design)
-    dut.mesh_idle <= 0
+    dut.node_idle <= 0
     await RisingEdge(dut.clk)
-    dut.mesh_idle <= ((1 << int(dut.dut.COLUMNS)) - 1)
+    dut.node_idle <= ((1 << int(dut.dut.COLUMNS)) - 1)
     await RisingEdge(dut.clk)
 
     # Request the updated state
     dut.info("Checking updated state")
-    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
-    dut.expected.append(StreamTransaction(ControlStatus(
-        idle_low=1, first_tick=1
-    ).pack()))
-    while dut.expected: await RisingEdge(dut.clk)
+    await check_status(
+        dut, active=0, mesh_idle=1, agg_idle=1, seen_low=1, first_tick=1,
+        cycle=0, countdown=0,
+    )
 
-    # Setup an interval
-    dut.info("Setting an interval")
+    # Run for an interval
+    dut.info("Running for an interval")
     cycles = randint(10, 20)
-    dut.inbound.append(ControlRaw(command=ControlCommand.INTERVAL, payload=cycles).pack())
+    await trigger(dut, active=1, cycles=cycles)
 
     # Request the updated state
     dut.info("Checking updated state")
-    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
-    dut.expected.append(StreamTransaction(ControlStatus(
-        idle_low=1, first_tick=1, interval_set=1
-    ).pack()))
-    while dut.expected: await RisingEdge(dut.clk)
+    await check_status(
+        dut, active=1, mesh_idle=1, agg_idle=1, seen_low=0, first_tick=0,
+        cycle=0, countdown=(cycles - 1),
+    )
 
-    # Set the mesh to be active
-    dut.info("Activating mesh")
-    dut.inbound.append(ControlSetActive(command=ControlCommand.ACTIVE, active=1).pack())
-    await dut.inbound.idle()
+    # Allow the mesh to tick
+    dut.info("Enabling dummy mesh")
+    en_mesh = True
+
+    # Queue up the output messages
+    for cycle in range(cycles):
+        for idx in range(ceil(int(dut.COLUMNS) * int(dut.OUTPUTS) / 96)):
+            resp = ControlResponse()
+            resp.outputs.format  = ControlRespType.OUTPUTS
+            resp.outputs.stamp   = cycle
+            resp.outputs.index   = idx
+            resp.outputs.section = 0
+            dut.exp_ctrl.append(StreamTransaction(resp.pack()))
 
     # Wait until active signal clears
     dut.info("Waiting for active signal to clear")
@@ -101,24 +107,7 @@ async def set_interval(dut):
 
     # Request the state
     dut.info("Checking state")
-    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
-    dut.expected.append(StreamTransaction(ControlStatus(
-        idle_low=1, interval_set=1
-    ).pack()))
-    while dut.expected: await RisingEdge(dut.clk)
-
-    # Request the updated cycle count
-    dut.info("Checking updated cycle count")
-    dut.inbound.append(ControlRaw(command=ControlCommand.CYCLES).pack())
-    dut.expected.append(StreamTransaction(cycles))
-    while dut.expected: await RisingEdge(dut.clk)
-
-    # Setup an interval
-    dut.info("Clearing the interval")
-    dut.inbound.append(ControlRaw(command=ControlCommand.INTERVAL, payload=0).pack())
-
-    # Request the state
-    dut.info("Checking state")
-    dut.inbound.append(ControlRaw(command=ControlCommand.STATUS).pack())
-    dut.expected.append(StreamTransaction(ControlStatus(idle_low=1).pack()))
-    while dut.expected: await RisingEdge(dut.clk)
+    await check_status(
+        dut, active=0, mesh_idle=1, agg_idle=1, seen_low=1, first_tick=0,
+        cycle=cycles, countdown=0,
+    )

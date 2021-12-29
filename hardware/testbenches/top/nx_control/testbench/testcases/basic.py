@@ -14,10 +14,6 @@
 
 from cocotb.triggers import ClockCycles
 
-from drivers.stream.common import StreamTransaction
-from nxconstants import (ControlCommand, ControlRaw, HW_DEV_ID, HW_VER_MAJOR,
-                         HW_VER_MINOR)
-
 from ..testbench import testcase
 
 @testcase()

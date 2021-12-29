@@ -15,8 +15,9 @@
 from random import random
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import (ControlCommand, ControlReadParam, ControlParam,
-                         HW_DEV_ID, MESSAGE_WIDTH, HW_VER_MAJOR, HW_VER_MINOR)
+from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
+                         ControlResponse, HW_DEV_ID, HW_VER_MAJOR, HW_VER_MINOR,
+                         TIMER_WIDTH)
 
 from ..testbench import testcase
 
@@ -26,20 +27,21 @@ async def read_params(dut):
     dut.info("Resetting the DUT")
     await dut.reset()
 
-    # Create a lookup between parameter and the true value
-    lookup = {
-        ControlParam.ID            : HW_DEV_ID,
-        ControlParam.VERSION       : (HW_VER_MAJOR << 8) | HW_VER_MINOR,
-        ControlParam.COUNTER_WIDTH : MESSAGE_WIDTH,
-        ControlParam.ROWS          : int(dut.ROWS     ),
-        ControlParam.COLUMNS       : int(dut.COLUMNS  ),
-        ControlParam.NODE_INPUTS   : int(dut.INPUTS   ),
-        ControlParam.NODE_OUTPUTS  : int(dut.OUTPUTS  ),
-        ControlParam.NODE_REGISTERS: int(dut.REGISTERS),
-    }
+    # Queue up a parameter request
+    req             = ControlRequest()
+    req.raw.command = ControlReqType.READ_PARAMS
+    dut.ctrl_in.append(StreamTransaction(req.pack()))
 
-    # Request all parameters in a random order
-    for param in sorted(list(ControlParam), key=lambda _: random()):
-        dut.info(f"Requesting parameter {ControlParam(param).name}")
-        dut.inbound.append(ControlReadParam(command=ControlCommand.PARAM, param=param).pack())
-        dut.expected.append(StreamTransaction(lookup[param]))
+    # Queue up a parameter response
+    resp                    = ControlResponse()
+    resp.params.format      = ControlRespType.PARAMS
+    resp.params.id          = HW_DEV_ID
+    resp.params.ver_major   = HW_VER_MAJOR
+    resp.params.ver_minor   = HW_VER_MINOR
+    resp.params.timer_width = TIMER_WIDTH
+    resp.params.rows        = int(dut.ROWS)
+    resp.params.columns     = int(dut.COLUMNS)
+    resp.params.node_ins    = int(dut.INPUTS)
+    resp.params.node_outs   = int(dut.OUTPUTS)
+    resp.params.node_regs   = int(dut.REGISTERS)
+    dut.exp_ctrl.append(StreamTransaction(resp.pack()))
