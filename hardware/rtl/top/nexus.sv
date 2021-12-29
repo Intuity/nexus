@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // nexus
-// Top-level of the Nexus simulation accelerator.
+// Top-level of the accelerator.
 //
 module nexus
 import NXConstants::*;
@@ -32,25 +32,21 @@ import NXConstants::*;
     , output logic              o_status_active
     , output logic              o_status_idle
     , output logic              o_status_trigger
-    // Control message streams
-    // - Inbound
-    , input  control_message_t  i_ctrl_ib_data
-    , input  logic              i_ctrl_ib_valid
-    , output logic              o_ctrl_ib_ready
-    // - Outbound
-    , output control_response_t o_ctrl_ob_data
-    , output logic              o_ctrl_ob_valid
-    , input  logic              i_ctrl_ob_ready
-    // Mesh message streams
-    // - Inbound
-    , input  node_message_t     i_mesh_ib_data
-    , input  logic              i_mesh_ib_valid
-    , output logic              o_mesh_ib_ready
-    // - Outbound
-    , output node_message_t     o_mesh_ob_data
-    , output logic              o_mesh_ob_valid
-    , input  logic              i_mesh_ob_ready
+    // Inbound control stream
+    , input  control_request_t  i_ctrl_in_data
+    , input  logic              i_ctrl_in_valid
+    , output logic              o_ctrl_in_ready
+    // Outbound control stream
+    , output control_response_t o_ctrl_out_data
+    , output logic              o_ctrl_out_valid
+    , input  logic              i_ctrl_out_ready
 );
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+localparam MESH_OUTPUTS = COLUMNS * OUTPUTS;
 
 // =============================================================================
 // Internal Signals
@@ -60,7 +56,11 @@ import NXConstants::*;
 logic rst_soft, rst_internal;
 
 // Mesh controller
-logic [COLUMNS-1:0] ctrl_mesh_idle, ctrl_trigger;
+node_message_t           mesh_in_data, mesh_out_data;
+logic                    mesh_in_valid, mesh_out_valid, mesh_in_ready, mesh_out_ready;
+logic [COLUMNS-1:0]      mesh_node_idle, mesh_trigger;
+logic                    mesh_agg_idle;
+logic [MESH_OUTPUTS-1:0] mesh_outputs;
 
 // =============================================================================
 // Reset Stretcher
@@ -86,23 +86,35 @@ nx_control #(
 ) u_control (
       .i_clk            ( i_clk            )
     , .i_rst            ( rst_internal     )
-    // Inbound message stream (from host)
-    , .i_inbound_data   ( i_ctrl_ib_data   )
-    , .i_inbound_valid  ( i_ctrl_ib_valid  )
-    , .o_inbound_ready  ( o_ctrl_ib_ready  )
-    // Outbound message stream (to host)
-    , .o_outbound_data  ( o_ctrl_ob_data   )
-    , .o_outbound_valid ( o_ctrl_ob_valid  )
-    , .i_outbound_ready ( i_ctrl_ob_ready  )
     // Soft reset request
     , .o_soft_reset     ( rst_soft         )
+    // Host message streams
+    // - Inbound
+    , .i_ctrl_in_data   ( i_ctrl_in_data   )
+    , .i_ctrl_in_valid  ( i_ctrl_in_valid  )
+    , .o_ctrl_in_ready  ( o_ctrl_in_ready  )
+    // - Outbound
+    , .o_ctrl_out_data  ( o_ctrl_out_data  )
+    , .o_ctrl_out_valid ( o_ctrl_out_valid )
+    , .i_ctrl_out_ready ( i_ctrl_out_ready )
+    // Mesh message streams
+    // - Inbound
+    , .o_mesh_in_data   ( mesh_in_data     )
+    , .o_mesh_in_valid  ( mesh_in_valid    )
+    , .i_mesh_in_ready  ( mesh_in_ready    )
+    // - Outbound
+    , .i_mesh_out_data  ( mesh_out_data    )
+    , .i_mesh_out_valid ( mesh_out_valid   )
+    , .o_mesh_out_ready ( mesh_out_ready   )
     // Externally visible status
     , .o_status_active  ( o_status_active  )
     , .o_status_idle    ( o_status_idle    )
     , .o_status_trigger ( o_status_trigger )
     // Interface to the mesh
-    , .i_mesh_idle      ( ctrl_mesh_idle   )
-    , .o_mesh_trigger   ( ctrl_trigger     )
+    , .i_mesh_node_idle ( mesh_node_idle   )
+    , .i_mesh_agg_idle  ( mesh_agg_idle    )
+    , .o_mesh_trigger   ( mesh_trigger     )
+    , .i_mesh_outputs   ( mesh_outputs     )
 );
 
 // =============================================================================
@@ -110,27 +122,30 @@ nx_control #(
 // =============================================================================
 
 nx_mesh #(
-      .ROWS             ( ROWS            )
-    , .COLUMNS          ( COLUMNS         )
-    , .INPUTS           ( INPUTS          )
-    , .OUTPUTS          ( OUTPUTS         )
-    , .REGISTERS        ( REGISTERS       )
-    , .RAM_ADDR_W       ( RAM_ADDR_W      )
-    , .RAM_DATA_W       ( RAM_DATA_W      )
+      .ROWS             ( ROWS           )
+    , .COLUMNS          ( COLUMNS        )
+    , .INPUTS           ( INPUTS         )
+    , .OUTPUTS          ( OUTPUTS        )
+    , .REGISTERS        ( REGISTERS      )
+    , .RAM_ADDR_W       ( RAM_ADDR_W     )
+    , .RAM_DATA_W       ( RAM_DATA_W     )
 ) u_mesh (
-      .i_clk            ( i_clk           )
-    , .i_rst            ( rst_internal    )
+      .i_clk            ( i_clk          )
+    , .i_rst            ( rst_internal   )
     // Control signals
-    , .o_idle           ( ctrl_mesh_idle  )
-    , .i_trigger        ( ctrl_trigger    )
+    , .o_node_idle      ( mesh_node_idle )
+    , .o_agg_idle       ( mesh_agg_idle  )
+    , .i_trigger        ( mesh_trigger   )
     // Inbound stream
-    , .i_inbound_data   ( i_mesh_ib_data  )
-    , .i_inbound_valid  ( i_mesh_ib_valid )
-    , .o_inbound_ready  ( o_mesh_ib_ready )
+    , .i_inbound_data   ( mesh_in_data   )
+    , .i_inbound_valid  ( mesh_in_valid  )
+    , .o_inbound_ready  ( mesh_in_ready  )
     // Outbound stream
-    , .o_outbound_data  ( o_mesh_ob_data  )
-    , .o_outbound_valid ( o_mesh_ob_valid )
-    , .i_outbound_ready ( i_mesh_ob_ready )
+    , .o_outbound_data  ( mesh_out_data  )
+    , .o_outbound_valid ( mesh_out_valid )
+    , .i_outbound_ready ( mesh_out_ready )
+    // Aggregated outputs
+    , .o_outputs        ( mesh_outputs   )
 );
 
 endmodule : nexus
