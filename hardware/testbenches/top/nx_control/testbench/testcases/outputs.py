@@ -19,7 +19,7 @@ import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import ControlRespType, ControlResponse
+from nxconstants import ControlRespType, ControlResponse, OUT_BITS_PER_MSG
 
 from ..common import trigger, check_status
 from ..testbench import testcase
@@ -51,12 +51,14 @@ async def outputs(dut):
                     dut.mesh_outputs <= outputs
                     await ClockCycles(dut.clk, randint(1, 5))
                 # Queue up output messages using the final value
-                for idx in range(ceil(mh_outs / 96)):
+                for idx in range(ceil(mh_outs / OUT_BITS_PER_MSG)):
                     resp                 = ControlResponse()
                     resp.outputs.format  = ControlRespType.OUTPUTS
                     resp.outputs.stamp   = cycle
                     resp.outputs.index   = idx
-                    resp.outputs.section = (outputs >> (idx * 96)) & ((1 << 96) - 1)
+                    resp.outputs.section = (
+                        (outputs >> (idx * OUT_BITS_PER_MSG)) & ((1 << OUT_BITS_PER_MSG) - 1)
+                    )
                     dut.exp_ctrl.append(StreamTransaction(resp.outputs.pack()))
                 # Raise the idle
                 dut.node_idle <= ((1 << columns) - 1)

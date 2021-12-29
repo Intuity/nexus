@@ -65,9 +65,8 @@ import NXConstants::*;
 // =============================================================================
 
 localparam MESH_OUTPUTS     = COLUMNS * OUTPUTS;
-localparam BITS_OUT_PER_MSG = 96;
-localparam MAX_OUTPUT_INDEX = (MESH_OUTPUTS + BITS_OUT_PER_MSG - 1) / BITS_OUT_PER_MSG;
-localparam OUTPUT_IDX_WIDTH = 1 + ((MESH_OUTPUTS > BITS_OUT_PER_MSG) ? $clog2(MAX_OUTPUT_INDEX) : 0);
+localparam MAX_OUTPUT_INDEX = (MESH_OUTPUTS + OUT_BITS_PER_MSG - 1) / OUT_BITS_PER_MSG;
+localparam OUTPUT_IDX_WIDTH = 1 + ((MESH_OUTPUTS > OUT_BITS_PER_MSG) ? $clog2(MAX_OUTPUT_INDEX) : 0);
 
 typedef enum logic [1:0] {
       CTRL_IDLE    // 0: Quiescent state (mesh and controller idle)
@@ -240,10 +239,10 @@ assign o_ctrl_in_ready = i_mesh_in_ready && (state_q != CTRL_OUTPUTS);
 // =============================================================================
 
 // Pad outputs with zeroes up to the next 96 bit boundary
-localparam FULL_WIDTH = MAX_OUTPUT_INDEX * BITS_OUT_PER_MSG;
+localparam FULL_WIDTH = MAX_OUTPUT_INDEX * OUT_BITS_PER_MSG;
 localparam OUTPUT_PAD = FULL_WIDTH - MESH_OUTPUTS;
 logic [FULL_WIDTH-1:0] padded_outputs;
-assign padded_outputs = { OUTPUT_PAD'(0), i_mesh_outputs };
+assign padded_outputs = { {OUTPUT_PAD{1'b0}}, i_mesh_outputs };
 
 // Populate output response
 assign emit_output_msg = (state_q == CTRL_OUTPUTS) && (state == CTRL_OUTPUTS);
@@ -251,14 +250,11 @@ assign emit_output_msg = (state_q == CTRL_OUTPUTS) && (state == CTRL_OUTPUTS);
 always_comb begin : comb_outputs
     resp_outputs.format = CONTROL_RESP_TYPE_OUTPUTS;
     resp_outputs.stamp  = cycle_q;
-    resp_outputs.index  = {
-        {($clog2(MESH_OUTPUTS / BITS_OUT_PER_MSG)-OUTPUT_IDX_WIDTH+1){1'b0}},
-        out_idx_q
-    };
+    resp_outputs.index  = { {(MAX_OUT_IDX_WIDTH-OUTPUT_IDX_WIDTH){1'b0}}, out_idx_q };
     resp_outputs._padding_0 = 'd0;
     for (int idx = 0; idx < MAX_OUTPUT_INDEX; idx++) begin : gen_outputs
         if (out_idx_q == idx[OUTPUT_IDX_WIDTH-1:0]) begin
-            assign resp_outputs.section = padded_outputs[idx*BITS_OUT_PER_MSG+:BITS_OUT_PER_MSG];
+            assign resp_outputs.section = padded_outputs[idx*OUT_BITS_PER_MSG+:OUT_BITS_PER_MSG];
         end
     end
 end

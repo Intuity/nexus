@@ -19,7 +19,7 @@ import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import ControlRespType, ControlResponse
+from nxconstants import ControlRespType, ControlResponse, OUT_BITS_PER_MSG
 
 from ..common import trigger, check_status
 from ..testbench import testcase
@@ -92,7 +92,7 @@ async def set_interval(dut):
 
     # Queue up the output messages
     for cycle in range(cycles):
-        for idx in range(ceil(int(dut.COLUMNS) * int(dut.OUTPUTS) / 96)):
+        for idx in range(ceil(int(dut.COLUMNS) * int(dut.OUTPUTS) / OUT_BITS_PER_MSG)):
             resp = ControlResponse()
             resp.outputs.format  = ControlRespType.OUTPUTS
             resp.outputs.stamp   = cycle

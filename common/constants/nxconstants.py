@@ -50,28 +50,32 @@ class NXConstants:
     )
 
     # Interface and selector sizes
-    CONTROL_WIDTH    : Constant("Width of the control stream" ) = 128
-    MESSAGE_WIDTH    : Constant("Width of the message stream" ) = 28
-    ADDR_ROW_WIDTH   : Constant("Width of the row address"    ) = ceil(log2(MAX_ROW_COUNT))
-    ADDR_COL_WIDTH   : Constant("Width of the column address" ) = ceil(log2(MAX_COLUMN_COUNT))
-    MAX_INPUT_WIDTH  : Constant("Width of input selector"     ) = ceil(log2(MAX_NODE_INPUTS))
-    MAX_OUTPUT_WIDTH : Constant("Width of output selector"    ) = ceil(log2(MAX_NODE_OUTPUTS))
-    MAX_IOR_WIDTH    : Constant("Width of in/out/reg selector") = ceil(log2(MAX_NODE_IOR_COUNT))
-    TIMER_WIDTH      : Constant("Width of the control timers" ) = 24
+    CONTROL_WIDTH     : Constant("Width of the control stream" ) = 128
+    MESSAGE_WIDTH     : Constant("Width of the message stream" ) = 28
+    ADDR_ROW_WIDTH    : Constant("Width of the row address"    ) = clog2(MAX_ROW_COUNT)
+    ADDR_COL_WIDTH    : Constant("Width of the column address" ) = clog2(MAX_COLUMN_COUNT)
+    MAX_INPUT_WIDTH   : Constant("Width of input selector"     ) = clog2(MAX_NODE_INPUTS)
+    MAX_OUTPUT_WIDTH  : Constant("Width of output selector"    ) = clog2(MAX_NODE_OUTPUTS)
+    MAX_IOR_WIDTH     : Constant("Width of in/out/reg selector") = clog2(MAX_NODE_IOR_COUNT)
+    TIMER_WIDTH       : Constant("Width of the control timers" ) = 24
+    OUT_BITS_PER_MSG  : Constant("Bits of output per message"  ) = 96
+    MAX_OUT_IDX_WIDTH : Constant("Output index field width"    ) = clog2(
+        (MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS) / OUT_BITS_PER_MSG
+    )
 
     # Truth table
     TT_WIDTH : Constant("Width of a three input truth table") = 8
 
     # Node memory and loading
     LOAD_SEG_WIDTH      : Constant("Segment width for accumulated load") = 16
-    NODE_MEM_ADDR_WIDTH : Constant("Width of node memory address"      ) = ceil(log2(MAX_NODE_MEMORY))
+    NODE_MEM_ADDR_WIDTH : Constant("Width of node memory address"      ) = clog2(MAX_NODE_MEMORY)
 
     # Node control
     NODE_PARAM_WIDTH : Constant("Maximum width of a node parameter") = 16
 
     # Trace
     TRACE_SECTION_WIDTH : Constant("Bits carried per trace message"     ) = 16
-    TRACE_SELECT_WIDTH  : Constant("Width of the trace section selector") = ceil(log2(MAX_NODE_OUTPUTS / TRACE_SECTION_WIDTH))
+    TRACE_SELECT_WIDTH  : Constant("Width of the trace section selector") = clog2(MAX_NODE_OUTPUTS / TRACE_SECTION_WIDTH)
 
 # ==============================================================================
 # Enumerations
@@ -267,8 +271,8 @@ class ControlResponseOutputs:
     """ Control response carrying sections of the output vector """
     format  : ControlRespType(desc="Control response format")
     stamp   : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Simulation cycle")
-    index   : Scalar(width=ceil(log2(
-        (NXConstants.MAX_COLUMN_COUNT.value * NXConstants.MAX_NODE_OUTPUTS.value) / 96)
+    index   : Scalar(width=clog2(
+        (NXConstants.MAX_COLUMN_COUNT.value * NXConstants.MAX_NODE_OUTPUTS.value) / 96
     ), desc="Which section of the full outputs is included")
     section : Scalar(width=96, desc="Section of the outputs")
 
