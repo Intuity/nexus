@@ -286,15 +286,15 @@ class ControlResponseFromMesh:
 class ControlResponseParameters:
     """ Parameters of the device """
     format      : ControlRespType(desc="Control response format")
-    id          : Scalar(width=clog2(NXConstants.HW_DEV_ID),          desc="Hardware identifier")
-    ver_major   : Scalar(width=clog2(NXConstants.HW_VER_MAJOR),       desc="Major version"      )
-    ver_minor   : Scalar(width=clog2(NXConstants.HW_VER_MINOR),       desc="Minor version"      )
-    timer_width : Scalar(width=clog2(NXConstants.TIMER_WIDTH),        desc="Timer width"        )
-    rows        : Scalar(width=clog2(NXConstants.MAX_ROW_COUNT),      desc="Number of rows"     )
-    columns     : Scalar(width=clog2(NXConstants.MAX_COLUMN_COUNT),   desc="Number of columns"  )
-    node_ins    : Scalar(width=clog2(NXConstants.MAX_NODE_INPUTS),    desc="Inputs per node"    )
-    node_outs   : Scalar(width=clog2(NXConstants.MAX_NODE_OUTPUTS),   desc="Outputs per node"   )
-    node_regs   : Scalar(width=clog2(NXConstants.MAX_NODE_REGISTERS), desc="Registers per node" )
+    id          : Scalar(width=clog2(NXConstants.HW_DEV_ID)+1,          desc="Hardware identifier")
+    ver_major   : Scalar(width=clog2(NXConstants.HW_VER_MAJOR)+1,       desc="Major version"      )
+    ver_minor   : Scalar(width=clog2(NXConstants.HW_VER_MINOR)+1,       desc="Minor version"      )
+    timer_width : Scalar(width=clog2(NXConstants.TIMER_WIDTH)+1,        desc="Timer width"        )
+    rows        : Scalar(width=clog2(NXConstants.MAX_ROW_COUNT)+1,      desc="Number of rows"     )
+    columns     : Scalar(width=clog2(NXConstants.MAX_COLUMN_COUNT)+1,   desc="Number of columns"  )
+    node_ins    : Scalar(width=clog2(NXConstants.MAX_NODE_INPUTS)+1,    desc="Inputs per node"    )
+    node_outs   : Scalar(width=clog2(NXConstants.MAX_NODE_OUTPUTS)+1,   desc="Outputs per node"   )
+    node_regs   : Scalar(width=clog2(NXConstants.MAX_NODE_REGISTERS)+1, desc="Registers per node" )
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlResponseStatus:

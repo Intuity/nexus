@@ -278,11 +278,11 @@ assign resp_params.id          = HW_DEV_ID;
 assign resp_params.ver_major   = HW_VER_MAJOR;
 assign resp_params.ver_minor   = HW_VER_MINOR;
 assign resp_params.timer_width = TIMER_WIDTH;
-assign resp_params.rows        = ROWS[$clog2(MAX_ROW_COUNT)-1:0];
-assign resp_params.columns     = COLUMNS[$clog2(MAX_COLUMN_COUNT)-1:0];
-assign resp_params.node_ins    = INPUTS[$clog2(MAX_NODE_INPUTS)-1:0];
-assign resp_params.node_outs   = OUTPUTS[$clog2(MAX_NODE_OUTPUTS)-1:0];
-assign resp_params.node_regs   = REGISTERS[$clog2(MAX_NODE_REGISTERS)-1:0];
+assign resp_params.rows        = ROWS[$clog2(MAX_ROW_COUNT):0];
+assign resp_params.columns     = COLUMNS[$clog2(MAX_COLUMN_COUNT):0];
+assign resp_params.node_ins    = INPUTS[$clog2(MAX_NODE_INPUTS):0];
+assign resp_params.node_outs   = OUTPUTS[$clog2(MAX_NODE_OUTPUTS):0];
+assign resp_params.node_regs   = REGISTERS[$clog2(MAX_NODE_REGISTERS):0];
 assign resp_params._padding_0  = 'd0;
 
 // Populate status response

@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import random
-
 from drivers.stream.common import StreamTransaction
 from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
                          ControlResponse, HW_DEV_ID, HW_VER_MAJOR, HW_VER_MINOR,
@@ -30,7 +28,7 @@ async def read_params(dut):
     # Queue up a parameter request
     req             = ControlRequest()
     req.raw.command = ControlReqType.READ_PARAMS
-    dut.ctrl_in.append(StreamTransaction(req.pack()))
+    dut.ctrl_in.append(StreamTransaction(req.raw.pack()))
 
     # Queue up a parameter response
     resp                    = ControlResponse()
@@ -44,4 +42,4 @@ async def read_params(dut):
     resp.params.node_ins    = int(dut.INPUTS)
     resp.params.node_outs   = int(dut.OUTPUTS)
     resp.params.node_regs   = int(dut.REGISTERS)
-    dut.exp_ctrl.append(StreamTransaction(resp.pack()))
+    dut.exp_ctrl.append(StreamTransaction(resp.params.pack()))
