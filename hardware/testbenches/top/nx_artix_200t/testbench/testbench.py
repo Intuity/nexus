@@ -52,20 +52,23 @@ class Testbench(TestbenchBase):
         # Create expected outbound queues
         self.expected = []
         # Create a scoreboard
-        def compare_ctrl(got):
-            exp    = self.expected.pop(0)
-            all_ok = True
-            if len(got.data) != len(exp.data):
-                self.error(f"Length differs - G: {len(got.data)}, E: {len(exp.data)}")
-                all_ok = False
-            for idx, (got_byte, exp_byte) in enumerate(zip(got.data, exp.data)):
-                if got_byte != exp_byte:
-                    self.error(f"Byte {idx}: 0x{got_byte:02X} != 0x{exp_byte:02X}")
-                    all_ok = False
-            assert all_ok, "Comparison error occurred"
+        def compare(got):
+            # Split the stream into 16-byte (128-bit) chunks and compare
+            all_data = got.data[:]
+            while all_data:
+                # Take the next chunk of received data
+                got_chunk = sum([(x << (n * 8)) for n, x in enumerate(all_data[:16])])
+                all_data = all_data[16:]
+                # Take the next chunk of expected data
+                exp_chunk = sum([(x << (n * 8)) for n, x in enumerate(self.expected[0].data[:16])])
+                self.expected[0].data = self.expected[0].data[16:]
+                if len(self.expected[0].data) == 0: self.expected.pop(0)
+                # Compare
+                assert got_chunk == exp_chunk, \
+                    f"Got: 0x{got_chunk:032X}, Exp: 0x{exp_chunk:032X}"
         self.scoreboard = Scoreboard(self, fail_immediately=False)
         self.scoreboard.add_interface(
-            self.outbound, self.expected, compare_fn=compare_ctrl
+            self.outbound, self.expected, compare_fn=compare
         )
         # Setup rapid access to every node in the mesh
         self.nodes = [

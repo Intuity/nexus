@@ -38,6 +38,7 @@ import NXConstants::*;
     , output logic              o_ctrl_in_ready
     // Outbound control stream
     , output control_response_t o_ctrl_out_data
+    , output logic              o_ctrl_out_last
     , output logic              o_ctrl_out_valid
     , input  logic              i_ctrl_out_ready
 );
@@ -95,6 +96,7 @@ nx_control #(
     , .o_ctrl_in_ready  ( o_ctrl_in_ready  )
     // - Outbound
     , .o_ctrl_out_data  ( o_ctrl_out_data  )
+    , .o_ctrl_out_last  ( o_ctrl_out_last  )
     , .o_ctrl_out_valid ( o_ctrl_out_valid )
     , .i_ctrl_out_ready ( i_ctrl_out_ready )
     // Mesh message streams

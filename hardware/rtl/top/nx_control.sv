@@ -38,6 +38,7 @@ import NXConstants::*;
     , output logic                         o_ctrl_in_ready
     // - Outbound
     , output control_response_t            o_ctrl_out_data
+    , output logic                         o_ctrl_out_last
     , output logic                         o_ctrl_out_valid
     , input  logic                         i_ctrl_out_ready
     // Mesh message streams
@@ -98,7 +99,8 @@ logic              mesh_in_stall;
 
 // Control response generation
 `DECLARE_DQT(control_response_t, ctrl_out_data,  i_clk, i_rst, 'd0)
-`DECLARE_DQ (1,                  ctrl_out_valid, i_clk, i_rst, 'd0)
+`DECLARE_DQ (                 1, ctrl_out_last,  i_clk, i_rst, 'd0)
+`DECLARE_DQ (                 1, ctrl_out_valid, i_clk, i_rst, 'd0)
 
 logic                         ctrl_out_stall;
 control_response_parameters_t resp_params;
@@ -307,6 +309,15 @@ assign ctrl_out_data = ctrl_out_stall   ? ctrl_out_data_q :
                        req_rd_status    ? resp_status
                                         : 'd0;
 
+// Flag last on basic requests and when returning to idle
+assign ctrl_out_last = (
+    (ctrl_out_stall && ctrl_out_last_q) ||
+    req_rd_params ||
+    req_rd_status ||
+    !active_q ||
+    (cycle_q[3:0] == 'd0)
+);
+
 // Drive the valid
 assign ctrl_out_valid = (
     ctrl_out_stall   ||
@@ -319,6 +330,7 @@ assign ctrl_out_valid = (
 // Drive the ports
 assign o_ctrl_out_data  = ctrl_out_data_q;
 assign o_ctrl_out_valid = ctrl_out_valid_q;
+assign o_ctrl_out_last  = ctrl_out_last_q;
 
 // =============================================================================
 // Debug Status Flags

@@ -60,12 +60,10 @@ nexus #(
     , .o_ctrl_in_ready  ( inbound_tready  )
     // Outbound control stream
     , .o_ctrl_out_data  ( outbound_tdata  )
+    , .o_ctrl_out_last  ( outbound_tlast  )
     , .o_ctrl_out_valid ( outbound_tvalid )
     , .i_ctrl_out_ready ( outbound_tready )
 );
-
-// Nexus does not provide a last flag, so tie-off
-assign outbound_tlast = 1'b1;
 
 // Tie-off unused signals
 wire _unused;

@@ -106,18 +106,20 @@ async def mission_mode(dut):
         dut.info(f"Checking node {row}, {col} has loaded {exp_val} entries")
         assert rtl_val == exp_val, f"{row}, {col}: RTL {rtl_val} != EXP {exp_val}"
 
+    # Simulation parameters
+    tick_count = 300
+    clk_period = 2
+
     # Raise active and let nexus tick
     dut.info("Enabling nexus")
     trig                  = ControlRequest()
     trig.trigger.command  = ControlReqType.TRIGGER
     trig.trigger.col_mask = (1 << num_cols) - 1
     trig.trigger.active   = 1
-    trig.trigger.cycles   = 0
+    trig.trigger.cycles   = tick_count
     dut.inbound.append(AXI4StreamTransaction(data=to_bytes(trig.trigger.pack(), 128)))
 
     # Capture start time
-    tick_count = 300
-    clk_period = 2
     start_time = get_sim_time(units="ns")
 
     # Compare RTL against the model tick by tick
