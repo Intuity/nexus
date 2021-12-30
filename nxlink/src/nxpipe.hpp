@@ -22,6 +22,8 @@
 
 namespace NXLink {
 
+    typedef unsigned __int128 uint128_t;
+
     // NXPipe
     // Manages a single pipe (e.g. control or mesh) into Nexus, queueing
     // messages into the device and receiving messages from the device.
@@ -44,9 +46,9 @@ namespace NXLink {
         // =====================================================================
         // Public Methods
         // =====================================================================
-        void     tx_to_device (uint32_t data);
-        bool     rx_available (void);
-        uint32_t rx_from_device (void);
+        void      tx_to_device (uint128_t data);
+        bool      rx_available (void);
+        uint128_t rx_from_device (void);
 
     private:
         // =====================================================================
@@ -61,8 +63,8 @@ namespace NXLink {
         std::string m_h2c_path;
         std::string m_c2h_path;
 
-        moodycamel::BlockingConcurrentQueue<uint32_t> m_tx_q;
-        moodycamel::BlockingConcurrentQueue<uint32_t> m_rx_q;
+        moodycamel::BlockingConcurrentQueue<uint128_t> m_tx_q;
+        moodycamel::BlockingConcurrentQueue<uint128_t> m_rx_q;
 
         std::thread m_tx_thread;
         std::thread m_rx_thread;

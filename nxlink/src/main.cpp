@@ -31,8 +31,7 @@ int main (int argc, char * argv [])
     options.add_options()
         // PCIe Interface
         ("d,device", "Path to PCIe device",      cxxopts::value<std::string>()->default_value("/dev/xdma0"))
-        ("ch_mesh",  "XDMA channel for control", cxxopts::value<std::string>()->default_value("0"))
-        ("ch_ctrl",  "XDMA channel for control", cxxopts::value<std::string>()->default_value("1"))
+        ("channel",  "XDMA channel for control", cxxopts::value<std::string>()->default_value("0"))
         // Debug/verbosity
         ("v,verbose", "Enable verbose output")
         ("h,help",    "Print help and usage information");
@@ -50,31 +49,20 @@ int main (int argc, char * argv [])
     std::stringstream tmp;
     // - Control H2C
     tmp << result["device"].as<std::string>() << "_h2c_"
-        << result["ch_ctrl"].as<std::string>();
-    std::string ctrl_h2c = std::string(tmp.str());
+        << result["channel"].as<std::string>();
+    std::string stream_h2c = std::string(tmp.str());
     tmp.str("");
     // - Control C2H
     tmp << result["device"].as<std::string>() << "_c2h_"
-        << result["ch_ctrl"].as<std::string>();
-    std::string ctrl_c2h = std::string(tmp.str());
-    tmp.str("");
-    // - Mesh H2C
-    tmp << result["device"].as<std::string>() << "_h2c_"
-        << result["ch_mesh"].as<std::string>();
-    std::string mesh_h2c = std::string(tmp.str());
-    tmp.str("");
-    // - Mesh H2C
-    tmp << result["device"].as<std::string>() << "_c2h_"
-        << result["ch_mesh"].as<std::string>();
-    std::string mesh_c2h = std::string(tmp.str());
+        << result["channel"].as<std::string>();
+    std::string stream_c2h = std::string(tmp.str());
     tmp.str("");
 
-    // Create pipes for control & mesh
-    NXPipe * ctrl_pipe = new NXPipe(ctrl_h2c, ctrl_c2h);
-    NXPipe * mesh_pipe = new NXPipe(mesh_h2c, mesh_c2h);
+    // Create pipes
+    NXPipe * pipe = new NXPipe(stream_h2c, stream_c2h);
 
     // Create a wrapper around the device
-    NXDevice * device = new NXDevice(ctrl_pipe, mesh_pipe);
+    NXDevice * device = new NXDevice(pipe);
 
     // Check the identity
     if (!device->identify()) {

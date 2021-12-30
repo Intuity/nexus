@@ -22,15 +22,6 @@ namespace NXLink {
         unsigned int minor;
     } nx_version_t;
 
-    typedef struct {
-        unsigned int counter_width;
-        unsigned int rows;
-        unsigned int columns;
-        unsigned int node_inputs;
-        unsigned int node_outputs;
-        unsigned int node_registers;
-    } nx_parameters_t;
-
 }
 
 #endif // __NX_LINK_HPP__

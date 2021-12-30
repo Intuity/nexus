@@ -33,7 +33,7 @@
 // tx_to_device
 // Queue up an item to send to the device
 //
-void NXLink::NXPipe::tx_to_device (uint32_t data)
+void NXLink::NXPipe::tx_to_device (NXLink::uint128_t data)
 {
     m_tx_q.enqueue(data);
 }
@@ -49,9 +49,9 @@ bool NXLink::NXPipe::rx_available (void)
 // rx_from_device
 // Dequeue an item received from the device
 //
-uint32_t NXLink::NXPipe::rx_from_device (void)
+NXLink::uint128_t NXLink::NXPipe::rx_from_device (void)
 {
-    uint32_t data = 0;
+    uint128_t data = 0;
     m_rx_q.wait_dequeue(data);
     return data;
 }
@@ -74,40 +74,35 @@ void NXLink::NXPipe::tx_process (void)
 
     // Create a transmit buffer
     uint8_t * tx_buffer = NULL;
-    posix_memalign((void **)&tx_buffer, 4096, buffer_size + 4096);
+    int pm_err = posix_memalign((void **)&tx_buffer, 4096, buffer_size + 4096);
+    assert(pm_err == 0);
     assert(tx_buffer != NULL);
     memset((void *)tx_buffer, 0, buffer_size);
 
     // Send messages forever
-    uint32_t * tx_slots = (uint32_t *)tx_buffer;
-    uint32_t   slot     = 0;
-    uint32_t   max_slot = buffer_size / 4;
+    uint128_t * tx_slots = (uint128_t *)tx_buffer;
 
     while (true) {
-        // Dequeue the next item
-        m_tx_q.wait_dequeue(tx_slots[slot]);
-        // Set bit 31 to indicate this is an active slot
-        tx_slots[slot] |= (1 << 31);
-        NXPIPE_DEBUG("Sending %3d: 0x%08x\n", slot, tx_slots[slot]);
-        // Keep track of the slot
-        slot += 1;
-        // If the buffer is full or the queue is empty, send to the device!
-        if (slot >= max_slot || (m_tx_q.size_approx() == 0)) {
-            // Log the send buffer
-            NXPIPE_DEBUG(
-                "Send %u: 0x%08x_%08x_%08x_%08x\n",
-                slot, tx_slots[3], tx_slots[2], tx_slots[1], tx_slots[0]
-            );
-            // Write the entire 16 byte buffer to avoid uninitialised data
-            ssize_t rc = write(fh, tx_buffer, buffer_size);
-            if (rc < 0) {
-                fprintf(stderr, "tx_process: Write failed - %li\n", rc);
-                assert(!"Write to device failed");
-                return;
-            }
-            // Clear up
-            slot = 0;
-            memset((void *)tx_buffer, 0, buffer_size);
+        // Dequeue next item from the queue
+        m_tx_q.wait_dequeue(tx_slots[0]);
+        // Log the payload being sent
+        #if NX_EN_DEBUG
+        uint32_t parts[4];
+        parts[0] = (tx_slots[0] >>  0) & 0xFFFFFFFF;
+        parts[1] = (tx_slots[0] >> 32) & 0xFFFFFFFF;
+        parts[2] = (tx_slots[0] >> 64) & 0xFFFFFFFF;
+        parts[3] = (tx_slots[0] >> 96) & 0xFFFFFFFF;
+        printf(
+            "Sending: 0x%08x_%08x_%08x_%08x\n",
+            parts[3], parts[2], parts[1], parts[0]
+        );
+        #endif
+        // Write to the device
+        ssize_t rc = write(fh, tx_buffer, buffer_size);
+        if (rc < 0) {
+            fprintf(stderr, "tx_process: Write failed - %li\n", rc);
+            assert(!"Write to device failed");
+            return;
         }
     }
 }
@@ -126,24 +121,25 @@ void NXLink::NXPipe::rx_process (void)
     }
 
     // Read chunk-by-chunk
+    uint128_t chunk = 0;
     while (true) {
-        // Read the 16-byte chunk
-        uint32_t rx_slots[4];
-        memset((void *)rx_slots, 0, 16);
-        ssize_t rc = read(fh, (uint8_t *)rx_slots, 16);
+        // Read the next message
+        ssize_t rc = read(fh, (uint8_t *)&chunk, 16);
+        // Ignore failed reads
         if (rc < 0) continue;
-        NXPIPE_DEBUG(
+        // Debug logging
+        #if NX_EN_DEBUG
+        uint32_t parts[4];
+        parts[0] = (chunk >>  0) & 0xFFFFFFFF;
+        parts[1] = (chunk >> 32) & 0xFFFFFFFF;
+        parts[2] = (chunk >> 64) & 0xFFFFFFFF;
+        parts[3] = (chunk >> 96) & 0xFFFFFFFF;
+        printf(
             "Receive %li: 0x%08x_%08x_%08x_%08x\n",
-            rc, rx_slots[3], rx_slots[2], rx_slots[1], rx_slots[0]
+            rc, parts[3], parts[2], parts[1], parts[0]
         );
-        // Start digesting messages
-        for (uint32_t slot = 0; slot < 4; slot++) {
-            // Skip empty slots
-            if (!(rx_slots[slot] & 0x80000000)) continue;
-            NXPIPE_DEBUG(" - Rx SLOT[%3d] = 0x%08x\n", slot, rx_slots[slot]);
-            // Decode message
-            uint32_t masked = rx_slots[slot] & 0x7FFFFFFF;
-            m_rx_q.enqueue(masked);
-        }
+        #endif
+        // Queue up for further processing
+        m_rx_q.enqueue(chunk);
     }
 }

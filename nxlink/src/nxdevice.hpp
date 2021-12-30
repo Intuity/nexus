@@ -15,8 +15,9 @@
 #ifndef __NX_DEVICE_HPP__
 #define __NX_DEVICE_HPP__
 
-#include <thread>
+#include <list>
 #include <map>
+#include <thread>
 #include <tuple>
 
 #include <blockingconcurrentqueue.h>
@@ -27,6 +28,8 @@
 
 namespace NXLink {
 
+    using namespace NXConstants;
+
     // NXDevice
     // Abstracted interface for interacting with Nexus hardware
     //
@@ -36,33 +39,29 @@ namespace NXLink {
         // =====================================================================
         // Constants
         // =====================================================================
-        typedef struct nx_bit_addr {
-            uint32_t row;
-            uint32_t column;
-            uint32_t index;
-            bool operator == (const nx_bit_addr & other) const {
-                return (
-                    std::tie(row, column, index) ==
-                    std::tie(other.row, other.column, other.index)
-                );
-            }
-            bool operator < (const nx_bit_addr & other) const {
-                return (
-                    std::tie(row, column, index) <
-                    std::tie(other.row, other.column, other.index)
-                );
-            }
-        } nx_bit_addr_t;
+        typedef struct {
+            uint64_t          cycle;
+            std::list<bool> * state;
+        } nx_outputs_t;
 
         // =====================================================================
         // Constructor
         // =====================================================================
-        NXDevice(NXPipe * ctrl_pipe, NXPipe * mesh_pipe)
-            : m_ctrl_pipe(ctrl_pipe                    )
-            , m_mesh_pipe(mesh_pipe                    )
-            , m_received (                             )
-            , m_rx_thread(&NXDevice::monitor_mesh, this)
-        { }
+        NXDevice(NXPipe * pipe)
+            : m_pipe       ( pipe )
+            , m_rx_outputs (      )
+            , m_rx_params  (      )
+            , m_rx_status  (      )
+            , m_rx_mesh    (      )
+            , m_outputs    (      )
+        {
+            // Start the receiving thread
+            m_rx_thread = new std::thread(&NXDevice::monitor, this);
+            // Read parameters
+            control_response_parameters_t params = read_parameters();
+            // Start the output processing thread
+            m_out_thread = new std::thread(&NXDevice::process_outputs, this, params);
+        }
 
         // =====================================================================
         // Public Methods
@@ -71,25 +70,25 @@ namespace NXLink {
         // Control plane
         uint32_t                      read_device_id (void);
         nx_version_t                  read_version (void);
-        bool                          identify (bool quiet=false);
-        nx_parameters_t               read_parameters (void);
-        NXConstants::control_status_t read_status (void);
+        bool                          identify (bool quiet=true);
+        control_response_parameters_t read_parameters (void);
+        control_response_status_t     read_status (void);
         uint32_t                      read_cycles (void);
-        void                          set_interval (uint32_t interval);
-        void                          clear_interval (void);
         void                          reset (void);
-        void                          set_active (bool active);
+        void                          start (uint32_t cycles=0);
+        void                          stop (void);
 
         // Mesh interface
-        void     send_to_mesh (uint32_t raw);
-        bool     receive_from_mesh (uint32_t & msg, bool blocking);
-        void     monitor_mesh (void);
-        uint64_t get_output_state (void);
+        void send_to_mesh (uint32_t to_mesh);
+        bool receive_from_mesh (uint32_t & msg, bool blocking);
+        void monitor (void);
+        void process_outputs (control_response_parameters_t params);
+        bool get_outputs (nx_outputs_t & state, bool blocking);
 
         // Helper methods
-        void log_parameters (nx_parameters_t params);
-        void log_status (NXConstants::control_status_t status);
-        void log_mesh_message (NXConstants::node_raw_t msg);
+        void log_parameters (control_response_parameters_t params);
+        void log_status (control_response_status_t status);
+        void log_mesh_message (node_raw_t msg);
 
     private:
         // =====================================================================
@@ -99,14 +98,18 @@ namespace NXLink {
         // =====================================================================
         // Private Members
         // =====================================================================
-        NXPipe * m_ctrl_pipe;
-        NXPipe * m_mesh_pipe;
+        NXPipe * m_pipe;
 
-        std::thread m_rx_thread;
+        // Streams separated by the monitor thread
+        std::thread * m_rx_thread;
+        moodycamel::BlockingConcurrentQueue<control_response_outputs_t>    m_rx_outputs;
+        moodycamel::BlockingConcurrentQueue<control_response_parameters_t> m_rx_params;
+        moodycamel::BlockingConcurrentQueue<control_response_status_t>     m_rx_status;
+        moodycamel::BlockingConcurrentQueue<uint32_t>                      m_rx_mesh;
 
-        moodycamel::BlockingConcurrentQueue<uint32_t> m_received;
-
-        std::map<nx_bit_addr_t, uint32_t> m_mesh_state;
+        // Accumulated per-cycle outputs
+        std::thread * m_out_thread;
+        moodycamel::BlockingConcurrentQueue<nx_outputs_t> m_outputs;
 
     };
 
