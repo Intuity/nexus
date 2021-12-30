@@ -267,6 +267,12 @@ class ControlRequest:
     to_mesh : ControlRequestToMesh(desc="Forward message into mesh format")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseRaw:
+    """ Raw control response format """
+    format  : ControlRespType(desc="Control response format")
+    payload : Scalar(width=NXConstants.CONTROL_WIDTH.value - ControlRespType._pt_width)
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlResponseOutputs:
     """ Control response carrying sections of the output vector """
     format  : ControlRespType(desc="Control response format")
@@ -311,6 +317,7 @@ class ControlResponseStatus:
 @packtype.union(package=NXConstants)
 class ControlResponse:
     """ Control responses sent by the device """
+    raw       : ControlResponseRaw(desc="Raw response format")
     params    : ControlResponseParameters(desc="Parameters of the device")
     status    : ControlResponseStatus(desc="Status of the device")
     outputs   : ControlResponseOutputs(desc="Reports the current outputs")
