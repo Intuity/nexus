@@ -94,7 +94,7 @@ typedef enum logic [1:0] {
 logic              ctrl_req;
 control_req_type_t ctrl_cmd;
 logic              req_rd_params, req_rd_status, req_soft_rst, req_trigger,
-                   req_to_mesh;
+                   req_to_mesh, req_config;
 logic              mesh_in_stall;
 
 // Control response generation
@@ -119,7 +119,8 @@ control_response_from_mesh_t  resp_mesh;
 `DECLARE_DQ(TIMER_WIDTH, cycle, i_clk, i_rst, 'd0)
 
 // Output generation
-`DECLARE_DQ(OUTPUT_IDX_WIDTH, out_idx, i_clk, i_rst, 'd0)
+`DECLARE_DQ(MAX_OUTPUT_INDEX, out_mask, i_clk, i_rst, {MAX_OUTPUT_INDEX{1'b1}})
+`DECLARE_DQ(OUTPUT_IDX_WIDTH, out_idx,  i_clk, i_rst, 'd0)
 
 logic emit_output_msg;
 
@@ -214,6 +215,7 @@ assign req_rd_status = ctrl_req && (ctrl_cmd == CONTROL_REQ_TYPE_READ_STATUS);
 assign req_soft_rst  = ctrl_req && (ctrl_cmd == CONTROL_REQ_TYPE_SOFT_RESET );
 assign req_trigger   = ctrl_req && (ctrl_cmd == CONTROL_REQ_TYPE_TRIGGER    );
 assign req_to_mesh   = ctrl_req && (ctrl_cmd == CONTROL_REQ_TYPE_TO_MESH    );
+assign req_config    = ctrl_req && (ctrl_cmd == CONTROL_REQ_TYPE_CONFIGURE  );
 
 // Trigger reset
 assign soft_reset = req_soft_rst || soft_reset_q;
@@ -240,6 +242,10 @@ assign mesh_in_valid = mesh_in_stall || req_to_mesh;
 assign o_mesh_in_data  = mesh_in_data_q;
 assign o_mesh_in_valid = mesh_in_valid_q;
 
+// Apply configuration
+assign out_mask = req_config ? i_ctrl_in_data.configure.output_mask[MAX_OUTPUT_INDEX-1:0]
+                             : out_mask_q;
+
 // Drive ready signal
 assign o_ctrl_in_ready = !ctrl_out_stall && !mesh_in_stall && (state_q != CTRL_OUTPUTS);
 
@@ -254,7 +260,11 @@ logic [FULL_WIDTH-1:0] padded_outputs;
 assign padded_outputs = { {OUTPUT_PAD{1'b0}}, i_mesh_outputs };
 
 // Populate output response
-assign emit_output_msg = (state_q == CTRL_OUTPUTS) && (state == CTRL_OUTPUTS);
+assign emit_output_msg = (
+    (state_q == CTRL_OUTPUTS) &&
+    (state   == CTRL_OUTPUTS) &&
+    (out_mask_q[out_idx_q]  )
+);
 
 always_comb begin : comb_outputs
     resp_outputs.format = CONTROL_RESP_TYPE_OUTPUTS;

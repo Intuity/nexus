@@ -95,6 +95,7 @@ class ControlReqType:
     READ_PARAMS : Constant("Read back the device's parameters")
     READ_STATUS : Constant("Read back the device's status"    )
     SOFT_RESET  : Constant("Request a soft reset"             )
+    CONFIGURE   : Constant("Configure the controller"         )
     TRIGGER     : Constant("Trigger the device to run"        )
     TO_MESH     : Constant("Forward message into the mesh"    )
 
@@ -259,12 +260,22 @@ class ControlRequestToMesh:
     command : ControlReqType(desc="Command to perform")
     message : Scalar(width=NXConstants.MESSAGE_WIDTH.value, desc="Message to forward into the mesh")
 
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlRequestConfigure:
+    """ Configure the controller """
+    command     : ControlReqType(desc="Command to perform")
+    output_mask : Scalar(
+        width=(1 << NXConstants.MAX_OUT_IDX_WIDTH.value),
+        desc="Mask of which output messages should be emitted"
+    )
+
 @packtype.union(package=NXConstants)
 class ControlRequest:
     """ Control requests sent by the host """
-    raw     : ControlRequestRaw(desc="Raw control format")
-    trigger : ControlRequestTrigger(desc="Trigger control format")
-    to_mesh : ControlRequestToMesh(desc="Forward message into mesh format")
+    raw       : ControlRequestRaw(desc="Raw control format")
+    trigger   : ControlRequestTrigger(desc="Trigger control format")
+    to_mesh   : ControlRequestToMesh(desc="Forward message into mesh format")
+    configure : ControlRequestConfigure(desc="Configure the controller")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlResponseRaw:

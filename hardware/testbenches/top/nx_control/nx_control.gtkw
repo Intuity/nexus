@@ -1,16 +1,18 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Wed Dec 29 12:00:54 2021
+[*] Fri Dec 31 11:27:26 2021
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control/sim.lxt"
-[dumpfile_mtime] "Wed Dec 29 11:33:15 2021"
-[dumpfile_size] 698750
+[dumpfile_mtime] "Fri Dec 31 11:26:45 2021"
+[dumpfile_size] 361422
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control/nx_control.gtkw"
 [timestart] 0
 [size] 1821 917
 [pos] -1 -1
-*-22.576334 267000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-21.370560 267000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
+[treeopen] testbench.u_dut.
+[treeopen] testbench.u_dut.comb_outputs.
 [sst_width] 193
 [signals_width] 586
 [sst_expanded] 1
@@ -179,21 +181,21 @@ testbench.u_dut.i_ctrl_out_ready[0]
 -CTRL IN/OUT
 @200
 -
-@800201
+@800200
 -MESH IN/OUT
-@23
+@22
 testbench.u_dut.o_mesh_in_data[27:0]
-@29
+@28
 testbench.u_dut.o_mesh_in_valid[0]
 testbench.u_dut.i_mesh_in_ready[0]
-@201
+@200
 -
-@23
+@22
 testbench.u_dut.i_mesh_out_data[27:0]
-@29
+@28
 testbench.u_dut.i_mesh_out_valid[0]
 testbench.u_dut.o_mesh_out_ready[0]
-@1000201
+@1000200
 -MESH IN/OUT
 @200
 -
@@ -246,6 +248,10 @@ testbench.u_dut.first_tick_q[0]
 @24
 testbench.u_dut.cycle_q[23:0]
 testbench.u_dut.interval_q[23:0]
+@200
+-
+@23
+testbench.u_dut.out_mask_q[3:0]
 @1000200
 -STATE
 [pattern_trace] 1

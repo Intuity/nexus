@@ -15,7 +15,20 @@
 from cocotb.triggers import RisingEdge
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import ControlReqType, ControlRespType, ControlRequest, ControlResponse
+from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
+                         ControlResponse, MAX_OUT_IDX_WIDTH)
+
+# Function to configure the controller
+async def configure(dut, out_mask=None):
+    # If out_mask is None, switch on all messages
+    if out_mask is None:
+        out_mask = [True] * MAX_OUT_IDX_WIDTH
+    # Write request
+    req                       = ControlRequest()
+    req.configure.command     = ControlReqType.CONFIGURE
+    req.configure.output_mask = sum([((1 if x else 0) << n) for n, x in enumerate(out_mask)])
+    dut.ctrl_in.append(StreamTransaction(req.configure.pack()))
+    await dut.ctrl_in.idle()
 
 # Function to trigger mesh
 async def trigger(dut, active=0, col_mask=None, cycles=0):
