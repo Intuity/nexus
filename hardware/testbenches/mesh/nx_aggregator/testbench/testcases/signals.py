@@ -36,7 +36,7 @@ async def signals(dut):
 
     # Queue up many signal updates
     state = 0
-    for _ in range(3000):
+    for _ in range(1000):
         # 50% of the time send a signal message
         if choice((True, False)):
             msg = NodeSignal()
