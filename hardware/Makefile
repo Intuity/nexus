@@ -60,7 +60,7 @@ lint: | $(WORKING_DIR)
 .PHONY: regress
 regress:
 	@echo "# Launching regression"
-	$(PREFIX)make -C testbench -j$(MAKE_J) run_all
+	$(PREFIX)make -C testbenches -j$(MAKE_J) run_all
 
 .PHONY: sv2v
 sv2v: $(SV2V_OUT)
