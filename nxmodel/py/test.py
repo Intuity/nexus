@@ -17,8 +17,8 @@ from pathlib import Path
 from nxmodel import Nexus, NXMesh, NXNode, NXLoader
 
 # Create an instance of the model
-print("# Creating a 6x6 mesh")
-instance = Nexus(6, 6)
+print("# Creating a 3x3 mesh")
+instance = Nexus(3, 3, 32, 32)
 print(f"# Instance reports {instance.get_rows()}x{instance.get_columns()}")
 
 # Extract the mesh
@@ -32,12 +32,15 @@ inst_node = inst_mesh.get_node(0, 2)
 assert isinstance(inst_node, NXNode)
 
 # Load a model into the mesh
+print("# Loading model into the mesh")
 NXLoader(instance, (Path(__file__).parent / "design.json").as_posix())
 
 # Run the mesh for 10,000 cycles
+print("# Running model for 10,000 cycles")
 instance.run(10000)
 
 # Pull the first few outputs
+print("# Extracting outputs")
 for idx in range(10):
     summary = instance.pop_output()
     print(f"{idx:02d} : {summary}")
