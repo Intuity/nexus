@@ -53,7 +53,6 @@ async def trace(dut):
 
     # Decide on the number of active outputs
     actv_outs = randint(1, outputs)
-    dut.info(f"Using {actv_outs=}")
 
     # Generate 0 active output mappings
     lookups, mappings = gen_output_mappings(

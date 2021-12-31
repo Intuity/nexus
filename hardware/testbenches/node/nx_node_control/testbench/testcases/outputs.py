@@ -87,7 +87,6 @@ async def output_multi(dut):
 
     # Decide on the number of active outputs
     actv_outs = randint(1, outputs)
-    dut.info(f"Using {actv_outs=}")
 
     # Decide on the number of loaded instructions
     num_instr = randint(1, (1 << ram_addr_w) // 2)
