@@ -19,6 +19,8 @@ import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 from cocotb_bus.scoreboard import Scoreboard
 
+from nxconstants import ControlRespType, ControlResponsePadding
+
 from tb_base import TestbenchBase
 from drivers.io_common import IORole
 from drivers.axi4stream.io import AXI4StreamIO
@@ -59,6 +61,12 @@ class Testbench(TestbenchBase):
                 # Take the next chunk of received data
                 got_chunk = sum([(x << (n * 8)) for n, x in enumerate(all_data[:16])])
                 all_data = all_data[16:]
+                # Ignore padding packets
+                # NOTE: Once a padding packet has been seen, the rest in this
+                #       transaction will all be padding as well!
+                pkt = ControlResponsePadding()
+                pkt.unpack(got_chunk)
+                if pkt.format == ControlRespType.PADDING: break
                 # Take the next chunk of expected data
                 exp_chunk = sum([(x << (n * 8)) for n, x in enumerate(self.expected[0].data[:16])])
                 self.expected[0].data = self.expected[0].data[16:]

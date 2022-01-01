@@ -71,7 +71,7 @@ async def control(dut, backpressure):
     resp_status                   = resp_status.status.pack()
 
     # Run a number of iterations
-    for _ in range(1000):
+    for _ in range(100):
         name, req, resp = choice((
             ("PARAM",  req_param,  resp_param),
             ("STATUS", req_status, resp_status)

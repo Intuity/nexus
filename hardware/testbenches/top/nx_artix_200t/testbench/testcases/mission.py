@@ -205,10 +205,13 @@ async def mission_mode(dut):
     num_cycles = delta / clk_period
     cyc_per_tk = num_cycles / tick_count
     dut.info(f"Achieved {cyc_per_tk:.02f} cycles/tick - if mesh clock...")
-    for tgt_period in (2, 4, 8):
+    for tgt_period in (2, 5, 10):
         clk_frequency  = (1 / (tgt_period * 1E-9)) / 1E6
         time_per_tick  = cyc_per_tk * tgt_period
         tick_frequency = (1 / (time_per_tick * 1E-9)) / 1E6
         dut.info(
             f" - @{clk_frequency:.02f} MHz -> {tick_frequency:.02f} MHz simulated"
         )
+
+    # List the outstanding messages
+    dut.info(f"Waiting on {len(dut.expected)} outbound messages")

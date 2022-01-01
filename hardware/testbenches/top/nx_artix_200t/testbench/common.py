@@ -65,6 +65,6 @@ async def request_reset(dut):
     dut.inbound.append(AXI4StreamTransaction(data=to_bytes(req.pack(), 128)))
     await dut.inbound.idle()
     # Wait for internal reset to rise
-    while dut.dut.u_dut.u_nexus.rst_internal == 0: await RisingEdge(dut.clk)
+    while dut.dut.u_dut.u_nexus.o_rst_internal == 0: await RisingEdge(dut.clk)
     # Wait for internal reset to fall
-    while dut.dut.u_dut.u_nexus.rst_internal == 1: await RisingEdge(dut.clk)
+    while dut.dut.u_dut.u_nexus.o_rst_internal == 1: await RisingEdge(dut.clk)
