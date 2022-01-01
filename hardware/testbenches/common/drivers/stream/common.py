@@ -19,5 +19,6 @@ from nxconstants import Direction
 @dataclass
 class StreamTransaction:
     data      : int       = 0
+    last      : bool      = False
     direction : Direction = Direction.NORTH
     timestamp : int       = field(default=0, compare=False)

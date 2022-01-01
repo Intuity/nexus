@@ -83,6 +83,7 @@ class StreamInitiator(Driver):
         while self.reset == 1: await RisingEdge(self.clock)
         # Drive the transaction interface
         self.intf.data <= transaction.data
+        self.intf.set("last", 1 if transaction.last else 0)
         self.intf.set("dir", int(transaction.direction))
         self.intf.valid <= 1
         while True:

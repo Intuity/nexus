@@ -62,6 +62,7 @@ class StreamResponder(Monitor):
             if self.intf.valid == 1 and self.intf.ready == 1:
                 self._recv(StreamTransaction(
                     data     =int(self.intf.data),
+                    last     =(self.intf.get("last", 0) == 1),
                     direction=Direction(self.intf.get("dir", 0)),
                     timestamp=get_sim_time(units="ns"),
                 ))
