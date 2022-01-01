@@ -1,0 +1,39 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Sat Jan  1 17:24:03 2022
+[*]
+[dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control_padder/sim.lxt"
+[dumpfile_mtime] "Sat Jan  1 17:23:20 2022"
+[dumpfile_size] 542
+[savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control_padder/nx_control_padder.gtkw"
+[timestart] 0
+[size] 1000 600
+[pos] 1833 481
+*-13.901174 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] testbench.
+[sst_width] 193
+[signals_width] 219
+[sst_expanded] 1
+[sst_vpaned_height] 167
+@28
+testbench.u_dut.i_clk[0]
+testbench.u_dut.i_rst[0]
+@200
+-
+@22
+testbench.u_dut.i_inbound_data[127:0]
+@28
+testbench.u_dut.i_inbound_last[0]
+testbench.u_dut.i_inbound_valid[0]
+testbench.u_dut.o_inbound_ready[0]
+@200
+-
+@22
+testbench.u_dut.o_outbound_data[127:0]
+@28
+testbench.u_dut.o_outbound_last[0]
+testbench.u_dut.o_outbound_valid[0]
+@29
+testbench.u_dut.i_outbound_ready[0]
+[pattern_trace] 1
+[pattern_trace] 0
