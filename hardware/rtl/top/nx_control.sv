@@ -319,13 +319,12 @@ assign ctrl_out_data = ctrl_out_stall   ? ctrl_out_data_q :
                        req_rd_status    ? resp_status
                                         : 'd0;
 
-// Flag last on basic requests and when returning to idle
+// Flag last on basic requests and whenever in an idle state
 assign ctrl_out_last = (
     (ctrl_out_stall && ctrl_out_last_q) ||
     req_rd_params ||
     req_rd_status ||
-    !active_q ||
-    (cycle_q[3:0] == 'd0)
+    !active_q
 );
 
 // Drive the valid

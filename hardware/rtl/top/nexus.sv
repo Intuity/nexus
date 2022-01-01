@@ -28,6 +28,7 @@ import NXConstants::*;
 ) (
       input  logic              i_clk
     , input  logic              i_rst
+    , output logic              o_rst_internal
     // Status signals
     , output logic              o_status_active
     , output logic              o_status_idle
@@ -54,7 +55,7 @@ localparam MESH_OUTPUTS = COLUMNS * OUTPUTS;
 // =============================================================================
 
 // Reset stretch
-logic rst_soft, rst_internal;
+logic rst_soft;
 
 // Mesh controller
 node_message_t           mesh_in_data, mesh_out_data;
@@ -68,10 +69,10 @@ logic [MESH_OUTPUTS-1:0] mesh_outputs;
 // =============================================================================
 
 nx_reset u_reset_stretch (
-      .i_clk         ( i_clk        )
-    , .i_rst_hard    ( i_rst        )
-    , .i_rst_soft    ( rst_soft     )
-    , .o_rst_internal( rst_internal )
+      .i_clk         ( i_clk          )
+    , .i_rst_hard    ( i_rst          )
+    , .i_rst_soft    ( rst_soft       )
+    , .o_rst_internal( o_rst_internal )
 );
 
 // =============================================================================
@@ -86,7 +87,7 @@ nx_control #(
     , .REGISTERS        ( REGISTERS        )
 ) u_control (
       .i_clk            ( i_clk            )
-    , .i_rst            ( rst_internal     )
+    , .i_rst            ( o_rst_internal   )
     // Soft reset request
     , .o_soft_reset     ( rst_soft         )
     // Host message streams
@@ -133,7 +134,7 @@ nx_mesh #(
     , .RAM_DATA_W       ( RAM_DATA_W     )
 ) u_mesh (
       .i_clk            ( i_clk          )
-    , .i_rst            ( rst_internal   )
+    , .i_rst            ( o_rst_internal )
     // Control signals
     , .o_node_idle      ( mesh_node_idle )
     , .o_agg_idle       ( mesh_agg_idle  )

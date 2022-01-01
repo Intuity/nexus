@@ -39,33 +39,64 @@ module nx_artix_200t #(
     , input  wire                       outbound_tready
 );
 
+// =============================================================================
+// Nexus Instance
+// =============================================================================
+
+wire                       rst_internal;
+wire [AXI4_DATA_WIDTH-1:0] ctrl_out_data;
+wire                       ctrl_out_last, ctrl_out_valid, ctrl_out_ready;
+
 nexus #(
-      .ROWS             ( ROWS            )
-    , .COLUMNS          ( COLUMNS         )
-    , .INPUTS           ( 32              )
-    , .OUTPUTS          ( 32              )
-    , .REGISTERS        ( 16              )
-    , .RAM_ADDR_W       ( 10              )
-    , .RAM_DATA_W       ( 32              )
+      .ROWS             ( ROWS           )
+    , .COLUMNS          ( COLUMNS        )
+    , .INPUTS           ( 32             )
+    , .OUTPUTS          ( 32             )
+    , .REGISTERS        ( 16             )
+    , .RAM_ADDR_W       ( 10             )
+    , .RAM_DATA_W       ( 32             )
 ) u_nexus (
-      .i_clk            ( clk             )
-    , .i_rst            ( ~rstn           )
+      .i_clk            ( clk            )
+    , .i_rst            ( ~rstn          )
+    , .o_rst_internal   ( rst_internal   )
     // Status signals
-    , .o_status_active  ( status_active   )
-    , .o_status_idle    ( status_idle     )
-    , .o_status_trigger ( status_trigger  )
+    , .o_status_active  ( status_active  )
+    , .o_status_idle    ( status_idle    )
+    , .o_status_trigger ( status_trigger )
     // Inbound control stream
-    , .i_ctrl_in_data   ( inbound_tdata   )
-    , .i_ctrl_in_valid  ( inbound_tvalid  )
-    , .o_ctrl_in_ready  ( inbound_tready  )
+    , .i_ctrl_in_data   ( inbound_tdata  )
+    , .i_ctrl_in_valid  ( inbound_tvalid )
+    , .o_ctrl_in_ready  ( inbound_tready )
     // Outbound control stream
-    , .o_ctrl_out_data  ( outbound_tdata  )
-    , .o_ctrl_out_last  ( outbound_tlast  )
-    , .o_ctrl_out_valid ( outbound_tvalid )
-    , .i_ctrl_out_ready ( outbound_tready )
+    , .o_ctrl_out_data  ( ctrl_out_data  )
+    , .o_ctrl_out_last  ( ctrl_out_last  )
+    , .o_ctrl_out_valid ( ctrl_out_valid )
+    , .i_ctrl_out_ready ( ctrl_out_ready )
 );
 
-// Tie-off unused signals
+// =============================================================================
+// Outbound Stream Padding
+// =============================================================================
+
+nx_control_padder u_padder (
+      .i_clk            ( clk             )
+    , .i_rst            ( rst_internal    )
+    // Inbound stream
+    , .i_inbound_data   ( ctrl_out_data   )
+    , .i_inbound_last   ( ctrl_out_last   )
+    , .i_inbound_valid  ( ctrl_out_valid  )
+    , .o_inbound_ready  ( ctrl_out_ready  )
+    // Outbound stream
+    , .o_outbound_data  ( outbound_tdata  )
+    , .o_outbound_last  ( outbound_tlast  )
+    , .o_outbound_valid ( outbound_tvalid )
+    , .i_outbound_ready ( outbound_tready )
+);
+
+// =============================================================================
+// Tie-Offs
+// =============================================================================
+
 wire _unused;
 assign _unused = &{ 1'b0, inbound_tlast };
 
