@@ -49,19 +49,23 @@ class NXConstants:
         MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS
     )
 
-    # Interface and selector sizes
+    # Control plane constants
     CONTROL_WIDTH     : Constant("Width of the control stream" ) = 128
+    HOST_PACKET_SIZE  : Constant("Maximum to-host packet size" ) = 512
+    SLOTS_PER_PACKET  : Constant("Control responses per packet") = (HOST_PACKET_SIZE * 8) // CONTROL_WIDTH
+    TIMER_WIDTH       : Constant("Width of the control timers" ) = 24
+    OUT_BITS_PER_MSG  : Constant("Bits of output per message"  ) = 96
+    MAX_OUT_IDX_WIDTH : Constant("Output index field width"    ) = clog2(
+        (MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS) / OUT_BITS_PER_MSG
+    )
+
+    # Interface and selector sizes
     MESSAGE_WIDTH     : Constant("Width of the message stream" ) = 28
     ADDR_ROW_WIDTH    : Constant("Width of the row address"    ) = clog2(MAX_ROW_COUNT)
     ADDR_COL_WIDTH    : Constant("Width of the column address" ) = clog2(MAX_COLUMN_COUNT)
     MAX_INPUT_WIDTH   : Constant("Width of input selector"     ) = clog2(MAX_NODE_INPUTS)
     MAX_OUTPUT_WIDTH  : Constant("Width of output selector"    ) = clog2(MAX_NODE_OUTPUTS)
     MAX_IOR_WIDTH     : Constant("Width of in/out/reg selector") = clog2(MAX_NODE_IOR_COUNT)
-    TIMER_WIDTH       : Constant("Width of the control timers" ) = 24
-    OUT_BITS_PER_MSG  : Constant("Bits of output per message"  ) = 96
-    MAX_OUT_IDX_WIDTH : Constant("Output index field width"    ) = clog2(
-        (MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS) / OUT_BITS_PER_MSG
-    )
 
     # Truth table
     TT_WIDTH : Constant("Width of a three input truth table") = 8
@@ -102,10 +106,11 @@ class ControlReqType:
 @packtype.enum(package=NXConstants)
 class ControlRespType:
     """ Control response type enumeration """
-    OUTPUTS   : Constant("Reporting the current outputs"    )
-    FROM_MESH : Constant("Message forwarded from the mesh"  )
-    PARAMS    : Constant("Device parameters"                )
-    STATUS    : Constant("Status of the controller and mesh")
+    OUTPUTS   : Constant("Reporting the current outputs"     )
+    FROM_MESH : Constant("Message forwarded from the mesh"   )
+    PARAMS    : Constant("Device parameters"                 )
+    STATUS    : Constant("Status of the controller and mesh" )
+    PADDING   : Constant("Packetised response padding marker")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
@@ -324,6 +329,15 @@ class ControlResponseStatus:
     first_tick : Scalar(width=1, desc="Is this the first tick after reset?")
     cycle      : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Current cycle")
     countdown  : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Remaining cycles")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponsePadding:
+    """ Padding used to signify unused entries following this response """
+    format  : ControlRespType(desc="Control response format")
+    entries : Scalar(
+        width=clog2(NXConstants.SLOTS_PER_PACKET),
+        desc="Number of padding entries"
+    )
 
 @packtype.union(package=NXConstants)
 class ControlResponse:
