@@ -80,3 +80,14 @@ class testcase(cocotb.test):
             await ClockCycles(tb.clk, 10)
             raise tb.scoreboard.result
         return cocotb.decorators.RunningTest(__run_test(), self)
+
+def _create_test(func, name, docs, mod, *args, **kwargs):
+    """ Custom factory function support """
+    async def _my_test(dut): await func(dut, *args, **kwargs)
+    _my_test.__name__     = name
+    _my_test.__qualname__ = name
+    _my_test.__doc__      = docs
+    _my_test.__module__   = mod.__name__
+    return testcase()(_my_test)
+
+cocotb.regression._create_test = _create_test

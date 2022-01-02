@@ -15,6 +15,7 @@
 from .aggregation import *
 from .basic import *
 from .load import *
+from .memory import *
 from .mission import *
 from .params import *
 from .routing import *
