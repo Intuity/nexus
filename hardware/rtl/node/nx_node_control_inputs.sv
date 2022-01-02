@@ -117,4 +117,15 @@ endgenerate
 // Whenever global trigger is presented, or current cycle inputs have changed
 assign core_trigger = i_trigger || (inputs_curr != inputs_curr_q);
 
+// =============================================================================
+// Unused Tie-Offs
+// =============================================================================
+
+generate
+if (!EXT_INPUTS) begin
+    logic _unused;
+    assign _unused = &{ 1'b0, i_ext_inputs_en, i_ext_inputs };
+end
+endgenerate
+
 endmodule : nx_node_control_inputs
