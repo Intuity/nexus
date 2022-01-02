@@ -18,7 +18,9 @@
 #include <cstring>
 #include <iomanip>
 #include <iostream>
+#include <stdio.h>
 #include <thread>
+#include <unistd.h>
 
 #include "nxdevice.hpp"
 
@@ -86,10 +88,12 @@ control_response_parameters_t NXLink::NXDevice::read_parameters (void)
         },
         (uint8_t *)&raw
     );
-    m_pipe->tx_to_device(raw);
+    tx_to_device(raw);
     // Pickup from monitor
-    control_response_parameters_t params;
-    m_rx_params.wait_dequeue(params);
+    m_rx_params.wait_dequeue(raw);
+    control_response_parameters_t params = unpack_control_response_parameters(
+        (uint8_t *)&raw
+    );
     return params;
 }
 
@@ -108,10 +112,12 @@ control_response_status_t NXLink::NXDevice::read_status (void)
         },
         (uint8_t *)&raw
     );
-    m_pipe->tx_to_device(raw);
+    tx_to_device(raw);
     // Pickup from monitor
-    control_response_status_t status;
-    m_rx_status.wait_dequeue(status);
+    m_rx_status.wait_dequeue(raw);
+    control_response_status_t status = unpack_control_response_status(
+        (uint8_t *)&raw
+    );
     return status;
 }
 
@@ -122,6 +128,27 @@ uint32_t NXLink::NXDevice::read_cycles (void)
 {
     control_response_status_t status = read_status();
     return status.cycle;
+}
+
+// configure
+// Selectively enable/disable output messages
+//
+void NXLink::NXDevice::configure (
+    uint8_t out_mask /* = 0xFF */,
+    uint8_t en_memory /* = 0 */,
+    uint8_t en_mem_wstrb /* = 0 */
+) {
+    uint128_t raw = 0;
+    pack_control_request_configure(
+        (control_request_configure_t){
+            .command      = CONTROL_REQ_TYPE_CONFIGURE,
+            .en_memory    = en_memory,
+            .en_mem_wstrb = en_mem_wstrb,
+            .output_mask  = out_mask
+        },
+        (uint8_t *)&raw
+    );
+    tx_to_device(raw);
 }
 
 // reset
@@ -138,7 +165,7 @@ void NXLink::NXDevice::reset (void)
         },
         (uint8_t *)&raw
     );
-    m_pipe->tx_to_device(raw);
+    tx_to_device(raw);
     // Wait for 100ms
     std::this_thread::sleep_for(100ms);
     // Check the identity of the device
@@ -168,7 +195,7 @@ void NXLink::NXDevice::start (uint32_t cycles /* = 0 */)
         },
         (uint8_t *)&raw
     );
-    m_pipe->tx_to_device(raw);
+    tx_to_device(raw);
 }
 
 // stop
@@ -186,7 +213,53 @@ void NXLink::NXDevice::stop (void)
         },
         (uint8_t *)&raw
     );
-    m_pipe->tx_to_device(raw);
+    tx_to_device(raw);
+}
+
+// memory_write
+// Perform a write to one of Nexus' on-board memories
+//
+void NXLink::NXDevice::memory_write (
+    uint8_t index, uint16_t address, uint32_t data, uint8_t strobe /* = 0xF */
+) {
+    uint128_t raw = 0;
+    pack_control_request_memory(
+        (control_request_memory_t){
+            .command  = CONTROL_REQ_TYPE_MEMORY,
+            .memory   = index,
+            .address  = address,
+            .wr_n_rd  = 1,
+            .wr_data  = data,
+            .wr_strb  = strobe
+        },
+        (uint8_t *)&raw
+    );
+    tx_to_device(raw);
+}
+
+// memory_read
+// Perform a read from one of Nexus' on-board memories
+//
+uint32_t NXLink::NXDevice::memory_read (uint8_t index, uint16_t address)
+{
+    // Request the read
+    uint128_t raw = 0;
+    pack_control_request_memory(
+        (control_request_memory_t){
+            .command  = CONTROL_REQ_TYPE_MEMORY,
+            .memory   = index,
+            .address  = address,
+            .wr_n_rd  = 0,
+            .wr_data  = 0,
+            .wr_strb  = 0
+        },
+        (uint8_t *)&raw
+    );
+    tx_to_device(raw);
+    // Wait for and decode the response
+    m_rx_memory.wait_dequeue(raw);
+    control_response_memory_t resp = unpack_control_response_memory((uint8_t *)&raw);
+    return resp.rd_data;
 }
 
 // send_to_mesh
@@ -202,7 +275,7 @@ void NXLink::NXDevice::send_to_mesh (uint32_t to_mesh)
         },
         (uint8_t *)&raw
     );
-    m_pipe->tx_to_device(to_mesh);
+    tx_to_device(to_mesh);
 }
 
 // receive_from_mesh
@@ -220,39 +293,74 @@ bool NXLink::NXDevice::receive_from_mesh (uint32_t & msg, bool blocking)
     return true;
 }
 
-// monitor
+// tx_to_device
+// Send an encoded item to the device.
+//
+void NXLink::NXDevice::tx_to_device (uint128_t msg)
+{
+    // Acquire mutex
+    m_tx_lock.lock();
+    // Create a transmit buffer
+    uint8_t * tx_buffer = NULL;
+    int pm_err = posix_memalign((void **)&tx_buffer, 4096, 16 + 4096);
+    assert(pm_err == 0);
+    assert(tx_buffer != NULL);
+    memcpy((void *)tx_buffer, (void *)&msg, 16);
+    // Write to the device
+    ssize_t rc = write(m_tx_fh, tx_buffer, 16);
+    if (rc < 0) {
+        fprintf(stderr, "tx_to_device: Write failed - %li\n", rc);
+        assert(!"tx_to_device: Write failed");
+    }
+    // Release mutex
+    m_tx_lock.unlock();
+}
+
+// rx_from_device
 // Continuously consume data coming from the device, separating the streams for
 // different types of message.
 //
-void NXLink::NXDevice::monitor (void)
+void NXLink::NXDevice::rx_from_device (void)
 {
-    uint128_t                    raw;
-    control_response_from_mesh_t msg;
+    // Setup loop to read from device
+    uint128_t           buffer[SLOTS_PER_PACKET];
+    control_resp_type_t fmt;
     while (true) {
-        // Receive the next message from the mesh
-        raw = m_pipe->rx_from_device();
+        // Receive the next chunk from the device
+        ssize_t rc = read(m_rx_fh, (uint8_t *)buffer, SLOTS_PER_PACKET * 16);
+        if (rc <= 0) continue;
         // Decode appropriately
-        msg = unpack_control_response_from_mesh((uint8_t *)&raw);
-        switch (msg.format) {
-            case CONTROL_RESP_TYPE_OUTPUTS: {
-                m_rx_outputs.enqueue(unpack_control_response_outputs((uint8_t *)&raw));
-                break;
-            }
-            case CONTROL_RESP_TYPE_PARAMS: {
-                m_rx_params.enqueue(unpack_control_response_parameters((uint8_t *)&raw));
-                break;
-            }
-            case CONTROL_RESP_TYPE_STATUS: {
-                m_rx_status.enqueue(unpack_control_response_status((uint8_t *)&raw));
-                break;
-            }
-            case CONTROL_RESP_TYPE_FROM_MESH: {
-                m_rx_mesh.enqueue(msg.message);
-                break;
-            }
-            default: {
-                std::cout << "ERROR: Unknown message format " << std::dec << msg.format << std::endl;
-                assert(!"Monitor received message with bad format");
+        for (int idx_pkt = 0; idx_pkt < SLOTS_PER_PACKET; idx_pkt++) {
+            fmt = (control_resp_type_t)((buffer[idx_pkt] >> 125) & 0x7);
+            // If this is a padding message - stop processing this chunk
+            if (fmt == CONTROL_RESP_TYPE_PADDING) break;
+            // Act on the message's format
+            switch (fmt) {
+                case CONTROL_RESP_TYPE_OUTPUTS: {
+                    // m_rx_outputs.enqueue(buffer[idx_pkt]);
+                    break;
+                }
+                case CONTROL_RESP_TYPE_PARAMS: {
+                    m_rx_params.enqueue(buffer[idx_pkt]);
+                    break;
+                }
+                case CONTROL_RESP_TYPE_STATUS: {
+                    m_rx_status.enqueue(buffer[idx_pkt]);
+                    break;
+                }
+                case CONTROL_RESP_TYPE_FROM_MESH: {
+                    uint32_t msg = (buffer[idx_pkt] >> 97) & 0x0FFFFFFF;
+                    m_rx_mesh.enqueue(msg);
+                    break;
+                }
+                case CONTROL_RESP_TYPE_MEMORY: {
+                    m_rx_memory.enqueue(buffer[idx_pkt]);
+                    break;
+                }
+                default: {
+                    std::cout << "ERROR: Unknown message format " << std::dec << fmt << std::endl;
+                    assert(!"Monitor received message with bad format");
+                }
             }
         }
     }
@@ -274,11 +382,25 @@ void NXLink::NXDevice::process_outputs (control_response_parameters_t params)
     control_response_outputs_t messages[per_cycle];
     std::fill_n(populated, per_cycle, false);
 
+    // Build up a 96-bit mask
+    uint128_t mask = 0;
+    mask  |= 0xFFFFFFFF;
+    mask <<= 32;
+    mask  |= 0xFFFFFFFF;
+    mask <<= 32;
+    mask  |= 0xFFFFFFFF;
+
     // Run in a loop, dequeuing messages
     while (true) {
         // Attempt to dequeue the next output segment
-        control_response_outputs_t msg;
-        m_rx_outputs.wait_dequeue(msg);
+        uint128_t raw;
+        m_rx_outputs.wait_dequeue(raw);
+        control_response_outputs_t msg = {
+            .format  = CONTROL_RESP_TYPE_OUTPUTS,
+            .stamp   = (uint32_t)((raw >> 102) & 0xFFFFFF),
+            .index   = (uint8_t )((raw >>  99) & 0x7),
+            .section = (raw >>   3) & mask
+        };
 
         // Check for an illegal message
         if (msg.index >= per_cycle) {
@@ -289,8 +411,8 @@ void NXLink::NXDevice::process_outputs (control_response_parameters_t params)
 
         // Check if the cycle has changed
         } else if (received > 0 && (cycle % (1 << TIMER_WIDTH)) != msg.stamp) {
-            std::cout << "WARNING: Dropping partial outputs for cycle "
-                      << std::dec << cycle << std::endl;
+            // std::cout << "WARNING: Dropping partial outputs for cycle "
+            //           << std::dec << cycle << std::endl;
             received = 0;
             std::fill_n(populated, per_cycle, false);
 

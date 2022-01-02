@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
+#include <stdlib.h>
+
 #include <cxxopts.hpp>
 
 #include "nxdevice.hpp"
-#include "nxpipe.hpp"
 
 using namespace NXLink;
 
@@ -58,11 +60,8 @@ int main (int argc, char * argv [])
     std::string stream_c2h = std::string(tmp.str());
     tmp.str("");
 
-    // Create pipes
-    NXPipe * pipe = new NXPipe(stream_h2c, stream_c2h);
-
     // Create a wrapper around the device
-    NXDevice * device = new NXDevice(pipe);
+    NXDevice * device = new NXDevice(stream_h2c, stream_c2h);
 
     // Check the identity
     if (!device->identify()) {
@@ -81,6 +80,56 @@ int main (int argc, char * argv [])
     // Read back the current status
     std::cout << "Reading back status" << std::endl;
     device->log_status(device->read_status());
+
+    std::cout << "Disabling outputs" << std::endl;
+    device->configure(0xF);
+
+    std::cout << "Starting device" << std::endl;
+    device->start((1 << TIMER_WIDTH) - 1);
+
+    while (true) {
+        std::cout << "Reading back status" << std::endl;
+        control_response_status_t status = device->read_status();
+        device->log_status(status);
+        if (status.countdown == 0) break;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    // Perform a memory test
+    std::cout << "Testing on-board memory" << std::endl;
+    uint32_t mem_size = 1 << TOP_MEM_ADDR_WIDTH;
+    uint32_t state[TOP_MEM_COUNT][mem_size];
+
+    for (uint8_t mem_idx = 0; mem_idx < NXConstants::TOP_MEM_COUNT; mem_idx++) {
+        std::cout << "Populating memory " << std::dec << (int)mem_idx << std::endl;
+        for (uint16_t addr = 0; addr < mem_size; addr++) {
+            state[mem_idx][addr] = rand();
+            device->memory_write(mem_idx, addr, state[mem_idx][addr], 0xF);
+        }
+    }
+
+    int mismatches = 0;
+    int checked    = 0;
+    for (uint8_t mem_idx = 0; mem_idx < NXConstants::TOP_MEM_COUNT; mem_idx++) {
+        std::cout << "Checking memory " << std::dec << (int)mem_idx << std::endl;
+        for (uint16_t addr = 0; addr < mem_size; addr++) {
+            uint32_t data = device->memory_read(mem_idx, addr);
+            if (data != state[mem_idx][addr]) {
+                std::cout << "Mismatch on memory " << std::dec << (int)mem_idx
+                          << " at address 0x" << std::hex << (uint32_t)addr
+                          << " expecting 0x" << std::hex << state[mem_idx][addr]
+                          << " got 0x" << std::hex << data
+                          << std::endl;
+                mismatches++;
+            }
+            checked++;
+        }
+    }
+
+    assert(mismatches == 0);
+    assert(checked    == (TOP_MEM_COUNT * mem_size));
+    std::cout << "Finished checking " << std::dec << (int)checked << " entries"
+              << std::endl;
 
     return 0;
 }
