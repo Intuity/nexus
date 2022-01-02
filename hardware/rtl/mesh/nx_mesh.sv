@@ -44,6 +44,9 @@ import NXConstants::*;
     , input  logic                         i_outbound_ready
     // Aggregated outputs
     , output logic [(COLUMNS*OUTPUTS)-1:0] o_outputs
+    // Memory inputs
+    , input  logic [TOP_MEM_COUNT-1:0]     i_mem_enable
+    , input  logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] i_mem_rd_data
 );
 
 // =============================================================================
@@ -86,6 +89,11 @@ assign o_agg_idle  = all_agg_idle_q;
 generate
 for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
     for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_columns
+
+        // Determine if this node has external inputs
+        localparam HAS_EXT_INPUTS = (
+            (idx_row == 0) && (idx_col >= (COLUMNS - TOP_MEM_COUNT))
+        );
 
         // Construct ID
         node_id_t node_id;
@@ -153,6 +161,17 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
                            : chain_trigger[idx_col][idx_row-1]
         );
 
+        // External inputs
+        logic              ext_inputs_en;
+        logic [INPUTS-1:0] ext_inputs;
+        if (HAS_EXT_INPUTS) begin
+            assign ext_inputs_en = i_mem_enable[idx_col + TOP_MEM_COUNT - COLUMNS];
+            assign ext_inputs    = i_mem_rd_data[idx_col + TOP_MEM_COUNT - COLUMNS];
+        end else begin
+            assign ext_inputs_en = 'd0;
+            assign ext_inputs    = 'd0;
+        end
+
         // Node instance
         nx_node #(
               .INPUTS             ( INPUTS                          )
@@ -160,6 +179,7 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
             , .REGISTERS          ( REGISTERS                       )
             , .RAM_ADDR_W         ( RAM_ADDR_W                      )
             , .RAM_DATA_W         ( RAM_DATA_W                      )
+            , .EXT_INPUTS         ( HAS_EXT_INPUTS                  )
         ) u_node (
               .i_clk              ( i_clk                           )
             , .i_rst              ( i_rst                           )
@@ -178,6 +198,9 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
             , .o_outbound_valid   ( mesh_ob_valid[idx_col][idx_row] )
             , .i_outbound_ready   ( node_ob_ready                   )
             , .i_outbound_present ( node_ob_present                 )
+            // External inputs
+            , .i_ext_inputs_en    ( ext_inputs_en                   )
+            , .i_ext_inputs       ( ext_inputs                      )
         );
 
     end
