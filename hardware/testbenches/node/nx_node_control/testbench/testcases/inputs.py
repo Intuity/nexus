@@ -105,7 +105,7 @@ async def inputs_lb(dut):
     # Reset the DUT
     await dut.reset()
 
-    # Pickup the number of inputs
+    # Pickup the number of inputs and outputs
     inputs  = int(dut.INPUTS)
     outputs = int(dut.OUTPUTS)
 
@@ -135,3 +135,39 @@ async def inputs_lb(dut):
             state = out_state & lb_mask
             assert dut.core_inputs == state, \
                 f"Core inputs haven't updated - 0x{state:08X} != 0x{int(dut.core_inputs):08X}"
+
+@testcase()
+async def inputs_ext(dut):
+    """ Check that external inputs take precedence over messages """
+    # Reset the DUT
+    await dut.reset()
+
+    # Pickup the number
+    inputs = int(dut.INPUTS)
+
+    # Enable external inputs
+    dut.ext_inputs_en <= 1
+
+    # Run a number of passes
+    for _ in range(100):
+        # Set external input to a random value
+        ext_ins = randint(0, (1 << inputs) - 1)
+        dut.ext_inputs <= ext_ins
+        # Make a number of sequential updates
+        for _ in range(10):
+            dut.input.append(SignalState(
+                index     =randint(0, inputs-1),
+                sequential=True,
+                state     =choice((0, 1)),
+            ))
+        # Wait for driver to flush
+        await dut.input.idle()
+        await RisingEdge(dut.clk)
+        # Trigger design
+        dut.trigger <= 1
+        await RisingEdge(dut.clk)
+        dut.trigger <= 0
+        await RisingEdge(dut.clk)
+        # Check inputs have updated
+        assert dut.core_inputs == ext_ins, \
+            f"Core inputs haven't updated - 0x{ext_ins:08X} != 0x{int(dut.core_inputs):08X}"

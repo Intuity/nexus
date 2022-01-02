@@ -19,6 +19,7 @@ import NXConstants::*;
     , parameter OUTPUTS    = 32
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
+    , parameter EXT_INPUTS =  1
 ) (
       input  logic                        rst
     // Control signals
@@ -46,6 +47,9 @@ import NXConstants::*;
     , input  logic                        i_core_idle
     , output logic [INPUTS-1:0]           o_core_inputs
     , input  logic [OUTPUTS-1:0]          i_core_outputs
+    // External inputs
+    , input  logic                        i_ext_inputs_en
+    , input  logic [INPUTS-1:0]           i_ext_inputs
 );
 
 // =============================================================================
@@ -60,10 +64,11 @@ always #1 clk <= ~clk;
 // =============================================================================
 
 nx_node_control #(
-      .INPUTS     ( INPUTS     )
-    , .OUTPUTS    ( OUTPUTS    )
-    , .RAM_ADDR_W ( RAM_ADDR_W )
-    , .RAM_DATA_W ( RAM_DATA_W )
+      .INPUTS          ( INPUTS          )
+    , .OUTPUTS         ( OUTPUTS         )
+    , .RAM_ADDR_W      ( RAM_ADDR_W      )
+    , .RAM_DATA_W      ( RAM_DATA_W      )
+    , .EXT_INPUTS      ( EXT_INPUTS      )
 ) u_dut (
       .i_clk           ( clk             )
     , .i_rst           ( rst             )
@@ -92,6 +97,9 @@ nx_node_control #(
     , .i_core_idle     ( i_core_idle     )
     , .o_core_inputs   ( o_core_inputs   )
     , .i_core_outputs  ( i_core_outputs  )
+    // External inputs
+    , .i_ext_inputs_en ( i_ext_inputs_en )
+    , .i_ext_inputs    ( i_ext_inputs    )
 );
 
 // =============================================================================

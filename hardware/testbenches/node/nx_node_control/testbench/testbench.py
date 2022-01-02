@@ -38,16 +38,18 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Basic interfaces
-        self.node_id      = self.dut.i_node_id
-        self.trace_en     = self.dut.i_trace_en
-        self.trigger      = self.dut.i_trigger
-        self.idle         = self.dut.o_idle
-        self.lb_mask      = self.dut.i_loopback_mask
-        self.num_instr    = self.dut.i_num_instr
-        self.core_trigger = self.dut.o_core_trigger
-        self.core_idle    = self.dut.i_core_idle
-        self.core_inputs  = self.dut.o_core_inputs
-        self.core_outputs = self.dut.i_core_outputs
+        self.node_id       = self.dut.i_node_id
+        self.trace_en      = self.dut.i_trace_en
+        self.trigger       = self.dut.i_trigger
+        self.idle          = self.dut.o_idle
+        self.lb_mask       = self.dut.i_loopback_mask
+        self.num_instr     = self.dut.i_num_instr
+        self.core_trigger  = self.dut.o_core_trigger
+        self.core_idle     = self.dut.i_core_idle
+        self.core_inputs   = self.dut.o_core_inputs
+        self.core_outputs  = self.dut.i_core_outputs
+        self.ext_inputs_en = self.dut.i_ext_inputs_en
+        self.ext_inputs    = self.dut.i_ext_inputs
         # Setup drivers/monitors
         self.input = StateInitiator(
             self, self.clk, self.rst, StateIO(self.dut, "input", IORole.RESPONDER),
@@ -84,13 +86,15 @@ class Testbench(TestbenchBase):
         """ Initialise the DUT's I/O """
         await super().initialise()
         # Basic interfaces
-        self.node_id      <= 0
-        self.trace_en     <= 0
-        self.trigger      <= 0
-        self.lb_mask      <= 0
-        self.num_instr    <= 0
-        self.core_idle    <= 0
-        self.core_outputs <= 0
+        self.node_id       <= 0
+        self.trace_en      <= 0
+        self.trigger       <= 0
+        self.lb_mask       <= 0
+        self.num_instr     <= 0
+        self.core_idle     <= 0
+        self.core_outputs  <= 0
+        self.ext_inputs_en <= 0
+        self.ext_inputs    <= 0
         # Drivers/monitors
         self.input.intf.initialise(IORole.INITIATOR)
         self.msg.intf.initialise(IORole.RESPONDER)
