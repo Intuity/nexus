@@ -32,7 +32,7 @@ async def stream(dut, backpressure):
     dut.outbound.delays = backpressure
 
     # Run for many iterations
-    for _ in range(1000):
+    for _ in range(100):
         # Determine whether to emit full packet
         emit_full = choice((True, False))
 
@@ -58,4 +58,3 @@ async def stream(dut, backpressure):
 factory = TestFactory(stream)
 factory.add_option("backpressure", [True, False])
 factory.generate_tests()
-
