@@ -59,6 +59,7 @@ namespace NXModel {
             , m_accumulator ( 0       )
             , m_num_instr   ( 0       )
             , m_loopback    ( 0       )
+            , m_trace_en    ( 0       )
         {
             for (int i = 0; i < 4; i++) {
                 m_inbound[i]  = std::make_shared<NXMessagePipe>();

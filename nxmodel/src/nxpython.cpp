@@ -110,6 +110,7 @@ PYBIND11_MODULE(nxmodel, m) {
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
         .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
+        .def("reset",                 &NXNode::reset                )
         .def("attach",                &NXNode::attach               )
         .def("get_pipe",              &NXNode::get_pipe             )
         .def("is_idle",               &NXNode::is_idle              )

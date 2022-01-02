@@ -40,8 +40,6 @@ void NXNode::reset (void)
     m_accumulator = 0;
     m_memory.clear();
     m_num_instr   = 0;
-    m_num_inputs  = 0;
-    m_num_outputs = 0;
     m_loopback    = 0;
     m_trace_en    = false;
     m_inputs_curr.clear();
@@ -352,7 +350,8 @@ void NXNode::transmit (void)
             );
             // Debug logging
             if (m_verbose) {
-                std::cout << "[NXNode " << m_row << ", " << m_column << "]"
+                std::cout << "[NXNode " << std::dec << (int)m_row << ", "
+                          << std::dec << (int)m_column << "]"
                           << " Sending trace section " << std::dec << (int)msg.select
                           << " with value 0x" << std::hex << (int)msg.trace
                           << std::endl;
