@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from types import SimpleNamespace
 
 import cocotb
 from cocotb.triggers import RisingEdge
@@ -34,10 +35,15 @@ class Testbench(TestbenchBase):
         """
         super().__init__(dut)
         # Wrap I/Os
-        self.node_id = self.dut.i_node_id
-        self.trigger = self.dut.i_trigger
-        self.idle    = self.dut.o_idle
-        self.present = [
+        self.node_id       = self.dut.i_node_id
+        self.trigger       = self.dut.i_trigger
+        self.idle          = SimpleNamespace(
+            input =self.dut.i_idle,
+            output=self.dut.o_idle,
+        )
+        self.ext_inputs_en = self.dut.i_ext_inputs_en
+        self.ext_inputs    = self.dut.i_ext_inputs
+        self.present       = [
             self.dut.i_ob_north_present, self.dut.i_ob_east_present,
             self.dut.i_ob_south_present, self.dut.i_ob_west_present,
         ]
@@ -68,9 +74,11 @@ class Testbench(TestbenchBase):
         for init in self.inbound : init.intf.initialise(IORole.INITIATOR)
         for resp in self.outbound: resp.intf.initialise(IORole.RESPONDER)
         for flag in self.present : flag <= 1
-        self.i_idle    <= 1
-        self.i_trigger <= 0
-        self.i_node_id <= 0
+        self.idle.input    <= 1
+        self.trigger       <= 0
+        self.node_id       <= 0
+        self.ext_inputs_en <= 0
+        self.ext_inputs    <= 0
 
 class testcase(cocotb.test):
     def __call__(self, dut, *args, **kwargs):

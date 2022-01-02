@@ -56,13 +56,13 @@ async def routing(dut):
         # Queue up the message onto the right outbound queue
         if msg.header.command == NodeCommand.TRACE:
             dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
-        elif msg.header.row < node_id.row:
-            dut.expected[int(Direction.NORTH)].append(StreamTransaction(data=msg.pack()))
-        elif msg.header.row > node_id.row:
-            dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
         elif msg.header.column < node_id.column:
             dut.expected[int(Direction.WEST)].append(StreamTransaction(data=msg.pack()))
         elif msg.header.column > node_id.column:
             dut.expected[int(Direction.EAST)].append(StreamTransaction(data=msg.pack()))
+        elif msg.header.row < node_id.row:
+            dut.expected[int(Direction.NORTH)].append(StreamTransaction(data=msg.pack()))
+        elif msg.header.row > node_id.row:
+            dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
         else:
             raise Exception("Could not route message")

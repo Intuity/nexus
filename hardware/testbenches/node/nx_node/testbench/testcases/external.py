@@ -28,11 +28,14 @@ from nxconstants import (NodeCommand, NodeID, NodeParameter, NodeSignal,
 from ..testbench import testcase
 
 @testcase()
-async def execute(dut):
-    """ Execute a random instruction stream with random output mappings """
+async def external(dut):
+    """ Execute a random instruction stream using externally driven inputs """
     # Reset the DUT
     dut.info("Resetting the DUT")
     await dut.reset()
+
+    # Enable external inputs
+    dut.ext_inputs_en <= 1
 
     # Pickup node parameters
     num_inputs    = int(dut.INPUTS)
@@ -83,10 +86,7 @@ async def execute(dut):
     )
 
     # Setup the loopback mask
-    loopback = [choice((0, 1)) for _ in range(num_inputs)]
-    lb_mask  = sum((x << i) for i, x in enumerate(loopback))
-    dut.info(f"Setting loopback mask to 0x{lb_mask:08X}")
-    load_loopback(rtl_in, node_id, num_inputs, lb_mask, model=mdl_in)
+    load_loopback(rtl_in, node_id, num_inputs, 0, model=mdl_in)
 
     # Wait for the inbound queue to go idle
     dut.info("Waiting for RTL to return to idle")
@@ -103,24 +103,29 @@ async def execute(dut):
     for outbound in dut.outbound: outbound._callbacks = []
 
     # Run multiple cycles
+    old_in      = [False] * num_inputs
     inputs      = [False] * num_inputs
     rtl_outputs = {}
     mdl_outputs = {}
-    is_seq      = [choice((True, False)) for _ in range(num_inputs)]
+    is_seq      = [True] * num_inputs
     for cycle in range(1000):
         # Seed the inputs to a random state
-        old_in = inputs[:]
-        inputs = [((not lb) and choice((True, False))) for lb in loopback]
+        inputs = [choice((True, False)) for _ in range(num_inputs)]
         dut.info(
             f"Starting cycle {cycle} with inputs 0x"
             f"{sum((x << i) for i, x in enumerate(inputs)):08X}"
         )
         await update_inputs(
             choice(dut.inbound), node_id, old_in, inputs, is_seq, only_seq=True,
-            model=choice(mdl_ins),
+            update_rtl=False, model=choice(mdl_ins),
         )
         await RisingEdge(dut.clk)
         model.step(False)
+        # Drive inputs to the design
+        dut.ext_inputs <= sum([((1 if x else 0) << n) for n, x in enumerate(inputs)])
+        await RisingEdge(dut.clk)
+        # Copy inputs -> old
+        old_in = inputs[:]
         # Wait for node to return to idle
         while dut.idle.output == 0: await RisingEdge(dut.clk)
         # Trigger the node
@@ -132,12 +137,6 @@ async def execute(dut):
         model.step(True)
         # Wait for node to become busy
         while dut.idle.output == 1: await RisingEdge(dut.clk)
-        # After a few cycles, update combinatorial inputs
-        await ClockCycles(dut.clk, randint(10, 20))
-        await update_inputs(
-            choice(dut.inbound), node_id, old_in, inputs, is_seq, only_com=True,
-            model=choice(mdl_ins),
-        )
         # Wait for node to return to idle
         while dut.idle.output == 0: await RisingEdge(dut.clk)
         # Run model until idle
@@ -146,15 +145,15 @@ async def execute(dut):
             if model.is_idle(): break
         # Check input and output state
         input_err, output_err = 0, 0
-        for index, (seq, lb) in enumerate(zip(is_seq, loopback)):
-            exp    = (1 if inputs[index] else 0)
-            rtl    = int(dut.dut.u_dut.u_core.i_inputs[index])
-            mdl    = (1 if model.get_current_inputs().get(index, 0) else 0)
-            prefix = f"I[{index:2d}] {'S' if seq else ' '}{'L' if lb else ' '}"
-            # For non-loopback ports, check for RTL match against expected
-            if not lb: assert rtl == exp, f"{prefix} - RTL: {rtl} != EXP: {exp}"
+        for index in range(num_inputs):
+            exp = (1 if inputs[index] else 0)
+            rtl = int(dut.dut.u_dut.u_core.i_inputs[index])
+            mdl = (1 if model.get_current_inputs().get(index, 0) else 0)
+            # Check for RTL match against expected
+            assert rtl == exp, f"I[{index:2d}] - RTL: {rtl} != EXP: {exp}"
+            # Check against model
             if rtl != mdl:
-                dut.error(f"{prefix} - RTL: {rtl} != MDL: {mdl}")
+                dut.error(f"I[{index:2d}] - RTL: {rtl} != MDL: {mdl}")
                 input_err += 1
         for index in range(num_outputs):
             rtl = int(dut.dut.u_dut.u_core.o_outputs[index])

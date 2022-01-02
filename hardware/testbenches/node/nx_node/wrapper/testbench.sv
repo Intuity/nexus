@@ -20,52 +20,56 @@ import NXConstants::*;
     , parameter REGISTERS  = 16
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
+    , parameter EXT_INPUTS =  1
 ) (
-      input  logic          rst
+      input  logic              rst
     // Control signals
-    , input  node_id_t      i_node_id
-    , input  logic          i_idle
-    , output logic          o_idle
-    , input  logic          i_trigger
-    , output logic          o_trigger
+    , input  node_id_t          i_node_id
+    , input  logic              i_idle
+    , output logic              o_idle
+    , input  logic              i_trigger
+    , output logic              o_trigger
     // Inbound interfaces
     // - North
-    , input  node_message_t i_ib_north_data
-    , input  logic          i_ib_north_valid
-    , output logic          o_ib_north_ready
+    , input  node_message_t     i_ib_north_data
+    , input  logic              i_ib_north_valid
+    , output logic              o_ib_north_ready
     // - East
-    , input  node_message_t i_ib_east_data
-    , input  logic          i_ib_east_valid
-    , output logic          o_ib_east_ready
+    , input  node_message_t     i_ib_east_data
+    , input  logic              i_ib_east_valid
+    , output logic              o_ib_east_ready
     // - South
-    , input  node_message_t i_ib_south_data
-    , input  logic          i_ib_south_valid
-    , output logic          o_ib_south_ready
+    , input  node_message_t     i_ib_south_data
+    , input  logic              i_ib_south_valid
+    , output logic              o_ib_south_ready
     // - West
-    , input  node_message_t i_ib_west_data
-    , input  logic          i_ib_west_valid
-    , output logic          o_ib_west_ready
+    , input  node_message_t     i_ib_west_data
+    , input  logic              i_ib_west_valid
+    , output logic              o_ib_west_ready
     // Outbound interfaces
     // - North
-    , output node_message_t o_ob_north_data
-    , output logic          o_ob_north_valid
-    , input  logic          i_ob_north_ready
-    , input  logic          i_ob_north_present
+    , output node_message_t     o_ob_north_data
+    , output logic              o_ob_north_valid
+    , input  logic              i_ob_north_ready
+    , input  logic              i_ob_north_present
     // - East
-    , output node_message_t o_ob_east_data
-    , output logic          o_ob_east_valid
-    , input  logic          i_ob_east_ready
-    , input  logic          i_ob_east_present
+    , output node_message_t     o_ob_east_data
+    , output logic              o_ob_east_valid
+    , input  logic              i_ob_east_ready
+    , input  logic              i_ob_east_present
     // - South
-    , output node_message_t o_ob_south_data
-    , output logic          o_ob_south_valid
-    , input  logic          i_ob_south_ready
-    , input  logic          i_ob_south_present
+    , output node_message_t     o_ob_south_data
+    , output logic              o_ob_south_valid
+    , input  logic              i_ob_south_ready
+    , input  logic              i_ob_south_present
     // - West
-    , output node_message_t o_ob_west_data
-    , output logic          o_ob_west_valid
-    , input  logic          i_ob_west_ready
-    , input  logic          i_ob_west_present
+    , output node_message_t     o_ob_west_data
+    , output logic              o_ob_west_valid
+    , input  logic              i_ob_west_ready
+    , input  logic              i_ob_west_present
+    // External inputs
+    , input  logic              i_ext_inputs_en
+    , input  logic [INPUTS-1:0] i_ext_inputs
 );
 
 // =============================================================================
@@ -88,7 +92,7 @@ assign o_ib_north_ready               = inbound_ready[DIRECTION_NORTH];
 
 assign inbound_data[DIRECTION_EAST]  = i_ib_east_data;
 assign inbound_valid[DIRECTION_EAST] = i_ib_east_valid;
-assign o_ib_east_ready                = inbound_ready[DIRECTION_EAST];
+assign o_ib_east_ready               = inbound_ready[DIRECTION_EAST];
 
 assign inbound_data[DIRECTION_SOUTH]  = i_ib_south_data;
 assign inbound_valid[DIRECTION_SOUTH] = i_ib_south_valid;
@@ -96,7 +100,7 @@ assign o_ib_south_ready               = inbound_ready[DIRECTION_SOUTH];
 
 assign inbound_data[DIRECTION_WEST]  = i_ib_west_data;
 assign inbound_valid[DIRECTION_WEST] = i_ib_west_valid;
-assign o_ib_west_ready                = inbound_ready[DIRECTION_WEST];
+assign o_ib_west_ready               = inbound_ready[DIRECTION_WEST];
 
 logic [3:0][MESSAGE_WIDTH-1:0] outbound_data;
 logic [3:0]                    outbound_valid, outbound_ready, outbound_present;
@@ -131,6 +135,7 @@ nx_node #(
     , .REGISTERS          ( REGISTERS        )
     , .RAM_ADDR_W         ( RAM_ADDR_W       )
     , .RAM_DATA_W         ( RAM_DATA_W       )
+    , .EXT_INPUTS         ( EXT_INPUTS       )
 ) u_dut (
       .i_clk              ( clk              )
     , .i_rst              ( rst              )
@@ -149,6 +154,9 @@ nx_node #(
     , .o_outbound_valid   ( outbound_valid   )
     , .i_outbound_ready   ( outbound_ready   )
     , .i_outbound_present ( outbound_present )
+    // External inputs
+    , .i_ext_inputs_en    ( i_ext_inputs_en  )
+    , .i_ext_inputs       ( i_ext_inputs     )
 );
 
 // =============================================================================

@@ -30,6 +30,7 @@ async def update_inputs(
     only_com      : bool = False,
     only_changed  : bool = True,
     wait_for_idle : bool = True,
+    update_rtl    : bool = True,
     model         : NXMessagePipe = None,
 ) -> None:
     """
@@ -46,6 +47,7 @@ async def update_inputs(
         only_com     : Only send combinatorial updates
         only_changed : Only send updates where a state has changed
         wait_for_idle: Whether to wait for the driver to return to idle
+        update_rtl   : Whether to send messages to the real design
         model        : Inbound message pipe to the model
     """
     # Queue up all of the messages
@@ -66,7 +68,7 @@ async def update_inputs(
         msg.state          = (1 if new else 0)
         # Queue up into the testbench driver
         encoded = msg.pack()
-        inbound.append(StreamTransaction(data=encoded))
+        if update_rtl: inbound.append(StreamTransaction(data=encoded))
         # Queue up into the C++ model if required
         if model: model.enqueue(unpack_node_signal(encoded))
     # Wait for driver to return to idle
