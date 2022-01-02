@@ -36,7 +36,11 @@ class Testbench(TestbenchBase):
         self.idle      = self.dut.o_idle
         # Wrap complex interfaces
         self.ram = MemoryResponder(
-            self, self.clk, self.rst, MemoryIO(self.dut, "instr", IORole.INITIATOR)
+            self,
+            self.clk,
+            self.rst,
+            MemoryIO(self.dut, "instr", IORole.INITIATOR),
+            delay=2,
         )
 
     async def initialise(self):
