@@ -14,31 +14,33 @@
 
 from dataclasses import dataclass
 
+import cocotb
 from cocotb_bus.drivers import Driver
 from cocotb_bus.monitors import Monitor
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import ClockCycles, RisingEdge
 
 class MemoryResponder(Driver, Monitor):
     """ Testbench driver acting as a responder to a memory interface """
 
     def __init__(
-        self, entity, clock, reset, intf, name="MemoryResponder",
+        self, entity, clock, reset, intf, name="MemoryResponder", delay=1,
     ):
         """ Initialise the MemoryResponder instance.
 
         Args:
-            entity     : Pointer to the testbench/DUT
-            clock      : Clock signal for the interface
-            reset      : Reset signal for the interface
-            intf       : Interface
-            name       : Optional name of the driver (defaults to MemoryResponder)
-            probability: Probability of delay
+            entity: Pointer to the testbench/DUT
+            clock : Clock signal for the interface
+            reset : Reset signal for the interface
+            intf  : Interface
+            name  : Optional name of the driver (defaults to MemoryResponder)
+            delay : Cycles of delay between request and response
         """
         self.name   = name
         self.entity = entity
         self.clock  = clock
         self.reset  = reset
         self.intf   = intf
+        self.delay  = delay
         self.memory = {}
         Driver.__init__(self)
         Monitor.__init__(self)
@@ -57,8 +59,15 @@ class MemoryResponder(Driver, Monitor):
         """
         # Never synchronise - already synced by monitor
         # Drive the memory response
-        self.intf.set("rd_data", transaction)
-        self.intf.set("stall", 0)
+        if self.delay > 1:
+            async def delayed(tran):
+                await ClockCycles(self.clock, (self.delay - 1))
+                self.intf.set("rd_data", tran)
+                self.intf.set("stall", 0)
+            cocotb.fork(delayed(transaction))
+        else:
+            self.intf.set("rd_data", transaction)
+            self.intf.set("stall", 0)
 
     async def _monitor_recv(self):
         """ Capture requests to the memory """
