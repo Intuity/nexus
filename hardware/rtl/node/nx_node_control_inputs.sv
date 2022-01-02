@@ -21,8 +21,9 @@
 module nx_node_control_inputs
 import NXConstants::*;
 #(
-      parameter INPUTS  = 32
-    , parameter OUTPUTS = 32
+      parameter INPUTS     = 32
+    , parameter OUTPUTS    = 32
+    , parameter EXT_INPUTS =  0
 ) (
       input  logic                      i_clk
     , input  logic                      i_rst
@@ -39,6 +40,9 @@ import NXConstants::*;
     , output logic [INPUTS-1:0]         o_core_inputs
     , input  logic [OUTPUTS-1:0]        i_core_outputs
     , output logic                      o_core_trigger
+    // External inputs
+    , input  logic                      i_ext_inputs_en
+    , input  logic [INPUTS-1:0]         i_ext_inputs
 );
 
 // =============================================================================
@@ -94,8 +98,15 @@ for (genvar idx = 0; idx < INPUTS; idx++) begin : gen_next
     // Detect any input update (sequential or non-sequential)
     logic dcd_match;
     assign dcd_match = i_input_update && (i_input_index == idx[INPUT_WIDTH-1:0]);
-    // Mux to select the correct input value
-    assign inputs_next[idx] = (dcd_match ? i_input_value : inputs_next_q[idx]);
+    // If external inputs are configured and enabled, always take that value
+    if (EXT_INPUTS) begin
+        assign inputs_next[idx] = i_ext_inputs_en ? i_ext_inputs[idx] :
+                                  dcd_match       ? i_input_value
+                                                  : inputs_next_q[idx];
+    // Otherwise pickup new value from an incoming message
+    end else begin
+        assign inputs_next[idx] = (dcd_match ? i_input_value : inputs_next_q[idx]);
+    end
 end
 endgenerate
 

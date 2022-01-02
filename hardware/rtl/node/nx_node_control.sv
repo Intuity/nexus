@@ -25,6 +25,7 @@ import NXConstants::*;
     , parameter OUTPUTS    = 32
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
+    , parameter EXT_INPUTS =  0
 ) (
       input  logic                        i_clk
     , input  logic                        i_rst
@@ -53,6 +54,9 @@ import NXConstants::*;
     , input  logic                        i_core_idle
     , output logic [INPUTS-1:0]           o_core_inputs
     , input  logic [OUTPUTS-1:0]          i_core_outputs
+    // External inputs
+    , input  logic                        i_ext_inputs_en
+    , input  logic [INPUTS-1:0]           i_ext_inputs
 );
 
 // =============================================================================
@@ -70,6 +74,7 @@ assign o_idle = inputs_idle && outputs_idle;
 nx_node_control_inputs #(
       .INPUTS          ( INPUTS          )
     , .OUTPUTS         ( OUTPUTS         )
+    , .EXT_INPUTS      ( EXT_INPUTS      )
 ) u_inputs (
       .i_clk           ( i_clk           )
     , .i_rst           ( i_rst           )
@@ -86,6 +91,9 @@ nx_node_control_inputs #(
     , .o_core_inputs   ( o_core_inputs   )
     , .i_core_outputs  ( i_core_outputs  )
     , .o_core_trigger  ( o_core_trigger  )
+    // External inputs
+    , .i_ext_inputs_en ( i_ext_inputs_en )
+    , .i_ext_inputs    ( i_ext_inputs    )
 );
 
 // =============================================================================

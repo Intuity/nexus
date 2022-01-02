@@ -28,6 +28,7 @@ import NXConstants::*,
     , parameter REGISTERS  = 16
     , parameter RAM_ADDR_W = 10
     , parameter RAM_DATA_W = 32
+    , parameter EXT_INPUTS =  0
 ) (
       input  logic                          i_clk
     , input  logic                          i_rst
@@ -46,6 +47,9 @@ import NXConstants::*,
     , output logic [3:0]                    o_outbound_valid
     , input  logic [3:0]                    i_outbound_ready
     , input  logic [3:0]                    i_outbound_present
+    // External inputs
+    , input  logic                          i_ext_inputs_en
+    , input  logic [INPUTS-1:0]             i_ext_inputs
 );
 
 // =============================================================================
@@ -267,6 +271,7 @@ nx_node_control #(
     , .OUTPUTS         ( OUTPUTS           )
     , .RAM_ADDR_W      ( RAM_ADDR_W        )
     , .RAM_DATA_W      ( RAM_DATA_W        )
+    , .EXT_INPUTS      ( EXT_INPUTS        )
 ) u_control (
       .i_clk           ( i_clk             )
     , .i_rst           ( i_rst             )
@@ -295,6 +300,9 @@ nx_node_control #(
     , .i_core_idle     ( idle_core         )
     , .o_core_inputs   ( core_inputs       )
     , .i_core_outputs  ( core_outputs      )
+    // External inputs
+    , .i_ext_inputs_en ( i_ext_inputs_en   )
+    , .i_ext_inputs    ( i_ext_inputs      )
 );
 
 // =============================================================================
