@@ -64,6 +64,10 @@ logic [COLUMNS-1:0]      mesh_node_idle, mesh_trigger;
 logic                    mesh_agg_idle;
 logic [MESH_OUTPUTS-1:0] mesh_outputs;
 
+// Memory interface
+logic [TOP_MEM_COUNT-1:0]                         mem_enable;
+logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] mem_rd_data;
+
 // =============================================================================
 // Reset Stretcher
 // =============================================================================
@@ -118,6 +122,8 @@ nx_control #(
     , .i_mesh_agg_idle  ( mesh_agg_idle    )
     , .o_mesh_trigger   ( mesh_trigger     )
     , .i_mesh_outputs   ( mesh_outputs     )
+    , .o_mesh_en_memory ( mem_enable       )
+    , .o_mesh_rd_data   ( mem_rd_data      )
 );
 
 // =============================================================================
@@ -149,6 +155,9 @@ nx_mesh #(
     , .i_outbound_ready ( mesh_out_ready )
     // Aggregated outputs
     , .o_outputs        ( mesh_outputs   )
+    // Memory inputs
+    , .i_mem_enable     ( mem_enable     )
+    , .i_mem_rd_data    ( mem_rd_data    )
 );
 
 endmodule : nexus
