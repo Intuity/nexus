@@ -51,13 +51,20 @@ class NXConstants:
 
     # Control plane constants
     CONTROL_WIDTH     : Constant("Width of the control stream" ) = 128
-    HOST_PACKET_SIZE  : Constant("Maximum to-host packet size" ) = 512
+    HOST_PACKET_SIZE  : Constant("Maximum to-host packet size" ) = 4096
     SLOTS_PER_PACKET  : Constant("Control responses per packet") = (HOST_PACKET_SIZE * 8) // CONTROL_WIDTH
     TIMER_WIDTH       : Constant("Width of the control timers" ) = 24
     OUT_BITS_PER_MSG  : Constant("Bits of output per message"  ) = 96
     MAX_OUT_IDX_WIDTH : Constant("Output index field width"    ) = clog2(
         (MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS) / OUT_BITS_PER_MSG
     )
+
+    # Memory constants
+    TOP_MEM_COUNT      : Constant("Number of on-board memories"  ) = 2
+    TOP_MEM_IDX_WIDTH  : Constant("On-board memory index width"  ) = clog2(TOP_MEM_COUNT)
+    TOP_MEM_ADDR_WIDTH : Constant("On-board memory address width") = 10
+    TOP_MEM_DATA_WIDTH : Constant("On-board memory data width"   ) = 32
+    TOP_MEM_STRB_WIDTH : Constant("On-board memory write strobe" ) = TOP_MEM_DATA_WIDTH // 8
 
     # Interface and selector sizes
     MESSAGE_WIDTH     : Constant("Width of the message stream" ) = 28
@@ -96,12 +103,13 @@ class Direction:
 @packtype.enum(package=NXConstants)
 class ControlReqType:
     """ Control request type enumeration """
-    READ_PARAMS : Constant("Read back the device's parameters")
-    READ_STATUS : Constant("Read back the device's status"    )
-    SOFT_RESET  : Constant("Request a soft reset"             )
-    CONFIGURE   : Constant("Configure the controller"         )
-    TRIGGER     : Constant("Trigger the device to run"        )
-    TO_MESH     : Constant("Forward message into the mesh"    )
+    READ_PARAMS : Constant("Read back the device's parameters" )
+    READ_STATUS : Constant("Read back the device's status"     )
+    SOFT_RESET  : Constant("Request a soft reset"              )
+    CONFIGURE   : Constant("Configure the controller"          )
+    TRIGGER     : Constant("Trigger the device to run"         )
+    TO_MESH     : Constant("Forward message into the mesh"     )
+    MEMORY      : Constant("Read and write the on-board memory")
 
 @packtype.enum(package=NXConstants)
 class ControlRespType:
@@ -111,6 +119,7 @@ class ControlRespType:
     PARAMS    : Constant("Device parameters"                 )
     STATUS    : Constant("Status of the controller and mesh" )
     PADDING   : Constant("Packetised response padding marker")
+    MEMORY    : Constant("Data read from the on-board memory")
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
@@ -252,6 +261,17 @@ class ControlRequestRaw:
     payload : Scalar(width=(NXConstants.CONTROL_WIDTH.value - ControlReqType._pt_width), desc="Payload")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlRequestConfigure:
+    """ Configure the controller """
+    command      : ControlReqType(desc="Command to perform")
+    en_memory    : Scalar(width=NXConstants.TOP_MEM_COUNT.value, desc="Enable/disable on-board memory"      )
+    en_mem_wstrb : Scalar(width=NXConstants.TOP_MEM_COUNT.value, desc="Enable/disable memory write strobing")
+    output_mask  : Scalar(
+        width=(1 << NXConstants.MAX_OUT_IDX_WIDTH.value),
+        desc="Mask of which output messages should be emitted"
+    )
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlRequestTrigger:
     """ Control request to trigger the mesh """
     command  : ControlReqType(desc="Command to perform")
@@ -266,43 +286,29 @@ class ControlRequestToMesh:
     message : Scalar(width=NXConstants.MESSAGE_WIDTH.value, desc="Message to forward into the mesh")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
-class ControlRequestConfigure:
-    """ Configure the controller """
-    command     : ControlReqType(desc="Command to perform")
-    output_mask : Scalar(
-        width=(1 << NXConstants.MAX_OUT_IDX_WIDTH.value),
-        desc="Mask of which output messages should be emitted"
-    )
+class ControlRequestMemory:
+    """ Request read and write operations from the on-board memory """
+    command : ControlReqType(desc="Command to perform")
+    memory  : Scalar(width=NXConstants.TOP_MEM_IDX_WIDTH.value,  desc="Memory index")
+    address : Scalar(width=NXConstants.TOP_MEM_ADDR_WIDTH.value, desc="Access address")
+    wr_n_rd : Scalar(width=1, desc="Set high to write, low to read")
+    wr_data : Scalar(width=NXConstants.TOP_MEM_DATA_WIDTH.value, desc="Write data")
+    wr_strb : Scalar(width=NXConstants.TOP_MEM_STRB_WIDTH.value, desc="Write strobe")
 
 @packtype.union(package=NXConstants)
 class ControlRequest:
     """ Control requests sent by the host """
     raw       : ControlRequestRaw(desc="Raw control format")
+    configure : ControlRequestConfigure(desc="Configure the controller")
     trigger   : ControlRequestTrigger(desc="Trigger control format")
     to_mesh   : ControlRequestToMesh(desc="Forward message into mesh format")
-    configure : ControlRequestConfigure(desc="Configure the controller")
+    memory    : ControlRequestMemory(desc="Access on-board memory")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlResponseRaw:
     """ Raw control response format """
     format  : ControlRespType(desc="Control response format")
     payload : Scalar(width=NXConstants.CONTROL_WIDTH.value - ControlRespType._pt_width)
-
-@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
-class ControlResponseOutputs:
-    """ Control response carrying sections of the output vector """
-    format  : ControlRespType(desc="Control response format")
-    stamp   : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Simulation cycle")
-    index   : Scalar(width=clog2(
-        (NXConstants.MAX_COLUMN_COUNT.value * NXConstants.MAX_NODE_OUTPUTS.value) / 96
-    ), desc="Which section of the full outputs is included")
-    section : Scalar(width=96, desc="Section of the outputs")
-
-@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
-class ControlResponseFromMesh:
-    """ Forwarded message from the mesh """
-    format  : ControlRespType(desc="Control response format")
-    message : Scalar(width=NXConstants.MESSAGE_WIDTH.value, desc="Forwarded message")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlResponseParameters:
@@ -331,6 +337,28 @@ class ControlResponseStatus:
     countdown  : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Remaining cycles")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseOutputs:
+    """ Control response carrying sections of the output vector """
+    format  : ControlRespType(desc="Control response format")
+    stamp   : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Simulation cycle")
+    index   : Scalar(width=clog2(
+        (NXConstants.MAX_COLUMN_COUNT.value * NXConstants.MAX_NODE_OUTPUTS.value) / 96
+    ), desc="Which section of the full outputs is included")
+    section : Scalar(width=96, desc="Section of the outputs")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseFromMesh:
+    """ Forwarded message from the mesh """
+    format  : ControlRespType(desc="Control response format")
+    message : Scalar(width=NXConstants.MESSAGE_WIDTH.value, desc="Forwarded message")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
+class ControlResponseMemory:
+    """ Read response from the on-board memory """
+    format  : ControlRespType(desc="Control response format")
+    rd_data : Scalar(width=NXConstants.TOP_MEM_DATA_WIDTH.value, desc="Read data")
+
+@packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
 class ControlResponsePadding:
     """ Padding used to signify unused entries following this response """
     format  : ControlRespType(desc="Control response format")
@@ -347,3 +375,5 @@ class ControlResponse:
     status    : ControlResponseStatus(desc="Status of the device")
     outputs   : ControlResponseOutputs(desc="Reports the current outputs")
     from_mesh : ControlResponseFromMesh(desc="Forwards messages from the mesh")
+    memory    : ControlResponseMemory(desc="Read response from on-board memory")
+    padding   : ControlResponsePadding(desc="Padding message format")
