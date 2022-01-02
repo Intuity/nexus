@@ -16,18 +16,22 @@
 // 36 Kib dual-port RAM intended to map directly to a Xilinx RAMB36 instance
 //
 module nx_ram #(
-      parameter ADDRESS_WIDTH = 16
-    , parameter DATA_WIDTH    = 36
+      parameter ADDRESS_WIDTH = 10
+    , parameter DATA_WIDTH    = 32
     , parameter DEPTH         = 1024
     , parameter REGISTER_A_RD = 0
     , parameter REGISTER_B_RD = 0
+    , parameter BYTE_WR_EN_A  = 0
+    , parameter BYTE_WR_EN_B  = 0
+    , parameter WSTRB_A_WIDTH = (BYTE_WR_EN_A ? (DATA_WIDTH / 8) : 1)
+    , parameter WSTRB_B_WIDTH = (BYTE_WR_EN_B ? (DATA_WIDTH / 8) : 1)
 ) (
     // Port A
       input  logic                     i_clk_a
     , input  logic                     i_rst_a
     , input  logic [ADDRESS_WIDTH-1:0] i_addr_a
     , input  logic [   DATA_WIDTH-1:0] i_wr_data_a
-    , input  logic                     i_wr_en_a
+    , input  logic [WSTRB_A_WIDTH-1:0] i_wr_en_a
     , input  logic                     i_en_a
     , output logic [   DATA_WIDTH-1:0] o_rd_data_a
     // Port B
@@ -35,10 +39,42 @@ module nx_ram #(
     , input  logic                     i_rst_b
     , input  logic [ADDRESS_WIDTH-1:0] i_addr_b
     , input  logic [   DATA_WIDTH-1:0] i_wr_data_b
-    , input  logic                     i_wr_en_b
+    , input  logic [WSTRB_B_WIDTH-1:0] i_wr_en_b
     , input  logic                     i_en_b
     , output logic [   DATA_WIDTH-1:0] o_rd_data_b
 );
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+localparam FULL_WSTRB_WIDTH = (DATA_WIDTH / 8);
+
+// =============================================================================
+// Resolve Write Strobes
+// =============================================================================
+
+logic [FULL_WSTRB_WIDTH-1:0] wstrb_a, wstrb_b;
+
+generate
+if (BYTE_WR_EN_A) begin
+    assign wstrb_a = i_wr_en_a;
+end else begin
+    assign wstrb_a = {FULL_WSTRB_WIDTH{i_wr_en_a}};
+end
+endgenerate
+
+generate
+if (BYTE_WR_EN_B) begin
+    assign wstrb_b = i_wr_en_b;
+end else begin
+    assign wstrb_b = {FULL_WSTRB_WIDTH{i_wr_en_b}};
+end
+endgenerate
+
+// =============================================================================
+// RAM Simulation Model
+// =============================================================================
 
 `ifdef USE_RAM_MODEL
 
@@ -46,6 +82,16 @@ reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 
 logic [DATA_WIDTH-1:0] rd_a_data_q, rd_a_data_dly_q;
 logic [DATA_WIDTH-1:0] rd_b_data_q, rd_b_data_dly_q;
+
+// Create bitwise masks
+logic [DATA_WIDTH-1:0] wmask_a, wmask_b;
+
+generate
+for (genvar idx = 0; idx < (DATA_WIDTH / 8); idx++) begin : gen_wmask
+    assign wmask_a[(idx*8)+:8] = {8{wstrb_a[idx]}};
+    assign wmask_b[(idx*8)+:8] = {8{wstrb_b[idx]}};
+end
+endgenerate
 
 // Optional pipelining of output
 assign o_rd_data_a = REGISTER_A_RD ? rd_a_data_dly_q : rd_a_data_q;
@@ -58,8 +104,11 @@ always_ff @(posedge i_clk_a, posedge i_rst_a) begin : ff_read_a
     end else begin
         rd_a_data_dly_q <= rd_a_data_q;
         if (i_en_a) begin
-            if (i_wr_en_a) begin
-                memory[i_addr_a] <= i_wr_data_a;
+            if (|i_wr_en_a) begin
+                memory[i_addr_a] <= (
+                    (i_wr_data_a      &  wmask_a) |
+                    (memory[i_addr_a] & ~wmask_a)
+                );
             end else begin
                 rd_a_data_q <= memory[i_addr_a];
             end
@@ -74,8 +123,11 @@ always_ff @(posedge i_clk_b, posedge i_rst_b) begin : ff_read_b
     end else begin
         rd_b_data_dly_q <= rd_b_data_q;
         if (i_en_b) begin
-            if (i_wr_en_b) begin
-                memory[i_addr_b] <= i_wr_data_b;
+            if (|i_wr_en_b) begin
+                memory[i_addr_b] <= (
+                    (i_wr_data_b      &  wmask_b) |
+                    (memory[i_addr_b] & ~wmask_b)
+                );
             end else begin
                 rd_b_data_q <= memory[i_addr_b];
             end
@@ -95,15 +147,21 @@ endgenerate
     `endif
 `endif // sim_icarus
 
+// =============================================================================
+// FPGA RAM Instance
+// =============================================================================
+
 `else
 
-logic [35:0] read_data [1:0], write_data [1:0];
-
+// Extract read data
+logic [35:0] read_data [1:0];
 assign o_rd_data_a = read_data[0][DATA_WIDTH-1:0];
 assign o_rd_data_b = read_data[1][DATA_WIDTH-1:0];
 
-assign write_data[0] = { {(DATA_WIDTH-1){1'b0}}, i_wr_data_a };
-assign write_data[1] = { {(DATA_WIDTH-1){1'b0}}, i_wr_data_b };
+// Pad write data
+logic [35:0] write_data [1:0];
+assign write_data[0] = { {(36-DATA_WIDTH){1'b0}}, i_wr_data_a };
+assign write_data[1] = { {(36-DATA_WIDTH){1'b0}}, i_wr_data_b };
 
 RAMB36E1 #(
       .RDADDR_COLLISION_HWCONFIG ( "PERFORMANCE" ) // No collision possible
@@ -148,7 +206,7 @@ RAMB36E1 #(
     , .REGCEAREGCE   ( 1'b0                                           )
     , .RSTRAMARSTRAM ( 1'b0                                           )
     , .RSTREGARSTREG ( 1'b0                                           )
-    , .WEA           ( {4{i_wr_en_a}}                                 )
+    , .WEA           ( wstrb_a                                        )
     , .DIADI         ( write_data[0][31: 0]                           )
     , .DIPADIP       ( write_data[0][35:32]                           )
     , .DOADO         ( read_data[0][31: 0]                            )
@@ -160,7 +218,7 @@ RAMB36E1 #(
     , .REGCEB        ( 1'b0                                           )
     , .RSTRAMB       ( 1'b0                                           )
     , .RSTREGB       ( 1'b0                                           )
-    , .WEBWE         ( {4{i_wr_en_b}}                                 )
+    , .WEBWE         ( wstrb_b                                        )
     , .DIBDI         ( write_data[1][31: 0]                           )
     , .DIPBDIP       ( write_data[1][35:32]                           )
     , .DOBDO         ( read_data[1][31: 0]                            )
