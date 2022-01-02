@@ -15,4 +15,5 @@
 from .basic import *
 from .control import *
 from .load import *
+from .memory import *
 from .mission import *
