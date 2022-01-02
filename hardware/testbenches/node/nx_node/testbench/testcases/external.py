@@ -58,6 +58,9 @@ async def external(dut):
     for idx, pipe in enumerate(mdl_outs):
         model.attach(direction_t(idx), pipe)
 
+    # Reset the model to initialise all state
+    model.reset()
+
     # Generate an instruction stream
     instrs = gen_instructions(
         int(0.75 * num_entries), num_inputs, num_outputs, num_registers
@@ -181,6 +184,7 @@ async def external(dut):
                 outbound.dequeue(raw)
                 msg = NodeSignal()
                 msg.unpack(pack_node_raw(raw))
+                assert msg.header.command == NodeCommand.SIGNAL
                 mdl_outputs[(msg.header.row, msg.header.column, msg.index)] = msg.state
         # Check RTL against the model
         rtl_keys = [x for x in rtl_outputs.keys()]
