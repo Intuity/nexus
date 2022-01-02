@@ -383,10 +383,10 @@ std::shared_ptr<NXMessagePipe> NXNode::route (
     std::shared_ptr<NXMessagePipe> tgt_pipe = NULL;
     uint32_t start;
     if      (command == NODE_COMMAND_TRACE) start = (int)DIRECTION_SOUTH;
-    else if (row    < m_row               ) start = (int)DIRECTION_NORTH;
-    else if (row    > m_row               ) start = (int)DIRECTION_SOUTH;
     else if (column < m_column            ) start = (int)DIRECTION_WEST;
-    else                                    start = (int)DIRECTION_EAST;
+    else if (column > m_column            ) start = (int)DIRECTION_EAST;
+    else if (row    < m_row               ) start = (int)DIRECTION_NORTH;
+    else                                    start = (int)DIRECTION_SOUTH;
     for (int idx_off = 0; idx_off < 4; idx_off++) {
         uint32_t trial = (start + idx_off) % 4;
         if (m_outbound[trial] == NULL) continue;
