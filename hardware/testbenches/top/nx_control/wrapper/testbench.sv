@@ -21,7 +21,7 @@ import NXConstants::*;
     , parameter OUTPUTS   = 32
     , parameter REGISTERS = 16
 ) (
-      input  logic                         rst
+      input  logic                          rst
     // Soft reset request
     , output logic                         o_soft_reset
     // Host message streams
@@ -31,6 +31,7 @@ import NXConstants::*;
     , output logic                         o_ctrl_in_ready
     // - Outbound
     , output control_response_t            o_ctrl_out_data
+    , output logic                         o_ctrl_out_last
     , output logic                         o_ctrl_out_valid
     , input  logic                         i_ctrl_out_ready
     // Mesh message streams
@@ -51,6 +52,8 @@ import NXConstants::*;
     , input  logic                         i_mesh_agg_idle
     , output logic [COLUMNS-1:0]           o_mesh_trigger
     , input  logic [(COLUMNS*OUTPUTS)-1:0] i_mesh_outputs
+    , output logic [TOP_MEM_COUNT-1:0]     o_mesh_en_memory
+    , output logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] o_mesh_rd_data
 );
 
 // =============================================================================
@@ -63,6 +66,8 @@ always #1 clk <= ~clk;
 // =============================================================================
 // DUT Instance
 // =============================================================================
+
+assign o_ctrl_out_last = 'd0;
 
 nx_control #(
       .ROWS             ( ROWS             )
@@ -82,6 +87,7 @@ nx_control #(
     , .o_ctrl_in_ready  ( o_ctrl_in_ready  )
     // - Outbound
     , .o_ctrl_out_data  ( o_ctrl_out_data  )
+    , .o_ctrl_out_last  (                  )
     , .o_ctrl_out_valid ( o_ctrl_out_valid )
     , .i_ctrl_out_ready ( i_ctrl_out_ready )
     // Mesh message streams
@@ -102,6 +108,8 @@ nx_control #(
     , .i_mesh_agg_idle  ( i_mesh_agg_idle  )
     , .o_mesh_trigger   ( o_mesh_trigger   )
     , .i_mesh_outputs   ( i_mesh_outputs   )
+    , .o_mesh_en_memory ( o_mesh_en_memory )
+    , .o_mesh_rd_data   ( o_mesh_rd_data   )
 );
 
 // =============================================================================

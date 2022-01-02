@@ -16,22 +16,29 @@ from cocotb.triggers import RisingEdge
 
 from drivers.stream.common import StreamTransaction
 from nxconstants import (ControlReqType, ControlRespType, ControlRequest,
-                         ControlResponse, MAX_OUT_IDX_WIDTH)
+                         ControlResponse, MAX_OUT_IDX_WIDTH, TOP_MEM_COUNT)
 
-# Function to configure the controller
-async def configure(dut, out_mask=None):
+async def configure(dut, out_mask=None, en_memory=None, en_mem_wstrb=None):
+    """ Configure the controller """
     # If out_mask is None, switch on all messages
     if out_mask is None:
-        out_mask = [True] * MAX_OUT_IDX_WIDTH
+        out_mask = [True] * (1 << MAX_OUT_IDX_WIDTH)
+    # Default memories to disabled
+    if en_memory is None:
+        en_memory = [False] * TOP_MEM_COUNT
+    if en_mem_wstrb is None:
+        en_mem_wstrb = [False] * TOP_MEM_COUNT
     # Write request
-    req                       = ControlRequest()
-    req.configure.command     = ControlReqType.CONFIGURE
-    req.configure.output_mask = sum([((1 if x else 0) << n) for n, x in enumerate(out_mask)])
+    req                        = ControlRequest()
+    req.configure.command      = ControlReqType.CONFIGURE
+    req.configure.output_mask  = sum([((1 if x else 0) << n) for n, x in enumerate(out_mask)])
+    req.configure.en_memory    = sum([((1 if x else 0) << n) for n, x in enumerate(en_memory)])
+    req.configure.en_mem_wstrb = sum([((1 if x else 0) << n) for n, x in enumerate(en_mem_wstrb)])
     dut.ctrl_in.append(StreamTransaction(req.configure.pack()))
     await dut.ctrl_in.idle()
 
-# Function to trigger mesh
 async def trigger(dut, active=0, col_mask=None, cycles=0):
+    """ Trigger the mesh to run for N cycles """
     if col_mask is None:
         col_mask = (1 << int(dut.COLUMNS)) - 1
     req                  = ControlRequest()
@@ -42,11 +49,11 @@ async def trigger(dut, active=0, col_mask=None, cycles=0):
     dut.ctrl_in.append(StreamTransaction(req.pack()))
     await dut.ctrl_in.idle()
 
-# Function to check status
 async def check_status(
     dut, active=0, mesh_idle=1, agg_idle=1, seen_low=0, first_tick=1, cycle=0,
     countdown=0,
 ):
+    """ Check the current status of the mesh """
     # Generate and queue request
     req             = ControlRequest()
     req.raw.command = ControlReqType.READ_STATUS

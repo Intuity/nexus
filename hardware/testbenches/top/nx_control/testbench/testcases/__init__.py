@@ -16,6 +16,7 @@ from .active import *
 from .basic import *
 from .forwarding import *
 from .interval import *
+from .memory import *
 from .outputs import *
 from .params import *
 from .reset import *

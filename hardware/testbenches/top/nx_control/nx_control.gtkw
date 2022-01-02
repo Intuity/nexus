@@ -1,18 +1,20 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Fri Dec 31 11:27:26 2021
+[*] Sun Jan  2 14:44:16 2022
 [*]
 [dumpfile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control/sim.lxt"
-[dumpfile_mtime] "Fri Dec 31 11:26:45 2021"
-[dumpfile_size] 361422
+[dumpfile_mtime] "Sun Jan  2 14:01:36 2022"
+[dumpfile_size] 6661912
 [savefile] "/Users/peterbirch/Development/Experiments/nexus/hardware/testbenches/top/nx_control/nx_control.gtkw"
 [timestart] 0
 [size] 1821 917
 [pos] -1 -1
-*-21.370560 267000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-26.504395 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.comb_outputs.
+[treeopen] testbench.u_dut.gen_top_mem[0].
+[treeopen] testbench.u_dut.gen_top_mem[1].
 [sst_width] 193
 [signals_width] 586
 [sst_expanded] 1
@@ -218,6 +220,8 @@ testbench.u_dut.i_mesh_agg_idle[0]
 @22
 testbench.u_dut.o_mesh_trigger[9:0]
 testbench.u_dut.i_mesh_outputs[319:0]
+@200
+-
 @1000200
 -MESH INTF
 @200
@@ -230,6 +234,7 @@ testbench.u_dut.req_rd_status[0]
 testbench.u_dut.req_soft_rst[0]
 testbench.u_dut.req_to_mesh[0]
 testbench.u_dut.req_trigger[0]
+testbench.u_dut.req_memory[0]
 @1000200
 -DECODE
 @200
@@ -244,15 +249,77 @@ testbench.u_dut.out_idx_q[2:0]
 @28
 testbench.u_dut.active_q[0]
 testbench.u_dut.seen_idle_low_q[0]
+testbench.u_dut.all_idle_q[0]
 testbench.u_dut.first_tick_q[0]
 @24
 testbench.u_dut.cycle_q[23:0]
 testbench.u_dut.interval_q[23:0]
 @200
 -
-@23
+@22
 testbench.u_dut.out_mask_q[3:0]
+@200
+-
 @1000200
 -STATE
+@200
+-
+@28
+testbench.u_dut.mem_host_access[1:0]
+testbench.u_dut.mem_rd_pend_q[1:0]
+@200
+-
+@800200
+-MEMORY A
+@200
+-DESIGN
+@22
+testbench.u_dut.gen_top_mem[0].u_memory.i_addr_a[9:0]
+@28
+testbench.u_dut.gen_top_mem[0].u_memory.i_en_a[0]
+@22
+testbench.u_dut.gen_top_mem[0].u_memory.i_wr_en_a[3:0]
+testbench.u_dut.gen_top_mem[0].u_memory.i_wr_data_a[31:0]
+testbench.u_dut.gen_top_mem[0].u_memory.o_rd_data_a[31:0]
+@200
+-
+-HOST
+@22
+testbench.u_dut.gen_top_mem[0].u_memory.i_addr_b[9:0]
+@28
+testbench.u_dut.gen_top_mem[0].u_memory.i_en_b[0]
+@22
+testbench.u_dut.gen_top_mem[0].u_memory.i_wr_en_b[3:0]
+testbench.u_dut.gen_top_mem[0].u_memory.i_wr_data_b[31:0]
+testbench.u_dut.gen_top_mem[0].u_memory.o_rd_data_b[31:0]
+@1000200
+-MEMORY A
+@200
+-
+@800200
+-MEMORY B
+@200
+-DESIGN
+@22
+testbench.u_dut.gen_top_mem[1].u_memory.i_addr_a[9:0]
+@28
+testbench.u_dut.gen_top_mem[1].u_memory.i_en_a[0]
+@22
+testbench.u_dut.gen_top_mem[1].u_memory.i_wr_en_a[3:0]
+testbench.u_dut.gen_top_mem[1].u_memory.i_wr_data_a[31:0]
+testbench.u_dut.gen_top_mem[1].u_memory.o_rd_data_a[31:0]
+@200
+-
+-HOST
+@23
+testbench.u_dut.gen_top_mem[1].u_memory.i_addr_b[9:0]
+@28
+testbench.u_dut.gen_top_mem[1].u_memory.i_en_b[0]
+@22
+testbench.u_dut.gen_top_mem[1].u_memory.i_wr_en_b[3:0]
+testbench.u_dut.gen_top_mem[1].u_memory.i_wr_data_b[31:0]
+testbench.u_dut.gen_top_mem[1].u_memory.o_rd_data_b[31:0]
+@1000200
+-MEMORY B
 [pattern_trace] 1
 [pattern_trace] 0

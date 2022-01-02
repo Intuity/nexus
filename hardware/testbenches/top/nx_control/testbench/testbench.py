@@ -39,6 +39,10 @@ class Testbench(TestbenchBase):
         self.agg_idle     = self.dut.i_mesh_agg_idle
         self.mesh_trigger = self.dut.o_mesh_trigger
         self.mesh_outputs = self.dut.i_mesh_outputs
+        self.memory       = SimpleNamespace(
+            enable =self.dut.o_mesh_en_memory,
+            rd_data=self.dut.o_mesh_rd_data,
+        )
         self.status       = SimpleNamespace(
             active =self.dut.o_status_active,
             idle   =self.dut.o_status_idle,
