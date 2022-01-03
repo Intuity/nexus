@@ -145,7 +145,7 @@ The implementation utilisation report the largest node within the mesh is as fol
 | - nx_stream_arbiter [2] | 8    | 30              | 0        | 0        | 0          |
 
 **NOTE:** The mesh is largely homogenous - but resource utilisation does vary
-across the mesh for a number of reasons, for example a node at the corner of the
+between nodes for a number of reasons, for example a node at the corner of the
 mesh can be missing up to two messaging interfaces which lowers the complexity
 of the stream components. The smallest node in the mesh has only 436 LUTs (around
 84% of the size).
