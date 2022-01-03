@@ -20,8 +20,8 @@ abspath=$(realpath $(dirname $0))
 # Get path to parent directory (which holds Python modules)
 parent_dir=$(realpath ${abspath}/../)
 
-# Extend PYTHONPATH
-PYTHONPATH=${parent_dir}:${PYTHONPATH}
+# Ensure the model is compiled
+make -C ${parent_dir}/nxmodel -j4
 
-# Invoke Python module
-python3 -m $(basename $0) $@
+# Run the model
+${parent_dir}/nxmodel/work/nxmodel $@
