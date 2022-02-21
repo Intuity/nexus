@@ -20,7 +20,6 @@ SYN_FULL           ?= no
 SYN_WORK_DIR       ?= work
 SYN_SCRIPT_PATH    ?= $(SYN_WORK_DIR)/yosys.do
 SYN_LOG_PATH       ?= $(SYN_WORK_DIR)/yosys.log
-SYN_OUTPUT_JSON    ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP).json
 SYN_OUTPUT_NETLIST ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP)_nl.v
 SYN_OUTPUT_RPT     ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP).rpt
 
@@ -45,6 +44,8 @@ endif
 	done
 	$(PRECMD)echo "log --> Building hierarchy from $(DESIGN_TOP);" >> $@
 	$(PRECMD)echo "hierarchy -top $(DESIGN_TOP);" >> $@
+	$(PRECMD)echo "log --> Flattening the hierarchy;" >> $@
+	$(PRECMD)echo "flatten;" >> $@
 	$(PRECMD)echo "log --> Translate processes to netlist;" >> $@
 	$(PRECMD)echo "proc;" >> $@
 	$(PRECMD)echo "log --> Extract and optimise FSMs;" >> $@
@@ -55,16 +56,14 @@ endif
 	$(PRECMD)echo "memory;" >> $@
 	$(PRECMD)echo "log --> Perform simple optimisations (round 2);" >> $@
 	$(PRECMD)echo "opt;" >> $@
-	$(PRECMD)echo "log --> Writing out design to JSON $(SYN_OUTPUT_JSON);" >> $@
-	$(PRECMD)echo "write_json -aig $(SYN_OUTPUT_JSON);" >> $@
-ifeq ($(SYN_FULL),yes)
-	$(PRECMD)echo "log --> Perform Xilinx synthesis;" >> $@
-	$(PRECMD)echo "synth_xilinx -top $(DESIGN_TOP) -family xc7;" >> $@
+	$(PRECMD)echo "log --> Zero-initialising all flops;" >> $@
+	$(PRECMD)echo "zinit;" >> $@
+	$(PRECMD)echo "log --> Generic technology mapping;" >> $@
+	$(PRECMD)echo "techmap;" >> $@
+	$(PRECMD)echo "log --> Writing out simple Verilog netlist;" >> $@
+	$(PRECMD)echo "write_verilog -noattr $(SYN_OUTPUT_NETLIST);" >> $@
 	$(PRECMD)echo "log --> Reporting statistics;" >> $@
 	$(PRECMD)echo "tee -o $(SYN_OUTPUT_RPT) stat -tech xilinx;" >> $@
-	$(PRECMD)echo "log --> Writing netlist to $(SYN_OUTPUT_NETLIST);" >> $@
-	$(PRECMD)echo "write_verilog $(SYN_OUTPUT_NETLIST);" >> $@
-endif
 
 # ==============================================================================
 # Synthesis Step
