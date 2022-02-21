@@ -18,3 +18,7 @@
 	path = common/thirdparty/dma_ip_drivers
 	url = https://github.com/Xilinx/dma_ip_drivers
 	branch = master
+[submodule "common/thirdparty/surelog"]
+	path = common/thirdparty/surelog
+	url = https://github.com/chipsalliance/Surelog.git
+	branch = master
