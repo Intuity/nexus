@@ -361,6 +361,58 @@ int main (int argc, const char ** argv) {
             // std::cout << UHDM::visit_designs({vpi_act}) << std::endl;
         }
 
+        // Extract 'reg' definitions
+        vpiHandle net_iter = vpi_iterate(vpiNet, mod);
+        while (vpiHandle net = vpi_scan(net_iter)) {
+            unsigned int net_type = vpi_get(vpiNetType, net);
+            get_vpi_str(net_name, net, vpiName);
+            switch (net_type) {
+                // 0: No associated type - skip
+                case 0: break;
+                // Declaration of 'wire'
+                case vpiWire: {
+                    vpiHandle net_rng_iter = vpi_iterate(vpiRange, net);
+                    while (vpiHandle net_rng = vpi_scan(net_rng_iter)) {
+                        vpiHandle net_rng_l_ref = vpi_handle(vpiLeftRange, net_rng);
+                        vpiHandle net_rng_r_ref = vpi_handle(vpiRightRange, net_rng);
+                        s_vpi_value net_rng_l, net_rng_r;
+                        vpi_get_value(net_rng_l_ref, &net_rng_l);
+                        vpi_get_value(net_rng_r_ref, &net_rng_r);
+                        std::cout << "wire ["
+                                  << net_rng_l.value.integer
+                                  << ":"
+                                  << net_rng_r.value.integer
+                                  << "] " << net_name << ";" << std::endl;
+                    }
+                    break;
+                }
+                // Declaration of 'reg'
+                case vpiReg: {
+                    vpiHandle net_rng_iter = vpi_iterate(vpiRange, net);
+                    while (vpiHandle net_rng = vpi_scan(net_rng_iter)) {
+                        vpiHandle net_rng_l_ref = vpi_handle(vpiLeftRange, net_rng);
+                        vpiHandle net_rng_r_ref = vpi_handle(vpiRightRange, net_rng);
+                        s_vpi_value net_rng_l, net_rng_r;
+                        vpi_get_value(net_rng_l_ref, &net_rng_l);
+                        vpi_get_value(net_rng_r_ref, &net_rng_r);
+                        std::cout << "reg ["
+                                  << net_rng_l.value.integer
+                                  << ":"
+                                  << net_rng_r.value.integer
+                                  << "] " << net_name << ";" << std::endl;
+                    }
+                    break;
+                }
+                // Default
+                default: {
+                    std::cerr << "UNKNOWN NET: " << net_type << std::endl;
+                    std::cerr << UHDM::visit_designs({net}) << std::endl;
+                    assert(!"Unknown net");
+                    break;
+                }
+            }
+        }
+
         // Extract continuous assignments
         vpiHandle asgn_iter = vpi_iterate(vpiContAssign, mod);
         while (vpiHandle asgn = vpi_scan(asgn_iter)) {
