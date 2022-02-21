@@ -48,6 +48,11 @@ $(WORKING_DIR)/%.d: $(PACKTYPE_SPEC_DIR)/%.py | $(WORKING_DIR)
 .PHONY: generate
 generate: $(addprefix $(WORKING_DIR)/,$(patsubst %.py,%.d,$(notdir $(PACKTYPE_SPECS))))
 
+setup:
+	@echo "# Compiling surelog"
+	@make -C thirdparty/surelog PREFIX=$(abspath thirdparty/surelog)/install
+	@make -C thirdparty/surelog install PREFIX=$(abspath thirdparty/surelog)/install
+
 # ==============================================================================
 # Include common rules
 # ==============================================================================
