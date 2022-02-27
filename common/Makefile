@@ -48,10 +48,28 @@ $(WORKING_DIR)/%.d: $(PACKTYPE_SPEC_DIR)/%.py | $(WORKING_DIR)
 .PHONY: generate
 generate: $(addprefix $(WORKING_DIR)/,$(patsubst %.py,%.d,$(notdir $(PACKTYPE_SPECS))))
 
-setup:
+.PHONY: setup_surelog
+setup_surelog:
 	@echo "# Compiling surelog"
 	@make -C thirdparty/surelog PREFIX=$(abspath thirdparty/surelog)/install
 	@make -C thirdparty/surelog install PREFIX=$(abspath thirdparty/surelog)/install
+
+.PHONY: setup_slang
+setup_slang:
+	@echo "# Compiling slang"
+	@mkdir -p thirdparty/slang/build
+	@cd thirdparty/slang/build && \
+	    cmake \
+	    -DCMAKE_CXX_COMPILER=clang++ \
+	    -DCMAKE_BUILD_TYPE=Release \
+	    -DCMAKE_INSTALL_PREFIX=$(abspath thirdparty/slang)/install \
+	    -DSLANG_INCLUDE_TESTS=OFF \
+	    ..
+	@cd thirdparty/slang/build && make -j6
+	@cd thirdparty/slang/build && make install
+
+.PHONY: setup
+setup: setup_surelog setup_slang
 
 # ==============================================================================
 # Include common rules

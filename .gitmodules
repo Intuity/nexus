@@ -22,3 +22,6 @@
 	path = common/thirdparty/surelog
 	url = https://github.com/chipsalliance/Surelog.git
 	branch = master
+[submodule "common/thirdparty/slang"]
+	path = common/thirdparty/slang
+	url = git@github.com:MikePopoloski/slang.git

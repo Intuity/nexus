@@ -24,16 +24,13 @@ CPP_INC_DIRS += $(CPP_SRC_DIRS)
 CPP_SRC_DIRS += ../common/work
 CPP_INC_DIRS += ../common/thirdparty/cxxopts/include
 CPP_INC_DIRS += ../common/thirdparty/json/single_include/nlohmann
-CPP_INC_DIRS += ../common/thirdparty/surelog/install/include
-CPP_INC_DIRS += ../common/thirdparty/surelog/install/include/surelog
+CPP_INC_DIRS += ../common/thirdparty/slang/install/include
 
 # Libraries
-LIBRARIES += ../common/thirdparty/surelog/install/lib/surelog/libflatbuffers.a
-LIBRARIES += ../common/thirdparty/surelog/install/lib/surelog/libantlr4-runtime.a
-LIBRARIES += ../common/thirdparty/surelog/install/lib/surelog/libsurelog.a
-LIBRARIES += ../common/thirdparty/surelog/install/lib/uhdm/libkj.a
-LIBRARIES += ../common/thirdparty/surelog/install/lib/uhdm/libcapnp.a
-LIBRARIES += ../common/thirdparty/surelog/install/lib/uhdm/libuhdm.a
+LIBRARIES += ../common/thirdparty/slang/install/lib/libslangcore.a
+LIBRARIES += ../common/thirdparty/slang/install/lib/libslangcompiler.a
+LIBRARIES += ../common/thirdparty/slang/install/lib/libslangparser.a
+LIBRARIES += ../common/thirdparty/slang/install/lib/libslangruntime.a
 
 LIBS_A  ?= $(patsubst lib%.a,%,$(notdir $(filter lib%.a,$(notdir $(LIBRARIES)))))
 LIBS_SO ?= $(patsubst lib%.so,%,$(notdir $(filter lib%.so,$(notdir $(LIBRARIES)))))
