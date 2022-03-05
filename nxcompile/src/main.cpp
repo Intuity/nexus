@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <assert.h>
+#include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -161,34 +163,143 @@ public:
         visitDefault(symbol);
     }
 
-    // Handle continuous assignments (e.g. `assign a = b & c`)
-    void handle (const ContinuousAssignSymbol & symbol) {
-        std::cout << " + assign ";
-        AssignmentExpression * asgn = (AssignmentExpression *)&symbol.getAssignment();
-        Expression             lhs  = asgn->left();
-        switch (lhs.kind) {
+    void resolveExpression(const Expression & expr) {
+        switch (expr.kind) {
+            case ExpressionKind::Assignment: {
+                auto & asgn = expr.as<AssignmentExpression>();
+                std::cout << "assign ";
+                resolveExpression(asgn.left());
+                std::cout << " = ";
+                resolveExpression(asgn.right());
+                std::cout << ";";
+                break;
+            }
+
             case ExpressionKind::NamedValue: {
-                NamedValueExpression * expr = (NamedValueExpression *)&lhs;
-                switch (expr->symbol.kind) {
+                auto & nval = expr.as<NamedValueExpression>();
+
+                switch (nval.symbol.kind) {
+                    // Handles 'wire'
+                    case SymbolKind::Net: {
+                        auto & sym = nval.symbol.as<NetSymbol>();
+                        std::cout << sym.name;
+                        break;
+                    }
+                    // Handles 'reg'
                     case SymbolKind::Variable: {
-                        std::cout << "<IS VARIABLE> " << expr->symbol.name;
+                        auto & sym = nval.symbol.as<VariableSymbol>();
+                        std::cout << sym.name;
                         break;
                     }
                     default: {
-                        std::cout << "<UNKNOWN SYMBOL>";
+                        std::cout << "<UNSUPPORTED SYM: "
+                                  << toString(nval.symbol.kind) << ">";
                         break;
                     }
                 }
+
                 break;
             }
+
+            case ExpressionKind::IntegerLiteral: {
+                const auto & itl = expr.as<IntegerLiteral>().getValue();
+                std::optional<unsigned int> uint_val = itl.as<unsigned int>();
+                std::cout << std::dec << uint_val.value_or(0);
+                break;
+            }
+
+            case ExpressionKind::ElementSelect: {
+                auto & val = expr.as<ElementSelectExpression>().value();
+                auto & sel = expr.as<ElementSelectExpression>().selector();
+
+                resolveExpression(val);
+                std::cout << "[";
+                resolveExpression(sel);
+                std::cout << "]";
+
+                break;
+            }
+
+            case ExpressionKind::RangeSelect: {
+                auto & value = expr.as<RangeSelectExpression>().value();
+                auto & left  = expr.as<RangeSelectExpression>().left();
+                auto & right = expr.as<RangeSelectExpression>().right();
+                resolveExpression(value);
+                std::cout << "[";
+                resolveExpression(left);
+                std::cout << ":";
+                resolveExpression(right);
+                std::cout << "]";
+                break;
+            }
+
+            case ExpressionKind::Concatenation: {
+                std::cout << "{ ";
+                bool first = true;
+                for (auto * elem : expr.as<ConcatenationExpression>().operands()) {
+                    if (!first) std::cout << ", ";
+                    resolveExpression(*elem);
+                    first = false;
+                }
+                std::cout << " }";
+                break;
+            }
+
+            case ExpressionKind::Conversion: {
+                resolveExpression(expr.as<ConversionExpression>().operand());
+                break;
+            }
+
+            case ExpressionKind::UnaryOp: {
+                UnaryOperator op = expr.as<UnaryExpression>().op;
+                auto & value     = expr.as<UnaryExpression>().operand();
+                std::cout << toString(op) << "(";
+                resolveExpression(value);
+                std::cout << ")";
+                break;
+            }
+
+            case ExpressionKind::BinaryOp: {
+                BinaryOperator op = expr.as<BinaryExpression>().op;
+                auto & left       = expr.as<BinaryExpression>().left();
+                auto & right      = expr.as<BinaryExpression>().left();
+                std::cout << toString(op) << "(";
+                resolveExpression(left);
+                std::cout << ", ";
+                resolveExpression(right);
+                std::cout << ")";
+                break;
+            }
+
+            case ExpressionKind::ConditionalOp: {
+                auto & pred  = expr.as<ConditionalExpression>().pred();
+                auto & left  = expr.as<ConditionalExpression>().left();
+                auto & right = expr.as<ConditionalExpression>().right();
+                std::cout << "(";
+                resolveExpression(pred);
+                std::cout << " ? ";
+                resolveExpression(left);
+                std::cout << " : ";
+                resolveExpression(right);
+                std::cout << ")";
+                break;
+            }
+
             default: {
-                std::cout << "<UNSUPPORTED>";
+                std::cout << "<UNSUPPORTED EXPR: " << toString(expr.kind) << ">";
+                assert(!"Hit unsupported expression");
                 break;
             }
         }
-        std::cout << " = ";
-        Expression rhs = asgn->right();
-        std::cout << ";" << std::endl;
+    }
+
+    // Handle continuous assignments (e.g. `assign a = b & c`)
+    void handle (const ContinuousAssignSymbol & symbol) {
+        std::cout << " + ";
+        auto & asgn = symbol.getAssignment();
+        resolveExpression(asgn);
+        std::cout << std::endl;
+        visitDefault(symbol);
     }
 
 };
