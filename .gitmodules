@@ -25,3 +25,6 @@
 [submodule "common/thirdparty/slang"]
 	path = common/thirdparty/slang
 	url = git@github.com:MikePopoloski/slang.git
+[submodule "common/thirdparty/spdlog"]
+	path = common/thirdparty/spdlog
+	url = https://github.com/gabime/spdlog
