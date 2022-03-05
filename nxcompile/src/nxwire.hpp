@@ -12,37 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stdint.h>
-#include <vector>
+#include <memory>
 
-#include "nxgate.hpp"
-#include "nxflop.hpp"
+#include "nxsignal.hpp"
 
-#ifndef __NXCOMPILE_HPP__
-#define __NXCOMPILE_HPP__
+#ifndef __NXWIRE_HPP__
+#define __NXWIRE_HPP__
 
 namespace Nexus {
 
-    class NXCompile {
+    class NXWire : public NXSignal {
     public:
 
         // =====================================================================
         // Constructor
         // =====================================================================
 
-        NXCompile ();
-
-    private:
-
-        // =====================================================================
-        // Members
-        // =====================================================================
-
-        std::vector<NXGate *> m_gates;
-        std::vector<NXFlop *> m_flops;
+        NXWire ( std::string name );
 
     };
 
 }
 
-#endif // __NXCOMPILE_HPP__
+#endif // __NXWIRE_HPP__

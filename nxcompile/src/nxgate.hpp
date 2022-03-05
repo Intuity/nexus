@@ -35,16 +35,13 @@ namespace Nexus {
             , NX_OP_OR
             , NX_OP_NOT
             , NX_OP_XOR
-        } nx_operation_t;
+        } nxgate_op_t;
 
         // =====================================================================
         // Constructor
         // =====================================================================
 
-        NXGate (
-              nx_operation_t op
-            , std::initializer_list<std::shared_ptr<NXSignal>> inputs
-        );
+        NXGate ( nxgate_op_t op );
 
     private:
 
@@ -52,8 +49,7 @@ namespace Nexus {
         // Members
         // =====================================================================
 
-        nx_operation_t                         m_op;
-        std::vector<std::shared_ptr<NXSignal>> m_inputs;
+        nxgate_op_t m_op;
 
     };
 

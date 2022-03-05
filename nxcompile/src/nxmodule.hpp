@@ -12,27 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+#include <stdint.h>
+#include <vector>
 
-#include "nxsignal.hpp"
+#include "nxflop.hpp"
+#include "nxgate.hpp"
+#include "nxport.hpp"
+#include "nxwire.hpp"
 
-#ifndef __NXFLOP_HPP__
-#define __NXFLOP_HPP__
+#ifndef __NXMODULE_HPP__
+#define __NXMODULE_HPP__
 
 namespace Nexus {
 
-    class NXFlop : public NXSignal {
+    class NXModule {
     public:
 
         // =====================================================================
         // Constructor
         // =====================================================================
 
-        NXFlop (
-              std::string               name
-            , std::shared_ptr<NXSignal> clk
-            , std::shared_ptr<NXSignal> rst
-        );
+        NXModule ( std::string name );
+
+        // =====================================================================
+        // Methods
+        // =====================================================================
+
+        void add_port ( NXPort * port ) { m_ports.push_back(port); }
+        void add_gate ( NXGate * gate ) { m_gates.push_back(gate); }
+        void add_flop ( NXFlop * flop ) { m_flops.push_back(flop); }
+        void add_wire ( NXWire * wire ) { m_wires.push_back(wire); }
 
     private:
 
@@ -40,11 +49,14 @@ namespace Nexus {
         // Members
         // =====================================================================
 
-        std::shared_ptr<NXSignal> m_clk;
-        std::shared_ptr<NXSignal> m_rst;
+        std::string           m_name;
+        std::vector<NXPort *> m_ports;
+        std::vector<NXGate *> m_gates;
+        std::vector<NXFlop *> m_flops;
+        std::vector<NXWire *> m_wires;
 
     };
 
 }
 
-#endif // __NXFLOP_HPP__
+#endif // __NXMODULE_HPP__

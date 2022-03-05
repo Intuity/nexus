@@ -27,7 +27,7 @@
 #include <slang/syntax/SyntaxVisitor.h>
 #include <slang/types/AllTypes.h>
 
-#include "nxcompile.hpp"
+#include "nxmodule.hpp"
 
 using namespace slang;
 
@@ -167,9 +167,9 @@ public:
         switch (expr.kind) {
             case ExpressionKind::Assignment: {
                 auto & asgn = expr.as<AssignmentExpression>();
-                std::cout << "assign ";
+                if (!asgn.isNonBlocking()) std::cout << "assign ";
                 resolveExpression(asgn.left());
-                std::cout << " = ";
+                std::cout << (asgn.isNonBlocking() ? " <= " : " = ");
                 resolveExpression(asgn.right());
                 std::cout << ";";
                 break;
@@ -299,6 +299,93 @@ public:
         auto & asgn = symbol.getAssignment();
         resolveExpression(asgn);
         std::cout << std::endl;
+        visitDefault(symbol);
+    }
+
+    void resolveTimingControl (const TimingControl & ctrl) {
+        switch (ctrl.kind) {
+
+            case TimingControlKind::EventList: {
+                bool first = true;
+                for (const auto * event : ctrl.as<EventListControl>().events) {
+                    if (!first) std::cout << ", ";
+                    resolveTimingControl(*event);
+                    first = false;
+                }
+                break;
+            }
+
+            case TimingControlKind::SignalEvent: {
+                EdgeKind     edge = ctrl.as<SignalEventControl>().edge;
+                const auto & expr = ctrl.as<SignalEventControl>().expr;
+                std::cout << toString(edge) << " ";
+                resolveExpression(expr);
+                break;
+            }
+
+            default: {
+                std::cout << "<UNSUPPORTED CTRL: " << toString(ctrl.kind) << ">";
+                assert(!"Hit unsupported timing control");
+                break;
+            }
+
+        }
+    }
+
+    void resolveStatement (const Statement & stmt) {
+        switch (stmt.kind) {
+
+            case StatementKind::Timed: {
+                std::cout << "@(";
+                resolveTimingControl(stmt.as<TimedStatement>().timing);
+                std::cout << ") ";
+                resolveStatement(stmt.as<TimedStatement>().stmt);
+                break;
+            }
+
+            case StatementKind::Conditional: {
+                std::cout << "if (";
+                resolveExpression(stmt.as<ConditionalStatement>().cond);
+                std::cout << ") ";
+                resolveStatement(stmt.as<ConditionalStatement>().ifTrue);
+                std::cout << " else ";
+                resolveStatement(*(stmt.as<ConditionalStatement>().ifFalse));
+                break;
+            }
+
+            case StatementKind::ExpressionStatement: {
+                resolveExpression(stmt.as<ExpressionStatement>().expr);
+                break;
+            }
+
+            default: {
+                std::cout << "<UNSUPPORTED STMT: " << toString(stmt.kind) << ">";
+                assert(!"Hit unsupported statement");
+                break;
+            }
+
+        }
+    }
+
+    // Handle procedural blocks (e.g. always/always_ff/always_comb)
+    void handle (const ProceduralBlockSymbol & symbol) {
+        std::cout << " + ";
+
+        switch (symbol.procedureKind) {
+            case ProceduralBlockKind::Always: {
+                std::cout << "always ";
+                resolveStatement(symbol.getBody());
+                break;
+            }
+            default: {
+                std::cout << "<UNSUPPORTED PROC: " << toString(symbol.procedureKind) << ">";
+                assert(!"Hit unsupported procedural block");
+                break;
+            }
+        }
+
+        std::cout << std::endl;
+
         visitDefault(symbol);
     }
 

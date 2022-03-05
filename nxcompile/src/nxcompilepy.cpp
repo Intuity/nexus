@@ -17,10 +17,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "nxcompile.hpp"
+#include "nxmodule.hpp"
 #include "nxflop.hpp"
 #include "nxgate.hpp"
+#include "nxport.hpp"
 #include "nxsignal.hpp"
+#include "nxwire.hpp"
 
 namespace py = pybind11;
 using namespace Nexus;
@@ -28,19 +30,50 @@ using namespace Nexus;
 PYBIND11_MODULE(nxcompile, m) {
 
     // Expose classes
-    py::class_<NXCompile, std::shared_ptr<NXCompile>>(m, "NXCompile")
-        .def(py::init<>());
+    py::class_<NXModule, std::shared_ptr<NXModule>>(m, "NXModule")
+        .def(py::init<
+              std::string // name
+        >());
 
     py::class_<NXFlop, std::shared_ptr<NXFlop>>(m, "NXFlop")
-        .def(py::init<std::shared_ptr<NXSignal>>());
+        .def(py::init<
+              std::string               // name
+            , std::shared_ptr<NXSignal> // clk
+            , std::shared_ptr<NXSignal> // rst
+        >());
 
     py::class_<NXGate, std::shared_ptr<NXGate>>(m, "NXGate")
+        .def(py::init<NXGate::nxgate_op_t>());
+
+    py::class_<NXPort, std::shared_ptr<NXPort>>(m, "NXPort")
         .def(py::init<
-            NXGate::nx_operation_t,
-            std::initializer_list<std::shared_ptr<NXSignal>>
+              std::string           // name
+            , NXPort::nxport_type_t // port_type
+            , int                   // max_inputs
+            , int                   // max_outputs
+        >());
+
+    py::class_<NXPortIn, std::shared_ptr<NXPortIn>>(m, "NXPortIn")
+        .def(py::init<
+              std::string // name
+        >());
+
+    py::class_<NXPortOut, std::shared_ptr<NXPortOut>>(m, "NXPortOut")
+        .def(py::init<
+              std::string // name
         >());
 
     py::class_<NXSignal, std::shared_ptr<NXSignal>>(m, "NXSignal")
-        .def(py::init<>());
+        .def(py::init<
+              std::string               // name
+            , NXSignal::nxsignal_type_t // type
+            , int                       // max_inputs
+            , int                       // max_outputs
+        >());
+
+    py::class_<NXWire, std::shared_ptr<NXWire>>(m, "NXWire")
+        .def(py::init<
+              std::string // name
+        >());
 
 }

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "nxflop.hpp"
+#include <iostream>
+
+#include "nxmodule.hpp"
 
 using namespace Nexus;
 
-NXFlop::NXFlop (
-      std::string               name
-    , std::shared_ptr<NXSignal> clk
-    , std::shared_ptr<NXSignal> rst
-) : NXSignal ( name, NXSignal::FLOP, 1 )
-  , m_clk    ( clk                     )
-  , m_rst    ( rst                     )
-{ }
+NXModule::NXModule (
+    std::string name
+) : m_name ( name )
+{
+    std::cout << "NXModule C++" << std::endl;
+}

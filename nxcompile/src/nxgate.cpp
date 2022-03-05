@@ -17,9 +17,7 @@
 using namespace Nexus;
 
 NXGate::NXGate (
-      NXGate::nx_operation_t                           op
-    , std::initializer_list<std::shared_ptr<NXSignal>> inputs
-) : NXSignal (        )
-  , m_op     ( op     )
-  , m_inputs ( inputs )
+      NXGate::nxgate_op_t op
+) : NXSignal ( "", NXSignal::GATE )
+  , m_op     ( op                 )
 { }

@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
-
-#include "nxcompile.hpp"
+#include "nxport.hpp"
 
 using namespace Nexus;
 
-NXCompile::NXCompile () {
-    std::cout << "NXCompile C++" << std::endl;
-}
+NXPort::NXPort (
+      std::string   name
+    , nxport_type_t port_type
+    , int           max_inputs
+    , int           max_outputs
+) : NXSignal    ( name, NXSignal::PORT, max_inputs, max_outputs )
+  , m_port_type ( port_type                                     )
+{ }
