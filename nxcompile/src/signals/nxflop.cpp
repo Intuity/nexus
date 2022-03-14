@@ -16,11 +16,6 @@
 
 using namespace Nexus;
 
-NXFlop::NXFlop (
-      std::string               name
-    , std::shared_ptr<NXSignal> clk
-    , std::shared_ptr<NXSignal> rst
-) : NXSignal ( name, NXSignal::FLOP, 1 )
-  , m_clk    ( clk                     )
-  , m_rst    ( rst                     )
+NXFlop::NXFlop ( std::string name )
+    : NXSignal ( name, NXSignal::FLOP, 1 )
 { }

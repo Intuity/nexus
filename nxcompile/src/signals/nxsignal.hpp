@@ -30,6 +30,7 @@ namespace Nexus {
 
         typedef enum {
               UNKNOWN
+            , CONSTANT
             , WIRE
             , GATE
             , FLOP
@@ -86,8 +87,6 @@ namespace Nexus {
         {
             return *static_cast<T *>(this);
         }
-
-    private:
 
         // =====================================================================
         // Members

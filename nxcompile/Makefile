@@ -17,11 +17,14 @@
 all: build
 
 # Source directories
+CPP_SRC_DIRS += ./src/parser
+CPP_SRC_DIRS += ./src/signals
 CPP_SRC_DIRS += ./src
 
 # Include directories
 CPP_INC_DIRS += $(CPP_SRC_DIRS)
 CPP_SRC_DIRS += ../common/work
+CPP_INC_DIRS += ../common/thirdparty/plog/include
 CPP_INC_DIRS += ../common/thirdparty/cxxopts/include
 CPP_INC_DIRS += ../common/thirdparty/json/single_include/nlohmann
 CPP_INC_DIRS += ../common/thirdparty/slang/install/include

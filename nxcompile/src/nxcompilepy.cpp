@@ -37,9 +37,7 @@ PYBIND11_MODULE(nxcompile, m) {
 
     py::class_<NXFlop, std::shared_ptr<NXFlop>>(m, "NXFlop")
         .def(py::init<
-              std::string               // name
-            , std::shared_ptr<NXSignal> // clk
-            , std::shared_ptr<NXSignal> // rst
+              std::string // name
         >());
 
     py::class_<NXGate, std::shared_ptr<NXGate>>(m, "NXGate")

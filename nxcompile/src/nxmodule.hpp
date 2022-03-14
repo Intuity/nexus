@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <map>
 #include <stdint.h>
 #include <vector>
+
+#include <plog/Log.h>
 
 #include "nxflop.hpp"
 #include "nxgate.hpp"
@@ -38,10 +41,36 @@ namespace Nexus {
         // Methods
         // =====================================================================
 
-        void add_port ( NXPort * port ) { m_ports.push_back(port); }
-        void add_gate ( NXGate * gate ) { m_gates.push_back(gate); }
-        void add_flop ( NXFlop * flop ) { m_flops.push_back(flop); }
-        void add_wire ( NXWire * wire ) { m_wires.push_back(wire); }
+        void add_port ( std::shared_ptr<NXPort> port )
+        {
+            m_ports.push_back(port);
+            m_signals[port->m_name] = port;
+        }
+
+        void add_gate ( std::shared_ptr<NXGate> gate )
+        {
+            m_gates.push_back(gate);
+            m_signals[gate->m_name] = gate;
+            PLOGI << "Adding gate " << std::dec << m_gates.size();
+        }
+
+        void add_flop ( std::shared_ptr<NXFlop> flop )
+        {
+            m_flops.push_back(flop);
+            m_signals[flop->m_name] = flop;
+        }
+
+        void add_wire ( std::shared_ptr<NXWire> wire )
+        {
+            m_wires.push_back(wire);
+            m_signals[wire->m_name] = wire;
+        }
+
+        std::shared_ptr<NXSignal> get_signal ( std::string name )
+        {
+            return m_signals[name];
+        }
+
 
     private:
 
@@ -49,11 +78,12 @@ namespace Nexus {
         // Members
         // =====================================================================
 
-        std::string           m_name;
-        std::vector<NXPort *> m_ports;
-        std::vector<NXGate *> m_gates;
-        std::vector<NXFlop *> m_flops;
-        std::vector<NXWire *> m_wires;
+        std::string                                        m_name;
+        std::vector< std::shared_ptr<NXPort> >             m_ports;
+        std::vector< std::shared_ptr<NXGate> >             m_gates;
+        std::vector< std::shared_ptr<NXFlop> >             m_flops;
+        std::vector< std::shared_ptr<NXWire> >             m_wires;
+        std::map< std::string, std::shared_ptr<NXSignal> > m_signals;
 
     };
 

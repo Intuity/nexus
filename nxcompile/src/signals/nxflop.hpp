@@ -12,36 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <initializer_list>
 #include <memory>
-#include <vector>
 
 #include "nxsignal.hpp"
 
-#ifndef __NXGATE_HPP__
-#define __NXGATE_HPP__
+#ifndef __NXFLOP_HPP__
+#define __NXFLOP_HPP__
 
 namespace Nexus {
 
-    class NXGate : public NXSignal {
+    class NXFlop : public NXSignal {
     public:
-
-        // =====================================================================
-        // Typedefs
-        // =====================================================================
-
-        typedef enum {
-              NX_OP_AND
-            , NX_OP_OR
-            , NX_OP_NOT
-            , NX_OP_XOR
-        } nxgate_op_t;
 
         // =====================================================================
         // Constructor
         // =====================================================================
 
-        NXGate ( nxgate_op_t op );
+        NXFlop ( std::string name );
+
+        // =====================================================================
+        // Methods
+        // =====================================================================
+
+        void set_clk ( std::shared_ptr<NXSignal> clk ) { m_clk = clk; }
+        void set_rst ( std::shared_ptr<NXSignal> rst ) { m_rst = rst; }
 
     private:
 
@@ -49,10 +43,11 @@ namespace Nexus {
         // Members
         // =====================================================================
 
-        nxgate_op_t m_op;
+        std::shared_ptr<NXSignal> m_clk;
+        std::shared_ptr<NXSignal> m_rst;
 
     };
 
 }
 
-#endif // __NXGATE_HPP__
+#endif // __NXFLOP_HPP__
