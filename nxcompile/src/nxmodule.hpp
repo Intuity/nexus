@@ -16,8 +16,6 @@
 #include <stdint.h>
 #include <vector>
 
-#include <plog/Log.h>
-
 #include "nxflop.hpp"
 #include "nxgate.hpp"
 #include "nxport.hpp"
@@ -51,7 +49,6 @@ namespace Nexus {
         {
             m_gates.push_back(gate);
             m_signals[gate->m_name] = gate;
-            PLOGI << "Adding gate " << std::dec << m_gates.size();
         }
 
         void add_flop ( std::shared_ptr<NXFlop> flop )

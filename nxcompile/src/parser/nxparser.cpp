@@ -190,7 +190,6 @@ void NXParser::handle (const NetSymbol & symbol) {
 }
 
 void NXParser::resolveExpression(const Expression & expr) {
-    PLOGI << "Resolving expression: " << toString(expr.kind);
     switch (expr.kind) {
         case ExpressionKind::Assignment: {
             // Get the first operand
@@ -203,8 +202,6 @@ void NXParser::resolveExpression(const Expression & expr) {
             resolveExpression(expr.as<AssignmentExpression>().right());
 
             // Check total RHS operands are the same as LHS width
-            PLOGI << "LHS: " << std::dec << lhs->m_bits.size()
-                << ", RHS: " << std::dec << operand_width();
             assert(operand_width() == lhs->m_bits.size());
 
             unsigned int lhs_idx = 0;
@@ -216,8 +213,10 @@ void NXParser::resolveExpression(const Expression & expr) {
                     // Outside a process, build a gate for each assignment
                     } else {
                         auto gate = std::make_shared<NXGate>(NXGate::ASSIGN);
-                        gate->add_input(lhs->m_bits[lhs_idx]);
+                        gate->add_output(lhs->m_bits[lhs_idx]);
                         gate->add_input(rhs);
+                        lhs->m_bits[lhs_idx]->add_input(gate);
+                        rhs->add_output(gate);
                         m_module->add_gate(gate);
                     }
                     lhs_idx++;
@@ -241,7 +240,6 @@ void NXParser::resolveExpression(const Expression & expr) {
                 // Handles 'wire'
                 case SymbolKind::Net: {
                     auto & sym = nval.symbol.as<NetSymbol>();
-                    PLOGI << "WIRE: " << sym.name;
                     for (auto sig : m_expansions[static_cast<std::string>(sym.name)]) {
                         holder->append(sig);
                     }
@@ -250,7 +248,6 @@ void NXParser::resolveExpression(const Expression & expr) {
                 // Handles 'reg'
                 case SymbolKind::Variable: {
                     auto & sym = nval.symbol.as<VariableSymbol>();
-                    PLOGI << "REG: " << sym.name;
                     for (auto sig : m_expansions[static_cast<std::string>(sym.name)]) {
                         holder->append(sig);
                     }
@@ -272,7 +269,6 @@ void NXParser::resolveExpression(const Expression & expr) {
             bitwidth_t   width   = literal.getBitWidth();
 
             auto holder = std::make_shared<NXBitHolder>();
-            // PLOGI << "Constant: " << std::dec << value << " Width: " << width;
             for (unsigned int idx = 0; idx < width; idx++) {
                 holder->append(std::make_shared<NXConstant>((value >> idx) & 0x1));
             }
@@ -296,7 +292,6 @@ void NXParser::resolveExpression(const Expression & expr) {
                    << "_" << std::dec << sel_uint.value_or(0);
 
             auto holder = std::make_shared<NXBitHolder>();
-            // PLOGI << "Element Select: " << lookup.str();
             holder->append(m_module->get_signal(lookup.str()));
 
             m_operands.push_back(holder);
@@ -321,11 +316,6 @@ void NXParser::resolveExpression(const Expression & expr) {
 
             unsigned int lower = std::min(left_uint.value_or(0), right_uint.value_or(0));
             unsigned int upper = std::max(left_uint.value_or(0), right_uint.value_or(0));
-
-            // PLOGI << "Range Select: "
-            //       << sig_expr.as<NamedValueExpression>().symbol.name
-            //       << " From: " << std::dec << lower
-            //       << " To: " << std::dec << upper;
 
             auto holder = std::make_shared<NXBitHolder>();
             for (unsigned int idx = lower; idx <= upper; idx++) {
@@ -373,24 +363,19 @@ void NXParser::resolveExpression(const Expression & expr) {
             bool                reduce = true;
             switch (ast_op) {
                 case UnaryOperator::BitwiseNot:
-                    PLOGI << "Unary op: ~(...)";
                     reduce = false;
                     nx_op  = NXGate::NOT;
                     break;
                 case UnaryOperator::LogicalNot:
-                    PLOGI << "Unary op: !(...)";
                     nx_op = NXGate::NOT;
                     break;
                 case UnaryOperator::BitwiseAnd:
-                    PLOGI << "Unary op: &(...)";
                     nx_op = NXGate::AND;
                     break;
                 case UnaryOperator::BitwiseOr:
-                    PLOGI << "Unary op: |(...)";
                     nx_op = NXGate::OR;
                     break;
                 case UnaryOperator::BitwiseXor:
-                    PLOGI << "Unary op: ^(...)";
                     nx_op = NXGate::XOR;
                     break;
                 default:
@@ -407,13 +392,17 @@ void NXParser::resolveExpression(const Expression & expr) {
             auto inputs = m_operands.front();
             if (reduce) {
                 auto gate = std::make_shared<NXGate>(nx_op);
-                for (auto bit : inputs->m_bits) gate->add_input(bit);
+                for (auto bit : inputs->m_bits) {
+                    gate->add_input(bit);
+                    bit->add_output(gate);
+                }
                 holder->append(gate);
                 m_module->add_gate(gate);
             } else {
                 for (auto bit : inputs->m_bits) {
                     auto gate = std::make_shared<NXGate>(nx_op);
                     gate->add_input(bit);
+                    bit->add_output(gate);
                     holder->append(gate);
                     m_module->add_gate(gate);
                 }
@@ -466,6 +455,8 @@ void NXParser::resolveExpression(const Expression & expr) {
                 auto gate = std::make_shared<NXGate>(nx_op);
                 gate->add_input(lhs->m_bits[idx]);
                 gate->add_input(rhs->m_bits[idx]);
+                lhs->m_bits[idx]->add_output(gate);
+                rhs->m_bits[idx]->add_output(gate);
                 holder->append(gate);
                 m_module->add_gate(gate);
             }
@@ -477,7 +468,6 @@ void NXParser::resolveExpression(const Expression & expr) {
         }
 
         case ExpressionKind::ConditionalOp: {
-            PLOGI << "CONDITIONAL OPERATION";
             // Get the predicate
             resolveExpression(expr.as<ConditionalExpression>().pred());
             assert(m_operands.size() == 1);
@@ -507,6 +497,9 @@ void NXParser::resolveExpression(const Expression & expr) {
                 gate->add_input(pred->m_bits[0]);
                 gate->add_input(lhs->m_bits[idx]);
                 gate->add_input(rhs->m_bits[idx]);
+                pred->m_bits[0]->add_output(gate);
+                lhs->m_bits[idx]->add_output(gate);
+                rhs->m_bits[idx]->add_output(gate);
                 holder->append(gate);
                 m_module->add_gate(gate);
             }
@@ -542,7 +535,6 @@ void NXParser::resolveTimingControl (const TimingControl & ctrl) {
 
         case TimingControlKind::SignalEvent: {
             resolveExpression(ctrl.as<SignalEventControl>().expr);
-            PLOGI << "NUM OPS: " << std::dec << m_operands.size();
             assert(m_operands.size() == 1);
             assert(m_operands.front()->m_bits.size() == 1);
             switch (ctrl.as<SignalEventControl>().edge) {
@@ -570,7 +562,6 @@ void NXParser::resolveTimingControl (const TimingControl & ctrl) {
 }
 
 void NXParser::resolveStatement (const Statement & stmt) {
-    PLOGI << "RESOLVING STATEMENT: " << toString(stmt.kind);
     switch (stmt.kind) {
 
         case StatementKind::Timed: {
@@ -629,11 +620,17 @@ void NXParser::resolveStatement (const Statement & stmt) {
                                 << ", rst_val: " << if_true->m_name
                                       << ", D: " << if_false->m_name
                                       << ", Q: " << asgn_lhs->m_name;
+                // Link up the flop to supporting signals
                 flop->m_clk     = m_proc_clk;
                 flop->m_rst     = m_proc_rst;
                 flop->m_rst_val = if_true;
                 flop->add_input(if_false);
                 flop->add_output(asgn_lhs);
+                // Link supporting signals to the flop
+                m_proc_clk->add_output(flop);
+                m_proc_rst->add_output(flop);
+                if_true->add_output(flop);
+                if_false->add_output(flop);
                 asgn_lhs->add_input(flop);
             }
             break;
@@ -662,7 +659,6 @@ void NXParser::handle (const ProceduralBlockSymbol & symbol) {
     // Detect the process type
     switch (symbol.procedureKind) {
         case ProceduralBlockKind::Always: {
-            PLOGI << "RESOLVING PROC STATMENT";
             resolveStatement(symbol.getBody());
             break;
         }
@@ -674,7 +670,6 @@ void NXParser::handle (const ProceduralBlockSymbol & symbol) {
     }
 
     // Handle the contents
-    PLOGI << "VISITING PROCESS";
     visitDefault(symbol);
 
     // Clear up
