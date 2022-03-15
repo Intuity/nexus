@@ -31,21 +31,9 @@ void NXParser::handle (const InstanceSymbol & symbol) {
 
 // Handle port declarations (e.g. `input logic [31:0] i_blah`)
 void NXParser::handle (const PortSymbol & symbol) {
-    switch (symbol.direction) {
-        case ArgumentDirection::In: std::cout << " - [IN ]"; break;
-        case ArgumentDirection::Out: std::cout << " - [OUT]"; break;
-        case ArgumentDirection::InOut: std::cout << " - [I/O]"; break;
-        default: std::cout << " [??? "; break;
-    }
-    std::cout << " " << symbol.name;
     if (symbol.getType().isScalar()) {
         // 1-bit wide signals
         ScalarType * s_type = (ScalarType *)&symbol.getType();
-        switch (s_type->scalarKind) {
-            case ScalarType::Bit  : std::cout << " [BIT]";   break;
-            case ScalarType::Logic: std::cout << " [LOGIC]"; break;
-            case ScalarType::Reg  : std::cout << " [REG]";   break;
-        }
         // TODO: This should also create a flop if output is registered
         switch (symbol.direction) {
             case ArgumentDirection::In:
@@ -60,20 +48,13 @@ void NXParser::handle (const PortSymbol & symbol) {
                 assert(!"Bad direction");
                 break;
         }
-        // std::cout << " W: " << std::dec << s_type->bitWidth << "]";
     } else if (symbol.getType().isPackedArray()) {
         // Multi-bit wide signals
         PackedArrayType * p_type = (PackedArrayType *)&symbol.getType();
         if (p_type->elementType.isScalar()) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
-            switch (s_elem->scalarKind) {
-                case ScalarType::Bit  : std::cout << " [BIT";   break;
-                case ScalarType::Logic: std::cout << " [LOGIC"; break;
-                case ScalarType::Reg  : std::cout << " [REG";   break;
-            }
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
-            std::cout << " " << rng_hi << ":" << rng_lo << "]";
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream port_name;
                 port_name << symbol.name << "_" << std::dec << idx;
@@ -86,73 +67,58 @@ void NXParser::handle (const PortSymbol & symbol) {
                         break;
                     default:
                         PLOGE << "Port '" << port_name.str()
-                                << "' has unsupported direction " << toString(symbol.direction);
+                              << "' has unsupported direction "
+                              << toString(symbol.direction);
                         assert(!"Bad direction");
                         break;
                 }
             }
         } else {
-            std::cout << " [PACKED ARRAY OF UNKNOWN TYPE]";
+            PLOGE << "PACKED ARRAY OF UNKNOWN TYPE";
+            assert(!"Bad packed array");
         }
     } else {
         // Other types
-        std::cout << " [TYPE UNKNOWN]";
+        PLOGE << "TYPE UNKNOWN";
+        assert(!"Bad type");
     }
-    std::cout << std::endl;
     visitDefault(symbol);
 }
 
 // Handle storage variables (e.g. `reg [31:0] foo`)
 void NXParser::handle (const VariableSymbol & symbol) {
-    std::cout << " - " << symbol.name;
     ScalarType * s_type = (ScalarType *)&symbol.getType();
     if (symbol.getType().isScalar()) {
-        switch (s_type->scalarKind) {
-            case ScalarType::Bit  : std::cout << " [BIT]";   break;
-            case ScalarType::Logic: std::cout << " [LOGIC]"; break;
-            case ScalarType::Reg  : std::cout << " [REG]";   break;
-        }
         m_module->add_flop(std::make_shared<NXFlop>(static_cast<std::string>(symbol.name)));
     } else if (symbol.getType().isPackedArray()) {
         // Multi-bit wide signals
         PackedArrayType * p_type = (PackedArrayType *)&symbol.getType();
         if (p_type->elementType.isScalar()) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
-            switch (s_elem->scalarKind) {
-                case ScalarType::Bit  : std::cout << " [BIT";   break;
-                case ScalarType::Logic: std::cout << " [LOGIC"; break;
-                case ScalarType::Reg  : std::cout << " [REG";   break;
-            }
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
-            std::cout << " " << rng_hi << ":" << rng_lo << "]";
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream flop_name;
                 flop_name << symbol.name << "_" << std::dec << idx;
                 m_module->add_flop(std::make_shared<NXFlop>(flop_name.str()));
             }
         } else {
-            std::cout << " [PACKED ARRAY OF UNKNOWN TYPE]";
+            PLOGE << " [PACKED ARRAY OF UNKNOWN TYPE]";
+            assert(!"Bad packed array");
         }
     } else {
         // Other types
-        std::cout << " [TYPE UNKNOWN]";
+        PLOGE << "TYPE UNKNOWN";
+        assert(!"Bad type");
     }
-    std::cout << std::endl;
     visitDefault(symbol);
 }
 
 // Handle net declarations (e.g. `wire [31:0] foo`)
 void NXParser::handle (const NetSymbol & symbol) {
-    std::cout << " - " << symbol.name;
     ScalarType * s_type  = (ScalarType *)&symbol.getType();
     std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
-        switch (s_type->scalarKind) {
-            case ScalarType::Bit  : std::cout << " [BIT]";   break;
-            case ScalarType::Logic: std::cout << " [LOGIC]"; break;
-            case ScalarType::Reg  : std::cout << " [REG]";   break;
-        }
         auto wire = std::make_shared<NXWire>(sig_name);
         m_module->add_wire(wire);
         m_expansions[sig_name] = NXSignalList({wire});
@@ -162,14 +128,8 @@ void NXParser::handle (const NetSymbol & symbol) {
         PackedArrayType * p_type = (PackedArrayType *)&symbol.getType();
         if (p_type->elementType.isScalar()) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
-            switch (s_elem->scalarKind) {
-                case ScalarType::Bit  : std::cout << " [BIT";   break;
-                case ScalarType::Logic: std::cout << " [LOGIC"; break;
-                case ScalarType::Reg  : std::cout << " [REG";   break;
-            }
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
-            std::cout << " " << rng_hi << ":" << rng_lo << "]";
             m_expansions[sig_name] = NXSignalList();
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream wire_name;
@@ -179,13 +139,14 @@ void NXParser::handle (const NetSymbol & symbol) {
                 m_expansions[sig_name].push_back(wire);
             }
         } else {
-            std::cout << " [PACKED ARRAY OF UNKNOWN TYPE]";
+            PLOGE << "PACKED ARRAY OF UNKNOWN TYPE";
+            assert(!"Bad packed array");
         }
     } else {
         // Other types
-        std::cout << " [TYPE UNKNOWN]";
+        PLOGE << "TYPE UNKNOWN";
+        assert(!"Bad type");
     }
-    std::cout << std::endl;
     visitDefault(symbol);
 }
 
@@ -611,27 +572,25 @@ void NXParser::resolveStatement (const Statement & stmt) {
             // Create flops for each case
             for (auto iter : all_true) {
                 std::string sig_name = iter.first;
-                auto        asgn_lhs = m_module->get_signal(sig_name);
+                auto        asgn_lhs = std::static_pointer_cast<NXFlop>(m_module->get_signal(sig_name));
                 auto        if_true  = iter.second;
                 auto        if_false = all_false[sig_name];
-                auto        flop     = std::make_shared<NXFlop>("flop");
-                PLOGI << "Creating flop - clk: " << m_proc_clk->m_name
-                                    << ", rst: " << m_proc_rst->m_name
-                                << ", rst_val: " << if_true->m_name
-                                      << ", D: " << if_false->m_name
-                                      << ", Q: " << asgn_lhs->m_name;
+                PLOGI << "Flop - clk: " << m_proc_clk->m_name
+                           << ", rst: " << m_proc_rst->m_name
+                       << ", rst_val: " << if_true->m_name
+                             << ", D: " << if_false->m_name
+                             << ", Q: " << asgn_lhs->m_name;
                 // Link up the flop to supporting signals
-                flop->m_clk     = m_proc_clk;
-                flop->m_rst     = m_proc_rst;
-                flop->m_rst_val = if_true;
-                flop->add_input(if_false);
-                flop->add_output(asgn_lhs);
+                asgn_lhs->m_clk     = m_proc_clk; // CLK
+                asgn_lhs->m_rst     = m_proc_rst; // RST
+                asgn_lhs->m_rst_val = if_true;    // RST_VAL
+                asgn_lhs->add_input(if_false);    // D
+                asgn_lhs->add_output(asgn_lhs);   // Q
                 // Link supporting signals to the flop
-                m_proc_clk->add_output(flop);
-                m_proc_rst->add_output(flop);
-                if_true->add_output(flop);
-                if_false->add_output(flop);
-                asgn_lhs->add_input(flop);
+                m_proc_clk->add_output(asgn_lhs);
+                m_proc_rst->add_output(asgn_lhs);
+                if_true->add_output(asgn_lhs);
+                if_false->add_output(asgn_lhs);
             }
             break;
         }
