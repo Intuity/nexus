@@ -18,6 +18,6 @@ using namespace Nexus;
 
 NXConstant::NXConstant (
       unsigned int value
-) : NXSignal ( "", NXSignal::CONSTANT, 0 )
-  , m_value  ( value                     )
+) : NXSignal ( std::to_string(value), NXSignal::CONSTANT, 0 )
+  , m_value  ( value                                        )
 { }

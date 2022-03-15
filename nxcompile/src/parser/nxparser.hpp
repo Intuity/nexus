@@ -32,7 +32,15 @@ namespace Nexus {
     {
     public:
 
-        void append ( std::shared_ptr<NXSignal> bit ) { m_bits.push_back(bit); }
+        void append ( std::shared_ptr<NXSignal> bit )
+        {
+            m_bits.push_back(bit);
+        }
+
+        unsigned int total_width ( void )
+        {
+            return m_bits.size();
+        }
 
         std::vector< std::shared_ptr<NXSignal> > m_bits;
     };
@@ -43,8 +51,11 @@ namespace Nexus {
 
         // Constructor
         NXParser ( )
-            : ASTVisitor<NXParser, true, true> (      )
-            , m_module                         ( NULL )
+            : ASTVisitor<NXParser, true, true> (       )
+            , m_module                         ( NULL  )
+            , m_in_process                     ( false )
+            , m_proc_clk                       ( NULL  )
+            , m_proc_rst                       ( NULL  )
         { }
 
         // Handle module instances (e.g. `module my_module (...); ... endmodule`)
@@ -71,10 +82,28 @@ namespace Nexus {
         // Handle procedural blocks (e.g. always/always_ff/always_comb)
         void handle ( const ProceduralBlockSymbol & symbol );
 
+        // Total width of accumulated operands
+        unsigned int operand_width ( void )
+        {
+            unsigned int width = 0;
+            for (auto holder : m_operands) width += holder->total_width();
+            return width;
+        }
+
     private:
 
+        typedef std::shared_ptr<NXSignal> NXSignalPtr;
+        typedef std::list< NXSignalPtr > NXSignalList;
+
         std::shared_ptr<NXModule>                 m_module;
+        std::map< std::string, NXSignalList >     m_expansions;
         std::list< std::shared_ptr<NXBitHolder> > m_operands;
+        bool                                      m_in_process;
+        NXSignalList                              m_pos_trig;
+        NXSignalList                              m_neg_trig;
+        NXSignalPtr                               m_proc_clk;
+        NXSignalPtr                               m_proc_rst;
+        std::map< std::string, NXSignalPtr >      m_proc_asgn;
 
     };
 

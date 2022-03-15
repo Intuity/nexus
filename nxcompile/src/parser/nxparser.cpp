@@ -145,14 +145,18 @@ void NXParser::handle (const VariableSymbol & symbol) {
 // Handle net declarations (e.g. `wire [31:0] foo`)
 void NXParser::handle (const NetSymbol & symbol) {
     std::cout << " - " << symbol.name;
-    ScalarType * s_type = (ScalarType *)&symbol.getType();
+    ScalarType * s_type  = (ScalarType *)&symbol.getType();
+    std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
         switch (s_type->scalarKind) {
             case ScalarType::Bit  : std::cout << " [BIT]";   break;
             case ScalarType::Logic: std::cout << " [LOGIC]"; break;
             case ScalarType::Reg  : std::cout << " [REG]";   break;
         }
-        m_module->add_wire(std::make_shared<NXWire>(static_cast<std::string>(symbol.name)));
+        auto wire = std::make_shared<NXWire>(sig_name);
+        m_module->add_wire(wire);
+        m_expansions[sig_name] = NXSignalList({wire});
+
     } else if (symbol.getType().isPackedArray()) {
         // Multi-bit wide signals
         PackedArrayType * p_type = (PackedArrayType *)&symbol.getType();
@@ -166,10 +170,13 @@ void NXParser::handle (const NetSymbol & symbol) {
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
             std::cout << " " << rng_hi << ":" << rng_lo << "]";
+            m_expansions[sig_name] = NXSignalList();
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream wire_name;
-                wire_name << symbol.name << "_" << std::dec << idx;
-                m_module->add_wire(std::make_shared<NXWire>(wire_name.str()));
+                wire_name << sig_name << "_" << std::dec << idx;
+                auto wire = std::make_shared<NXWire>(wire_name.str());
+                m_module->add_wire(wire);
+                m_expansions[sig_name].push_back(wire);
             }
         } else {
             std::cout << " [PACKED ARRAY OF UNKNOWN TYPE]";
@@ -194,23 +201,34 @@ void NXParser::resolveExpression(const Expression & expr) {
 
             // Get the second operand
             resolveExpression(expr.as<AssignmentExpression>().right());
-            assert(m_operands.size() == 1);
-            auto rhs = m_operands.front();
-            m_operands.pop_front();
 
-            // Check bit counts match
-            assert(lhs->m_bits.size() == rhs->m_bits.size());
+            // Check total RHS operands are the same as LHS width
+            PLOGI << "LHS: " << std::dec << lhs->m_bits.size()
+                << ", RHS: " << std::dec << operand_width();
+            assert(operand_width() == lhs->m_bits.size());
 
-            // Build a gate for each bit
-            for (unsigned int idx = 0; idx < lhs->m_bits.size(); idx++) {
-                auto gate = std::make_shared<NXGate>(NXGate::ASSIGN);
-                gate->add_input(lhs->m_bits[idx]);
-                gate->add_input(rhs->m_bits[idx]);
-                m_module->add_gate(gate);
+            unsigned int lhs_idx = 0;
+            for (auto rh_holder : m_operands) {
+                for (auto rhs : rh_holder->m_bits) {
+                    // Inside a process, add entries to the map
+                    if (m_in_process) {
+                        m_proc_asgn[lhs->m_bits[lhs_idx]->m_name] = rhs;
+                    // Outside a process, build a gate for each assignment
+                    } else {
+                        auto gate = std::make_shared<NXGate>(NXGate::ASSIGN);
+                        gate->add_input(lhs->m_bits[lhs_idx]);
+                        gate->add_input(rhs);
+                        m_module->add_gate(gate);
+                    }
+                    lhs_idx++;
+                }
             }
 
-            // NOTE: Do not insert the result into the operands list, as a
-            //       continuous assignment is just a property of the block
+            // NOTE: Do not insert the result into the operands list, as
+            //       assignments are a direct property of the block
+
+            // Clear RHS operands
+            m_operands.clear();
 
             break;
         }
@@ -218,25 +236,32 @@ void NXParser::resolveExpression(const Expression & expr) {
         case ExpressionKind::NamedValue: {
             auto & nval = expr.as<NamedValueExpression>();
 
+            auto holder = std::make_shared<NXBitHolder>();
             switch (nval.symbol.kind) {
                 // Handles 'wire'
                 case SymbolKind::Net: {
                     auto & sym = nval.symbol.as<NetSymbol>();
-                    std::cout << sym.name;
+                    PLOGI << "WIRE: " << sym.name;
+                    for (auto sig : m_expansions[static_cast<std::string>(sym.name)]) {
+                        holder->append(sig);
+                    }
                     break;
                 }
                 // Handles 'reg'
                 case SymbolKind::Variable: {
                     auto & sym = nval.symbol.as<VariableSymbol>();
-                    std::cout << sym.name;
+                    PLOGI << "REG: " << sym.name;
+                    for (auto sig : m_expansions[static_cast<std::string>(sym.name)]) {
+                        holder->append(sig);
+                    }
                     break;
                 }
                 default: {
-                    std::cout << "<UNSUPPORTED SYM: "
-                                << toString(nval.symbol.kind) << ">";
+                    PLOGE << "UNSUPPORTED SYM: " << toString(nval.symbol.kind);
                     break;
                 }
             }
+            m_operands.push_back(holder);
 
             break;
         }
@@ -309,6 +334,7 @@ void NXParser::resolveExpression(const Expression & expr) {
                        << "_" << std::dec << idx;
                 holder->append(m_module->get_signal(lookup.str()));
             }
+            m_operands.push_back(holder);
             break;
         }
 
@@ -509,20 +535,28 @@ void NXParser::resolveTimingControl (const TimingControl & ctrl) {
     switch (ctrl.kind) {
 
         case TimingControlKind::EventList: {
-            bool first = true;
-            for (const auto * event : ctrl.as<EventListControl>().events) {
-                if (!first) std::cout << ", ";
+            for (const auto * event : ctrl.as<EventListControl>().events)
                 resolveTimingControl(*event);
-                first = false;
-            }
             break;
         }
 
         case TimingControlKind::SignalEvent: {
-            EdgeKind     edge = ctrl.as<SignalEventControl>().edge;
-            const auto & expr = ctrl.as<SignalEventControl>().expr;
-            std::cout << toString(edge) << " ";
-            resolveExpression(expr);
+            resolveExpression(ctrl.as<SignalEventControl>().expr);
+            PLOGI << "NUM OPS: " << std::dec << m_operands.size();
+            assert(m_operands.size() == 1);
+            assert(m_operands.front()->m_bits.size() == 1);
+            switch (ctrl.as<SignalEventControl>().edge) {
+                case EdgeKind::PosEdge:
+                    m_pos_trig.push_back(m_operands.front()->m_bits[0]);
+                    break;
+                case EdgeKind::NegEdge:
+                    m_neg_trig.push_back(m_operands.front()->m_bits[0]);
+                    break;
+                default:
+                    assert(!"Unsupported edge");
+                    break;
+            }
+            m_operands.clear();
             break;
         }
 
@@ -536,23 +570,72 @@ void NXParser::resolveTimingControl (const TimingControl & ctrl) {
 }
 
 void NXParser::resolveStatement (const Statement & stmt) {
+    PLOGI << "RESOLVING STATEMENT: " << toString(stmt.kind);
     switch (stmt.kind) {
 
         case StatementKind::Timed: {
-            std::cout << "@(";
             resolveTimingControl(stmt.as<TimedStatement>().timing);
-            std::cout << ") ";
             resolveStatement(stmt.as<TimedStatement>().stmt);
             break;
         }
 
         case StatementKind::Conditional: {
-            std::cout << "if (";
+            // Get the conditional e.g. 'if (rst) ...'
+            // NOTE: This is coded around the strict assumption of simple
+            //       processes of the form - other forms may well break it
+            //
+            //          always @(posedge clk, posedge rst)
+            //              if (rst) my_var_q <= 'd0;
+            //              else     my_var_q <= my_var_d;
+            //
             resolveExpression(stmt.as<ConditionalStatement>().cond);
-            std::cout << ") ";
+            assert(m_operands.size() == 1);
+            assert(m_operands.front()->m_bits.size() == 1);
+            auto lcl_rst = m_operands.front()->m_bits[0];
+            m_proc_clk   = NULL;
+            m_proc_rst   = NULL;
+            for (auto bit : m_pos_trig) {
+                if (bit == lcl_rst) {
+                    m_proc_rst = bit;
+                } else {
+                    assert(m_proc_clk == NULL);
+                    m_proc_clk = bit;
+                }
+                if (m_proc_clk != NULL && m_proc_rst != NULL) break;
+            }
+            assert(m_proc_clk != NULL);
+            assert(m_proc_rst != NULL);
+            m_operands.clear();
+
+            // Get assignments in the true section
             resolveStatement(stmt.as<ConditionalStatement>().ifTrue);
-            std::cout << " else ";
+            std::map< std::string, std::shared_ptr<NXSignal> > all_true(m_proc_asgn);
+            m_proc_asgn.clear();
+
+            // Get assignments in the false section
             resolveStatement(*(stmt.as<ConditionalStatement>().ifFalse));
+            std::map< std::string, std::shared_ptr<NXSignal> > all_false(m_proc_asgn);
+            m_proc_asgn.clear();
+
+            // Create flops for each case
+            for (auto iter : all_true) {
+                std::string sig_name = iter.first;
+                auto        asgn_lhs = m_module->get_signal(sig_name);
+                auto        if_true  = iter.second;
+                auto        if_false = all_false[sig_name];
+                auto        flop     = std::make_shared<NXFlop>("flop");
+                PLOGI << "Creating flop - clk: " << m_proc_clk->m_name
+                                    << ", rst: " << m_proc_rst->m_name
+                                << ", rst_val: " << if_true->m_name
+                                      << ", D: " << if_false->m_name
+                                      << ", Q: " << asgn_lhs->m_name;
+                flop->m_clk     = m_proc_clk;
+                flop->m_rst     = m_proc_rst;
+                flop->m_rst_val = if_true;
+                flop->add_input(if_false);
+                flop->add_output(asgn_lhs);
+                asgn_lhs->add_input(flop);
+            }
             break;
         }
 
@@ -562,7 +645,7 @@ void NXParser::resolveStatement (const Statement & stmt) {
         }
 
         default: {
-            std::cout << "<UNSUPPORTED STMT: " << toString(stmt.kind) << ">";
+            PLOGE << "UNSUPPORTED STMT: " << toString(stmt.kind);
             assert(!"Hit unsupported statement");
             break;
         }
@@ -572,22 +655,32 @@ void NXParser::resolveStatement (const Statement & stmt) {
 
 // Handle procedural blocks (e.g. always/always_ff/always_comb)
 void NXParser::handle (const ProceduralBlockSymbol & symbol) {
-    std::cout << " + ";
+    // Guard against multiple entry
+    assert(!m_in_process);
+    m_in_process = true;
 
+    // Detect the process type
     switch (symbol.procedureKind) {
         case ProceduralBlockKind::Always: {
-            std::cout << "always ";
+            PLOGI << "RESOLVING PROC STATMENT";
             resolveStatement(symbol.getBody());
             break;
         }
         default: {
-            std::cout << "<UNSUPPORTED PROC: " << toString(symbol.procedureKind) << ">";
+            PLOGE << "UNSUPPORTED PROC: " << toString(symbol.procedureKind);
             assert(!"Hit unsupported procedural block");
             break;
         }
     }
 
-    std::cout << std::endl;
-
+    // Handle the contents
+    PLOGI << "VISITING PROCESS";
     visitDefault(symbol);
+
+    // Clear up
+    m_in_process = false;
+    m_pos_trig.clear();
+    m_neg_trig.clear();
+    m_proc_clk = NULL;
+    m_proc_rst = NULL;
 }

@@ -31,20 +31,12 @@ namespace Nexus {
         NXFlop ( std::string name );
 
         // =====================================================================
-        // Methods
-        // =====================================================================
-
-        void set_clk ( std::shared_ptr<NXSignal> clk ) { m_clk = clk; }
-        void set_rst ( std::shared_ptr<NXSignal> rst ) { m_rst = rst; }
-
-    private:
-
-        // =====================================================================
         // Members
         // =====================================================================
 
         std::shared_ptr<NXSignal> m_clk;
         std::shared_ptr<NXSignal> m_rst;
+        std::shared_ptr<NXSignal> m_rst_val;
 
     };
 

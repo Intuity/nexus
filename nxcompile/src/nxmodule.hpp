@@ -68,6 +68,7 @@ namespace Nexus {
 
         std::shared_ptr<NXSignal> get_signal ( std::string name )
         {
+            assert(m_signals.find(name) != m_signals.end());
             return m_signals[name];
         }
 
