@@ -49,7 +49,9 @@ namespace Nexus {
     {
     public:
 
+        // =====================================================================
         // Constructor
+        // =====================================================================
         NXParser ( )
             : ASTVisitor<NXParser, true, true> (       )
             , m_module                         ( NULL  )
@@ -57,6 +59,24 @@ namespace Nexus {
             , m_proc_clk                       ( NULL  )
             , m_proc_rst                       ( NULL  )
         { }
+
+        // =====================================================================
+        // Static Methods
+        // =====================================================================
+
+        static std::shared_ptr<NXModule> parse_from_file ( std::string path )
+        {
+            auto tree = slang::SyntaxTree::fromFile(path);
+            slang::Compilation compile;
+            compile.addSyntaxTree(tree);
+            NXParser ast;
+            compile.getRoot().visit(ast);
+            return ast.get_module();
+        }
+
+        // =====================================================================
+        // Methods
+        // =====================================================================
 
         // Handle module instances (e.g. `module my_module (...); ... endmodule`)
         void handle ( const InstanceSymbol & symbol );
@@ -89,6 +109,9 @@ namespace Nexus {
             for (auto holder : m_operands) width += holder->total_width();
             return width;
         }
+
+        // Get the parsed module
+        std::shared_ptr<NXModule> get_module (void) { return m_module; }
 
     private:
 

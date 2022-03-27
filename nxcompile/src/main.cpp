@@ -27,6 +27,7 @@
 #include <slang/syntax/SyntaxTree.h>
 
 #include "nxparser.hpp"
+#include "nxdump_sv.hpp"
 
 int main (int argc, const char ** argv) {
     // Initialize logging
@@ -40,7 +41,9 @@ int main (int argc, const char ** argv) {
     parser.add_options()
         // Debug/verbosity
         ("v,verbose", "Enable verbose output")
-        ("h,help",    "Print help and usage information");
+        ("h,help",    "Print help and usage information")
+        // Dump different stages
+        ("dump-parsed", "Dump logic immediately after parsing", cxxopts::value<std::string>());
 
     // Setup positional options
     parser.add_options()
@@ -67,13 +70,15 @@ int main (int argc, const char ** argv) {
     auto & positional = options["positional"].as<std::vector<std::string>>();
 
     // Parse syntax tree with Slang
-    auto tree = slang::SyntaxTree::fromFile(positional[0]);
+    PLOGI << "Starting to parse " << positional[0];
+    auto module = Nexus::NXParser::parse_from_file(positional[0]);
+    PLOGI << "Parsing return top-level " << module->m_name;
 
-    slang::Compilation compile;
-    compile.addSyntaxTree(tree);
-
-    Nexus::NXParser ast;
-    compile.getRoot().visit(ast);
+    // If requested, dump out parsed output
+    if (options.count("dump-parsed")) {
+        auto path = options["dump-parsed"].as<std::string>();
+        Nexus::dump_to_sv(module, path);
+    }
 
     return 0;
 }

@@ -13,25 +13,17 @@
 // limitations under the License.
 
 #include <memory>
+#include <string>
 
-#include "nxsignal.hpp"
+#include "nxmodule.hpp"
 
-#ifndef __NXWIRE_HPP__
-#define __NXWIRE_HPP__
+#ifndef __NXDUMP_HPP__
+#define __NXDUMP_HPP__
 
 namespace Nexus {
 
-    class NXWire : public NXSignal {
-    public:
-
-        // =====================================================================
-        // Constructor
-        // =====================================================================
-
-        NXWire ( std::string name );
-
-    };
+    void dump_to_sv ( std::shared_ptr<NXModule> module, std::string out_path );
 
 }
 
-#endif // __NXWIRE_HPP__
+#endif // __NXDUMP_HPP__

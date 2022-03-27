@@ -19,7 +19,6 @@
 #include "nxflop.hpp"
 #include "nxgate.hpp"
 #include "nxport.hpp"
-#include "nxwire.hpp"
 
 #ifndef __NXMODULE_HPP__
 #define __NXMODULE_HPP__
@@ -57,20 +56,22 @@ namespace Nexus {
             m_signals[flop->m_name] = flop;
         }
 
-        void add_wire ( std::shared_ptr<NXWire> wire )
+        void add_wire ( std::shared_ptr<NXSignal> wire )
         {
             m_wires.push_back(wire);
             m_signals[wire->m_name] = wire;
         }
 
-        std::shared_ptr<NXSignal> get_signal ( std::string name )
+        bool has_signal ( std::string name )
         {
-            assert(m_signals.find(name) != m_signals.end());
-            return m_signals[name];
+            return m_signals.find(name) != m_signals.end();
         }
 
-
-    private:
+        std::shared_ptr<NXSignal> get_signal ( std::string name )
+        {
+            assert(has_signal(name));
+            return m_signals[name];
+        }
 
         // =====================================================================
         // Members
@@ -80,7 +81,7 @@ namespace Nexus {
         std::vector< std::shared_ptr<NXPort> >             m_ports;
         std::vector< std::shared_ptr<NXGate> >             m_gates;
         std::vector< std::shared_ptr<NXFlop> >             m_flops;
-        std::vector< std::shared_ptr<NXWire> >             m_wires;
+        std::vector< std::shared_ptr<NXSignal> >           m_wires;
         std::map< std::string, std::shared_ptr<NXSignal> > m_signals;
 
     };

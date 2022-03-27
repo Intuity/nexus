@@ -54,7 +54,10 @@ namespace Nexus {
             return type == m_port_type;
         }
 
-    private:
+        static std::shared_ptr<NXPort> from_signal ( std::shared_ptr<NXSignal> signal )
+        {
+            return NXSignal::as<NXPort>(signal);
+        }
 
         // =====================================================================
         // Members
@@ -76,6 +79,15 @@ namespace Nexus {
         ) : NXPort ( name, NXPort::INPUT, 0 )
         { }
 
+        // =====================================================================
+        // Methods
+        // =====================================================================
+
+        static std::shared_ptr<NXPortIn> from_port ( std::shared_ptr<NXSignal> signal )
+        {
+            return NXSignal::as<NXPortIn>(signal);
+        }
+
     };
 
     class NXPortOut : public NXPort {
@@ -89,6 +101,15 @@ namespace Nexus {
               std::string name
         ) : NXPort ( name, NXPort::OUTPUT, -1, 0 )
         { }
+
+        // =====================================================================
+        // Methods
+        // =====================================================================
+
+        static std::shared_ptr<NXPortOut> from_port ( std::shared_ptr<NXSignal> signal )
+        {
+            return NXSignal::as<NXPortOut>(signal);
+        }
 
     };
 

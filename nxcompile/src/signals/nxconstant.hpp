@@ -30,7 +30,14 @@ namespace Nexus {
 
         NXConstant ( unsigned int value );
 
-    private:
+        // =====================================================================
+        // Methods
+        // =====================================================================
+
+        static std::shared_ptr<NXConstant> from_signal ( std::shared_ptr<NXSignal> signal )
+        {
+            return NXSignal::as<NXConstant>(signal);
+        }
 
         // =====================================================================
         // Members

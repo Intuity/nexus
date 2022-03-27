@@ -46,7 +46,14 @@ namespace Nexus {
 
         NXGate ( nxgate_op_t op );
 
-    private:
+        // =====================================================================
+        // Methods
+        // =====================================================================
+
+        static std::shared_ptr<NXGate> from_signal ( std::shared_ptr<NXSignal> signal )
+        {
+            return NXSignal::as<NXGate>(signal);
+        }
 
         // =====================================================================
         // Members

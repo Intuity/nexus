@@ -21,6 +21,7 @@
 #define __NXSIGNAL_HPP__
 
 namespace Nexus {
+
     class NXSignal {
     public:
 
@@ -41,6 +42,7 @@ namespace Nexus {
         // Constructor
         // =====================================================================
 
+        // Specialised constructor for derived types
         NXSignal (
               std::string     name
             , nxsignal_type_t type
@@ -50,6 +52,15 @@ namespace Nexus {
           , m_type        ( type        )
           , m_max_inputs  ( max_inputs  )
           , m_max_outputs ( max_outputs )
+        { }
+
+        // Simple constructor when used as a simple wire
+        NXSignal (
+              std::string name
+        ) : m_name        ( name )
+          , m_type        ( WIRE )
+          , m_max_inputs  ( 1    )
+          , m_max_outputs ( -1   )
         { }
 
         // =====================================================================
@@ -83,9 +94,10 @@ namespace Nexus {
             m_outputs.push_back(signal);
         }
 
-        template<typename T> T & as ( )
+        template<typename T>
+        static std::shared_ptr<T> as ( std::shared_ptr<NXSignal> ptr )
         {
-            return *static_cast<T *>(this);
+            return std::static_pointer_cast<T>(ptr);
         }
 
         // =====================================================================

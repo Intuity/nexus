@@ -12,12 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "nxgate.hpp"
 
 using namespace Nexus;
 
+static int gate_count = 0;
+
 NXGate::NXGate (
       NXGate::nxgate_op_t op
-) : NXSignal ( "", NXSignal::GATE )
-  , m_op     ( op                 )
-{ }
+) : NXSignal ( "nx_gate_" + std::to_string(gate_count), NXSignal::GATE )
+  , m_op     ( op                                                      )
+{
+    gate_count += 1;
+}

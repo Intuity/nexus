@@ -31,22 +31,31 @@ void NXParser::handle (const InstanceSymbol & symbol) {
 
 // Handle port declarations (e.g. `input logic [31:0] i_blah`)
 void NXParser::handle (const PortSymbol & symbol) {
+    std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
         // 1-bit wide signals
         ScalarType * s_type = (ScalarType *)&symbol.getType();
         // TODO: This should also create a flop if output is registered
-        switch (symbol.direction) {
-            case ArgumentDirection::In:
-                m_module->add_port(std::make_shared<NXPortIn>(static_cast<std::string>(symbol.name)));
-                break;
-            case ArgumentDirection::Out:
-                m_module->add_port(std::make_shared<NXPortOut>(static_cast<std::string>(symbol.name)));
-                break;
-            default:
-                PLOGE << "Port '" << symbol.name
-                      << "' has unsupported direction " << toString(symbol.direction);
-                assert(!"Bad direction");
-                break;
+        if (!m_module->has_signal(sig_name)) {
+            switch (symbol.direction) {
+                case ArgumentDirection::In: {
+                    auto port = std::make_shared<NXPortIn>(sig_name);
+                    m_module->add_port(port);
+                    m_expansions[sig_name] = NXSignalList({port});
+                    break;
+                }
+                case ArgumentDirection::Out: {
+                    auto port = std::make_shared<NXPortOut>(sig_name);
+                    m_module->add_port(port);
+                    m_expansions[sig_name] = NXSignalList({port});
+                    break;
+                }
+                default:
+                    PLOGE << "Port '" << sig_name << "' has bad direction "
+                          << toString(symbol.direction);
+                    assert(!"Bad direction");
+                    break;
+            }
         }
     } else if (symbol.getType().isPackedArray()) {
         // Multi-bit wide signals
@@ -55,22 +64,33 @@ void NXParser::handle (const PortSymbol & symbol) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
+            if (m_expansions.find(sig_name) == m_expansions.end()) {
+                m_expansions[sig_name] = NXSignalList();
+            }
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream port_name;
-                port_name << symbol.name << "_" << std::dec << idx;
-                switch (symbol.direction) {
-                    case ArgumentDirection::In:
-                        m_module->add_port(std::make_shared<NXPortIn>(port_name.str()));
-                        break;
-                    case ArgumentDirection::Out:
-                        m_module->add_port(std::make_shared<NXPortOut>(port_name.str()));
-                        break;
-                    default:
-                        PLOGE << "Port '" << port_name.str()
-                              << "' has unsupported direction "
-                              << toString(symbol.direction);
-                        assert(!"Bad direction");
-                        break;
+                port_name << sig_name << "_" << std::dec << idx;
+                if (!m_module->has_signal(port_name.str())) {
+                    switch (symbol.direction) {
+                        case ArgumentDirection::In: {
+                            auto port = std::make_shared<NXPortIn>(port_name.str());
+                            m_module->add_port(port);
+                            m_expansions[sig_name].push_back(port);
+                            break;
+                        }
+                        case ArgumentDirection::Out: {
+                            auto port = std::make_shared<NXPortOut>(port_name.str());
+                            m_module->add_port(port);
+                            m_expansions[sig_name].push_back(port);
+                            break;
+                        }
+                        default:
+                            PLOGE << "Port '" << port_name.str()
+                                << "' has unsupported direction "
+                                << toString(symbol.direction);
+                            assert(!"Bad direction");
+                            break;
+                    }
                 }
             }
         } else {
@@ -87,9 +107,13 @@ void NXParser::handle (const PortSymbol & symbol) {
 
 // Handle storage variables (e.g. `reg [31:0] foo`)
 void NXParser::handle (const VariableSymbol & symbol) {
-    ScalarType * s_type = (ScalarType *)&symbol.getType();
+    std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
-        m_module->add_flop(std::make_shared<NXFlop>(static_cast<std::string>(symbol.name)));
+        if (!m_module->has_signal(sig_name)) {
+            auto flop = std::make_shared<NXFlop>(sig_name);
+            m_module->add_flop(flop);
+            m_expansions[sig_name] = NXSignalList({flop});
+        }
     } else if (symbol.getType().isPackedArray()) {
         // Multi-bit wide signals
         PackedArrayType * p_type = (PackedArrayType *)&symbol.getType();
@@ -97,10 +121,17 @@ void NXParser::handle (const VariableSymbol & symbol) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
+            if (m_expansions.find(sig_name) == m_expansions.end()) {
+                m_expansions[sig_name] = NXSignalList();
+            }
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream flop_name;
-                flop_name << symbol.name << "_" << std::dec << idx;
-                m_module->add_flop(std::make_shared<NXFlop>(flop_name.str()));
+                flop_name << sig_name << "_" << std::dec << idx;
+                if (!m_module->has_signal(flop_name.str())) {
+                    auto flop = std::make_shared<NXFlop>(flop_name.str());
+                    m_module->add_flop(flop);
+                    m_expansions[sig_name].push_back(flop);
+                }
             }
         } else {
             PLOGE << " [PACKED ARRAY OF UNKNOWN TYPE]";
@@ -116,12 +147,14 @@ void NXParser::handle (const VariableSymbol & symbol) {
 
 // Handle net declarations (e.g. `wire [31:0] foo`)
 void NXParser::handle (const NetSymbol & symbol) {
-    ScalarType * s_type  = (ScalarType *)&symbol.getType();
     std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
-        auto wire = std::make_shared<NXWire>(sig_name);
-        m_module->add_wire(wire);
-        m_expansions[sig_name] = NXSignalList({wire});
+        if (!m_module->has_signal(sig_name)) {
+            PLOGI << "REGISTERING " << sig_name;
+            auto wire = std::make_shared<NXSignal>(sig_name);
+            m_module->add_wire(wire);
+            m_expansions[sig_name] = NXSignalList({wire});
+        }
 
     } else if (symbol.getType().isPackedArray()) {
         // Multi-bit wide signals
@@ -130,13 +163,18 @@ void NXParser::handle (const NetSymbol & symbol) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
-            m_expansions[sig_name] = NXSignalList();
+            if (m_expansions.find(sig_name) == m_expansions.end()) {
+                m_expansions[sig_name] = NXSignalList();
+            }
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream wire_name;
                 wire_name << sig_name << "_" << std::dec << idx;
-                auto wire = std::make_shared<NXWire>(wire_name.str());
-                m_module->add_wire(wire);
-                m_expansions[sig_name].push_back(wire);
+                if (!m_module->has_signal(wire_name.str())) {
+                    PLOGI << "REGISTERING " << wire_name.str();
+                    auto wire = std::make_shared<NXSignal>(wire_name.str());
+                    m_module->add_wire(wire);
+                    m_expansions[sig_name].push_back(wire);
+                }
             }
         } else {
             PLOGE << "PACKED ARRAY OF UNKNOWN TYPE";
@@ -171,20 +209,16 @@ void NXParser::resolveExpression(const Expression & expr) {
                     // Inside a process, add entries to the map
                     if (m_in_process) {
                         m_proc_asgn[lhs->m_bits[lhs_idx]->m_name] = rhs;
-                    // Outside a process, build a gate for each assignment
+                    // Outside a process, link from the previous term
                     } else {
-                        auto gate = std::make_shared<NXGate>(NXGate::ASSIGN);
-                        gate->add_output(lhs->m_bits[lhs_idx]);
-                        gate->add_input(rhs);
-                        lhs->m_bits[lhs_idx]->add_input(gate);
-                        rhs->add_output(gate);
-                        m_module->add_gate(gate);
+                        rhs->add_output(lhs->m_bits[lhs_idx]);
+                        lhs->m_bits[lhs_idx]->add_input(rhs);
                     }
                     lhs_idx++;
                 }
             }
 
-            // NOTE: Do not insert the result into the operands list, as
+            // NOTE: Do not insert a result into the operands list, as
             //       assignments are a direct property of the block
 
             // Clear RHS operands
@@ -572,7 +606,7 @@ void NXParser::resolveStatement (const Statement & stmt) {
             // Create flops for each case
             for (auto iter : all_true) {
                 std::string sig_name = iter.first;
-                auto        asgn_lhs = std::static_pointer_cast<NXFlop>(m_module->get_signal(sig_name));
+                auto        asgn_lhs = NXSignal::as<NXFlop>(m_module->get_signal(sig_name));
                 auto        if_true  = iter.second;
                 auto        if_false = all_false[sig_name];
                 PLOGI << "Flop - clk: " << m_proc_clk->m_name
@@ -581,8 +615,8 @@ void NXParser::resolveStatement (const Statement & stmt) {
                              << ", D: " << if_false->m_name
                              << ", Q: " << asgn_lhs->m_name;
                 // Link up the flop to supporting signals
-                asgn_lhs->m_clk     = m_proc_clk; // CLK
-                asgn_lhs->m_rst     = m_proc_rst; // RST
+                asgn_lhs->m_clock   = m_proc_clk; // CLK
+                asgn_lhs->m_reset   = m_proc_rst; // RST
                 asgn_lhs->m_rst_val = if_true;    // RST_VAL
                 asgn_lhs->add_input(if_false);    // D
                 asgn_lhs->add_output(asgn_lhs);   // Q

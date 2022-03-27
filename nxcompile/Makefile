@@ -19,6 +19,7 @@ all: build
 # Source directories
 CPP_SRC_DIRS += ./src/parser
 CPP_SRC_DIRS += ./src/signals
+CPP_SRC_DIRS += ./src/dump
 CPP_SRC_DIRS += ./src
 
 # Include directories
@@ -47,7 +48,7 @@ COMPILE_DEBUG ?= no
 # Compiler options
 CXX_OPTS += $(if $(findstring yes,$(COMPILE_DEBUG)),-g3,-O3)
 CXX_OPTS += -fPIC
-CXX_OPTS += -std=c++17
+CXX_OPTS += -std=c++20
 CXX_OPTS += $(foreach d,$(abspath $(CPP_INC_DIRS)),-I $(d))
 CXX_OPTS += $(shell python3 -m pybind11 --includes)
 CXX_OPTS += -pthread
