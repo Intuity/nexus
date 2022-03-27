@@ -281,6 +281,8 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
         }
 
         // Clean up dropped flops and gates
+        PLOGI << "Optimisation pass " << passes << " dropped " << to_drop.size()
+              << " flops/gates";
         for (auto entry : to_drop) {
             for (auto input : entry->m_inputs) input->remove_output(entry);
             entry->clear_inputs();
