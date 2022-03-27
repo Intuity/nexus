@@ -13,17 +13,11 @@
 // limitations under the License.
 
 #include <memory>
-#include <string>
 
 #include "nxmodule.hpp"
 
-#ifndef __NXDUMP_SV_HPP__
-#define __NXDUMP_SV_HPP__
-
 namespace Nexus {
 
-    void dump_to_sv ( std::shared_ptr<NXModule> module, std::string out_path );
+    void optimise_prune ( std::shared_ptr<NXModule> module );
 
 }
-
-#endif // __NXDUMP_SV_HPP__

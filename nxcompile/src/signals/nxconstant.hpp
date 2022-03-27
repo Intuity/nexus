@@ -28,7 +28,7 @@ namespace Nexus {
         // Constructor
         // =====================================================================
 
-        NXConstant ( unsigned int value );
+        NXConstant ( unsigned int value, int width = -1 );
 
         // =====================================================================
         // Methods
@@ -44,6 +44,7 @@ namespace Nexus {
         // =====================================================================
 
         unsigned int m_value;
+        int          m_width;
 
     };
 

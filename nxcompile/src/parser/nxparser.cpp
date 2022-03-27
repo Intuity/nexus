@@ -150,7 +150,6 @@ void NXParser::handle (const NetSymbol & symbol) {
     std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
         if (!m_module->has_signal(sig_name)) {
-            PLOGI << "REGISTERING " << sig_name;
             auto wire = std::make_shared<NXSignal>(sig_name);
             m_module->add_wire(wire);
             m_expansions[sig_name] = NXSignalList({wire});
@@ -170,7 +169,6 @@ void NXParser::handle (const NetSymbol & symbol) {
                 std::stringstream wire_name;
                 wire_name << sig_name << "_" << std::dec << idx;
                 if (!m_module->has_signal(wire_name.str())) {
-                    PLOGI << "REGISTERING " << wire_name.str();
                     auto wire = std::make_shared<NXSignal>(wire_name.str());
                     m_module->add_wire(wire);
                     m_expansions[sig_name].push_back(wire);
@@ -265,7 +263,9 @@ void NXParser::resolveExpression(const Expression & expr) {
 
             auto holder = std::make_shared<NXBitHolder>();
             for (unsigned int idx = 0; idx < width; idx++) {
-                holder->append(std::make_shared<NXConstant>((value >> idx) & 0x1));
+                holder->append(std::make_shared<NXConstant>(
+                    (value >> idx) & 0x1, 1
+                ));
             }
             m_operands.push_back(holder);
 
@@ -609,11 +609,11 @@ void NXParser::resolveStatement (const Statement & stmt) {
                 auto        asgn_lhs = NXSignal::as<NXFlop>(m_module->get_signal(sig_name));
                 auto        if_true  = iter.second;
                 auto        if_false = all_false[sig_name];
-                PLOGI << "Flop - clk: " << m_proc_clk->m_name
-                           << ", rst: " << m_proc_rst->m_name
-                       << ", rst_val: " << if_true->m_name
-                             << ", D: " << if_false->m_name
-                             << ", Q: " << asgn_lhs->m_name;
+                // PLOGI << "Flop - clk: " << m_proc_clk->m_name
+                //            << ", rst: " << m_proc_rst->m_name
+                //        << ", rst_val: " << if_true->m_name
+                //              << ", D: " << if_false->m_name
+                //              << ", Q: " << asgn_lhs->m_name;
                 // Link up the flop to supporting signals
                 asgn_lhs->m_clock   = m_proc_clk; // CLK
                 asgn_lhs->m_reset   = m_proc_rst; // RST

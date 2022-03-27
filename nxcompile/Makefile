@@ -19,6 +19,7 @@ all: build
 # Source directories
 CPP_SRC_DIRS += ./src/parser
 CPP_SRC_DIRS += ./src/signals
+CPP_SRC_DIRS += ./src/opt
 CPP_SRC_DIRS += ./src/dump
 CPP_SRC_DIRS += ./src
 

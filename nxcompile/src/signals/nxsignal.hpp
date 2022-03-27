@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <assert.h>
 #include <memory>
 #include <string>
@@ -88,10 +89,34 @@ namespace Nexus {
             m_inputs.push_back(signal);
         }
 
+        void remove_input ( std::shared_ptr<NXSignal> signal )
+        {
+            auto pos = std::find(m_inputs.begin(), m_inputs.end(), signal);
+            assert(pos != m_inputs.end());
+            m_inputs.erase(pos);
+        }
+
+        void clear_inputs ( void )
+        {
+            m_inputs.clear();
+        }
+
         void add_output ( std::shared_ptr<NXSignal> signal )
         {
             assert(m_max_outputs < 0 || (m_outputs.size() < m_max_outputs));
             m_outputs.push_back(signal);
+        }
+
+        void remove_output ( std::shared_ptr<NXSignal> signal )
+        {
+            auto pos = std::find(m_outputs.begin(), m_outputs.end(), signal);
+            assert(pos != m_outputs.end());
+            m_outputs.erase(pos);
+        }
+
+        void clear_outputs ( void )
+        {
+            m_outputs.clear();
         }
 
         template<typename T>

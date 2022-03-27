@@ -16,8 +16,15 @@
 
 using namespace Nexus;
 
+static int constant_count = 0;
+
 NXConstant::NXConstant (
       unsigned int value
-) : NXSignal ( std::to_string(value), NXSignal::CONSTANT, 0 )
-  , m_value  ( value                                        )
+    , int          width /* = -1 */
+) : NXSignal (
+        "nx_const_" + std::to_string(constant_count) + "_eq_" + std::to_string(value),
+        NXSignal::CONSTANT, 0
+    )
+  , m_value ( value )
+  , m_width ( width )
 { }

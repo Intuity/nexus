@@ -17,13 +17,13 @@
 
 #include "nxmodule.hpp"
 
-#ifndef __NXDUMP_SV_HPP__
-#define __NXDUMP_SV_HPP__
+#ifndef __NXDUMP_STATS_HPP__
+#define __NXDUMP_STATS_HPP__
 
 namespace Nexus {
 
-    void dump_to_sv ( std::shared_ptr<NXModule> module, std::string out_path );
+    std::string dump_stats ( std::shared_ptr<NXModule> module );
 
 }
 
-#endif // __NXDUMP_SV_HPP__
+#endif // __NXDUMP_STATS_HPP__
