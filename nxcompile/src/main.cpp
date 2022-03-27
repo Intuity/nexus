@@ -75,35 +75,35 @@ int main (int argc, const char ** argv) {
     auto & positional = options["positional"].as<std::vector<std::string>>();
 
     // Parse syntax tree with Slang
-    PLOGI << "Starting to parse " << positional[0];
+    PLOGI << "Starting to parse '" << positional[0] << "'";
     auto module = Nexus::NXParser::parse_from_file(positional[0]);
-    PLOGI << "Parsing return top-level " << module->m_name;
+    PLOGI << "Parser returned top-level '" << module->m_name << "'";
 
     // Dump base statistics
-    PLOGI << Nexus::dump_stats(module);
+    std::cout << Nexus::dump_rtl_stats(module);
 
     // If requested, dump out parsed output
     if (options.count("dump-parsed"))
         Nexus::dump_to_sv(module, options["dump-parsed"].as<std::string>());
 
     // Prune, and then possibly dump
-    PLOGI << "Pruning top-level " << module->m_name;
+    PLOGI << "Pruning top-level '" << module->m_name << "'";
     Nexus::optimise_prune(module);
     if (options.count("dump-pruned"))
         Nexus::dump_to_sv(module, options["dump-pruned"].as<std::string>());
 
     // Dump pruned statistics
-    PLOGI << Nexus::dump_stats(module);
+    std::cout << Nexus::dump_rtl_stats(module);
 
     // Propagate constants, prune, and then possibly dump
-    PLOGI << "Propagating constants in top-level " << module->m_name;
+    PLOGI << "Propagating constants in top-level '" << module->m_name << "'";
     Nexus::optimise_propagate(module);
     Nexus::optimise_prune(module);
     if (options.count("dump-propagated"))
         Nexus::dump_to_sv(module, options["dump-propagated"].as<std::string>());
 
     // Dump propagated statistics
-    PLOGI << Nexus::dump_stats(module);
+    std::cout << Nexus::dump_rtl_stats(module);
 
     return 0;
 }

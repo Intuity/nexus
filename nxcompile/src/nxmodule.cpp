@@ -21,6 +21,4 @@ using namespace Nexus;
 NXModule::NXModule (
     std::string name
 ) : m_name ( name )
-{
-    std::cout << "NXModule C++" << std::endl;
-}
+{ }

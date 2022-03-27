@@ -22,7 +22,7 @@
 
 namespace Nexus {
 
-    std::string dump_stats ( std::shared_ptr<NXModule> module );
+    std::string dump_rtl_stats ( std::shared_ptr<NXModule> module );
 
 }
 

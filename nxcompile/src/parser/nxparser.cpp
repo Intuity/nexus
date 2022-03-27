@@ -24,7 +24,6 @@ using namespace slang;
 
 // Handle module instances (e.g. `module my_module (...); ... endmodule`)
 void NXParser::handle (const InstanceSymbol & symbol) {
-    std::cout << "INSTANCE: " << symbol.name << std::endl;
     m_module = std::make_shared<NXModule>(static_cast<std::string>(symbol.name));
     visitDefault(symbol);
 }

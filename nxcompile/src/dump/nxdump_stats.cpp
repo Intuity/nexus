@@ -16,11 +16,11 @@
 
 #include "nxdump_stats.hpp"
 
-std::string Nexus::dump_stats ( std::shared_ptr<NXModule> module )
+std::string Nexus::dump_rtl_stats ( std::shared_ptr<NXModule> module )
 {
     std::stringstream ss;
     ss << std::endl;
-    ss << "========================== [ STATISTICS ] ==========================" << std::endl;
+    ss << "======================== [ RTL STATISTICS ] ========================" << std::endl;
     ss << "Top-Level: " << module->m_name << std::endl;
     ss << "Ports    : " << std::dec << module->m_ports.size() << std::endl;
     ss << "Gates    : " << std::dec << module->m_gates.size() << std::endl;
