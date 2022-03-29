@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -125,6 +126,31 @@ namespace Nexus {
             return std::static_pointer_cast<T>(ptr);
         }
 
+        void set_tag ( std::string key, std::string value )
+        {
+            m_tags[key] = value;
+        }
+
+        void set_tag ( std::string key, int value )
+        {
+            return set_tag(key, std::to_string(value));
+        }
+
+        bool has_tag ( std::string key )
+        {
+            return m_tags.count(key);
+        }
+
+        std::string get_tag ( std::string key, std::string def_val = "N/A" )
+        {
+            return has_tag(key) ? m_tags[key] : def_val;
+        }
+
+        int get_tag_int ( std::string key, int def_val = -1 )
+        {
+            return std::stoi(get_tag(key, std::to_string(def_val)));
+        }
+
         // =====================================================================
         // Members
         // =====================================================================
@@ -137,6 +163,7 @@ namespace Nexus {
         std::shared_ptr<NXSignal>              m_reset;
         std::vector<std::shared_ptr<NXSignal>> m_inputs;
         std::vector<std::shared_ptr<NXSignal>> m_outputs;
+        std::map<std::string, std::string>     m_tags;
 
     };
 

@@ -31,6 +31,7 @@
 #include "nxdump_sv.hpp"
 #include "nxopt_propagate.hpp"
 #include "nxopt_prune.hpp"
+#include "nxpartitioner.hpp"
 
 int main (int argc, const char ** argv) {
     // Initialize logging
@@ -48,7 +49,14 @@ int main (int argc, const char ** argv) {
         // Dump different stages
         ("dump-parsed",     "Dump logic immediately after parsing",  cxxopts::value<std::string>())
         ("dump-pruned",     "Dump logic after pruning",              cxxopts::value<std::string>())
-        ("dump-propagated", "Dump logic after constant propagation", cxxopts::value<std::string>());
+        ("dump-propagated", "Dump logic after constant propagation", cxxopts::value<std::string>())
+        // Mesh configuration
+        ("rows",    "Rows in the mesh",    cxxopts::value<unsigned int>()->default_value("10"))
+        ("columns", "Columns in the mesh", cxxopts::value<unsigned int>()->default_value("10"))
+        // Node configuration
+        ("node-inputs",  "Number of inputs to each node",    cxxopts::value<unsigned int>()->default_value("32"))
+        ("node-outputs", "Number of outputs from each node", cxxopts::value<unsigned int>()->default_value("32"))
+        ("node-working", "Working registers per node",       cxxopts::value<unsigned int>()->default_value("16"));
 
     // Setup positional options
     parser.add_options()
@@ -104,6 +112,15 @@ int main (int argc, const char ** argv) {
 
     // Dump propagated statistics
     std::cout << Nexus::dump_rtl_stats(module);
+
+    // Partition the design
+    PLOGI << "Running the partitioner";
+    unsigned int nd_inputs  = options["node-inputs" ].as<unsigned int>();
+    unsigned int nd_outputs = options["node-outputs"].as<unsigned int>();
+    auto part = std::make_shared<Nexus::NXPartitioner>(
+        module, nd_inputs, nd_outputs
+    );
+    part->run();
 
     return 0;
 }
