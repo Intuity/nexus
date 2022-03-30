@@ -36,12 +36,19 @@ std::shared_ptr<NXSignal> NXPartition::chase_to_source (
 // branch followed
 //
 std::vector< std::shared_ptr<NXSignal> > NXPartition::chase_to_targets (
-    std::shared_ptr<NXSignal> ptr
+      std::shared_ptr<NXSignal> ptr
+    , bool                      thru_gates /* =false */
 ) {
     std::vector< std::shared_ptr<NXSignal> > vector;
-    if (ptr->m_type != NXSignal::WIRE) {
+    if (
+        (ptr->m_type != NXSignal::WIRE               ) &&
+        (!thru_gates || ptr->m_type != NXSignal::GATE)
+    ) {
         vector.push_back(ptr);
     } else {
+        // Always track gates (even if thru_gates is true)
+        if (ptr->m_type == NXSignal::GATE) vector.push_back(ptr);
+        // Search through outputs
         for (auto output : ptr->m_outputs) {
             auto recurse = chase_to_targets(output);
             vector.insert(vector.end(), recurse.begin(), recurse.end());
@@ -141,20 +148,52 @@ void NXPartitioner::run ( void )
     PLOGI << first->announce();
 
     // Loop until all partitions fit into the available I/O
-    bool all_fit = true;
+    bool         all_fit = true;
+    unsigned int part_idx = 1;
     do {
         // Reset marker to break out on a clean pass
         all_fit = true;
         // Iterate through partitions
-        for (auto part : m_partitions) {
+        // NOTE: lhs/rhs do not have a physical connotation other that signifying
+        //       two sides of the partition boundary
+        std::list< std::shared_ptr<NXPartition> > new_partitions;
+        for (auto lhs : m_partitions) {
             // Test to see if the partition fits within the budget
-            all_fit &= part->fits(m_node_inputs, m_node_outputs);
-            if (all_fit) break;
-            // Divide into two roughly equal sub-partitions
-            PLOGI << "Dividing partition " << std::dec << part->m_index;
+            if (lhs->fits(m_node_inputs, m_node_outputs)) continue;
+            all_fit = false;
+            // Form a new partition
+            auto rhs = std::make_shared<NXPartition>(part_idx, shared_from_this());
+            new_partitions.push_back(rhs);
+            part_idx += 1;
+            // Move half the flops into the new partition
+            while (lhs->m_flops.size() > rhs->m_flops.size()) {
+                rhs->add(lhs->m_flops.front());
+                lhs->m_flops.pop_front();
+            }
+            // Move fan-out logic from the flops into the new partition
+            for (auto flop : rhs->m_flops) {
+                for (auto output : flop->m_outputs) {
+                    for (auto target : lhs->chase_to_targets(output, true)) {
+                        // Skip outputs which aren't gates
+                        if (target->m_type != NXSignal::GATE) continue;
+                        // Skip gates which aren't associated to the LHS partition
+                        if (target->get_tag_int("partition") != lhs->m_index) continue;
+                        // Move the gate
+                        auto gate = NXGate::from_signal(target);
+                        rhs->add(gate);
+                        lhs->m_gates.remove(gate);
+                    }
+                }
+            }
+            // Report on the partitions formed
+            PLOGI << "LHS: " << lhs->announce();
+            PLOGI << "RHS: " << rhs->announce();
         }
 
+        // Merge all new partitions into the main list
+        m_partitions.insert(m_partitions.end(), new_partitions.begin(), new_partitions.end());
+
         // TODO: Temporary break
-        break;
+        if (part_idx > 10) break;
     } while (!all_fit);
 }

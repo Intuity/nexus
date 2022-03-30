@@ -71,7 +71,8 @@ namespace Nexus {
         );
 
         std::vector< std::shared_ptr<NXSignal> > chase_to_targets (
-            std::shared_ptr<NXSignal> ptr
+              std::shared_ptr<NXSignal> ptr
+            , bool                      thru_gates=false
         );
 
         unsigned int required_inputs (void);
