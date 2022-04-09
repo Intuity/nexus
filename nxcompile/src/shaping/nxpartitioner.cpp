@@ -50,111 +50,99 @@ std::vector< std::shared_ptr<NXSignal> > NXPartition::chase_to_targets (
         if (ptr->m_type == NXSignal::GATE) vector.push_back(ptr);
         // Search through outputs
         for (auto output : ptr->m_outputs) {
-            auto recurse = chase_to_targets(output);
+            auto recurse = NXPartition::chase_to_targets(output);
             vector.insert(vector.end(), recurse.begin(), recurse.end());
         }
     }
     return vector;
 }
 
-unsigned int NXPartition::required_inputs (void)
-{
-    unsigned int total = 0;
-    // All flops must be inputs due to hardware architecture
-    total += m_flops.size();
-    // Search all gates for inputs coming from other partitions
-    std::set<std::shared_ptr<NXSignal>> external;
-    for (auto gate : m_gates) {
-        for (auto input : gate->m_inputs) {
-            // Chase back to the first significant signal
-            auto sig = chase_to_source(input);
-            // Skip constants
-            if (sig->m_type == NXSignal::CONSTANT) continue;
-            // Check this is a supported type
-            assert(
-                (sig->m_type == NXSignal::GATE) ||
-                (sig->m_type == NXSignal::FLOP) ||
-                (sig->m_type == NXSignal::PORT)
-            );
-            // Check the partition on the input
-            if (sig->get_tag_int("partition") != m_index) {
-                external.insert(sig);
-            }
-        }
+std::set<std::shared_ptr<NXSignal>> NXPartition::trace_inputs (
+    std::shared_ptr<NXSignal> root
+) {
+    std::set<std::shared_ptr<NXSignal>> traced;
+    for (auto input : root->m_inputs) {
+        // Chase back to the first flop/gate on the path
+        auto source = NXPartition::chase_to_source(input);
+        // Skip over constants
+        if (source->m_type == NXSignal::CONSTANT) continue;
+        // Check this is a supported type
+        assert(
+            (source->m_type == NXSignal::GATE) ||
+            (source->m_type == NXSignal::FLOP) ||
+            (source->m_type == NXSignal::PORT)
+        );
+        // Check the partition on the signal
+        if (source->get_tag_int("partition") != m_index) traced.insert(source);
     }
-    total += external.size();
-    // Return the total number of inputs
-    return total;
+    return traced;
 }
 
-unsigned int NXPartition::required_outputs (void)
+std::set<std::shared_ptr<NXSignal>> NXPartition::trace_outputs (
+    std::shared_ptr<NXSignal> root
+) {
+    std::set<std::shared_ptr<NXSignal>> traced;
+    for (auto output : root->m_outputs) {
+        for (auto target : NXPartition::chase_to_targets(output)) {
+            // Check this is a supported type
+            assert(
+                (target->m_type == NXSignal::GATE) ||
+                (target->m_type == NXSignal::FLOP) ||
+                (target->m_type == NXSignal::PORT)
+            );
+            // Check the partition on the signal
+            if (target->get_tag_int("partition") != m_index) traced.insert(target);
+        }
+    }
+    return traced;
+}
+
+std::map<std::shared_ptr<NXSignal>, unsigned int> NXPartition::required_inputs (void)
 {
-    // Search for all gates which drive other partitions
-    std::set<std::shared_ptr<NXSignal>> external;
+    std::map<std::shared_ptr<NXSignal>, unsigned int> external;
+    // Trace all gates that take external inputs
     for (auto gate : m_gates) {
-        for (auto output : gate->m_outputs) {
-            for (auto sig : chase_to_targets(output)) {
-                // Check this is a supported type
-                assert(
-                    (sig->m_type == NXSignal::GATE) ||
-                    (sig->m_type == NXSignal::FLOP) ||
-                    (sig->m_type == NXSignal::PORT)
-                );
-                // Skip target signals which are internal to this partition
-                if (sig->get_tag_int("partition") == m_index) continue;
-                // Collect the driving gate
-                external.insert(gate);
-                break;
-            }
+        for (auto input : trace_inputs(gate)) {
+            if (!external.count(input)) external[input] = 0;
+            external[input] += 1;
         }
     }
-    // Search for all flops which drive external I/O ports
+    // All flops, regardless of whether they are looped back, consume an input
+    // NOTE: This is an artefact of the hardware
     for (auto flop : m_flops) {
-        for (auto output : flop->m_outputs) {
-            for (auto sig : chase_to_targets(output)) {
-                // Skip anything except ports
-                if (sig->m_type != NXSignal::PORT) continue;
-                // Collect the driving flop
-                external.insert(flop);
-                break;
-            }
+        auto input = chase_to_source(flop->m_inputs[0]);
+        if (!external.count(input)) external[input] = 0;
+        external[input] += 1;
+    }
+    return external;
+}
+
+std::map<std::shared_ptr<NXSignal>, unsigned int> NXPartition::required_outputs (void)
+{
+    std::map<std::shared_ptr<NXSignal>, unsigned int> external;
+    for (auto node : all_flops_and_gates()) {
+        for (auto output : trace_outputs(node)) {
+            if (!external.count(output)) external[output] = 0;
+            external[output] += 1;
         }
     }
-    // Return the total number of outputs
-    return external.size();
+    return external;
 }
 
 bool NXPartition::fits ( unsigned int node_inputs, unsigned int node_outputs )
 {
     return (
-        (required_inputs()  <= node_inputs ) &&
-        (required_outputs() <= node_outputs)
+        (required_inputs().size()  <= node_inputs ) &&
+        (required_outputs().size() <= node_outputs)
     );
 }
 
-bool should_move (
-      std::shared_ptr<NXSignal>    signal
-    , std::shared_ptr<NXPartition> from
-    , std::shared_ptr<NXPartition> to
-) {
-    unsigned int ref_from = 0;
-    unsigned int ref_to   = 0;
-    // Consider each input
-    for (auto input : signal->m_inputs) {
-        int in_part = from->chase_to_source(input)->get_tag_int("partition");
-        if (in_part == from->m_index) ref_from += 1;
-        if (in_part == to->m_index  ) ref_to   += 1;
-    }
-    // Consider each output
-    for (auto output : signal->m_outputs) {
-        for (auto target : from->chase_to_targets(output, true)) {
-            int out_part = target->get_tag_int("partition");
-            if (out_part == from->m_index) ref_from += 1;
-            if (out_part == to->m_index  ) ref_to   += 1;
-        }
-    }
-    // Return if more references found to 'to' than 'from'
-    return ref_to > ref_from;
+std::list< std::shared_ptr<NXSignal> > NXPartition::all_flops_and_gates ( void )
+{
+    std::list< std::shared_ptr<NXSignal> > all_sigs;
+    for (auto gate : m_gates) all_sigs.push_back(gate);
+    for (auto flop : m_flops) all_sigs.push_back(flop);
+    return all_sigs;
 }
 
 void NXPartitioner::run ( void )
@@ -181,69 +169,128 @@ void NXPartitioner::run ( void )
             if (lhs->fits(m_node_inputs, m_node_outputs)) continue;
             all_fit = false;
             PLOGI << lhs->announce();
-            // Form a new partition
+            // Roughly bisect the existing partition, arbitrarily moving gates & flops
             auto rhs = std::make_shared<NXPartition>(part_idx, shared_from_this());
             new_partitions.push_back(rhs);
             part_idx += 1;
-            // Move half the flops into the new partition
             while (lhs->m_flops.size() > rhs->m_flops.size()) {
                 rhs->add(lhs->m_flops.front());
                 lhs->m_flops.pop_front();
             }
-            // Move half the gates into the new partition
             while (lhs->m_gates.size() > rhs->m_gates.size()) {
                 rhs->add(lhs->m_gates.front());
                 lhs->m_gates.pop_front();
             }
-            // Run multiple passes to refine the partition
-            for (int pass = 0; pass < 10; pass++) {
-                unsigned int moves = 0;
-                // Move LHS flops that are attached to more logic on the RHS
-                for (auto flop : std::list<std::shared_ptr<NXFlop>>(lhs->m_flops)) {
-                    if (should_move(flop, lhs, rhs)) {
-                        rhs->add(flop);
-                        lhs->m_flops.remove(flop);
-                        moves++;
+
+            // Log pre-optimisation state
+            PLOGI << "Pre-optimisation:";
+            PLOGI << " - LHS: " << lhs->announce();
+            PLOGI << " - RHS: " << rhs->announce();
+
+            // Use a KL algorithm to minimise cost of the partition
+            PLOGI << "Executing KL optimisation:";
+            for (unsigned int pass = 0; pass < 10; pass++) {
+                // Track if a swap was made
+                unsigned int swap_count = 0;
+
+                // Take a copy of LHS & RHS arrays
+                auto all_lhs = lhs->all_flops_and_gates();
+                auto all_rhs = rhs->all_flops_and_gates();
+
+                // Determine baseline I/O for LHS/RHS at this point
+                auto lhs_inputs  = lhs->required_inputs();
+                auto lhs_outputs = lhs->required_outputs();
+                auto rhs_inputs  = rhs->required_inputs();
+                auto rhs_outputs = rhs->required_outputs();
+
+                // Sum up the I/O counts
+                unsigned int lhs_base_ios = 0;
+                unsigned int rhs_base_ios = 0;
+                for (auto entry : lhs_inputs ) lhs_base_ios += entry.second;
+                for (auto entry : lhs_outputs) lhs_base_ios += entry.second;
+                for (auto entry : rhs_inputs ) rhs_base_ios += entry.second;
+                for (auto entry : rhs_outputs) rhs_base_ios += entry.second;
+
+                // Iterate through all gates/flops in the LHS
+                for (auto lhs_sig : all_lhs) {
+                    unsigned int lhs_trial_ios = lhs_base_ios;
+                    unsigned int rhs_trial_ios = rhs_base_ios;
+
+                    // Make adjustments to LHS I/O counts
+                    auto lhs_orig_inputs  = lhs->trace_inputs(lhs_sig);
+                    auto lhs_orig_outputs = lhs->trace_outputs(lhs_sig);
+                    lhs_trial_ios -= lhs_orig_inputs.size() + lhs_orig_outputs.size();
+                    // Move the LHS signal to the RHS
+                    lhs->remove(lhs_sig);
+                    rhs->add(lhs_sig);
+                    // Make adjustments to the RHS I/O counts
+                    auto lhs_move_inputs  = rhs->trace_inputs(lhs_sig);
+                    auto lhs_move_outputs = rhs->trace_outputs(lhs_sig);
+                    rhs_trial_ios += lhs_move_inputs.size() + lhs_move_outputs.size();
+
+                    // Iterate through all gates/flops in the RHS
+                    for (auto rhs_sig : all_rhs) {
+                        // Skip if already marked as swapped in this pass
+                        if (rhs_sig->get_tag_int("swapped", 0)) continue;
+
+                        // Make adjustments to RHS I/O counts
+                        auto rhs_orig_inputs  = rhs->trace_inputs(rhs_sig);
+                        auto rhs_orig_outputs = rhs->trace_outputs(rhs_sig);
+                        unsigned int rhs_cand_ios = rhs_trial_ios - rhs_orig_inputs.size() + rhs_orig_outputs.size();
+                        // Move the RHS signal to the LHS
+                        rhs->remove(rhs_sig);
+                        lhs->add(rhs_sig);
+                        // Make adjustments to the LHS I/O counts
+                        auto rhs_move_inputs  = lhs->trace_inputs(rhs_sig);
+                        auto rhs_move_outputs = lhs->trace_outputs(rhs_sig);
+                        unsigned int lhs_cand_ios = lhs_trial_ios + rhs_move_inputs.size() + rhs_move_outputs.size();
+
+                        // Does this move yield a net improvement?
+                        if ((lhs_cand_ios + rhs_cand_ios) < (lhs_base_ios + rhs_base_ios)) {
+                            // PLOGI << " - Swapping " << lhs_sig->m_name
+                            //       << " with " << rhs_sig->m_name;
+                            // Mark that a swap happened
+                            swap_count += 1;
+                            // Update base I/O counts with these new values
+                            lhs_base_ios = lhs_cand_ios;
+                            rhs_base_ios = rhs_cand_ios;
+                            // Mark signals as swapped
+                            lhs_sig->set_tag("swapped", 1);
+                            rhs_sig->set_tag("swapped", 1);
+                            break;
+                        // Otherwise, move signal back to RHS
+                        } else {
+                            lhs->remove(rhs_sig);
+                            rhs->add(rhs_sig);
+                        }
+                    }
+                    // If LHS signal not marked for swap, move it back
+                    if (!lhs_sig->get_tag_int("swapped", 0)) {
+                        rhs->remove(lhs_sig);
+                        lhs->add(lhs_sig);
                     }
                 }
-                // Move LHS gates that are attached to more logic on the RHS
-                for (auto gate : std::list<std::shared_ptr<NXGate>>(lhs->m_gates)) {
-                    if (should_move(gate, lhs, rhs)) {
-                        rhs->add(gate);
-                        lhs->m_gates.remove(gate);
-                        moves++;
-                    }
-                }
-                // Move RHS flops that are attached to more logic on the LHS
-                for (auto flop : std::list<std::shared_ptr<NXFlop>>(rhs->m_flops)) {
-                    if (should_move(flop, rhs, lhs)) {
-                        lhs->add(flop);
-                        rhs->m_flops.remove(flop);
-                        moves++;
-                    }
-                }
-                // Move RHS gates that are attached to more logic on the LHS
-                for (auto gate : std::list<std::shared_ptr<NXGate>>(rhs->m_gates)) {
-                    if (should_move(gate, rhs, lhs)) {
-                        lhs->add(gate);
-                        rhs->m_gates.remove(gate);
-                        moves++;
-                    }
-                }
-                // Log number of moves being made
-                PLOGI << " - " << moves << " moves made on pass " << pass;
-                if (moves == 0) break;
+
+                // Stop searching if no swaps were made in this pass
+                PLOGI << "KL pass " << std::dec << pass << " made "
+                      << swap_count << " swaps:";
+                PLOGI << " - LHS: " << lhs->announce();
+                PLOGI << " - RHS: " << rhs->announce();
+                if (swap_count == 0) break;
+
+                // Reset all swap markers
+                for (auto lhs_sig : all_lhs) lhs_sig->set_tag("swapped", 0);
+                for (auto rhs_sig : all_rhs) rhs_sig->set_tag("swapped", 0);
             }
+
             // Report on the partitions formed
+            PLOGI << "Step summary:";
             PLOGI << " - LHS: " << lhs->announce();
             PLOGI << " - RHS: " << rhs->announce();
         }
 
         // Merge all new partitions into the main list
         m_partitions.insert(m_partitions.end(), new_partitions.begin(), new_partitions.end());
-
-        // TODO: Temporary break
-        if (part_idx > 20) break;
     } while (!all_fit);
     PLOGI << "Partitioning summary:";
     for (auto part : m_partitions) {

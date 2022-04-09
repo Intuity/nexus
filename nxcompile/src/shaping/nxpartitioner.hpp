@@ -15,8 +15,10 @@
 #ifndef __NXPARTITION_HPP__
 #define __NXPARTITION_HPP__
 
+#include <assert.h>
 #include <list>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <vector>
 
@@ -58,28 +60,76 @@ namespace Nexus {
             m_gates.push_back(gate);
         }
 
+        void add ( std::shared_ptr<NXSignal> signal )
+        {
+            switch (signal->m_type) {
+                case NXSignal::GATE:
+                    add(NXGate::from_signal(signal));
+                    break;
+                case NXSignal::FLOP:
+                    add(NXFlop::from_signal(signal));
+                    break;
+                default: assert(!"Unsupported signal type");
+            }
+        }
+
+        void remove ( std::shared_ptr<NXFlop> flop )
+        {
+            m_flops.remove(flop);
+        }
+
+        void remove ( std::shared_ptr<NXGate> gate )
+        {
+            m_gates.remove(gate);
+        }
+
+        void remove ( std::shared_ptr<NXSignal> signal )
+        {
+            switch (signal->m_type) {
+                case NXSignal::GATE:
+                    remove(NXGate::from_signal(signal));
+                    break;
+                case NXSignal::FLOP:
+                    remove(NXFlop::from_signal(signal));
+                    break;
+                default: assert(!"Unsupported signal type");
+            }
+        }
+
         std::string announce ( void )
         {
+            unsigned int req_ins  = required_inputs().size();
+            unsigned int req_outs = required_outputs().size();
             std::stringstream ss;
             ss << "Partition " << std::dec << m_index << " has "
                << m_flops.size() << " flops and " << m_gates.size()
-               << " gates and needs " << required_inputs() << " inputs and "
-               << required_outputs() << " outputs";
+               << " gates and needs " << req_ins << " inputs and " << req_outs
+               << " outputs (total: " << (req_ins + req_outs) << ")";
             return ss.str();
         }
 
-        std::shared_ptr<NXSignal> chase_to_source (
+        static std::shared_ptr<NXSignal> chase_to_source (
             std::shared_ptr<NXSignal> ptr
         );
 
-        std::vector< std::shared_ptr<NXSignal> > chase_to_targets (
+        static std::vector< std::shared_ptr<NXSignal> > chase_to_targets (
               std::shared_ptr<NXSignal> ptr
             , bool                      thru_gates=false
         );
 
-        unsigned int required_inputs (void);
+        std::list< std::shared_ptr<NXSignal> > all_flops_and_gates ( void );
 
-        unsigned int required_outputs (void);
+        std::set<std::shared_ptr<NXSignal>> trace_inputs (
+            std::shared_ptr<NXSignal> root
+        );
+
+        std::set<std::shared_ptr<NXSignal>> trace_outputs (
+            std::shared_ptr<NXSignal> root
+        );
+
+        std::map<std::shared_ptr<NXSignal>, unsigned int> required_inputs ( void );
+
+        std::map<std::shared_ptr<NXSignal>, unsigned int> required_outputs ( void );
 
         bool fits ( unsigned int node_inputs, unsigned int node_outputs );
 
