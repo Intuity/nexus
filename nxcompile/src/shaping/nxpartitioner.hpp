@@ -62,7 +62,9 @@ namespace Nexus {
         {
             std::stringstream ss;
             ss << "Partition " << std::dec << m_index << " has "
-               << m_flops.size() << " flops and " << m_gates.size() << " gates";
+               << m_flops.size() << " flops and " << m_gates.size()
+               << " gates and needs " << required_inputs() << " inputs and "
+               << required_outputs() << " outputs";
             return ss.str();
         }
 

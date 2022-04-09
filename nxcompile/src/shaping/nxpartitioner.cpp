@@ -89,7 +89,7 @@ unsigned int NXPartition::required_inputs (void)
 
 unsigned int NXPartition::required_outputs (void)
 {
-    // Search all gates for outputs going to other partitions
+    // Search for all gates which drive other partitions
     std::set<std::shared_ptr<NXSignal>> external;
     for (auto gate : m_gates) {
         for (auto output : gate->m_outputs) {
@@ -100,21 +100,23 @@ unsigned int NXPartition::required_outputs (void)
                     (sig->m_type == NXSignal::FLOP) ||
                     (sig->m_type == NXSignal::PORT)
                 );
-                // Check the partition on the output
-                if (sig->get_tag_int("partition") != m_index) {
-                    external.insert(sig);
-                }
+                // Skip target signals which are internal to this partition
+                if (sig->get_tag_int("partition") == m_index) continue;
+                // Collect the driving gate
+                external.insert(gate);
+                break;
             }
         }
     }
-    // Search all flops for outputs driving ports
+    // Search for all flops which drive external I/O ports
     for (auto flop : m_flops) {
         for (auto output : flop->m_outputs) {
             for (auto sig : chase_to_targets(output)) {
                 // Skip anything except ports
                 if (sig->m_type != NXSignal::PORT) continue;
-                // Always append ports to external
-                external.insert(sig);
+                // Collect the driving flop
+                external.insert(flop);
+                break;
             }
         }
     }
@@ -124,17 +126,35 @@ unsigned int NXPartition::required_outputs (void)
 
 bool NXPartition::fits ( unsigned int node_inputs, unsigned int node_outputs )
 {
-    unsigned int req_ins  = required_inputs();
-    unsigned int req_outs = required_outputs();
-    PLOGI << "Partition " << std::dec << m_index << " needs "
-          << req_ins << " inputs and "
-          << req_outs << " outputs, and is allowed "
-          << node_inputs << " inputs and "
-          << node_outputs << " outputs";
     return (
         (required_inputs()  <= node_inputs ) &&
         (required_outputs() <= node_outputs)
     );
+}
+
+bool should_move (
+      std::shared_ptr<NXSignal>    signal
+    , std::shared_ptr<NXPartition> from
+    , std::shared_ptr<NXPartition> to
+) {
+    unsigned int ref_from = 0;
+    unsigned int ref_to   = 0;
+    // Consider each input
+    for (auto input : signal->m_inputs) {
+        int in_part = from->chase_to_source(input)->get_tag_int("partition");
+        if (in_part == from->m_index) ref_from += 1;
+        if (in_part == to->m_index  ) ref_to   += 1;
+    }
+    // Consider each output
+    for (auto output : signal->m_outputs) {
+        for (auto target : from->chase_to_targets(output, true)) {
+            int out_part = target->get_tag_int("partition");
+            if (out_part == from->m_index) ref_from += 1;
+            if (out_part == to->m_index  ) ref_to   += 1;
+        }
+    }
+    // Return if more references found to 'to' than 'from'
+    return ref_to > ref_from;
 }
 
 void NXPartitioner::run ( void )
@@ -145,7 +165,6 @@ void NXPartitioner::run ( void )
     for (auto gate : m_module->m_gates) first->add(gate);
     for (auto flop : m_module->m_flops) first->add(flop);
     m_partitions.push_back(first);
-    PLOGI << first->announce();
 
     // Loop until all partitions fit into the available I/O
     bool         all_fit = true;
@@ -161,6 +180,7 @@ void NXPartitioner::run ( void )
             // Test to see if the partition fits within the budget
             if (lhs->fits(m_node_inputs, m_node_outputs)) continue;
             all_fit = false;
+            PLOGI << lhs->announce();
             // Form a new partition
             auto rhs = std::make_shared<NXPartition>(part_idx, shared_from_this());
             new_partitions.push_back(rhs);
@@ -170,30 +190,64 @@ void NXPartitioner::run ( void )
                 rhs->add(lhs->m_flops.front());
                 lhs->m_flops.pop_front();
             }
-            // Move fan-out logic from the flops into the new partition
-            for (auto flop : rhs->m_flops) {
-                for (auto output : flop->m_outputs) {
-                    for (auto target : lhs->chase_to_targets(output, true)) {
-                        // Skip outputs which aren't gates
-                        if (target->m_type != NXSignal::GATE) continue;
-                        // Skip gates which aren't associated to the LHS partition
-                        if (target->get_tag_int("partition") != lhs->m_index) continue;
-                        // Move the gate
-                        auto gate = NXGate::from_signal(target);
-                        rhs->add(gate);
-                        lhs->m_gates.remove(gate);
+            // Move half the gates into the new partition
+            while (lhs->m_gates.size() > rhs->m_gates.size()) {
+                rhs->add(lhs->m_gates.front());
+                lhs->m_gates.pop_front();
+            }
+            // Run multiple passes to refine the partition
+            for (int pass = 0; pass < 10; pass++) {
+                unsigned int moves = 0;
+                // Move LHS flops that are attached to more logic on the RHS
+                for (auto flop : std::list<std::shared_ptr<NXFlop>>(lhs->m_flops)) {
+                    if (should_move(flop, lhs, rhs)) {
+                        rhs->add(flop);
+                        lhs->m_flops.remove(flop);
+                        moves++;
                     }
                 }
+                // Move LHS gates that are attached to more logic on the RHS
+                for (auto gate : std::list<std::shared_ptr<NXGate>>(lhs->m_gates)) {
+                    if (should_move(gate, lhs, rhs)) {
+                        rhs->add(gate);
+                        lhs->m_gates.remove(gate);
+                        moves++;
+                    }
+                }
+                // Move RHS flops that are attached to more logic on the LHS
+                for (auto flop : std::list<std::shared_ptr<NXFlop>>(rhs->m_flops)) {
+                    if (should_move(flop, rhs, lhs)) {
+                        lhs->add(flop);
+                        rhs->m_flops.remove(flop);
+                        moves++;
+                    }
+                }
+                // Move RHS gates that are attached to more logic on the LHS
+                for (auto gate : std::list<std::shared_ptr<NXGate>>(rhs->m_gates)) {
+                    if (should_move(gate, rhs, lhs)) {
+                        lhs->add(gate);
+                        rhs->m_gates.remove(gate);
+                        moves++;
+                    }
+                }
+                // Log number of moves being made
+                PLOGI << " - " << moves << " moves made on pass " << pass;
+                if (moves == 0) break;
             }
             // Report on the partitions formed
-            PLOGI << "LHS: " << lhs->announce();
-            PLOGI << "RHS: " << rhs->announce();
+            PLOGI << " - LHS: " << lhs->announce();
+            PLOGI << " - RHS: " << rhs->announce();
         }
 
         // Merge all new partitions into the main list
         m_partitions.insert(m_partitions.end(), new_partitions.begin(), new_partitions.end());
 
         // TODO: Temporary break
-        if (part_idx > 10) break;
+        if (part_idx > 20) break;
     } while (!all_fit);
+    PLOGI << "Partitioning summary:";
+    for (auto part : m_partitions) {
+        PLOGI << " - " << part->announce() << ": "
+              << (part->fits(m_node_inputs, m_node_outputs) ? "FITS" : "DOESN'T FIT");
+    }
 }
