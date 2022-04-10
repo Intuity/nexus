@@ -27,6 +27,7 @@
 #include <slang/syntax/SyntaxTree.h>
 
 #include "nxparser.hpp"
+#include "nxdump_partitions_sv.hpp"
 #include "nxdump_stats.hpp"
 #include "nxdump_sv.hpp"
 #include "nxopt_propagate.hpp"
@@ -50,6 +51,7 @@ int main (int argc, const char ** argv) {
         ("dump-parsed",     "Dump logic immediately after parsing",  cxxopts::value<std::string>())
         ("dump-pruned",     "Dump logic after pruning",              cxxopts::value<std::string>())
         ("dump-propagated", "Dump logic after constant propagation", cxxopts::value<std::string>())
+        ("dump-partitions", "Dump logic after partitioning",         cxxopts::value<std::string>())
         // Mesh configuration
         ("rows",    "Rows in the mesh",    cxxopts::value<unsigned int>()->default_value("10"))
         ("columns", "Columns in the mesh", cxxopts::value<unsigned int>()->default_value("10"))
@@ -121,6 +123,10 @@ int main (int argc, const char ** argv) {
         module, nd_inputs, nd_outputs
     );
     part->run();
+
+    // If requested, dump out partitioner output
+    if (options.count("dump-partitions"))
+        Nexus::dump_partitions_to_sv(part, options["dump-partitions"].as<std::string>());
 
     return 0;
 }
