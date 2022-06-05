@@ -79,8 +79,7 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                     to_prop = gate->m_inputs[2];
                 // Relink all of the outputs
                 for (auto driven : gate->m_outputs) {
-                    driven->remove_input(gate);
-                    driven->add_input(to_prop);
+                    driven->replace_input(gate, to_prop);
                     to_prop->add_output(driven);
                 }
                 // Mark gate as dropped
@@ -123,8 +122,7 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                 // Form a new constant and relink outputs
                 auto new_const = std::make_shared<NXConstant>(value, 1);
                 for (auto output : gate->m_outputs) {
-                    output->remove_input(gate);
-                    output->add_input(new_const);
+                    output->replace_input(gate, new_const);
                     new_const->add_output(output);
                 }
 
@@ -155,8 +153,7 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                     }
                     auto new_const = std::make_shared<NXConstant>(new_val, 1);
                     for (auto output : gate->m_outputs) {
-                        output->remove_input(gate);
-                        output->add_input(new_const);
+                        output->replace_input(gate, new_const);
                         new_const->add_output(output);
                     }
                     dropped = true;
@@ -168,15 +165,13 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         case NXGate::AND: {
                             if (lhs_value != 0) {
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(rhs);
+                                    output->replace_input(gate, rhs);
                                     rhs->add_output(output);
                                 }
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(0, 1);
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(new_const);
+                                    output->replace_input(gate, new_const);
                                     new_const->add_output(output);
                                 }
                             }
@@ -186,15 +181,13 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         case NXGate::OR: {
                             if (lhs_value == 0) {
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(rhs);
+                                    output->replace_input(gate, rhs);
                                     rhs->add_output(output);
                                 }
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(1, 1);
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(new_const);
+                                    output->replace_input(gate, new_const);
                                     new_const->add_output(output);
                                 }
                             }
@@ -213,15 +206,13 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         case NXGate::AND: {
                             if (rhs_value != 0) {
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(rhs);
+                                    output->replace_input(gate, lhs);
                                     lhs->add_output(output);
                                 }
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(0, 1);
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(new_const);
+                                    output->replace_input(gate, new_const);
                                     new_const->add_output(output);
                                 }
                             }
@@ -231,16 +222,31 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         case NXGate::OR: {
                             if (rhs_value == 0) {
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(rhs);
+                                    output->replace_input(gate, lhs);
                                     lhs->add_output(output);
                                 }
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(1, 1);
                                 for (auto output : gate->m_outputs) {
-                                    output->remove_input(gate);
-                                    output->add_input(new_const);
+                                    output->replace_input(gate, rhs);
                                     new_const->add_output(output);
+                                }
+                            }
+                            dropped = true;
+                            break;
+                        }
+                        case NXGate::XOR: {
+                            if (rhs_value == 0) {
+                                for (auto output : gate->m_outputs) {
+                                    output->replace_input(gate, lhs);
+                                    lhs->add_output(output);
+                                }
+                            } else {
+                                auto new_gate = std::make_shared<NXGate>(NXGate::NOT);
+                                new_gate->add_input(lhs);
+                                for (auto output : gate->m_outputs) {
+                                    output->replace_input(gate, new_gate);
+                                    new_gate->add_output(output);
                                 }
                             }
                             dropped = true;
@@ -266,19 +272,19 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
         }
 
         // Search through flops, looking for constant inputs
-        PLOGI << "Starting flop elimination pass " << passes;
-        for (auto flop : module->m_flops) {
-            // Skip flops not driven by constants
-            if (flop->m_inputs[0]->m_type != NXSignal::CONSTANT) continue;
-            // Propagate constant through the flop
-            for (auto output : flop->m_outputs) {
-                output->remove_input(flop);
-                output->add_input(flop->m_inputs[0]);
-                flop->m_inputs[0]->add_output(flop);
-            }
-            // Add it to the list of signals to drop
-            to_drop.push_back(flop);
-        }
+        // PLOGI << "Starting flop elimination pass " << passes;
+        // for (auto flop : module->m_flops) {
+        //     // Skip flops not driven by constants
+        //     if (flop->m_inputs[0]->m_type != NXSignal::CONSTANT) continue;
+        //     // Propagate constant through the flop
+        //     for (auto output : flop->m_outputs) {
+        //         output->remove_input(flop);
+        //         output->add_input(flop->m_inputs[0]);
+        //         flop->m_inputs[0]->add_output(flop);
+        //     }
+        //     // Add it to the list of signals to drop
+        //     to_drop.push_back(flop);
+        // }
 
         // Clean up dropped flops and gates
         PLOGI << "Optimisation pass " << passes << " dropped " << to_drop.size()
