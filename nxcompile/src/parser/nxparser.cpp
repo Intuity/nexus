@@ -68,7 +68,7 @@ void NXParser::handle (const PortSymbol & symbol) {
             }
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream port_name;
-                port_name << sig_name << "_" << std::dec << idx;
+                port_name << sig_name << "___X" << std::dec << idx;
                 if (!m_module->has_signal(port_name.str())) {
                     switch (symbol.direction) {
                         case ArgumentDirection::In: {
@@ -125,7 +125,7 @@ void NXParser::handle (const VariableSymbol & symbol) {
             }
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream flop_name;
-                flop_name << sig_name << "_" << std::dec << idx;
+                flop_name << sig_name << "___X" << std::dec << idx;
                 if (!m_module->has_signal(flop_name.str())) {
                     auto flop = std::make_shared<NXFlop>(flop_name.str());
                     m_module->add_flop(flop);
@@ -161,12 +161,12 @@ void NXParser::handle (const NetSymbol & symbol) {
             ScalarType * s_elem = (ScalarType *)&p_type->elementType;
             int32_t rng_hi = p_type->range.upper();
             int32_t rng_lo = p_type->range.lower();
-            if (m_expansions.find(sig_name) == m_expansions.end()) {
+            if (!m_expansions.count(sig_name)) {
                 m_expansions[sig_name] = NXSignalList();
             }
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream wire_name;
-                wire_name << sig_name << "_" << std::dec << idx;
+                wire_name << sig_name << "___X" << std::dec << idx;
                 if (!m_module->has_signal(wire_name.str())) {
                     auto wire = std::make_shared<NXSignal>(wire_name.str());
                     m_module->add_wire(wire);
@@ -283,7 +283,7 @@ void NXParser::resolveExpression(const Expression & expr) {
 
             std::stringstream lookup;
             lookup << sig_expr.as<NamedValueExpression>().symbol.name
-                   << "_" << std::dec << sel_uint.value_or(0);
+                   << "___X" << std::dec << sel_uint.value_or(0);
 
             auto holder = std::make_shared<NXBitHolder>();
             holder->append(m_module->get_signal(lookup.str()));
@@ -315,7 +315,7 @@ void NXParser::resolveExpression(const Expression & expr) {
             for (unsigned int idx = lower; idx <= upper; idx++) {
                 std::stringstream lookup;
                 lookup << sig_expr.as<NamedValueExpression>().symbol.name
-                       << "_" << std::dec << idx;
+                       << "___X" << std::dec << idx;
                 holder->append(m_module->get_signal(lookup.str()));
             }
             m_operands.push_back(holder);
@@ -467,7 +467,9 @@ void NXParser::resolveExpression(const Expression & expr) {
             assert(m_operands.size() == 1);
             auto pred = m_operands.front();
             m_operands.pop_front();
-            assert(pred->m_bits.size() == 1);
+            if (pred->m_bits.size() == 0) {
+                PLOGE << "Conditional expression is missing predicate";
+            }
 
             // Get the first option
             resolveExpression(expr.as<ConditionalExpression>().left());
@@ -481,7 +483,8 @@ void NXParser::resolveExpression(const Expression & expr) {
             auto rhs = m_operands.front();
             m_operands.pop_front();
 
-            // Check bit counts match
+            // Check sizes counts are sensible
+            assert(pred->m_bits.size() == 1);
             assert(lhs->m_bits.size() == rhs->m_bits.size());
 
             // Build a gate for each bit
@@ -589,42 +592,71 @@ void NXParser::resolveStatement (const Statement & stmt) {
                 if (m_proc_clk != NULL && m_proc_rst != NULL) break;
             }
             assert(m_proc_clk != NULL);
-            assert(m_proc_rst != NULL);
+            // assert(m_proc_rst != NULL);
             m_operands.clear();
 
-            // Get assignments in the true section
-            resolveStatement(stmt.as<ConditionalStatement>().ifTrue);
-            std::map< std::string, std::shared_ptr<NXSignal> > all_true(m_proc_asgn);
-            m_proc_asgn.clear();
+            // Handle non-reset flops
+            if (m_proc_rst == NULL) {
 
-            // Get assignments in the false section
-            resolveStatement(*(stmt.as<ConditionalStatement>().ifFalse));
-            std::map< std::string, std::shared_ptr<NXSignal> > all_false(m_proc_asgn);
-            m_proc_asgn.clear();
+                // Get assignments in the true section
+                resolveStatement(stmt.as<ConditionalStatement>().ifTrue);
+                std::map< std::string, std::shared_ptr<NXSignal> > all_true(m_proc_asgn);
+                m_proc_asgn.clear();
 
-            // Create flops for each case
-            for (auto iter : all_true) {
-                std::string sig_name = iter.first;
-                auto        asgn_lhs = NXSignal::as<NXFlop>(m_module->get_signal(sig_name));
-                auto        if_true  = iter.second;
-                auto        if_false = all_false[sig_name];
-                // PLOGI << "Flop - clk: " << m_proc_clk->m_name
-                //            << ", rst: " << m_proc_rst->m_name
-                //        << ", rst_val: " << if_true->m_name
-                //              << ", D: " << if_false->m_name
-                //              << ", Q: " << asgn_lhs->m_name;
-                // Link up the flop to supporting signals
-                asgn_lhs->m_clock   = m_proc_clk; // CLK
-                asgn_lhs->m_reset   = m_proc_rst; // RST
-                asgn_lhs->m_rst_val = if_true;    // RST_VAL
-                asgn_lhs->add_input(if_false);    // D
-                asgn_lhs->add_output(asgn_lhs);   // Q
-                // Link supporting signals to the flop
-                m_proc_clk->add_output(asgn_lhs);
-                m_proc_rst->add_output(asgn_lhs);
-                if_true->add_output(asgn_lhs);
-                if_false->add_output(asgn_lhs);
+                for (auto iter : all_true) {
+                    std::string sig_name = iter.first;
+                    auto        input    = iter.second;
+                    auto        asgn_lhs = NXSignal::as<NXFlop>(m_module->get_signal(sig_name));
+                    // Link up the flop to supporting signals
+                    asgn_lhs->m_clock   = m_proc_clk; // CLK
+                    asgn_lhs->m_reset   = NULL;       // RST
+                    asgn_lhs->m_rst_val = 0;          // RST_VAL
+                    asgn_lhs->add_input(input);       // D
+                    asgn_lhs->add_output(asgn_lhs);   // Q
+                    // Link supporting signals to the flop
+                    m_proc_clk->add_output(asgn_lhs);
+                    input->add_output(asgn_lhs);
+                }
+
+            // Handle reset flops
+            } else {
+
+                // Get assignments in the true section
+                resolveStatement(stmt.as<ConditionalStatement>().ifTrue);
+                std::map< std::string, std::shared_ptr<NXSignal> > all_true(m_proc_asgn);
+                m_proc_asgn.clear();
+
+                // Get assignments in the false section
+                resolveStatement(*(stmt.as<ConditionalStatement>().ifFalse));
+                std::map< std::string, std::shared_ptr<NXSignal> > all_false(m_proc_asgn);
+                m_proc_asgn.clear();
+
+                // Create flops for each case
+                for (auto iter : all_true) {
+                    std::string sig_name = iter.first;
+                    auto        asgn_lhs = NXSignal::as<NXFlop>(m_module->get_signal(sig_name));
+                    auto        if_true  = iter.second;
+                    auto        if_false = all_false[sig_name];
+                    // PLOGI << "Flop - clk: " << m_proc_clk->m_name
+                    //            << ", rst: " << m_proc_rst->m_name
+                    //        << ", rst_val: " << if_true->m_name
+                    //              << ", D: " << if_false->m_name
+                    //              << ", Q: " << asgn_lhs->m_name;
+                    // Link up the flop to supporting signals
+                    asgn_lhs->m_clock   = m_proc_clk; // CLK
+                    asgn_lhs->m_reset   = m_proc_rst; // RST
+                    asgn_lhs->m_rst_val = if_true;    // RST_VAL
+                    asgn_lhs->add_input(if_false);    // D
+                    asgn_lhs->add_output(asgn_lhs);   // Q
+                    // Link supporting signals to the flop
+                    m_proc_clk->add_output(asgn_lhs);
+                    m_proc_rst->add_output(asgn_lhs);
+                    if_true->add_output(asgn_lhs);
+                    if_false->add_output(asgn_lhs);
+                }
+
             }
+
             break;
         }
 
