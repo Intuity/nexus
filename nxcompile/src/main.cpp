@@ -20,24 +20,19 @@
 
 #include <cxxopts.hpp>
 #include <plog/Log.h>
-#include <plog/Init.h>
-#include <plog/Formatters/TxtFormatter.h>
-#include <plog/Appenders/ColorConsoleAppender.h>
-#include <slang/compilation/Compilation.h>
-#include <slang/syntax/SyntaxTree.h>
 
-#include "nxparser.hpp"
 #include "nxdump_partitions_sv.hpp"
 #include "nxdump_stats.hpp"
 #include "nxdump_sv.hpp"
+#include "nxlogging.hpp"
 #include "nxopt_propagate.hpp"
 #include "nxopt_prune.hpp"
+#include "nxparser.hpp"
 #include "nxpartitioner.hpp"
 
 int main (int argc, const char ** argv) {
-    // Initialize logging
-    static plog::ColorConsoleAppender<plog::TxtFormatter> console;
-    plog::init(plog::debug, &console);
+    // Initialise logging
+    Nexus::setup_logging();
 
     // Create instance of cxxopts
     cxxopts::Options parser("nxcompile", "Compiler targeting Nexus hardware");
