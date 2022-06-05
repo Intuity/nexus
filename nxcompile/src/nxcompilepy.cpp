@@ -17,9 +17,14 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "nxmodule.hpp"
+#include "nxdump_stats.hpp"
+#include "nxconstant.hpp"
 #include "nxflop.hpp"
 #include "nxgate.hpp"
+#include "nxlogging.hpp"
+#include "nxmodule.hpp"
+#include "nxopt_propagate.hpp"
+#include "nxopt_prune.hpp"
 #include "nxparser.hpp"
 #include "nxport.hpp"
 #include "nxsignal.hpp"
@@ -97,6 +102,17 @@ PYBIND11_MODULE(nxcompile, m) {
         .def_readwrite("inputs",      &NXSignal::m_inputs)
         .def_readwrite("outputs",     &NXSignal::m_outputs);
 
+    py::class_<NXConstant, NXSignal, std::shared_ptr<NXConstant>>(m, "NXConstant")
+        .def(py::init<
+              unsigned int // value
+            , int          // width
+        >())
+        // Methods
+        .def("from_signal", &NXConstant::from_signal)
+        // Members
+        .def_readwrite("value", &NXConstant::m_value)
+        .def_readwrite("width", &NXConstant::m_width);
+
     py::class_<NXFlop, NXSignal, std::shared_ptr<NXFlop>>(m, "NXFlop")
         .def(py::init<
               std::string // name
@@ -131,5 +147,11 @@ PYBIND11_MODULE(nxcompile, m) {
               std::string // name
         >())
         .def("from_port", &NXPortOut::from_port);
+
+    // Expose functions
+    m.def("dump_rtl_stats",     &dump_rtl_stats    );
+    m.def("optimise_prune",     &optimise_prune    );
+    m.def("optimise_propagate", &optimise_propagate);
+    m.def("setup_logging",      &setup_logging     );
 
 }
