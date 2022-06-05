@@ -27,13 +27,35 @@ using namespace Nexus;
 //
 void Nexus::optimise_prune ( std::shared_ptr<NXModule> module )
 {
-    // Take a copy of the map to avoid mutation while iterating
-    std::map< std::string, std::shared_ptr<NXSignal> > sig_map(module->m_signals);
+    // Bypass any 'wire' objects in the design
+    bool keep_going = false;
+    do {
+        keep_going = false;
+        for (auto sig_pair : module->m_signals) {
+            auto signal = sig_pair.second;
+            if (
+                signal->is_type(NXSignal::WIRE) &&
+                signal->m_inputs.size()  > 0    &&
+                signal->m_outputs.size() > 0
+            ) {
+                signal->m_inputs[0]->remove_output(signal);
+                for (auto output : signal->m_outputs) {
+                    signal->m_inputs[0]->add_output(output);
+                    output->replace_input(signal, signal->m_inputs[0]);
+                }
+                signal->clear_inputs();
+                signal->clear_outputs();
+                keep_going = true;
+            }
+        }
+    } while(keep_going);
     // Search for items to drop
+    std::map< std::string, std::shared_ptr<NXSignal> > sig_map(module->m_signals);
     for (auto sig_pair : sig_map) {
         auto signal = sig_pair.second;
         if (signal->m_inputs.size() == 0 && signal->m_outputs.size() == 0) {
             module->drop_signal(signal);
+            keep_going = true;
         }
     }
 }
