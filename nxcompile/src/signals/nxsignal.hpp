@@ -97,6 +97,11 @@ namespace Nexus {
             m_inputs.erase(pos);
         }
 
+        void replace_input ( std::shared_ptr<NXSignal> orig, std::shared_ptr<NXSignal> repl )
+        {
+            std::replace(m_inputs.begin(), m_inputs.end(), orig, repl);
+        }
+
         void clear_inputs ( void )
         {
             m_inputs.clear();
@@ -113,6 +118,11 @@ namespace Nexus {
             auto pos = std::find(m_outputs.begin(), m_outputs.end(), signal);
             assert(pos != m_outputs.end());
             m_outputs.erase(pos);
+        }
+
+        void replace_output ( std::shared_ptr<NXSignal> orig, std::shared_ptr<NXSignal> repl )
+        {
+            std::replace(m_outputs.begin(), m_outputs.end(), orig, repl);
         }
 
         void clear_outputs ( void )

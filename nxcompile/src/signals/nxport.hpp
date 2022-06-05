@@ -99,7 +99,7 @@ namespace Nexus {
 
         NXPortOut (
               std::string name
-        ) : NXPort ( name, NXPort::OUTPUT, -1, 0 )
+        ) : NXPort ( name, NXPort::OUTPUT, -1 )
         { }
 
         // =====================================================================
