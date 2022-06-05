@@ -62,9 +62,9 @@ void Nexus::dump_partitions_to_sv ( std::shared_ptr<NXPartitioner> partitions, s
     fh << ");" << std::endl;
 
     // Declare all wires
-    fh << "\n// Wires\n\n";
-    for (auto wire : partitions->m_module->m_wires) {
-        fh << "logic " << signame(wire) << ";" << std::endl;
+    fh << "\n// Signals\n\n";
+    for (auto gate : partitions->m_module->m_gates) {
+        fh << "logic " << signame(gate) << ";" << std::endl;
     }
 
     // Walk through all partitions
@@ -85,62 +85,60 @@ void Nexus::dump_partitions_to_sv ( std::shared_ptr<NXPartitioner> partitions, s
             fh << "    if (" << signame(flop->m_reset) << ") "
             << signame(flop) << " <= " << signame(flop->m_rst_val) << ";" << std::endl;
             fh << "    else "
-            << signame(flop) << " <= " << signame(flop->m_inputs[0]) << ";" << std::endl;
+            << signame(flop) << " <= " << signame(NXPartition::chase_to_source(flop->m_inputs[0])) << ";" << std::endl;
             first = false;
         }
         fh << std::endl;
         fh << "//   Gates" << std::endl;
         for (auto gate : part->m_gates) {
-            for (auto output : gate->m_outputs) {
-                fh << "assign " << signame(output) << " = ";
-                // Basic assignment
-                if (gate->m_op == NXGate::ASSIGN && gate->m_inputs.size() == 1) {
-                    fh << signame(gate->m_inputs[0]);
+            fh << "assign " << signame(gate) << " = ";
+            // Basic assignment
+            if (gate->m_op == NXGate::ASSIGN && gate->m_inputs.size() == 1) {
+                fh << signame(NXPartition::chase_to_source(gate->m_inputs[0]));
 
-                // Ternary expression: A ? B : C
-                } else if (gate->m_op == NXGate::COND && gate->m_inputs.size() == 3) {
-                    fh << signame(gate->m_inputs[0])
-                    << " ? " << signame(gate->m_inputs[1])
-                    << " : " << signame(gate->m_inputs[2]);
+            // Ternary expression: A ? B : C
+            } else if (gate->m_op == NXGate::COND && gate->m_inputs.size() == 3) {
+                fh << signame(NXPartition::chase_to_source(gate->m_inputs[0]))
+                   << " ? " << signame(NXPartition::chase_to_source((gate->m_inputs[1])))
+                   << " : " << signame(NXPartition::chase_to_source((gate->m_inputs[2])));
 
-                // Binary & Unary Expressions
-                } else if (
-                    gate->m_inputs.size() >= 1 &&
-                    (
-                        (gate->m_op == NXGate::AND) ||
-                        (gate->m_op == NXGate::OR ) ||
-                        (gate->m_op == NXGate::NOT) ||
-                        (gate->m_op == NXGate::XOR)
-                    )
-                ) {
-                    // Determine the operation string
-                    std::string op_str;
-                    switch (gate->m_op) {
-                        case NXGate::AND: op_str = "&"; break;
-                        case NXGate::OR : op_str = "|"; break;
-                        case NXGate::NOT: op_str = "!"; break;
-                        case NXGate::XOR: op_str = "^"; break;
-                        default: assert(!"Unsupported operation");
-                    }
-
-                    // Unary operations
-                    if (gate->m_inputs.size() == 1) {
-                        fh << op_str << "(" << signame(gate->m_inputs[0]) << ")";
-                    // Binary operations
-                    } else {
-                        bool op_first = true;
-                        for (auto input : gate->m_inputs) {
-                            fh << (op_first ? "" : (" " + op_str + " ")) << signame(input);
-                            op_first = false;
-                        }
-                    }
-
-                // Unknown
-                } else {
-                    assert(!"Unknown gate type");
+            // Binary & Unary Expressions
+            } else if (
+                gate->m_inputs.size() >= 1 &&
+                (
+                    (gate->m_op == NXGate::AND) ||
+                    (gate->m_op == NXGate::OR ) ||
+                    (gate->m_op == NXGate::NOT) ||
+                    (gate->m_op == NXGate::XOR)
+                )
+            ) {
+                // Determine the operation string
+                std::string op_str;
+                switch (gate->m_op) {
+                    case NXGate::AND: op_str = "&"; break;
+                    case NXGate::OR : op_str = "|"; break;
+                    case NXGate::NOT: op_str = "!"; break;
+                    case NXGate::XOR: op_str = "^"; break;
+                    default: assert(!"Unsupported operation");
                 }
-                fh << ";" << std::endl;
+
+                // Unary operations
+                if (gate->m_inputs.size() == 1) {
+                    fh << op_str << "(" << signame(NXPartition::chase_to_source(gate->m_inputs[0])) << ")";
+                // Binary operations
+                } else {
+                    bool op_first = true;
+                    for (auto input : gate->m_inputs) {
+                        fh << (op_first ? "" : (" " + op_str + " ")) << signame(NXPartition::chase_to_source(input));
+                        op_first = false;
+                    }
+                }
+
+            // Unknown
+            } else {
+                assert(!"Unknown gate type");
             }
+            fh << ";" << std::endl;
         }
         fh << std::endl;
     }
@@ -158,7 +156,7 @@ void Nexus::dump_partitions_to_sv ( std::shared_ptr<NXPartitioner> partitions, s
 
         // Basic assignments
         } else if (wire->m_inputs.size() == 1) {
-            fh << "assign " << signame(wire) << " = " << signame(wire->m_inputs[0]);
+            fh << "assign " << signame(wire) << " = " << signame(NXPartition::chase_to_source(wire->m_inputs[0]));
 
         // Unsupported number of drivers for one signal
         } else {
