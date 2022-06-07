@@ -13,6 +13,10 @@
 # limitations under the License.
 
 from collections import defaultdict
+from functools import lru_cache
+from itertools import product
+
+from tabulate import tabulate
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort, NXConstant, nxgate_op_t
 
@@ -78,6 +82,35 @@ def compile_partition(partition):
     # Logic Reductions
     # ==========================================================================
 
+    class Table:
+
+        ID = 0
+
+        def __init__(self, op, inputs, outputs):
+            self.id       = Table.ID
+            Table.ID     += 1
+            self.op       = op
+            self.inputs   = inputs
+            self.outputs  = outputs
+
+        @property
+        def name(self):
+            return f"TT{self.id}"
+
+        def explode(self):
+            yield self
+            for input in self.inputs:
+                if isinstance(input, Table):
+                    yield from input.explode()
+
+        def display(self):
+            print(tabulate(
+                [
+                    ([y for y in f"{x:0{len(self.inputs)}b}"] + [self.outputs[x]])
+                    for x in range(2 ** len(self.inputs))
+                ],
+                headers=[x.name for x in self.inputs] + ["R"],
+            ))
 
     class Operation:
         def __init__(self, gate, *inputs):
@@ -115,6 +148,64 @@ def compile_partition(partition):
         def __str__(self):
             return self.__repr__()
 
+        @lru_cache
+        def truth(self, max_vars=3):
+            # Compile tables for sub-operations
+            sub_tables = { x: x.truth() for x in
+                           filter(lambda x: isinstance(x, Operation), self.inputs) }
+            # Determine the table for this operation
+            variables = []
+            results   = []
+            # Ternary expression
+            if self.op == nxgate_op_t.COND:
+                for input in self.inputs:
+                    if isinstance(input, Operation):
+                        variables.append(sub_tables[input])
+                    else:
+                        variables.append(input)
+                # Fixed result of A ? B : C
+                results = [0, 1, 0, 1, 0, 0, 1, 1]
+            elif self.op == nxgate_op_t.NOT:
+                assert len(self.inputs) == 1
+                if isinstance(self.inputs[0], Operation):
+                    table     = sub_tables[self.inputs[0]]
+                    variables = table.inputs
+                    results   = [[1, 0][x] for x in table.outputs]
+                else:
+                    variables.append(self.inputs[0])
+                    results = [1, 0]
+            else:
+                assert len(self.inputs) == 2
+                tmp_vars   = []
+                tmp_chunks = []
+                for input in self.inputs:
+                    if isinstance(input, Operation):
+                        tmp_vars.append(sub_tables[input])
+                    else:
+                        tmp_vars.append(input)
+                    tmp_chunks.append([0, 1])
+                # Consider merging tables
+                chunks = []
+                for variable, chunk in zip(tmp_vars, tmp_chunks):
+                    if isinstance(variable, Table) and (len(variables) + len(variable.inputs) <= max_vars):
+                        variables += variable.inputs
+                        chunks.append(variable.outputs)
+                    else:
+                        variables.append(variable)
+                        chunks.append(chunk)
+                for lhs, rhs in product(*chunks):
+                    if self.op == nxgate_op_t.AND:
+                        results.append(lhs & rhs)
+                    elif self.op == nxgate_op_t.OR:
+                        results.append(lhs | rhs)
+                    elif self.op == nxgate_op_t.XOR:
+                        results.append(lhs ^ rhs)
+                    else:
+                        raise Exception("UNKNOWN OP!")
+            # Return variables and results
+            return Table(self, variables, results)
+
+    @lru_cache
     def chase(signal):
         if signal.is_type(nxsignal_type_t.WIRE):
             return chase(signal.inputs[0])
@@ -131,6 +222,16 @@ def compile_partition(partition):
         else:
             raise Exception(f"UNKNOWN TYPE: {signal.type}")
 
-    for group in partition.groups:
-        op = chase(group.target.inputs[0])
-        breakpoint()
+    print("Compiling logic cones")
+    cones = []
+    for idx, group in enumerate(partition.groups):
+        print(f"Building logic cones for group {idx}")
+        signal = group.target.inputs[0]
+        if signal.is_type(nxsignal_type_t.GATE):
+            op = chase(signal)
+            cones.append((op, op.truth()))
+    print(f"{len(cones)} cones compiled")
+
+    tables = sum([list(x.explode()) for _, x in cones], [])
+    print(f"{len(tables)} total tables of which {len(set(tables))} are unique")
+    breakpoint()
