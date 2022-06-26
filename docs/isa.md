@@ -107,11 +107,12 @@ table tr td:first-child, table tr th:first-child {
         <td>TRUTH</td>
         <td colspan="3">100</td>
         <td colspan="8">TABLE</td>
-        <td colspan="1">SI</td>
-        <td colspan="8">IMM</td>
+        <td colspan="3">MUX_C</td>
+        <td colspan="3">MUX_B</td>
+        <td colspan="3">MUX_A</td>
         <td colspan="3">SRC_C</td>
         <td colspan="3">SRC_B</td>
-        <td colspan="3">TGT</td>
+        <td colspan="3">RSVD</td>
         <td colspan="3">SRC_A</td>
     </tr>
     <tr>
@@ -218,10 +219,12 @@ Queues up a 8-bit atom of data to send to any other node in the system:
 Performs logical operations on up to 3x8-bit sources:
 
  * `SRC_A`, `SRC_B`, `SRC_C` - input register selections;
- * `TGT` - target register selection;
- * `IMM` - 8-bit immediate;
- * `SI` - select between use of `IMM` (`1`) or `SRC_C` (`0`) as the third input;
+ * `MUX_A`, `MUX_B`, `MUX_C` - bit selection from each of the input registers;
  * `TABLE` - encoded truth table;
+
+The `TRUTH` instruction does not have a target register, instead the result is
+always placed into register 7. Register 7 is a shift register, and each new
+value is inserted at bit 0 with existing entries shifted up one place.
 
 ## `ARITH`
 
