@@ -481,4 +481,8 @@ print()
 print("=== NODE COMPILATION ===")
 print()
 for partition in ord_util:
-    compile_partition(partition)
+    stream = compile_partition(partition)
+    with open(f"{partition.id}.asm", "w", encoding="utf-8") as fh:
+        fh.write("\n".join([x.to_asm() for x in stream]) + "\n")
+    with open(f"{partition.id}.hex", "w", encoding="utf-8") as fh:
+        fh.write("\n".join([f"{x.encode():08X}" for x in stream]) + "\n")

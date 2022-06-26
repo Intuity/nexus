@@ -16,12 +16,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import product
+from math import ceil
+from statistics import mean
 from typing import Tuple
 
 from tabulate import tabulate
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort, NXConstant, nxgate_op_t
-from nxisa import Load, Store, Branch, Send, Truth, Arithmetic, Shuffle
+from nxisa import Comparison, Load, Store, Branch, Send, Truth, Arithmetic, Shuffle, Offset
 
 class Table:
 
@@ -293,7 +295,8 @@ def assign_outputs(partition):
     outputs = defaultdict(lambda: set())
     for group in partition.groups:
         for target in group.drives_to:
-            outputs[target.partition.id].add(target.target)
+            if target.partition.id != partition.id:
+                outputs[target.partition.id].add(target.target)
     # Assign outputs to slots
     output_slots = []
     output_map   = {}
@@ -323,22 +326,26 @@ def identify_operations(partition):
         else:
             raise Exception(f"UNKNOWN TYPE: {signal.type}")
 
-    tables = []
+    mapping = {}
     for group in partition.groups:
         signal = group.target.inputs[0]
         if signal.is_type(nxsignal_type_t.GATE):
-            tables.append(chase(signal).truth())
-    print(f" - Compiled {len(tables)} logic cones")
+            mapping[signal] = chase(signal).truth()
 
     # Expand the full set (including tables within tables)
-    tables = list(set(sum([list(x.explode()) for x in tables], [])))
+    tables = list(set(sum([list(x.explode()) for x in mapping.values()], [])))
 
     # Build table-to-table references
     refs = defaultdict(lambda: set())
     for table in tables:
+        # Track tables using other tables as inputs
         for input in table.inputs:
             if isinstance(input, Table):
                 refs[input].add(table)
+        # Track flops consuming a table's output
+        for signal in table.op.gate.outputs:
+            if signal.name in (x.name for x in partition.tgt_flops):
+                refs[table].add(signal)
 
     # Sort tables into an order where they are always satisified
     satisfied  = []
@@ -352,7 +359,7 @@ def identify_operations(partition):
         assert len(to_drop) > 0, "No progress since last pass!"
         tables = [x for i, x in enumerate(tables) if i not in to_drop]
 
-    return satisfied, refs
+    return satisfied, refs, mapping
 
 
 def compile_partition(partition):
@@ -372,9 +379,15 @@ def compile_partition(partition):
     print(f" - Requires {num_input_slots:3d} input slots")
     print(f" - Requires {num_flop_slots:3d} flop slots")
     print(f" - Requires {len(output_slots):3d} output slots")
+    print()
 
     # Identify all of the logic tables
-    tables, references = identify_operations(partition)
+    tables, references, sig_table_map = identify_operations(partition)
+
+    print("Logic Tables:")
+    print(f" - Compiled {len(tables):3d} tables")
+    print(f" - Referred {sum(map(len, references.values())):3d} times")
+    print()
 
     class Register:
 
@@ -404,133 +417,220 @@ def compile_partition(partition):
             return self.elements
 
     # Track register usage
-    registers = [Register(index=x) for x in range(8)]
+    registers = [Register(index=x) for x in range(7)]
+
+    # Reserve R7 for outputs of truth tables
+    reg_work = Register(index=7)
+
+    # Gather the instruction stream
+    stream = []
+
+    # Track read/write addresses
+    trk_read           = defaultdict(lambda: 0)
+    trk_write          = defaultdict(lambda: 0)
+    trk_usage          = defaultdict(lambda: [])
+    trk_select         = 0
+    trk_evict_inactive = 0
+    trk_evict_novel    = 0
+    trk_evict_notnovel = 0
 
     def select_register(exclude=None):
-        nonlocal registers
-        exclude = exclude or []
+        nonlocal registers, trk_select, trk_evict_inactive, trk_evict_novel, trk_evict_notnovel
+        exclude     = exclude or []
+        trk_select += 1
         # Filter out non-excluded registers
         legal = list(filter(lambda x: (x not in exclude), registers))
         # Look for inactive registers
         if inactive := [x for x in legal if not x.active]:
+            trk_evict_inactive += 1
             return inactive[0]
         # Look for the oldest non-novel register
         if notnovel := sorted([x for x in legal if not x.novel], key=lambda x: x.age, reverse=True):
+            trk_evict_novel += 1
             return notnovel[0]
         # Finally choose the oldest register
-        return sorted(legal, key=lambda x: x.age, reverse=True)[0]
+        trk_evict_notnovel += 1
+        ordered = sorted(legal, key=lambda x: x.age, reverse=True)
+        return ordered[0]
 
     def emit_register_reuse(register):
-        # TODO: Check that any of the values actually need to be preserved
+        nonlocal trk_write
         if register.active and register.novel:
             # Check if any entries actually need preserving?
             if any((len(references.get(x, [])) > 0) for x in register.elements):
                 row, slot = memory.place_all(register.elements, False, True)
+                trk_write[(row, slot)] += 1
+                trk_usage[(row, slot)].append(("write", len(stream)))
                 yield Store(src    =register.index,
                             mask   =0xFF,
                             slot   =(slot // 2),
                             address=row,
                             offset =(2 | (slot % 2)))
         register.activate()
-        register.age = 0
+        register.age   = 0
+        register.novel = False
 
     def emit_source_setup(signal, exclude=None):
-        nonlocal registers
+        nonlocal registers, trk_read
         exclude = exclude or []
         # Search for this signal in the registers
-        for reg in registers:
-            if signal not in reg.elements:
-                continue
-            if (bit_idx := reg.elements.index(signal)) != 0:
-                # If this register is protected, shuffle into a different one
-                if reg in exclude:
-                    new_reg = select_register(exclude)
-                    yield from emit_register_reuse(new_reg)
-                    yield Shuffle(src=reg.index, tgt=new_reg.index, mux=[
-                        { 0: bit_idx, bit_idx: 0 }.get(i, i) for i in range(8)
-                    ])
-                    new_reg.elements = reg.elements[:]
-                    new_reg.elements[0], new_reg.elements[bit_idx] = new_reg.elements[bit_idx], new_reg.elements[0]
-                # If this register is not protected, shuffle it
-                else:
-                    yield Shuffle(src=reg.index, tgt=reg.index, mux=[
-                        { 0: bit_idx, bit_idx: 0 }.get(i, i) for i in range(8)
-                    ])
-                    reg.elements[0], reg.elements[bit_idx] = reg.elements[bit_idx], reg.elements[0]
-            break
+        for reg in registers + [reg_work]:
+            if signal in reg.elements:
+                break
         # If not found, then try to load in from memory
         else:
             tgt = select_register(exclude)
             yield from emit_register_reuse(tgt)
             # Search in memory
             if mapping := memory.find(signal):
-                row, slot, bit_idx = mapping
+                row, slot, _ = mapping
                 yield Load(tgt    =tgt.index,
                            slot   =(slot // 2),
                            address=row,
                            offset =(2 | (slot % 2)))
-                for idx, entry in enumerate(memory.rows[row].slots[slot].elements):
-                    tgt.elements[idx] = entry
-                if bit_idx != 0:
-                    yield Shuffle(src=tgt.index, tgt=tgt.index, mux=[
-                        { 0: bit_idx, bit_idx: 0 }.get(i, i) for i in range(8)
-                    ])
-                    tgt.elements[0], tgt.elements[bit_idx] = tgt.elements[bit_idx], tgt.elements[0]
+                trk_usage[(row, slot)].append(("read", len(stream)))
+                trk_read[(row, slot)] += 1
+                tgt.elements = memory.rows[row].slots[slot].elements[:]
             else:
                 # Not found
                 raise Exception(f"Failed to locate signal '{signal}'")
 
     def emit_operation(cone):
         nonlocal registers
-        # Perform first stage preparation of registers
+        # Gather inputs
         srcs = []
+        idxs = []
         for input in cone.inputs:
             yield from emit_source_setup(input, exclude=srcs)
-            # NOTE: Assuming the required value is placed in bit 0
-            srcs.append([x for x in registers if x[0] == input][0])
+            for reg in registers + [reg_work]:
+                if input in reg.elements:
+                    srcs.append(reg)
+                    idxs.append(reg.elements.index(input))
             if isinstance(input, Table):
                 references[input].remove(cone)
-        # Determine a target register and trigger optional reuse
-        tgt = select_register(exclude=srcs)
-        yield from emit_register_reuse(tgt)
+        # Check if working register is full (if so, move it to another register)
+        if None not in reg_work.elements:
+            tgt = select_register(exclude=srcs)
+            yield from emit_register_reuse(tgt)
+            yield Shuffle(src=reg_work.index, tgt=tgt.index, mux=list(range(8)))
+            tgt.elements      = reg_work.elements[:]
+            tgt.novel         = True
+            reg_work.elements = [None] * 8
         # Extract and pad the lookup table
         table = 0
         if len(cone.inputs) == 1:
             srcs  = [srcs[0].index, 0, 0]
+            idxs  = [idxs[0]]
             table = sum([(x << i) for i, x in enumerate(cone.outputs * 4)])
         elif len(cone.inputs) == 2:
             srcs  = [srcs[0].index, srcs[1].index, 0]
+            idxs  = [idxs[0], idxs[1], 0]
             table = sum([(x << i) for i, x in enumerate(cone.outputs * 2)])
         elif len(cone.inputs) == 3:
-            srcs = [x.index for x in srcs]
+            srcs  = [x.index for x in srcs]
             table = sum([(x << i) for i, x in enumerate(cone.outputs)])
         else:
             raise Exception("Unsupported number of inputs")
-        if table > 0xFF:
-            breakpoint()
+        assert table >= 0 and table <= 0xFF, "Incorrect table value"
         # Emit an instruction
-        yield Truth(src=srcs, tgt=tgt.index, imm=0, si=0, table=table)
-        # Insert the new value
-        tgt.elements = [cone] + ([None] * 7)
-        # Mark value as novel (will cause STORE to operate on reuse)
-        tgt.novel = True
+        yield Truth(src=srcs, mux=idxs, table=table, tgt=reg_work.index)
+        # Shift working register and insert new value
+        reg_work.elements = [cone] + reg_work.elements[:7]
 
-    # Assemble the instruction stream
+    # Assemble the computation stream
     counts = defaultdict(lambda: 0)
-    stream = []
-    for table in tables:
-        for instr in emit_operation(table):
-            stream.append(instr)
-            counts[instr.instr.opcode.op_name] += 1
-            print(f">>> I{len(stream):04d}: {instr.to_asm():40} -> 0x{instr.encode():08X}")
+    print("Generating Instruction Stream:")
+    print()
+    def stream_add(instr):
+        stream.append(instr)
+        counts[instr.instr.opcode.op_name] += 1
+        print(f"[{len(stream):04d}] {instr.to_asm():40} -> 0x{instr.encode():08X}")
+
+    def stream_iter(gen):
+        for instr in gen:
+            stream_add(instr)
             for reg in registers:
                 reg.aging()
 
+    for table in tables:
+        stream_iter(emit_operation(table))
+        # TODO: Detect when values are ready for sending to other nodes
+
+    # Append flop updates
+    for flop in partition.tgt_flops:
+        # Locate where the flop should be stored
+        tgt_row, tgt_slot, tgt_idx = memory.find(flop)
+        # Find the signal driving the flop
+        signal = sig_table_map.get(flop.inputs[0], flop.inputs[0])
+        if getattr(signal, "type", None) == nxsignal_type_t.CONSTANT:
+            # TODO: Generate a constant value and write to memory
+            continue
+        else:
+            stream_iter(emit_source_setup(signal))
+            src_reg = next(iter(x for x in registers + [reg_work] if signal in x.elements))
+            src_idx = src_reg.elements.index(signal)
+            # If bit is not in the right place, swap over
+            if tgt_idx != src_idx:
+                stream_add(Shuffle(src=src_reg.index,
+                                tgt=src_reg.index,
+                                mux=[{
+                                    src_idx: tgt_idx,
+                                    tgt_idx: src_idx
+                                }.get(x, x) for x in range(8)]))
+                src_reg.elements[tgt_idx], src_reg.elements[src_idx] = (
+                    src_reg.elements[src_idx], src_reg.elements[tgt_idx]
+                )
+            # Write out
+            stream_add(Store(src    =src_reg.index,
+                             mask   =(1 << tgt_idx),
+                             slot   =(tgt_slot // 2),
+                             address=tgt_row,
+                             offset =Store.offset.PRESERVE))
+
+    # Append a branch to wait for the next trigger
+    stream_add(Branch(pc=0,
+                      offset=Branch.offset.INVERSE,
+                      idle=1,
+                      mark=1,
+                      comparison=Branch.comparison.WAIT))
+
+    print()
+
     # Instruction stats
-    print("")
     print("=" * 80)
     print("Instruction Counts:")
+    print(f" - Total  : {len(stream):3d}")
     for key, count in counts.items():
-        print(f" - {key}: {count:3d}")
+        print(f" - {key:7s}: {count:3d}")
     print("=" * 80)
-    print("")
+    print()
+
+    # Calculate access deltas
+    deltas = {}
+    for key, accesses in trk_usage.items():
+        deltas[key] = [(y - x) for ((_, x), (_, y)) in zip(accesses, accesses[1:])]
+    min_delta = min(sum(deltas.values(), []))
+    max_delta = max(sum(deltas.values(), []))
+    avg_delta = ceil(mean(sum(deltas.values(), [])))
+
+    # Memory access stats
+    write_n_read = set(trk_write.keys()).difference(trk_read.keys())
+    read_n_write = set(trk_read.keys()).difference(trk_write.keys())
+    print("=" * 80)
+    print("Memory Accesses:")
+    print(f" - Total Writes       : {sum(trk_write.values()):4d}")
+    print(f" - Total Reads        : {sum(trk_read.values()):4d}")
+    print(f" - Written Not Read   : {len(write_n_read):4d}")
+    print(f" - Read Not Written   : {len(read_n_write):4d}")
+    print(f" - Register Selections: {trk_select:4d}")
+    print(f" - Inactive Evictions : {trk_evict_inactive:4d}")
+    print(f" - Novel Evictions    : {trk_evict_novel:4d}")
+    print(f" - Not Novel Evictions: {trk_evict_notnovel:4d}")
+    print(f" - Minimum Residency  : {min_delta:4d}")
+    print(f" - Maximum Residency  : {max_delta:4d}")
+    print(f" - Average Residency  : {avg_delta:4d}")
+    print("=" * 80)
+    print()
+
+    return stream
+
