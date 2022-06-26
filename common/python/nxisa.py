@@ -62,17 +62,17 @@ class OpCode(Field):
 
     def __init__(self, op : Tuple[str, int]) -> None:
         super().__init__("op", 3, {
-                            "LOAD"  : 0,
-                            "STORE" : 1,
-                            "BRANCH": 2,
-                            "SEND"  : 3,
-                            "TRUTH" : 4,
-                            "ARITH" : 5,
-                            "SHUFL" : 6,
+                            "LOAD": 0,
+                            "STOR": 1,
+                            "BRCH": 2,
+                            "SEND": 3,
+                            "TRTH": 4,
+                            "ARTH": 5,
+                            "SHFL": 6,
                         })
         self.op_name  = op.upper()
         self.op_value = self.values[self.op_name]
-        if self.op_name == "SHUFL":
+        if self.op_name == "SHFL":
             self.width = 2
 
     def match(self, value : int) -> bool:
@@ -335,7 +335,7 @@ class LoadDef(InstructionDef):
 class StoreDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("STORE"),
+        super().__init__(OpCode("STOR"),
                          Source(),
                          Mask(),
                          Flag("slot"),
@@ -346,7 +346,7 @@ class StoreDef(InstructionDef):
 class BranchDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("BRANCH"),
+        super().__init__(OpCode("BRCH"),
                          Source(),
                          Reserved(3),
                          Source(),
@@ -373,7 +373,7 @@ class SendDef(InstructionDef):
 class TruthDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("TRUTH"),
+        super().__init__(OpCode("TRTH"),
                          Source(),
                          Target(),
                          Source(),
@@ -385,7 +385,7 @@ class TruthDef(InstructionDef):
 class ArithmeticDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("ARITH"),
+        super().__init__(OpCode("ARTH"),
                          Source(),
                          Target(),
                          Source(),
@@ -396,7 +396,7 @@ class ArithmeticDef(InstructionDef):
 class ShuffleDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("SHUFL"),
+        super().__init__(OpCode("SHFL"),
                          Source(),
                          Target(),
                          Mux(),
