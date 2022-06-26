@@ -62,17 +62,17 @@ class OpCode(Field):
 
     def __init__(self, op : Tuple[str, int]) -> None:
         super().__init__("op", 3, {
-                            "LOAD": 0,
-                            "STOR": 1,
-                            "BRCH": 2,
-                            "SEND": 3,
-                            "TRTH": 4,
-                            "ARTH": 5,
-                            "SHFL": 6,
+                            "LOAD"   : 0,
+                            "STORE"  : 1,
+                            "BRANCH" : 2,
+                            "SEND"   : 3,
+                            "TRUTH"  : 4,
+                            "ARITH"  : 5,
+                            "SHUFFLE": 6,
                         })
         self.op_name  = op.upper()
         self.op_value = self.values[self.op_name]
-        if self.op_name == "SHFL":
+        if self.op_name == "SHUFFLE":
             self.width = 2
 
     def match(self, value : int) -> bool:
@@ -263,11 +263,11 @@ class InstructionDef:
             if isinstance(field, Reserved) or (isinstance(field, list) and isinstance(field[0], Reserved)):
                 continue
             if isinstance(field, list):
-                unpacked += list(map(field[0].to_asm, fields[key]))
-                unpacked += ([field[0].to_asm(0)] * (len(field) - len(fields[key])))
+                chunk = list(map(field[0].to_asm, fields.get(key, [])))
+                unpacked += chunk + ([field[0].to_asm(0)] * (len(field) - len(chunk)))
             else:
                 unpacked.append(field.to_asm(fields[key]))
-        return self.opcode.op_name.upper() + " " + ", ".join(list(map(str, unpacked)))
+        return f"{self.opcode.op_name.upper():7s} " + ", ".join(list(map(str, unpacked)))
 
     @classmethod
     def from_asm(cls, asm : str) -> Tuple["InstructionDef", Dict[str, Union[int, List[int]]]]:
@@ -335,7 +335,7 @@ class LoadDef(InstructionDef):
 class StoreDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("STOR"),
+        super().__init__(OpCode("STORE"),
                          Source(),
                          Mask(),
                          Flag("slot"),
@@ -346,7 +346,7 @@ class StoreDef(InstructionDef):
 class BranchDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("BRCH"),
+        super().__init__(OpCode("BRANCH"),
                          Source(),
                          Reserved(3),
                          Source(),
@@ -373,19 +373,20 @@ class SendDef(InstructionDef):
 class TruthDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("TRTH"),
+        super().__init__(OpCode("TRUTH"),
                          Source(),
                          Target(),
                          Source(),
                          Source(),
-                         Immediate("imm", 8),
-                         Flag("si"),
+                         Mux(),
+                         Mux(),
+                         Mux(),
                          Table())
 
 class ArithmeticDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("ARTH"),
+        super().__init__(OpCode("ARITH"),
                          Source(),
                          Target(),
                          Source(),
@@ -396,7 +397,7 @@ class ArithmeticDef(InstructionDef):
 class ShuffleDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("SHFL"),
+        super().__init__(OpCode("SHUFFLE"),
                          Source(),
                          Target(),
                          Mux(),
