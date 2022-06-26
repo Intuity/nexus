@@ -323,37 +323,36 @@ def identify_operations(partition):
         else:
             raise Exception(f"UNKNOWN TYPE: {signal.type}")
 
-    cones = []
+    tables = []
     for group in partition.groups:
         signal = group.target.inputs[0]
         if signal.is_type(nxsignal_type_t.GATE):
-            op = chase(signal)
-            cones.append((op, op.truth()))
-    print(f" - Compiled {len(cones)} logic cones")
+            tables.append(chase(signal).truth())
+    print(f" - Compiled {len(tables)} logic cones")
 
-    tables = list(sorted(set(sum([list(x.explode()) for _, x in cones], [])), key=lambda x: x.id))
-    uses   = { t: tables.count(t) for t in set(tables) }
-    print(f"   + {len(tables)} total tables of which {len(uses.keys())} are unique")
-    print(f"   + {len(set([''.join(map(str, x.outputs)) for x in uses.keys()]))} unique encodings")
-    print()
+    # Expand the full set (including tables within tables)
+    tables = list(set(sum([list(x.explode()) for x in tables], [])))
 
-    # Sort cones into an order where they are always satisified
+    # Build table-to-table references
+    refs = defaultdict(lambda: set())
+    for table in tables:
+        for input in table.inputs:
+            if isinstance(input, Table):
+                refs[input].add(table)
+
+    # Sort tables into an order where they are always satisified
     satisfied  = []
-    last_count = len(tables)
     while tables:
         to_drop = []
         for idx, table in enumerate(tables):
             if any(x for x in table.inputs if isinstance(x, Table) and x not in satisfied):
-                if last_count == 89:
-                    breakpoint()
                 continue
             satisfied.append(table)
             to_drop.append(idx)
+        assert len(to_drop) > 0, "No progress since last pass!"
         tables = [x for i, x in enumerate(tables) if i not in to_drop]
-        assert len(tables) != last_count
-        last_count = len(tables)
 
-    return satisfied, uses
+    return satisfied, refs
 
 
 def compile_partition(partition):
@@ -375,15 +374,16 @@ def compile_partition(partition):
     print(f" - Requires {len(output_slots):3d} output slots")
 
     # Identify all of the logic tables
-    tables, uses = identify_operations(partition)
+    tables, references = identify_operations(partition)
 
     class Register:
 
         def __init__(self, index, width=8):
-            self.index    = 0
+            self.index    = index
             self.elements = [None] * width
             self.age      = 0
             self.active   = False
+            self.novel    = False
 
         def __getitem__(self, key):
             return self.elements[key]
@@ -409,24 +409,28 @@ def compile_partition(partition):
     def select_register(exclude=None):
         nonlocal registers
         exclude = exclude or []
-        # First look for inactive registers
-        try:
-            return next(x for x in registers if not x.active and x not in exclude)
-        # If no inactive registers available, select the oldest
-        except StopIteration:
-            return next(iter(sorted([x for x in registers if x not in exclude],
-                                    key=lambda x: x.age,
-                                    reverse=True)))
+        # Filter out non-excluded registers
+        legal = list(filter(lambda x: (x not in exclude), registers))
+        # Look for inactive registers
+        if inactive := [x for x in legal if not x.active]:
+            return inactive[0]
+        # Look for the oldest non-novel register
+        if notnovel := sorted([x for x in legal if not x.novel], key=lambda x: x.age, reverse=True):
+            return notnovel[0]
+        # Finally choose the oldest register
+        return sorted(legal, key=lambda x: x.age, reverse=True)[0]
 
     def emit_register_reuse(register):
         # TODO: Check that any of the values actually need to be preserved
-        if register.active:
-            row, slot = memory.place_all(register.elements, False, True)
-            yield Store(src    =register.index,
-                        mask   =0xFF,
-                        slot   =(slot // 2),
-                        address=row,
-                        offset =(2 | (slot % 2)))
+        if register.active and register.novel:
+            # Check if any entries actually need preserving?
+            if any((len(references.get(x, [])) > 0) for x in register.elements):
+                row, slot = memory.place_all(register.elements, False, True)
+                yield Store(src    =register.index,
+                            mask   =0xFF,
+                            slot   =(slot // 2),
+                            address=row,
+                            offset =(2 | (slot % 2)))
         register.activate()
         register.age = 0
 
@@ -484,6 +488,8 @@ def compile_partition(partition):
             yield from emit_source_setup(input, exclude=srcs)
             # NOTE: Assuming the required value is placed in bit 0
             srcs.append([x for x in registers if x[0] == input][0])
+            if isinstance(input, Table):
+                references[input].remove(cone)
         # Determine a target register and trigger optional reuse
         tgt = select_register(exclude=srcs)
         yield from emit_register_reuse(tgt)
@@ -504,13 +510,27 @@ def compile_partition(partition):
             breakpoint()
         # Emit an instruction
         yield Truth(src=srcs, tgt=tgt.index, imm=0, si=0, table=table)
+        # Insert the new value
         tgt.elements = [cone] + ([None] * 7)
+        # Mark value as novel (will cause STORE to operate on reuse)
+        tgt.novel = True
 
     # Assemble the instruction stream
+    counts = defaultdict(lambda: 0)
     stream = []
     for table in tables:
         for instr in emit_operation(table):
             stream.append(instr)
+            counts[instr.instr.opcode.op_name] += 1
             print(f">>> I{len(stream):04d}: {instr.to_asm():40} -> 0x{instr.encode():08X}")
             for reg in registers:
                 reg.aging()
+
+    # Instruction stats
+    print("")
+    print("=" * 80)
+    print("Instruction Counts:")
+    for key, count in counts.items():
+        print(f" - {key}: {count:3d}")
+    print("=" * 80)
+    print("")
