@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from collections import defaultdict
-from dataclasses import dataclass
 from functools import lru_cache
 from itertools import product
 from math import ceil
@@ -23,7 +22,7 @@ from typing import Tuple
 from tabulate import tabulate
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort, NXConstant, nxgate_op_t
-from nxisa import Comparison, Load, Store, Branch, Send, Truth, Arithmetic, Shuffle, Offset
+from nxisa import Load, Store, Branch, Send, Truth, Arithmetic, Shuffle
 
 class Table:
 
@@ -39,6 +38,10 @@ class Table:
     @property
     def name(self):
         return f"TT{self.id}"
+
+    @property
+    def all_inputs(self):
+        return self.inputs + sum((x.all_inputs for x in self.inputs if isinstance(x, Table)), [])
 
     def explode(self):
         for input in self.inputs:
@@ -278,17 +281,64 @@ def assign_inputs(partition, memory):
     memory.align(True)
     return num_slots
 
-def assign_flops(partition, memory):
-    all_target = list(partition.tgt_flops)
-    num_slots = 0
-    for offset in range(0, len(all_target), 8):
-        memory.place_all(all_target[offset:offset+8], True)
-        num_slots += 1
-    # Bump and align to make placement safe
-    if memory.last_bit != 0:
-        memory.bump_slot()
-    memory.align(True)
-    return num_slots
+def assign_flops(partition, memory, tables):
+    # Pack results as efficiently as possible
+    slots  = []
+    cycles = {}
+    # Consider table results in chunks of 8
+    for idx in range(0, len(tables), 8):
+        # Take chunk & reverse it (as results are shifted up the register)
+        chunk = tables[idx:idx+8][::-1]
+        # Work out which results drive flops
+        for cix, entry in enumerate(chunk):
+            flops = [x for x in entry.op.gate.outputs if x.is_type(nxsignal_type_t.FLOP)]
+            if flops:
+                assert len(flops) == 1
+                chunk[cix] = flops[0]
+            else:
+                chunk[cix] = None
+        # Try to find a slot with gaps in the right places
+        candidates = []
+        for slot_idx, slot in enumerate(slots):
+            if not any((slot[i] is not None) for i, x in enumerate(chunk) if x is not None):
+                candidates.append((slot_idx, slot, len([x for x in slot if x is None])))
+        if len(candidates) == 0:
+            slots.append([None] * 8)
+            candidates.append((len(slots)- 1, slots[-1], 8))
+        # Choose the busiest slot
+        slot_idx, slot, _ = sorted(candidates, key=lambda x: x[2])[0]
+        # Insert flops into the slot
+        # NOTE: Use 'idx+8' because this is the operation for which flush occurs
+        cycles[idx+8] = (slot_idx, [])
+        for cix, entry in enumerate(chunk):
+            if entry is not None:
+                slot[cix] = entry
+                cycles[idx+8][1].append(cix)
+        # If no entries recorded
+        if not cycles[idx+8][1]:
+            del cycles[idx+8]
+    # Place any flops which are not driven by tables (constants/pipelining)
+    all_flops = sum([[x.name for x in y if x is not None] for y in slots], [])
+    for flop in partition.tgt_flops:
+        # Skip flops that are already placed
+        if flop.name in all_flops:
+            continue
+        # Search for the first free location
+        # NOTE: This won't make stores any more efficient, but is has a chance
+        #       of reducing the number of loads
+        for slot in slots:
+            if None in slot:
+                slot[slot.index(None)] = flop
+                break
+        else:
+            slots.append([None] * 8)
+            slots[0] = flop
+    # Allocate slots in the memory
+    targets = []
+    for slot in slots:
+        targets.append(memory.place_all(slot, is_seq=True, clear=True))
+    # Return the slots and cycle encodings
+    return slots, cycles, targets
 
 def assign_outputs(partition):
     # Accumulate outputs based on target partition
@@ -347,17 +397,26 @@ def identify_operations(partition):
             if signal.name in (x.name for x in partition.tgt_flops):
                 refs[table].add(signal)
 
+    # Sort tables by descending complexity
+    # NOTE: The intention here is to bias placement in the next step to prefer
+    #       completion of complex terms first, rather than evaluating all of the
+    #       simple terms
+    tables.sort(key=lambda x: len(x.all_inputs), reverse=True)
+
     # Sort tables into an order where they are always satisified
-    satisfied  = []
+    # NOTE: It may seem inefficient to only make one placement per pass, but it
+    #       has a notable benefit on number of instructions required as this
+    #       prefers completing complex terms first
+    satisfied = []
     while tables:
-        to_drop = []
-        for idx, table in enumerate(tables):
+        for table in tables:
             if any(x for x in table.inputs if isinstance(x, Table) and x not in satisfied):
                 continue
             satisfied.append(table)
-            to_drop.append(idx)
-        assert len(to_drop) > 0, "No progress since last pass!"
-        tables = [x for i, x in enumerate(tables) if i not in to_drop]
+            tables.remove(table)
+            break
+        else:
+            raise Exception("Made no progress!")
 
     return satisfied, refs, mapping
 
@@ -370,19 +429,19 @@ def compile_partition(partition):
     # Create a memory
     memory = Memory()
 
+    # Identify all of the logic tables
+    tables, references, sig_table_map = identify_operations(partition)
+
     # Assign input slots
-    num_input_slots          = assign_inputs(partition, memory)
-    num_flop_slots           = assign_flops(partition, memory)
-    output_map, output_slots = assign_outputs(partition)
+    num_input_slots                       = assign_inputs(partition, memory)
+    flop_slots, flop_cycles, flop_targets = assign_flops(partition, memory, tables)
+    output_map, output_slots              = assign_outputs(partition)
 
     print("Slot Allocation:")
     print(f" - Requires {num_input_slots:3d} input slots")
-    print(f" - Requires {num_flop_slots:3d} flop slots")
+    print(f" - Requires {len(flop_slots):3d} flop slots")
     print(f" - Requires {len(output_slots):3d} output slots")
     print()
-
-    # Identify all of the logic tables
-    tables, references, sig_table_map = identify_operations(partition)
 
     print("Logic Tables:")
     print(f" - Compiled {len(tables):3d} tables")
@@ -475,7 +534,7 @@ def compile_partition(partition):
         exclude = exclude or []
         # Search for this signal in the registers
         for reg in registers + [reg_work]:
-            if signal in reg.elements:
+            if signal.name in (x.name for x in reg.elements if x is not None):
                 break
         # If not found, then try to load in from memory
         else:
@@ -495,7 +554,7 @@ def compile_partition(partition):
                 # Not found
                 raise Exception(f"Failed to locate signal '{signal}'")
 
-    def emit_operation(cone):
+    def emit_operation(cone_idx, cone):
         nonlocal registers
         # Gather inputs
         srcs = []
@@ -503,19 +562,32 @@ def compile_partition(partition):
         for input in cone.inputs:
             yield from emit_source_setup(input, exclude=srcs)
             for reg in registers + [reg_work]:
-                if input in reg.elements:
+                if input.name in (getattr(x, "name", None) for x in reg.elements):
                     srcs.append(reg)
-                    idxs.append(reg.elements.index(input))
+                    idxs.append([getattr(x, "name", None) for x in reg.elements].index(input.name))
+                    break
+            else:
+                raise Exception("Failed to locate input")
             if isinstance(input, Table):
                 references[input].remove(cone)
-        # Check if working register is full (if so, move it to another register)
+        # Check if working register has reached a flush point (all registers full)
         if None not in reg_work.elements:
+            # Move value out to a target register (uses shuffle but keeps order)
             tgt = select_register(exclude=srcs)
             yield from emit_register_reuse(tgt)
             yield Shuffle(src=reg_work.index, tgt=tgt.index, mux=list(range(8)))
             tgt.elements      = reg_work.elements[:]
             tgt.novel         = True
             reg_work.elements = [None] * 8
+            # If this is corresponds to a flop update, perform masked store
+            if (selection := flop_cycles.get(cone_idx, None)):
+                slot_idx, places = selection
+                row, slot        = flop_targets[slot_idx]
+                yield Store(src    =reg_work.index,
+                            mask   =sum(((1 << x) for x in places)),
+                            slot   =(slot // 2),
+                            address=row,
+                            offset =Store.offset.PRESERVE)
         # Extract and pad the lookup table
         table = 0
         if len(cone.inputs) == 1:
@@ -552,12 +624,19 @@ def compile_partition(partition):
             for reg in registers:
                 reg.aging()
 
-    for table in tables:
-        stream_iter(emit_operation(table))
+    truth_flops = []
+    for idx, table in enumerate(tables):
+        stream_iter(emit_operation(idx, table))
+        for output in table.op.gate.outputs:
+            if output.is_type(nxsignal_type_t.FLOP):
+                truth_flops.append(output.name)
         # TODO: Detect when values are ready for sending to other nodes
 
-    # Append flop updates
+    # Append flop updates not covered by logic
     for flop in partition.tgt_flops:
+        # Check if flop has already been handled
+        if flop.name in truth_flops:
+            continue
         # Locate where the flop should be stored
         tgt_row, tgt_slot, tgt_idx = memory.find(flop)
         # Find the signal driving the flop
@@ -616,10 +695,12 @@ def compile_partition(partition):
     # Memory access stats
     write_n_read = set(trk_write.keys()).difference(trk_read.keys())
     read_n_write = set(trk_read.keys()).difference(trk_write.keys())
+    sorted_reads = sorted(trk_read.items(), key=lambda x: x[1])
     print("=" * 80)
     print("Memory Accesses:")
     print(f" - Total Writes       : {sum(trk_write.values()):4d}")
     print(f" - Total Reads        : {sum(trk_read.values()):4d}")
+    print(f" - Most Read Address  : {sorted_reads[-1][0]} ({sorted_reads[-1][1]} times)")
     print(f" - Written Not Read   : {len(write_n_read):4d}")
     print(f" - Read Not Written   : {len(read_n_write):4d}")
     print(f" - Register Selections: {trk_select:4d}")
