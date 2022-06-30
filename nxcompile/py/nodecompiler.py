@@ -493,24 +493,37 @@ def compile_partition(partition):
     trk_evict_novel    = 0
     trk_evict_notnovel = 0
 
-    def select_register(exclude=None):
+    def select_register(op_idx, exclude=None):
         nonlocal registers, trk_select, trk_evict_inactive, trk_evict_novel, trk_evict_notnovel
+        # Setup & tracking
         exclude     = exclude or []
         trk_select += 1
         # Filter out non-excluded registers
         legal = list(filter(lambda x: (x not in exclude), registers))
-        # Look for inactive registers
+        # If there are any inactive registers, choose one of those first
         if inactive := [x for x in legal if not x.active]:
             trk_evict_inactive += 1
             return inactive[0]
-        # Look for the oldest non-novel register
-        if notnovel := sorted([x for x in legal if not x.novel], key=lambda x: x.age, reverse=True):
+        # For each register, analyse the proximity of the next use
+        proximities = []
+        for reg in legal:
+            proximity = len(tables)
+            for elem in reg.elements:
+                if elem is None:
+                    continue
+                for idx, op in enumerate(tables[op_idx:]):
+                    if elem.name in (x.name for x in op.inputs if x is not None):
+                        proximity = min(proximity, idx)
+                        break
+            proximities.append((proximity, reg))
+        # Sort registers by descending proximity & pick item 0 (furthest away)
+        _, chosen = sorted(proximities, key=lambda x: x[0], reverse=True)[0]
+        # Track if register holds 'novel' values (requires a store)
+        if chosen.novel:
             trk_evict_novel += 1
-            return notnovel[0]
-        # Finally choose the oldest register
-        trk_evict_notnovel += 1
-        ordered = sorted(legal, key=lambda x: x.age, reverse=True)
-        return ordered[0]
+        else:
+            trk_evict_notnovel += 1
+        return chosen
 
     def emit_register_reuse(register):
         nonlocal trk_write
@@ -529,7 +542,7 @@ def compile_partition(partition):
         register.age   = 0
         register.novel = False
 
-    def emit_source_setup(signal, exclude=None):
+    def emit_source_setup(op_idx, signal, exclude=None):
         nonlocal registers, trk_read
         exclude = exclude or []
         # Search for this signal in the registers
@@ -538,7 +551,7 @@ def compile_partition(partition):
                 break
         # If not found, then try to load in from memory
         else:
-            tgt = select_register(exclude)
+            tgt = select_register(op_idx, exclude)
             yield from emit_register_reuse(tgt)
             # Search in memory
             if mapping := memory.find(signal):
@@ -560,7 +573,7 @@ def compile_partition(partition):
         srcs = []
         idxs = []
         for input in cone.inputs:
-            yield from emit_source_setup(input, exclude=srcs)
+            yield from emit_source_setup(cone_idx, input, exclude=srcs)
             for reg in registers + [reg_work]:
                 if input.name in (getattr(x, "name", None) for x in reg.elements):
                     srcs.append(reg)
@@ -573,7 +586,7 @@ def compile_partition(partition):
         # Check if working register has reached a flush point (all registers full)
         if None not in reg_work.elements:
             # Move value out to a target register (uses shuffle but keeps order)
-            tgt = select_register(exclude=srcs)
+            tgt = select_register(cone_idx, exclude=srcs)
             yield from emit_register_reuse(tgt)
             yield Shuffle(src=reg_work.index, tgt=tgt.index, mux=list(range(8)))
             tgt.elements      = reg_work.elements[:]
@@ -645,7 +658,7 @@ def compile_partition(partition):
             # TODO: Generate a constant value and write to memory
             continue
         else:
-            stream_iter(emit_source_setup(signal))
+            stream_iter(emit_source_setup(len(stream), signal))
             src_reg = next(iter(x for x in registers + [reg_work] if signal in x.elements))
             src_idx = src_reg.elements.index(signal)
             # If bit is not in the right place, swap over
