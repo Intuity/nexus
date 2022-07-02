@@ -66,24 +66,134 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
 
             // Condition expressions (A ? B : C)
             if (gate->m_op == NXGate::COND) {
-                // Skip if the condition is not constant
-                auto cond = gate->m_inputs[0];
-                if (cond->m_type != NXSignal::CONSTANT) continue;
-                // Pickup the term to propagate
+                auto cond     = gate->m_inputs[0];
+                auto if_true  = gate->m_inputs[1];
+                auto if_false = gate->m_inputs[2];
                 std::shared_ptr<NXSignal> to_prop;
-                // If condition is non-zero, propagate the first term
-                if (NXConstant::from_signal(cond)->m_value != 0)
-                    to_prop = gate->m_inputs[1];
-                // Otherwise, propagate the second term
-                else
-                    to_prop = gate->m_inputs[2];
-                // Relink all of the outputs
-                for (auto driven : gate->m_outputs) {
-                    driven->replace_input(gate, to_prop);
-                    to_prop->add_output(driven);
+                std::shared_ptr<NXGate>   new_gate;
+                // If condition is constant, choose the right option
+                if (cond->m_type == NXSignal::CONSTANT) {
+                    // If condition is non-zero, propagate the first term
+                    if (NXConstant::from_signal(cond)->m_value != 0)
+                        to_prop = gate->m_inputs[1];
+                    // Otherwise, propagate the second term
+                    else
+                        to_prop = gate->m_inputs[2];
+                    // Mark gate as dropped
+                    dropped = true;
+
+                // If both terms are constant, the condition is all that matters
+                } else if (if_true->m_type  == NXSignal::CONSTANT &&
+                           if_false->m_type == NXSignal::CONSTANT) {
+                    auto t_const = NXConstant::from_signal(if_true);
+                    auto f_const = NXConstant::from_signal(if_false);
+                    // Matching values means condition doesn't matter
+                    if (t_const->m_value == f_const->m_value) {
+                        to_prop = t_const;
+                    // If true is high and false is low, condition is propagated
+                    } else if (t_const->m_value && !(f_const->m_value)) {
+                        to_prop = cond;
+                    // If true is low and false is high, inverse of condition is propagated
+                    } else if (!(t_const->m_value) && f_const->m_value) {
+                        new_gate = std::make_shared<NXGate>(NXGate::NOT);
+                        new_gate->add_input(cond);
+                        cond->add_output(new_gate);
+                        to_prop = new_gate;
+                    }
+                    // Mark gate as dropped
+                    dropped = true;
+
+                // If true term is constant
+                } else if (if_true->m_type == NXSignal::CONSTANT) {
+                    // For 'A ? 1 : C' becomes 'A | ((!A) & C)'
+                    if (NXConstant::from_signal(if_true)->m_value == 1) {
+                        // !A
+                        auto not_gate = std::make_shared<NXGate>(NXGate::NOT);
+                        not_gate->add_input(cond);
+                        cond->add_output(not_gate);
+                        // (!A) & C
+                        auto and_gate = std::make_shared<NXGate>(NXGate::AND);
+                        and_gate->add_input(not_gate);
+                        and_gate->add_input(if_false);
+                        not_gate->add_output(and_gate);
+                        if_false->add_output(and_gate);
+                        // A | ((!A) & C)
+                        new_gate = std::make_shared<NXGate>(NXGate::OR);
+                        new_gate->add_input(cond);
+                        new_gate->add_input(and_gate);
+                        not_gate->add_output(new_gate);
+                        and_gate->add_output(new_gate);
+                        cond->add_output(new_gate);
+                        and_gate->add_output(new_gate);
+                        // Dropping
+                        to_prop = new_gate;
+                        dropped = true;
+
+                    // For 'A ? 0 : C' becomes '(!A) & C'
+                    } else {
+                        // !A
+                        auto not_gate = std::make_shared<NXGate>(NXGate::NOT);
+                        not_gate->add_input(cond);
+                        cond->add_output(not_gate);
+                        // A & B
+                        new_gate = std::make_shared<NXGate>(NXGate::AND);
+                        new_gate->add_input(not_gate);
+                        new_gate->add_input(if_false);
+                        not_gate->add_output(new_gate);
+                        if_false->add_output(new_gate);
+                        // Dropping
+                        to_prop = new_gate;
+                        dropped = true;
+                    }
+
+                // If false term is constant
+                } else if (if_false->m_type == NXSignal::CONSTANT) {
+                    auto f_const = NXConstant::from_signal(if_true);
+                    std::shared_ptr<NXGate> new_gate;
+
+                    // For 'A ? B : 1' becomes '(A & B) | (!A)'
+                    if (NXConstant::from_signal(if_false)->m_value == 1) {
+                        // A & B
+                        auto and_gate = std::make_shared<NXGate>(NXGate::AND);
+                        and_gate->add_input(cond);
+                        and_gate->add_input(if_true);
+                        cond->add_output(and_gate);
+                        if_true->add_output(and_gate);
+                        // !A
+                        auto not_gate = std::make_shared<NXGate>(NXGate::NOT);
+                        not_gate->add_input(cond);
+                        cond->add_output(not_gate);
+                        // (A & B) | (!A)
+                        new_gate = std::make_shared<NXGate>(NXGate::OR);
+                        new_gate->add_input(and_gate);
+                        new_gate->add_input(not_gate);
+                        and_gate->add_output(new_gate);
+                        not_gate->add_output(new_gate);
+                        // Dropping
+                        to_prop = new_gate;
+                        dropped = true;
+
+                    // For 'A ? B : 0' becomes 'A & B'
+                    } else {
+                        // A & B
+                        new_gate = std::make_shared<NXGate>(NXGate::AND);
+                        new_gate->add_input(cond);
+                        new_gate->add_input(if_true);
+                        cond->add_output(new_gate);
+                        if_true->add_output(new_gate);
+                        // Dropping
+                        to_prop = new_gate;
+                        dropped = true;
+                    }
+
                 }
-                // Mark gate as dropped
-                dropped = true;
+
+                if(dropped) {
+                    for (auto driven : gate->m_outputs) {
+                        driven->replace_input(gate, to_prop);
+                        to_prop->add_output(driven);
+                    }
+                }
 
             // Unary expression
             } else if (gate->m_inputs.size() == 1) {
