@@ -26,17 +26,20 @@ if "NX_SEED" in os.environ:
     seed(int(os.environ["NX_SEED"]))
 
 from nxcompile import (NXParser, nxsignal_type_t, optimise_propagate,
-                       optimise_prune, dump_rtl_stats, setup_logging)
+                       optimise_prune, optimise_sanity, dump_rtl_stats,
+                       setup_logging)
 
 setup_logging()
 
 print(f"Parsing {sys.argv[1]}")
 module = NXParser.parse_from_file(sys.argv[1])
+optimise_sanity(module, True)
 print("Pre-optimisation:\n" + dump_rtl_stats(module))
 optimise_prune(module)
 optimise_propagate(module)
 optimise_prune(module)
 print("Post-optimisation:\n" + dump_rtl_stats(module))
+optimise_sanity(module, False)
 
 groups  = {}
 bkt_int = 20
@@ -66,17 +69,22 @@ class Grouping:
 for flop in module.flops:
     # Define function to chase through logic & collect gates, flops, and ports
     # stopping at the first flop/port it finds on a given tree
-    def chase(sig):
+    def chase(sig, ban_constants=False):
         if sig.is_type(nxsignal_type_t.WIRE):
             yield from chase(sig.inputs[0])
         elif sig.is_type(nxsignal_type_t.GATE):
             yield sig
             for input in sig.inputs:
-                yield from chase(input)
+                yield from chase(input, ban_constants=True)
         elif sig.is_type(nxsignal_type_t.PORT):
             yield sig
         elif sig.is_type(nxsignal_type_t.FLOP):
             yield sig
+        # Constants driving flops are acceptable (as they can create initial
+        # conditions that update after 1 cycle), but they should have been
+        # eliminated from all logic clouds
+        elif ban_constants and sig.is_type(nxsignal_type_t.CONSTANT):
+            raise Exception("Constant term found")
     # Search for ports, flops, and gates
     ports, flops, gates = [], [], []
     for entry in chase(flop.inputs[0]):
