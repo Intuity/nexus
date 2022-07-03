@@ -25,6 +25,7 @@
 #include "nxmodule.hpp"
 #include "nxopt_propagate.hpp"
 #include "nxopt_prune.hpp"
+#include "nxopt_sanity.hpp"
 #include "nxparser.hpp"
 #include "nxport.hpp"
 #include "nxsignal.hpp"
@@ -152,6 +153,7 @@ PYBIND11_MODULE(nxcompile, m) {
     m.def("dump_rtl_stats",     &dump_rtl_stats    );
     m.def("optimise_prune",     &optimise_prune    );
     m.def("optimise_propagate", &optimise_propagate);
+    m.def("optimise_sanity",    &optimise_sanity   );
     m.def("setup_logging",      &setup_logging     );
 
 }
