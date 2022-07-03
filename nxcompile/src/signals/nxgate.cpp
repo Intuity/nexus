@@ -22,8 +22,7 @@ static int gate_count = 0;
 
 NXGate::NXGate (
       NXGate::nxgate_op_t op
-) : NXSignal ( "nx_gate_" + std::to_string(gate_count), NXSignal::GATE )
-  , m_op     ( op                                                      )
-{
-    gate_count += 1;
-}
+) : NXSignal ( "nx_gate_" + std::to_string(gate_count++) + "_" + NXGate::op_to_str(op),
+               NXSignal::GATE )
+  , m_op     ( op )
+{ }

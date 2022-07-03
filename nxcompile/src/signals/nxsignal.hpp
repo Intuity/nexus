@@ -90,6 +90,11 @@ namespace Nexus {
             m_inputs.push_back(signal);
         }
 
+        bool has_input ( std::shared_ptr<NXSignal> signal )
+        {
+            return std::find(m_inputs.begin(), m_inputs.end(), signal) != m_inputs.end();
+        }
+
         void remove_input ( std::shared_ptr<NXSignal> signal )
         {
             auto pos = std::find(m_inputs.begin(), m_inputs.end(), signal);
@@ -111,6 +116,11 @@ namespace Nexus {
         {
             assert(m_max_outputs < 0 || (m_outputs.size() < m_max_outputs));
             m_outputs.push_back(signal);
+        }
+
+        bool has_output ( std::shared_ptr<NXSignal> signal )
+        {
+            return std::find(m_outputs.begin(), m_outputs.end(), signal) != m_outputs.end();
         }
 
         void remove_output ( std::shared_ptr<NXSignal> signal )

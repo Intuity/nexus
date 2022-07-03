@@ -55,6 +55,28 @@ namespace Nexus {
             return NXSignal::as<NXGate>(signal);
         }
 
+
+        static std::string op_to_str ( nxgate_op_t op )
+        {
+            switch (op) {
+                case UNKNOWN:
+                    return "UNKNOWN";
+                case ASSIGN:
+                    return "ASSIGN";
+                case AND:
+                    return "AND";
+                case OR:
+                    return "OR";
+                case NOT:
+                    return "NOT";
+                case XOR:
+                    return "XOR";
+                case COND:
+                    return "COND";
+            }
+            return "UNSUPPORTED";
+        }
+
         // =====================================================================
         // Members
         // =====================================================================

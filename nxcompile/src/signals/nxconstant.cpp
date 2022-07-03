@@ -22,7 +22,7 @@ NXConstant::NXConstant (
       unsigned int value
     , int          width /* = -1 */
 ) : NXSignal (
-        "nx_const_" + std::to_string(constant_count) + "_eq_" + std::to_string(value),
+        "nx_const_" + std::to_string(constant_count++) + "_eq_" + std::to_string(value),
         NXSignal::CONSTANT, 0
     )
   , m_value ( value )
