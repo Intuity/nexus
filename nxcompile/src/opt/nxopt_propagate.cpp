@@ -98,6 +98,7 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         new_gate = std::make_shared<NXGate>(NXGate::NOT);
                         new_gate->add_input(cond);
                         cond->add_output(new_gate);
+                        module->add_gate(new_gate);
                         to_prop = new_gate;
                     }
                     // Mark gate as dropped
@@ -111,20 +112,21 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         auto not_gate = std::make_shared<NXGate>(NXGate::NOT);
                         not_gate->add_input(cond);
                         cond->add_output(not_gate);
+                        module->add_gate(not_gate);
                         // (!A) & C
                         auto and_gate = std::make_shared<NXGate>(NXGate::AND);
                         and_gate->add_input(not_gate);
                         and_gate->add_input(if_false);
                         not_gate->add_output(and_gate);
                         if_false->add_output(and_gate);
+                        module->add_gate(and_gate);
                         // A | ((!A) & C)
                         new_gate = std::make_shared<NXGate>(NXGate::OR);
                         new_gate->add_input(cond);
                         new_gate->add_input(and_gate);
-                        not_gate->add_output(new_gate);
                         and_gate->add_output(new_gate);
                         cond->add_output(new_gate);
-                        and_gate->add_output(new_gate);
+                        module->add_gate(new_gate);
                         // Dropping
                         to_prop = new_gate;
                         dropped = true;
@@ -135,12 +137,14 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         auto not_gate = std::make_shared<NXGate>(NXGate::NOT);
                         not_gate->add_input(cond);
                         cond->add_output(not_gate);
-                        // A & B
+                        module->add_gate(not_gate);
+                        // !A & C
                         new_gate = std::make_shared<NXGate>(NXGate::AND);
                         new_gate->add_input(not_gate);
                         new_gate->add_input(if_false);
                         not_gate->add_output(new_gate);
                         if_false->add_output(new_gate);
+                        module->add_gate(new_gate);
                         // Dropping
                         to_prop = new_gate;
                         dropped = true;
@@ -159,16 +163,19 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         and_gate->add_input(if_true);
                         cond->add_output(and_gate);
                         if_true->add_output(and_gate);
+                        module->add_gate(and_gate);
                         // !A
                         auto not_gate = std::make_shared<NXGate>(NXGate::NOT);
                         not_gate->add_input(cond);
                         cond->add_output(not_gate);
+                        module->add_gate(not_gate);
                         // (A & B) | (!A)
                         new_gate = std::make_shared<NXGate>(NXGate::OR);
                         new_gate->add_input(and_gate);
                         new_gate->add_input(not_gate);
                         and_gate->add_output(new_gate);
                         not_gate->add_output(new_gate);
+                        module->add_gate(new_gate);
                         // Dropping
                         to_prop = new_gate;
                         dropped = true;
@@ -181,6 +188,7 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         new_gate->add_input(if_true);
                         cond->add_output(new_gate);
                         if_true->add_output(new_gate);
+                        module->add_gate(new_gate);
                         // Dropping
                         to_prop = new_gate;
                         dropped = true;
@@ -212,8 +220,8 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                         break;
                     }
                     case NXGate::NOT: {
-                        flatten = (num_one >  0);
-                        value   = (num_one == 0 && num_var == 0);
+                        flatten = (num_zero > 0 || num_one > 0);
+                        value   = (num_zero > 0);
                         break;
                     }
                     case NXGate::XOR: {
@@ -273,11 +281,13 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                     auto lhs_value = NXConstant::from_signal(lhs)->m_value;
                     switch (gate->m_op) {
                         case NXGate::AND: {
+                            // If LHS is one - pass through unchanged
                             if (lhs_value != 0) {
                                 for (auto output : gate->m_outputs) {
                                     output->replace_input(gate, rhs);
                                     rhs->add_output(output);
                                 }
+                            // If LHS is zero - replace with a constant zero
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(0, 1);
                                 for (auto output : gate->m_outputs) {
@@ -289,17 +299,40 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                             break;
                         }
                         case NXGate::OR: {
+                            // If LHS is zero - pass through unchanged
                             if (lhs_value == 0) {
                                 for (auto output : gate->m_outputs) {
                                     output->replace_input(gate, rhs);
                                     rhs->add_output(output);
                                 }
+                            // If LHS is one - replace with a constant one
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(1, 1);
                                 for (auto output : gate->m_outputs) {
                                     output->replace_input(gate, new_const);
                                     new_const->add_output(output);
                                 }
+                            }
+                            dropped = true;
+                            break;
+                        }
+                        case NXGate::XOR: {
+                            // If LHS is zero - pass through unchanged
+                            if (lhs_value == 0) {
+                                for (auto output : gate->m_outputs) {
+                                    output->replace_input(gate, rhs);
+                                    rhs->add_output(output);
+                                }
+                            // If LHS is one - replace with an inversion
+                            } else {
+                                auto new_gate = std::make_shared<NXGate>(NXGate::NOT);
+                                rhs->add_output(new_gate);
+                                new_gate->add_input(rhs);
+                                for (auto output : gate->m_outputs) {
+                                    output->replace_input(gate, new_gate);
+                                    new_gate->add_output(output);
+                                }
+                                module->add_gate(new_gate);
                             }
                             dropped = true;
                             break;
@@ -314,11 +347,13 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                     auto rhs_value = NXConstant::from_signal(rhs)->m_value;
                     switch (gate->m_op) {
                         case NXGate::AND: {
+                            // If RHS is one - pass through unchanged
                             if (rhs_value != 0) {
                                 for (auto output : gate->m_outputs) {
                                     output->replace_input(gate, lhs);
                                     lhs->add_output(output);
                                 }
+                            // If RHS is zero - replace with a constant zero
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(0, 1);
                                 for (auto output : gate->m_outputs) {
@@ -330,11 +365,13 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                             break;
                         }
                         case NXGate::OR: {
+                            // If RHS is zero - pass through unchanged
                             if (rhs_value == 0) {
                                 for (auto output : gate->m_outputs) {
                                     output->replace_input(gate, lhs);
                                     lhs->add_output(output);
                                 }
+                            // If RHS is one - replace with a constant one
                             } else {
                                 auto new_const = std::make_shared<NXConstant>(1, 1);
                                 for (auto output : gate->m_outputs) {
@@ -346,18 +383,22 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                             break;
                         }
                         case NXGate::XOR: {
+                            // If RHS is zero - pass through unchanged
                             if (rhs_value == 0) {
                                 for (auto output : gate->m_outputs) {
-                                    output->replace_input(gate, lhs);
-                                    lhs->add_output(output);
+                                    output->replace_input(gate, rhs);
+                                    rhs->add_output(output);
                                 }
+                            // If RHS is one - replace with an inversion
                             } else {
                                 auto new_gate = std::make_shared<NXGate>(NXGate::NOT);
+                                lhs->add_output(new_gate);
                                 new_gate->add_input(lhs);
                                 for (auto output : gate->m_outputs) {
                                     output->replace_input(gate, new_gate);
                                     new_gate->add_output(output);
                                 }
+                                module->add_gate(new_gate);
                             }
                             dropped = true;
                             break;
