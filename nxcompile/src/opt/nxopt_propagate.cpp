@@ -74,11 +74,12 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                 // If condition is constant, choose the right option
                 if (cond->m_type == NXSignal::CONSTANT) {
                     // If condition is non-zero, propagate the first term
-                    if (NXConstant::from_signal(cond)->m_value != 0)
+                    if (NXConstant::from_signal(cond)->m_value != 0) {
                         to_prop = gate->m_inputs[1];
                     // Otherwise, propagate the second term
-                    else
+                    } else {
                         to_prop = gate->m_inputs[2];
+                    }
                     // Mark gate as dropped
                     dropped = true;
 
@@ -386,8 +387,8 @@ void Nexus::optimise_propagate ( std::shared_ptr<NXModule> module )
                             // If RHS is zero - pass through unchanged
                             if (rhs_value == 0) {
                                 for (auto output : gate->m_outputs) {
-                                    output->replace_input(gate, rhs);
-                                    rhs->add_output(output);
+                                    output->replace_input(gate, lhs);
+                                    lhs->add_output(output);
                                 }
                             // If RHS is one - replace with an inversion
                             } else {
