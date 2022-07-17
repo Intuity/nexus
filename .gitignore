@@ -147,3 +147,7 @@ sim_build
 
 # Working directories
 work/
+
+# NXCompile hex/assembly
+P*.hex
+P*.asm
