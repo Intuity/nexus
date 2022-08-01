@@ -28,12 +28,13 @@ class Table:
 
     ID = 0
 
-    def __init__(self, op, inputs, outputs):
+    def __init__(self, op, inputs, outputs, ops):
         self.id       = Table.ID
         Table.ID     += 1
         self.op       = op
         self.inputs   = inputs
         self.outputs  = outputs
+        self.ops      = ops
 
     @property
     def name(self):
@@ -62,20 +63,28 @@ class Operation:
 
     def __init__(self, gate, *inputs):
         self.gate   = gate
-        self.inputs = inputs
+        self.inputs = list(inputs)
 
     @property
     def op(self):
         return self.gate.op
 
-    def __repr__(self):
+    def sub_ops(self):
+        for input in self.inputs:
+            if isinstance(input, Operation):
+                yield input
+                yield from input.sub_ops()
+
+    def render(self, include=None):
+        if include and self not in include:
+            return f"<{self.gate.name}>"
         def name(obj):
             if isinstance(obj, NXPort):
                 return "P:" + obj.name
             elif isinstance(obj, NXFlop):
                 return "F:" + obj.name
             else:
-                return str(obj)
+                return obj.render(include=include)
         if self.op == nxgate_op_t.COND:
             return (
                 "(" + name(self.inputs[0]) + ") ? " +
@@ -92,72 +101,36 @@ class Operation:
             }[self.op]
             return op_str.join([("(" + name(x) + ")") for x in self.inputs])
 
+    def prettyprint(self):
+        op_str   = self.render()
+        pretty   = ""
+        brackets = 0
+        indents  = []
+        for idx, char in enumerate(op_str):
+            next = op_str[idx+1] if (idx + 1) < len(op_str) else None
+            if char == "(":
+                brackets += 1
+                if next == "(":
+                    indents.append(brackets)
+                    pretty += "(\n" + ((len(indents) * 4) * " ")
+                else:
+                    pretty += "("
+            elif char == ")":
+                if brackets in indents:
+                    indents.pop()
+                    pretty += "\n" + ((len(indents) * 4) * " ") + ")"
+                else:
+                    pretty += ")"
+                brackets -= 1
+            else:
+                pretty += char
+        return pretty
+
+    def __repr__(self) -> str:
+        return self.render()
+
     def __str__(self):
         return self.__repr__()
-
-    @lru_cache
-    def truth(self, max_vars=3):
-        # Compile tables for sub-operations
-        sub_tables = { x: x.truth() for x in
-                        filter(lambda x: isinstance(x, Operation), self.inputs) }
-        # Determine the table for this operation
-        variables = []
-        results   = []
-        # Ternary expression
-        if self.op == nxgate_op_t.COND:
-            for input in self.inputs:
-                if isinstance(input, Operation):
-                    variables.append(sub_tables[input])
-                else:
-                    variables.append(input)
-            # Fixed result of A ? B : C
-            results = [0, 1, 0, 1, 0, 0, 1, 1]
-        elif self.op == nxgate_op_t.NOT:
-            assert len(self.inputs) == 1
-            if isinstance(self.inputs[0], Operation):
-                table     = sub_tables[self.inputs[0]]
-                variables = table.inputs
-                results   = [[1, 0][x] for x in table.outputs]
-            else:
-                variables.append(self.inputs[0])
-                results = [1, 0]
-        else:
-            assert len(self.inputs) == 2
-            tmp_vars   = []
-            tmp_chunks = []
-            for input in self.inputs:
-                if isinstance(input, Operation):
-                    tmp_vars.append(sub_tables[input])
-                else:
-                    tmp_vars.append(input)
-                tmp_chunks.append([0, 1])
-            # Consider merging tables
-            chunks = []
-            for variable, chunk in zip(tmp_vars, tmp_chunks):
-                if isinstance(variable, Table) and (len(variables) + len(variable.inputs) <= max_vars):
-                    variables += variable.inputs
-                    chunks.append(variable.outputs)
-                else:
-                    variables.append(variable)
-                    chunks.append(chunk)
-            # If number of variables has exceeded limit, revert to base
-            if len(variables) > max_vars:
-                variables = tmp_vars
-                chunks    = tmp_chunks
-            # Construct the results based on chunks
-            for lhs, rhs in product(*chunks):
-                if self.op == nxgate_op_t.AND:
-                    results.append(lhs & rhs)
-                elif self.op == nxgate_op_t.OR:
-                    results.append(lhs | rhs)
-                elif self.op == nxgate_op_t.XOR:
-                    results.append(lhs ^ rhs)
-                else:
-                    raise Exception("UNKNOWN OP!")
-        # Sanity check
-        assert len(variables) <= max_vars
-        # Return variables and results
-        return Table(self, variables, results)
 
 class MemorySlot:
 
@@ -293,7 +266,8 @@ def assign_flops(partition, memory, tables):
         for cix, entry in enumerate(chunk):
             flops = [x for x in entry.op.gate.outputs if x.is_type(nxsignal_type_t.FLOP)]
             if flops:
-                assert len(flops) == 1
+                # TODO: Turn this check back on!
+                # assert len(flops) == 1
                 chunk[cix] = flops[0]
             else:
                 chunk[cix] = None
@@ -332,7 +306,7 @@ def assign_flops(partition, memory, tables):
                 break
         else:
             slots.append([None] * 8)
-            slots[0] = flop
+            slots[-1][0] = flop
     # Allocate slots in the memory
     targets = []
     for slot in slots:
@@ -359,31 +333,170 @@ def assign_outputs(partition):
     return output_map, output_slots
 
 def identify_operations(partition):
+    # Wrap every gate in an operation
+    ops = {}
+    for gate in partition.all_gates:
+        ops[gate.name] = Operation(NXGate.from_signal(gate))
+
     @lru_cache
-    def chase(signal):
+    def chase(signal, flag_constants=True):
         if signal.is_type(nxsignal_type_t.WIRE):
             return chase(signal.inputs[0])
         elif signal.is_type(nxsignal_type_t.GATE):
-            all_inputs = list(map(chase, signal.inputs))
-            gate       = NXGate.from_signal(signal)
-            return Operation(gate, *all_inputs)
+            return ops[signal.name]
         elif signal.is_type(nxsignal_type_t.FLOP):
             return NXFlop.from_signal(signal)
         elif signal.is_type(nxsignal_type_t.PORT):
             return NXPort.from_signal(signal)
         elif signal.is_type(nxsignal_type_t.CONSTANT):
-            return NXConstant.from_signal(signal).value
+            if flag_constants:
+                raise Exception("Unoptimised constant term found!")
         else:
             raise Exception(f"UNKNOWN TYPE: {signal.type}")
 
-    mapping = {}
-    for group in partition.groups:
-        signal = group.target.inputs[0]
-        if signal.is_type(nxsignal_type_t.GATE):
-            mapping[signal] = chase(signal).truth()
+    # Link operations together & track direct references
+    refs = defaultdict(list)
+    for op in ops.values():
+        for input in op.gate.inputs:
+            op.inputs.append(found := chase(input))
+            if isinstance(found, Operation):
+                refs[found.gate.name].append(op)
 
-    # Expand the full set (including tables within tables)
-    tables = list(set(sum([list(x.explode()) for x in mapping.values()], [])))
+    # Include references from flops
+    for flop in partition.tgt_flops:
+        driver = chase(flop.inputs[0], flag_constants=False)
+        if isinstance(driver, Operation):
+            refs[driver.gate.name].append(flop)
+
+    # Order operations by number of references
+    ordered = [ops[x[0]] for x in sorted(refs.items(), key=lambda x: len(x[1]), reverse=True)]
+
+    # Compile truth tables for all operations
+    tables = {}
+    for op in ordered:
+        # Attempt to merge supporting operations
+        current  = op.inputs
+        contrib  = []
+        best_ins = current[:]
+        best_ops = []
+        while True:
+            # Track successful expansions
+            expanded = False
+            # Iterate through each term in the current expression
+            work_ins = []
+            work_ops = contrib[:]
+            for idx_term, term in enumerate(current):
+                # Expand this term
+                if term in tables:
+                    work_ins.append(tables[term])
+                elif isinstance(term, Operation):
+                    work_ins += term.inputs
+                    work_ops.append(term)
+                    expanded = True
+                else:
+                    work_ins.append(term)
+                # Join with the remainder
+                full_ins = work_ins + current[idx_term+1:]
+                if len(set(full_ins)) <= 3:
+                    best_ins = full_ins
+                    best_ops = work_ops[:]
+            # Update the current state
+            current = work_ins[:]
+            contrib = work_ops[:]
+            # If no expansion occurred, stop searching
+            if not expanded:
+                break
+        # Build logic function for each term
+        funcs = {}
+        all_ops = [op] + best_ops
+        for input in best_ins:
+            funcs[input.op if isinstance(input, Table) else input] = [1, 0]
+        for step in all_ops[::-1]:
+            # Static encoding of A ? B : C
+            if step.op == nxgate_op_t.COND:
+                # Get terms B+C & expand to 4 bits
+                if_true  = (4 // len(funcs[step.inputs[1]])) * funcs[step.inputs[1]]
+                if_false = (4 // len(funcs[step.inputs[2]])) * funcs[step.inputs[2]]
+                # Concatenate terms together
+                funcs[step] = if_false + if_true
+            # NOT gates invert the term that they carry
+            elif step.op == nxgate_op_t.NOT:
+                inner = funcs[step.inputs[0]]
+                funcs[step] = [[1, 0][x] for x in inner]
+            # Two input terms need to expand a product
+            elif step.op in (nxgate_op_t.OR, nxgate_op_t.AND, nxgate_op_t.XOR):
+                inner_lhs, inner_rhs = [funcs[x] for x in step.inputs]
+                funcs[step] = []
+                for lhs, rhs in product(inner_lhs, inner_rhs):
+                    if step.op == nxgate_op_t.AND:
+                        funcs[step].append(lhs & rhs)
+                    elif step.op == nxgate_op_t.OR:
+                        funcs[step].append(lhs | rhs)
+                    elif step.op == nxgate_op_t.XOR:
+                        funcs[step].append(lhs ^ rhs)
+            # Otherwise unsupported
+            else:
+                raise Exception(f"Unsupported op {step.op}")
+        # Extract the result & expand to fit
+        result = (8 // len(funcs[op])) * funcs[op]
+        # Create a table
+        tables[op] = Table(op, best_ins, result, [op] + best_ops)
+
+    # Update any table inputs to reference other tables
+    for table in tables.values():
+        for idx, input in enumerate(table.inputs):
+            if isinstance(input, Operation):
+                table.inputs[idx] = tables[input]
+
+    # Eliminate truth tables which are not referenced
+    print(f"Compiled {len(tables)} tables")
+    while True:
+        # Freshly count references
+        refs = defaultdict(lambda: 0)
+        for table in tables.values():
+            for input in table.inputs:
+                if isinstance(input, Table):
+                    refs[input.op.gate.name] += 1
+        for flop in partition.tgt_flops:
+            refs[flop.inputs[0].name] += 1
+        # Drop any items with a zero count
+        dropped = 0
+        for op in list(tables.keys()):
+            if refs[op.gate.name] == 0:
+                del tables[op]
+                dropped += 1
+        # If no terms dropped, break out
+        print(f"Dropped {dropped} tables")
+        if dropped == 0:
+            break
+    print(f"There are {len(tables)} remaining tables")
+
+    # Sum all included operations
+    all_ins = []
+    all_ops = []
+    all_tgt = []
+    for table in tables.values():
+        all_ins += [x for x in table.inputs if not isinstance(x, (Table, Operation))]
+        all_ops += table.ops
+        all_tgt += [x for x in table.op.gate.outputs if x.is_type(nxsignal_type_t.FLOP)]
+
+    # Count number of simple and complex ops
+    simple_ops  = 0
+    complex_ops = 0
+    for table in tables.values():
+        if len(table.ops) == 1 and len(table.inputs) <= 2:
+            simple_ops += 1
+        else:
+            complex_ops += 1
+
+    print(f"All Inputs : {len(set(all_ins))}")
+    print(f"All Ops    : {len(set(all_ops))}")
+    print(f"All Tgts   : {len(set(all_tgt))}")
+    print(f"Simple Ops : {simple_ops}")
+    print(f"Complex Ops: {complex_ops}")
+
+    # Convert tables to a list
+    tables = list(tables.values())
 
     # Build table-to-table references
     refs = defaultdict(lambda: set())
@@ -418,19 +531,20 @@ def identify_operations(partition):
         else:
             raise Exception("Made no progress!")
 
-    return satisfied, refs, mapping
+    return satisfied, refs
 
 
 def compile_partition(partition):
     print(f"Compiling partition {partition.id}")
     print(f" - Has {len(partition.all_gates)} gates")
+    print(f" - Has {len(partition.tgt_flops)} flops")
     print()
 
     # Create a memory
     memory = Memory()
 
     # Identify all of the logic tables
-    tables, references, sig_table_map = identify_operations(partition)
+    tables, references = identify_operations(partition)
 
     # Assign input slots
     num_input_slots                       = assign_inputs(partition, memory)
@@ -581,7 +695,7 @@ def compile_partition(partition):
                     break
             else:
                 raise Exception("Failed to locate input")
-            if isinstance(input, Table):
+            if isinstance(input, Table) and input in references and cone in references[input]:
                 references[input].remove(cone)
         # Check if working register has reached a flush point (all registers full)
         if None not in reg_work.elements:
@@ -603,19 +717,21 @@ def compile_partition(partition):
                             offset =Store.offset.PRESERVE)
         # Extract and pad the lookup table
         table = 0
-        if len(cone.inputs) == 1:
-            srcs  = [srcs[0].index, 0, 0]
-            idxs  = [idxs[0]]
-            table = sum([(x << i) for i, x in enumerate(cone.outputs * 4)])
-        elif len(cone.inputs) == 2:
-            srcs  = [srcs[0].index, srcs[1].index, 0]
-            idxs  = [idxs[0], idxs[1], 0]
-            table = sum([(x << i) for i, x in enumerate(cone.outputs * 2)])
-        elif len(cone.inputs) == 3:
-            srcs  = [x.index for x in srcs]
-            table = sum([(x << i) for i, x in enumerate(cone.outputs)])
-        else:
-            raise Exception("Unsupported number of inputs")
+        srcs  = [x.index for x in srcs] + ([0] * (3 - len(srcs)))
+        table = sum([(x << i) for i, x in enumerate(cone.outputs)])
+        # if len(cone.inputs) == 1:
+        #     srcs  = [srcs[0].index, 0, 0]
+        #     idxs  = [idxs[0]]
+        #     table = sum([(x << i) for i, x in enumerate(cone.outputs * 4)])
+        # elif len(cone.inputs) == 2:
+        #     srcs  = [srcs[0].index, srcs[1].index, 0]
+        #     idxs  = [idxs[0], idxs[1], 0]
+        #     table = sum([(x << i) for i, x in enumerate(cone.outputs * 2)])
+        # elif len(cone.inputs) == 3:
+        #     srcs  = [x.index for x in srcs]
+        #     table = sum([(x << i) for i, x in enumerate(cone.outputs)])
+        # else:
+        #     raise Exception("Unsupported number of inputs")
         assert table >= 0 and table <= 0xFF, "Incorrect table value"
         # Emit an instruction
         yield Truth(src=srcs, mux=idxs, table=table, tgt=reg_work.index)
@@ -646,38 +762,41 @@ def compile_partition(partition):
         # TODO: Detect when values are ready for sending to other nodes
 
     # Append flop updates not covered by logic
-    for flop in partition.tgt_flops:
-        # Check if flop has already been handled
-        if flop.name in truth_flops:
-            continue
-        # Locate where the flop should be stored
-        tgt_row, tgt_slot, tgt_idx = memory.find(flop)
-        # Find the signal driving the flop
-        signal = sig_table_map.get(flop.inputs[0], flop.inputs[0])
-        if getattr(signal, "type", None) == nxsignal_type_t.CONSTANT:
-            # TODO: Generate a constant value and write to memory
-            continue
-        else:
-            stream_iter(emit_source_setup(len(stream), signal))
-            src_reg = next(iter(x for x in registers + [reg_work] if signal in x.elements))
-            src_idx = src_reg.elements.index(signal)
-            # If bit is not in the right place, swap over
-            if tgt_idx != src_idx:
-                stream_add(Shuffle(src=src_reg.index,
-                                tgt=src_reg.index,
-                                mux=[{
-                                    src_idx: tgt_idx,
-                                    tgt_idx: src_idx
-                                }.get(x, x) for x in range(8)]))
-                src_reg.elements[tgt_idx], src_reg.elements[src_idx] = (
-                    src_reg.elements[src_idx], src_reg.elements[tgt_idx]
-                )
-            # Write out
-            stream_add(Store(src    =src_reg.index,
-                             mask   =(1 << tgt_idx),
-                             slot   =(tgt_slot // 2),
-                             address=tgt_row,
-                             offset =Store.offset.PRESERVE))
+    # for flop in partition.tgt_flops:
+    #     # Check if flop has already been handled
+    #     if flop.name in truth_flops:
+    #         continue
+    #     # Locate where the flop should be stored
+    #     tgt_row, tgt_slot, tgt_idx = memory.find(flop)
+    #     # Find the signal driving the flop
+    #     signal = sig_table_map.get(flop.inputs[0], flop.inputs[0])
+    #     if getattr(signal, "type", None) == nxsignal_type_t.CONSTANT:
+    #         # TODO: Generate a constant value and write to memory
+    #         continue
+    #     else:
+    #         stream_iter(emit_source_setup(len(stream), signal))
+    #         try:
+    #             src_reg = next(iter(x for x in registers + [reg_work] if signal in x.elements))
+    #         except StopIteration:
+    #             raise Exception(f"Failed to find {signal.name}")
+    #         src_idx = src_reg.elements.index(signal)
+    #         # If bit is not in the right place, swap over
+    #         if tgt_idx != src_idx:
+    #             stream_add(Shuffle(src=src_reg.index,
+    #                             tgt=src_reg.index,
+    #                             mux=[{
+    #                                 src_idx: tgt_idx,
+    #                                 tgt_idx: src_idx
+    #                             }.get(x, x) for x in range(8)]))
+    #             src_reg.elements[tgt_idx], src_reg.elements[src_idx] = (
+    #                 src_reg.elements[src_idx], src_reg.elements[tgt_idx]
+    #             )
+    #         # Write out
+    #         stream_add(Store(src    =src_reg.index,
+    #                          mask   =(1 << tgt_idx),
+    #                          slot   =(tgt_slot // 2),
+    #                          address=tgt_row,
+    #                          offset =Store.offset.PRESERVE))
 
     # Append a branch to wait for the next trigger
     stream_add(Branch(pc=0,
@@ -696,6 +815,24 @@ def compile_partition(partition):
         print(f" - {key:7s}: {count:3d}")
     print("=" * 80)
     print()
+
+    if counts["TRUTH"] > len(partition.all_gates):
+        print(f"{counts['TRUTH']:=} > {len(partition.all_gates):=}")
+
+    rendered = {}
+    for table in tables:
+        sub_ops = [x.op for x in table.inputs if isinstance(x, Table)]
+        rendered[table.op.gate.name] = table.op.render(include=[table.op] + sub_ops)
+
+    # # Count references
+    # print("=== TABLES ===")
+    # for key, full in rendered.items():
+    #     refs = len([x for x in rendered.values() if key in x])
+    #     print(f"{key} -> {full} -> {refs} times")
+
+    # print(tables[-1].op.prettyprint())
+    # breakpoint()
+    # assert False
 
     # Calculate access deltas
     deltas = {}

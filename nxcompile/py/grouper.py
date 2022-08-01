@@ -38,9 +38,9 @@ print("Pre-optimisation:\n" + dump_rtl_stats(module))
 optimise_prune(module)
 optimise_propagate(module)
 optimise_prune(module)
+
 print("Post-optimisation:\n" + dump_rtl_stats(module))
 optimise_sanity(module, False)
-
 groups  = {}
 bkt_int = 20
 buckets = defaultdict(lambda: [])
@@ -49,7 +49,7 @@ class Grouping:
 
     GROUP_ID = 0
 
-    def __init__(self, target, src_ports, src_flops, gates):
+    def __init__(self, target, src_ports, tgt_ports, src_flops, gates):
         # Assign a unique ID
         self.id            = f"G{Grouping.GROUP_ID:03X}"
         Grouping.GROUP_ID += 1
@@ -57,6 +57,7 @@ class Grouping:
         self.target    = target
         self.src_ports = list(set(src_ports))
         self.src_flops = list(set(src_flops))
+        self.tgt_ports = list(set(tgt_ports))
         self.gates     = list(set(gates))
         self.drives_to = set()
         self.driven_by = set()
@@ -93,8 +94,13 @@ for flop in module.flops:
             nxsignal_type_t.FLOP: flops,
             nxsignal_type_t.GATE: gates,
         }[entry.type].append(entry)
+    # Search for target ports
+    tgt_ports = []
+    for entry in flop.outputs:
+        if entry.is_type(nxsignal_type_t.PORT):
+            tgt_ports.append(entry)
     # Append the grouping
-    group = Grouping(flop, ports, flops, gates)
+    group = Grouping(flop, ports, tgt_ports, flops, gates)
     groups[group.target.name] = group
     # Bucket the grouping based on complexity (number of gates)
     buckets[group.complexity // bkt_int].append(group)
@@ -161,6 +167,7 @@ class Partition:
         self.tgt_flops = None
         self.src_flops = None
         self.src_ports = None
+        self.tgt_ports = None
         self.all_gates = None
 
     @property
@@ -180,12 +187,14 @@ class Partition:
         self.tgt_flops = set()
         self.src_flops = set()
         self.src_ports = set()
+        self.tgt_ports = set()
         self.all_gates = set()
         for group in self.groups:
             self.tgt_flops.add(group.target)
             tgt_flop_map[group.target.name] = self
             self.src_flops = self.src_flops.union(set(group.src_flops))
             self.src_ports = self.src_ports.union(set(group.src_ports))
+            self.tgt_ports = self.tgt_ports.union(set(group.tgt_ports))
             self.all_gates = self.all_gates.union(set(group.gates))
 
     def usage(self):
