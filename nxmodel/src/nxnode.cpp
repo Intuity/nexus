@@ -16,6 +16,7 @@
 #include <bitset>
 #include <iomanip>
 
+#include "nxisa.hpp"
 #include "nxnode.hpp"
 
 using namespace NXModel;
@@ -36,20 +37,22 @@ std::shared_ptr<NXMessagePipe> NXNode::get_pipe (direction_t dirx)
 
 void NXNode::reset (void)
 {
-    m_seen_first = false;
-    m_accumulator = 0;
-    m_memory.clear();
-    m_num_instr   = 0;
-    m_loopback    = 0;
-    m_trace_en    = false;
-    m_inputs_curr.clear();
-    m_inputs_next.clear();
-    m_outputs.clear();
+    m_idle        = true;
+    m_waiting     = true;
+    m_pc          = 0;
+    m_offset      = false;
+    m_restart_pc  = 0;
+    m_next_pc     = 0;
+    m_next_offset = false;
+    for (int i = 0; i < 8; i++) m_registers[i] = 0;
+    m_inst_memory.clear();
+    m_data_memory.clear();
 }
 
 bool NXNode::is_idle (void)
 {
     return (
+        (m_idle                                         ) &&
         (m_inbound[0] == NULL || m_inbound[0]->is_idle()) &&
         (m_inbound[1] == NULL || m_inbound[1]->is_idle()) &&
         (m_inbound[2] == NULL || m_inbound[2]->is_idle()) &&
@@ -59,53 +62,11 @@ bool NXNode::is_idle (void)
 
 void NXNode::step (bool trigger)
 {
-    // On the first triggered cycle, always evaluate instructions
-    bool ip_delta = (!m_seen_first && trigger);
+    // Digest inbound messages, capturing if combinational updates were received
+    bool comb_ips = digest();
 
-    // If a trigger is received, copy next->current
-    if (trigger) {
-        for (io_state_t::iterator it = m_inputs_next.begin(); it != m_inputs_next.end(); it++) {
-            uint32_t index = it->first;
-            bool     state = it->second;
-            // Is this a change in value
-            ip_delta |= (state != get_input(index));
-            // Update the value
-            m_inputs_curr[index] = state;
-        }
-    }
-
-    // Digest inbound messages
-    ip_delta |= digest();
-
-    // Perform execution
-    bool op_delta = false;
-    if (ip_delta) op_delta = evaluate();
-
-    // Generate outbound messages
-    if (op_delta) transmit();
-
-    // Record whether a trigger has ever been seen
-    m_seen_first |= trigger;
-}
-
-std::vector<uint32_t> NXNode::get_memory (void)
-{
-    return m_memory;
-}
-
-NXNode::io_state_t NXNode::get_current_inputs (void)
-{
-    return m_inputs_curr;
-}
-
-NXNode::io_state_t NXNode::get_next_inputs (void)
-{
-    return m_inputs_next;
-}
-
-NXNode::io_state_t NXNode::get_current_outputs (void)
-{
-    return m_outputs;
+    // If triggered or combinational updates received, evaluate
+    if (trigger || comb_ips) evaluate(trigger);
 }
 
 bool NXNode::digest (void)
@@ -120,68 +81,49 @@ bool NXNode::digest (void)
         while (!pipe->is_idle()) {
             node_header_t header = pipe->next_header();
             // Is the message targeted at this node?
-            if (header.row == m_row && header.column == m_column) {
+            if (header.target.row == m_id.row && header.target.column == m_id.column) {
                 // std::cout << "[NXNode " << m_row << ", " << m_column << "] "
                 //           << "Received command " << header.command << std::endl;
                 switch (header.command) {
+                    // LOAD: Write into the node's instruction memory
                     case NODE_COMMAND_LOAD: {
                         node_load_t msg;
                         pipe->dequeue(msg);
-                        // Accumulate the value
-                        m_accumulator = (
-                            (m_accumulator << LOAD_SEG_WIDTH) |
-                            msg.data
-                        );
-                        // When the last flag is set, load into the memory
-                        if (msg.last) {
-                            m_memory.push_back(m_accumulator);
-                            m_accumulator = 0;
-                        }
+                        uint32_t data = msg.data;
+                        data <<= msg.slot * 8;
+                        uint32_t mask = 0xFF;
+                        mask <<= msg.slot * 8;
+                        m_inst_memory.write(msg.address, data, mask);
                         break;
                     }
+                    // SIGNAL: Write into the node's data memory
                     case NODE_COMMAND_SIGNAL: {
                         node_signal_t msg;
                         pipe->dequeue(msg);
-                        // Update input state
-                        if (m_verbose) {
-                            std::cout << "[NXNode " << m_row << ", " << m_column << "]"
-                                      << " Received Signal -"
-                                      << " IDX: " << (int)msg.index
-                                      << " VAL: " << (int)msg.state
-                                      << " SEQ: " << (int)msg.is_seq << std::endl;
-                        }
-                        m_inputs_next[msg.index] = msg.state;
-                        if (!msg.is_seq) {
-                            curr_delta = (m_inputs_curr[msg.index] != msg.state);
-                            m_inputs_curr[msg.index] = msg.state;
-                        }
-                        break;
-                    }
-                    case NODE_COMMAND_CONTROL: {
-                        node_control_t msg;
-                        pipe->dequeue(msg);
-                        switch (msg.param) {
-                            case NODE_PARAMETER_INSTRUCTIONS:
-                                m_num_instr = msg.value;
+                        bool offset = m_offset;
+                        switch (msg.offset) {
+                            case MEMORY_OFFSET_PRESERVE:
                                 break;
-                            case NODE_PARAMETER_LOOPBACK:
-                                m_loopback = (
-                                    (m_loopback & ((1 << NODE_PARAM_WIDTH)-1)) << NODE_PARAM_WIDTH |
-                                    msg.value
-                                );
-                                if (m_verbose) {
-                                    std::cout << "[NXNode " << m_row << ", " << m_column << "] "
-                                                << "Loopback mask set to "
-                                                << std::bitset<32>(m_loopback) << std::endl;
-                                }
+                            case MEMORY_OFFSET_INVERSE:
+                                offset = !offset;
                                 break;
-                            case NODE_PARAMETER_TRACE:
-                                m_trace_en = ((msg.value & 0x1) != 0);
+                            case MEMORY_OFFSET_SET_LOW:
+                                offset = false;
+                                break;
+                            case MEMORY_OFFSET_SET_HIGH:
+                                offset = true;
                                 break;
                             default:
-                                assert(!"Unsupported control parameter");
-                                break;
+                                assert(!"Unsupported offset");
                         }
+                        uint32_t data  = msg.data;
+                        uint32_t mask  = 0xFF;
+                        uint32_t shift = 0;
+                        if (msg.slot) shift += 16;
+                        if (offset  ) shift +=  8;
+                        data <<= shift;
+                        mask <<= shift;
+                        m_data_memory.write(msg.address, data, mask);
                         break;
                     }
                     default: assert(!"Unsupported command received");
@@ -200,177 +142,154 @@ bool NXNode::digest (void)
     return curr_delta;
 }
 
-bool NXNode::evaluate (void)
+bool NXNode::evaluate ( bool trigger )
 {
-    // Log the current inputs
-    uint64_t vector = 0;
-    for (uint32_t idx = 0; idx < 32; idx++) vector |= (get_input(idx) << idx);
-    if (m_verbose) {
-        std::cout << "[NXNode " << m_row << ", " << m_column << "] Inputs "
-                  << std::bitset<32>(vector) << std::endl;
-    }
-    // Declare storage for the working registers
-    io_state_t working;
-    auto get_reg = [&] (uint32_t index) -> bool {
-        return working.count(index) ? working[index] : false;
-    };
-    // Iterate through instructions performing input->output transform
-    uint32_t op_index = 0;
-    bool     op_delta = false;
-    for (uint32_t pc = 0; pc < m_num_instr; pc++) {
-        uint32_t      raw_data = m_memory[pc];
-        instruction_t instr    = unpack_instruction((uint8_t *)&raw_data);
-        // Pickup the inputs
-        bool input_a = instr.src_a_ip ? get_input(instr.src_a) : get_reg(instr.src_a);
-        bool input_b = instr.src_b_ip ? get_input(instr.src_b) : get_reg(instr.src_b);
-        bool input_c = instr.src_c_ip ? get_input(instr.src_c) : get_reg(instr.src_c);
-        // Work out the shift
-        uint32_t shift = (input_a ? 4 : 0) + (input_b ? 2 : 0) + (input_c ? 1 : 0);
-        // Select the right entry from the truth table
-        bool result = (((instr.truth >> shift) & 0x1) != 0);
-        // Store to the target register
-        working[instr.tgt_reg] = result;
-        // Log
-        if (m_verbose) {
-            std::cout << "[NXNode " << m_row << ", " << m_column << "] "
-                      << "@" << std::dec << std::setw(4) << std::setfill('0') << (int)pc << " -"
-                      << " 0x" << std::hex << std::setw(8) << std::setfill('0') << (int)raw_data << " -"
-                      << " TT: 0x"   << std::bitset<8>(instr.truth) << std::dec
-                      << " SRC_A: "  << (instr.src_a_ip ? "I[" : "R[") << std::dec << std::setw(2) << std::setfill(' ') << (int)instr.src_a << "]"
-                      << " SRC_B: "  << (instr.src_b_ip ? "I[" : "R[") << std::dec << std::setw(2) << std::setfill(' ') << (int)instr.src_b << "]"
-                      << " SRC_C: "  << (instr.src_c_ip ? "I[" : "R[") << std::dec << std::setw(2) << std::setfill(' ') << (int)instr.src_c << "]"
-                      << " TGT: "    << (int)instr.tgt_reg
-                      << " OUTPUT: " << (instr.gen_out ? "YES" : "NO ")
-                      << " - F(" << (input_a ? "1" : "0")
-                      << ", "    << (input_b ? "1" : "0")
-                      << ", "    << (input_c ? "1" : "0")
-                      << ") => " << (result  ? "1" : "0");
-            if (instr.gen_out) {
-                std::cout << " -> O[" << std::dec << std::setw(2) << std::setfill(' ')
-                        << (int)op_index << "]";
-            }
-            std::cout << std::endl;
-        }
-        // Does this instruction generate an output?
-        if (instr.gen_out) {
-            // Has the output value changed
-            op_delta |= (result != get_output(op_index));
-            // Store the output value
-            m_outputs[op_index] = result;
-            // Does this need to loopback?
-            if (((m_loopback >> op_index) & 0x1) != 0) {
-                if (m_verbose) {
-                    std::cout << "[NXNode " << m_row << ", " << m_column << "] Loopback "
-                              << (int)op_index << " - " << result << std::endl;
-                }
-                m_inputs_next[op_index] = result;
-            }
-            // Always increment the output
-            op_index++;
-        }
-    }
-    // Return whether the outputs have updated
-    return op_delta;
-}
+    // Should always be waiting at this point
+    assert(m_waiting);
 
-void NXNode::transmit (void)
-{
-    // Generate signal state updates
-    uint32_t bitmap = 0;
-    for (io_state_t::iterator it = m_outputs.begin(); it != m_outputs.end(); it++) {
-        uint32_t index = it->first;
-        bool     state = it->second;
-        bool     last  = m_outputs_last.count(index) ? m_outputs_last[index] : false;
-        // Accumulate bitmap for trace
-        bitmap |= (state ? 1 : 0) << index;
-        // Skip outputs where the value has not changed
-        if (state == last) continue;
-        // Skip outputs that are not enabled
-        if (index >= m_num_outputs) continue;
-        // Lookup the output mappings
-        uint32_t raw_lookup    = m_memory[m_num_instr + index];
-        output_lookup_t lookup = unpack_output_lookup((uint8_t *)&raw_lookup);
-        // Skip inactive entries (i.e. those with no non-loopback outputs)
-        if (!lookup.active) continue;
-        // Log
-        if (m_verbose) {
-            std::cout << "[NXNode " << m_row << ", " << m_column << "]"
-                      << " Lookup for output " << std::dec << (int)index
-                      << " - START: 0x" << std::hex << (int)lookup.start
-                      << ", END: 0x" << std::hex << (int)lookup.stop
-                      << std::endl;
-        }
-        // Fetch and generate each of the messages
-        for (uint32_t addr = lookup.start; addr <= lookup.stop; addr++) {
-            // Sanity check
-            assert(addr < MAX_NODE_MEMORY);
-            // Fetch the mapping
-            uint32_t         raw_mapping = m_memory[addr];
-            output_mapping_t mapping     = unpack_output_mapping((uint8_t *)&raw_mapping);
-            // Generate and send a message
-            node_signal_t msg;
-            msg.header.row     = mapping.row;
-            msg.header.column  = mapping.column;
-            msg.header.command = NODE_COMMAND_SIGNAL;
-            msg.index          = mapping.index;
-            msg.is_seq         = mapping.is_seq;
-            msg.state          = state;
-            // Log
-            if (m_verbose) {
-                std::cout << "[NXNode " << m_row << ", " << m_column << "]"
-                          << " Sending Signal -"
-                          << " ROW: " << std::dec << (int)msg.header.row
-                          << " COL: " << std::dec << (int)msg.header.column
-                          << " IDX: " << std::dec << (int)msg.index
-                          << " VAL: " << std::dec << (int)msg.state
-                          << " SEQ: " << std::dec << (int)msg.is_seq << std::endl;
-            }
-            // Dispatch the message
-            route(mapping.row, mapping.column, NODE_COMMAND_SIGNAL)->enqueue(msg);
-        }
-        // Always update the last sent state
-        m_outputs_last[index] = state;
+    // If evaluation caused by a global trigger, adopt next PC & offset
+    if (trigger) {
+        m_pc         = m_next_pc;
+        m_restart_pc = m_next_pc;
+        m_offset     = m_next_offset;
+    // Otherwise restart from the PC last jumped to by a trigger event
+    } else {
+        m_pc = m_restart_pc;
     }
-    // Generate trace messages if required
-    if (m_trace_en) {
-        for (
-            uint32_t idx = 0;
-            idx < ((m_num_outputs + TRACE_SECTION_WIDTH - 1) / TRACE_SECTION_WIDTH);
-            idx++
-        ) {
-            // Build the message
-            node_trace_t msg;
-            msg.header.row     = m_row;
-            msg.header.column  = m_column;
-            msg.header.command = NODE_COMMAND_TRACE;
-            msg.select         = idx;
-            msg.trace          = (
-                (bitmap >> (idx * TRACE_SECTION_WIDTH)) &
-                ((1 << TRACE_SECTION_WIDTH) - 1)
-            );
-            // Debug logging
-            if (m_verbose) {
-                std::cout << "[NXNode " << std::dec << (int)m_row << ", "
-                          << std::dec << (int)m_column << "]"
-                          << " Sending trace section " << std::dec << (int)msg.select
-                          << " with value 0x" << std::hex << (int)msg.trace
-                          << std::endl;
+
+    // Always clear idle & waiting flags
+    m_idle    = false;
+    m_waiting = false;
+
+    // Evaluate instructions until waiting is set
+    while (!m_waiting) {
+        // Fetch
+        uint32_t raw = m_inst_memory.read(m_pc);
+
+        // Decode instruction type
+        NXISA::opcode_t op = (NXISA::opcode_t)NXISA::extract_op(raw);
+
+        // Extract common fields
+        uint32_t        f_src_a   = NXISA::extract_src_a(raw);
+        uint32_t        f_src_b   = NXISA::extract_src_b(raw);
+        uint32_t        f_src_c   = NXISA::extract_src_c(raw);
+        uint32_t        f_tgt     = NXISA::extract_tgt(raw);
+        uint32_t        f_slot    = NXISA::extract_slot(raw);
+        uint32_t        f_address = NXISA::extract_address(raw);
+        NXISA::offset_t f_offset  = (NXISA::offset_t)NXISA::extract_offset(raw);
+        uint32_t        f_jump_pc = NXISA::extract_pc(raw);
+
+        // Pickup register values
+        uint8_t val_a = m_registers[f_src_a];
+        uint8_t val_b = m_registers[f_src_b];
+        uint8_t val_c = m_registers[f_src_c];
+
+        // Determine offset state for this instruction
+        bool offset = m_offset;
+        switch (f_offset) {
+            case NXISA::OFFSET_PRESERVE:
+                break;
+            case NXISA::OFFSET_INVERSE:
+                offset = !offset;
+                break;
+            case NXISA::OFFSET_SET_HIGH:
+                offset = true;
+                break;
+            case NXISA::OFFSET_SET_LOW:
+                offset = false;
+                break;
+            default:
+                assert(!"Unsupported offset");
+        }
+
+        // Work out shift based on offset state and field
+        uint32_t shift = (f_slot ? 16 : 0) + (offset ? 8 : 0);
+
+        // Perform the correct operation
+        switch (op) {
+            case NXISA::OP_LOAD: {
+                uint32_t word = m_data_memory.read(f_address);
+                m_registers[f_tgt] = (word >> shift) & 0xFF;
+                break;
             }
-            // Dispatch the message
-            route(m_row, m_column, NODE_COMMAND_TRACE)->enqueue(msg);
+            case NXISA::OP_STORE: {
+                uint32_t data = val_a;
+                uint32_t mask = NXISA::extract_mask(raw);
+                data <<= shift;
+                mask <<= shift;
+                m_data_memory.write(f_address, data, mask);
+                break;
+            }
+            case NXISA::OP_BRANCH: {
+                // NOTE: Not fully implemented as likely to be simplified in the
+                //       final ISA as branching not required
+                m_waiting     = true;
+                m_idle        = (NXISA::extract_idle(raw) != 0);
+                m_next_pc     = f_jump_pc;
+                m_next_offset = offset;
+                break;
+            }
+            case NXISA::OP_SEND: {
+                assert(!"Not yet implemented")
+                break;
+            }
+            case NXISA::OP_TRUTH: {
+                // Pickup the mux values
+                uint32_t mux_a = NXISA::extract_mux_a(raw);
+                uint32_t mux_b = NXISA::extract_mux_b(raw);
+                uint32_t mux_c = NXISA::extract_mux_c(raw);
+                // Extract the selected bit from each source
+                bool bit_a = (((val_a >> mux_a) & 1) != 0);
+                bool bit_b = (((val_b >> mux_b) & 1) != 0);
+                bool bit_c = (((val_c >> mux_c) & 1) != 0);
+                // Apply shifts to the truth table
+                uint32_t table = NXISA::extract_table(raw);
+                if (bit_a) table >>= 1;
+                if (bit_b) table >>= 2;
+                if (bit_c) table >>= 4;
+                // Determine the result
+                bool result = ((table & 1) != 0);
+                // Shift into the result register (r7)
+                m_registers[7] = (m_registers[7] << 1) | (result ? 1 : 0);
+                break;
+            }
+            case NXISA::OP_ARITH: {
+                assert(!"Not yet implemented");
+                break;
+            }
+            case NXISA::OP_SHUFFLE:
+            case NXISA::OP_SHUFFLE_ALT: {
+                // Extract bit selectors
+                uint32_t b0 = NXISA::extract_b0(raw);
+                uint32_t b1 = NXISA::extract_b1(raw);
+                uint32_t b2 = NXISA::extract_b2(raw);
+                uint32_t b3 = NXISA::extract_b3(raw);
+                uint32_t b4 = NXISA::extract_b4(raw);
+                uint32_t b5 = NXISA::extract_b5(raw);
+                uint32_t b6 = NXISA::extract_b6(raw);
+                uint32_t b7 = NXISA::extract_b7(raw);
+                // Update target register with the selections
+                m_registers[f_tgt] = (
+                    (((val_a >> b0) & 1) << 0) |
+                    (((val_a >> b1) & 1) << 1) |
+                    (((val_a >> b2) & 1) << 2) |
+                    (((val_a >> b3) & 1) << 3) |
+                    (((val_a >> b4) & 1) << 4) |
+                    (((val_a >> b5) & 1) << 5) |
+                    (((val_a >> b6) & 1) << 6) |
+                    (((val_a >> b7) & 1) << 7)
+                );
+                break;
+            }
+            default: {
+                assert(!"Unsupported operation");
+            }
         }
 
     }
-}
 
-bool NXNode::get_input (uint32_t index)
-{
-    return m_inputs_curr.count(index) ? m_inputs_curr[index] : false;
-}
-
-bool NXNode::get_output (uint32_t index)
-{
-    return m_outputs.count(index) ? m_outputs[index] : false;
+    // Return whether the node is now idle
+    return m_idle;
 }
 
 std::shared_ptr<NXMessagePipe> NXNode::route (

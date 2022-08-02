@@ -18,9 +18,11 @@
 #include <memory>
 #include <stdint.h>
 #include <stdbool.h>
-#include <vector>
+#include <queue>
 
 #include "nxconstants.hpp"
+#include "nxisa.hpp"
+#include "nxmemory.hpp"
 #include "nxmessagepipe.hpp"
 
 #ifndef __NXNODE_HPP__
@@ -37,30 +39,29 @@ namespace NXModel {
         // Data Structures
         // =====================================================================
 
-        typedef std::vector<uint32_t> memory_t;
-        typedef std::map<uint32_t, bool> io_state_t;
+        typedef struct {
+            uint8_t row;
+            uint8_t column;
+        } node_id_t;
 
         // =====================================================================
         // Constructor
         // =====================================================================
 
         NXNode (
-            uint32_t row,
-            uint32_t column,
-            uint32_t inputs,
-            uint32_t outputs,
-            bool     verbose = false
-        )   : m_row         ( row     )
-            , m_column      ( column  )
-            , m_num_inputs  ( inputs  )
-            , m_num_outputs ( outputs )
+            node_id_t id,
+            bool      verbose = false
+        )   : m_id          ( id      )
             , m_verbose     ( verbose )
-            , m_seen_first  ( false   )
-            , m_accumulator ( 0       )
-            , m_num_instr   ( 0       )
-            , m_loopback    ( 0       )
-            , m_trace_en    ( 0       )
+            , m_idle        ( true    )
+            , m_waiting     ( true    )
+            , m_pc          ( 0       )
+            , m_offset      ( false   )
+            , m_restart_pc  ( 0       )
+            , m_next_pc     ( 0       )
+            , m_next_offset ( false   )
         {
+            m_registers = new uint8_t[8];
             for (int i = 0; i < 4; i++) {
                 m_inbound[i]  = std::make_shared<NXMessagePipe>();
                 m_outbound[i] = NULL;
@@ -102,47 +103,17 @@ namespace NXModel {
          */
         void step (bool trigger);
 
-        /** Return the contents of the memory
+        /** Return the pointer to the instruction memory
          *
-         * @return vector of the contents of the memory
+         * @return pointer to instruction memory
          */
-        std::vector<uint32_t> get_memory (void);
+        NXMemory * get_inst_memory ( void ) { return &m_inst_memory };
 
-        /** Retrieve current input state
+        /** Return the pointer to the data memory
          *
-         * @return state of inputs in the current cycle
+         * @return pointer to data memory
          */
-        io_state_t get_current_inputs (void);
-
-        /** Retrieve next input state
-         *
-         * @return state of inputs in the next cycle
-         */
-        io_state_t get_next_inputs (void);
-
-        /** Retrieve current output state
-         *
-         * @return state of output in the current cycle
-         */
-        io_state_t get_current_outputs (void);
-
-        /** Return the number of instructions loaded
-         *
-         * @return integer count of instructions
-         */
-        uint32_t get_instruction_count (void) { return m_num_instr; }
-
-        /** Return the number of outputs configured
-         *
-         * @return integer count of outputs
-         */
-        uint32_t get_output_count (void) { return m_num_outputs; }
-
-        /** Return the number of inputs configured
-         *
-         * @return integer count of inputs
-         */
-        uint32_t get_input_count (void) { return m_num_inputs; }
+        NXMemory * get_data_memory ( void ) { return &m_data_memory };
 
     private:
 
@@ -154,31 +125,13 @@ namespace NXModel {
          *
          * @return True if current input values have changed, false otherwise
          */
-        bool digest (void);
+        bool digest ( void );
 
         /** Transform inputs to outputs using instructions
          *
          * @return True if output values have changed, false otherwise
          */
-        bool evaluate (void);
-
-        /** Send outbound messages
-         */
-        void transmit (void);
-
-        /** Get input value
-         *
-         * @param index input value to retrieve
-         * @return the boolean value
-         */
-        bool get_input (uint32_t index);
-
-        /** Get output value
-         *
-         * @param index output value to retrieve
-         * @return the boolean value
-         */
-        bool get_output (uint32_t index);
+        bool evaluate ( bool trigger );
 
         /** Return the correct target pipe for a message
          *
@@ -195,35 +148,28 @@ namespace NXModel {
         // =====================================================================
 
         // Mesh location
-        uint32_t m_row;
-        uint32_t m_column;
+        node_id_t m_id;
 
         // Verbosity
         bool m_verbose;
-
-        // Status
-        bool m_seen_first;
 
         // Inbound and outbound message pipes
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_inbound;
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_outbound;
 
         // Node memory
-        uint32_t m_accumulator;
-        memory_t m_memory;
+        NXMemory m_inst_memory;
+        NXMemory m_data_memory;
 
-        // Node parameters
-        uint32_t m_num_instr;
-        uint32_t m_num_inputs;
-        uint32_t m_num_outputs;
-        uint64_t m_loopback;
-        bool     m_trace_en;
-
-        // Current state
-        io_state_t m_inputs_curr;
-        io_state_t m_inputs_next;
-        io_state_t m_outputs;
-        io_state_t m_outputs_last;
+        // Node state
+        bool      m_idle;
+        bool      m_waiting;
+        uint32_t  m_pc;
+        bool      m_offset;
+        uint32_t  m_restart_pc;
+        uint32_t  m_next_pc;
+        bool      m_next_offset;
+        uint8_t * m_registers;
 
     };
 }
