@@ -36,18 +36,11 @@ class NXConstants:
     HW_VER_MINOR : Constant("Minor hardware revision") = 3
 
     # Maximum sizes
-    MAX_ROW_COUNT      : Constant("Maximum number of rows"                ) = 16
-    MAX_COLUMN_COUNT   : Constant("Maximum number of columns"             ) = 16
-    MAX_NODE_MEMORY    : Constant("Maximum memory rows per node"          ) = 1024
-    MAX_NODE_INPUTS    : Constant("Maximum number of inputs per node"     ) = 32
-    MAX_NODE_OUTPUTS   : Constant("Maximum number of outputs per node"    ) = 32
-    MAX_NODE_REGISTERS : Constant("Maximum number of registers per node"  ) = 32
-    MAX_NODE_IOR_COUNT : Constant("Max input, output, or register count"  ) = max(
-        MAX_NODE_INPUTS, MAX_NODE_OUTPUTS, MAX_NODE_REGISTERS
-    )
-    MAX_MESH_OUTPUTS   : Constant("Maximum outputs of the mesh"           ) = (
-        MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS
-    )
+    MAX_ROW_COUNT      : Constant("Maximum number of rows"              ) = 16
+    MAX_COLUMN_COUNT   : Constant("Maximum number of columns"           ) = 16
+    MAX_NODE_MEMORY    : Constant("Maximum memory rows per node"        ) = 1024
+    MAX_NODE_REGISTERS : Constant("Maximum number of registers per node") = 8
+    MAX_MESH_OUTPUTS   : Constant("Maximum outputs of the mesh"         ) = MAX_COLUMN_COUNT * 32
 
     # Control plane constants
     CONTROL_WIDTH     : Constant("Width of the control stream" ) = 128
@@ -55,11 +48,9 @@ class NXConstants:
     SLOTS_PER_PACKET  : Constant("Control responses per packet") = (HOST_PACKET_SIZE * 8) // CONTROL_WIDTH
     TIMER_WIDTH       : Constant("Width of the control timers" ) = 24
     OUT_BITS_PER_MSG  : Constant("Bits of output per message"  ) = 96
-    MAX_OUT_IDX_WIDTH : Constant("Output index field width"    ) = clog2(
-        (MAX_COLUMN_COUNT * MAX_NODE_OUTPUTS) / OUT_BITS_PER_MSG
-    )
+    MAX_OUT_IDX_WIDTH : Constant("Output index field width"    ) = clog2(MAX_MESH_OUTPUTS / OUT_BITS_PER_MSG)
 
-    # Memory constants
+    # Top-level memory constants
     TOP_MEM_COUNT      : Constant("Number of on-board memories"  ) = 2
     TOP_MEM_IDX_WIDTH  : Constant("On-board memory index width"  ) = clog2(TOP_MEM_COUNT)
     TOP_MEM_ADDR_WIDTH : Constant("On-board memory address width") = 10
@@ -67,26 +58,20 @@ class NXConstants:
     TOP_MEM_STRB_WIDTH : Constant("On-board memory write strobe" ) = TOP_MEM_DATA_WIDTH // 8
 
     # Interface and selector sizes
-    MESSAGE_WIDTH     : Constant("Width of the message stream" ) = 28
-    ADDR_ROW_WIDTH    : Constant("Width of the row address"    ) = clog2(MAX_ROW_COUNT)
-    ADDR_COL_WIDTH    : Constant("Width of the column address" ) = clog2(MAX_COLUMN_COUNT)
-    MAX_INPUT_WIDTH   : Constant("Width of input selector"     ) = clog2(MAX_NODE_INPUTS)
-    MAX_OUTPUT_WIDTH  : Constant("Width of output selector"    ) = clog2(MAX_NODE_OUTPUTS)
-    MAX_IOR_WIDTH     : Constant("Width of in/out/reg selector") = clog2(MAX_NODE_IOR_COUNT)
+    MESSAGE_WIDTH : Constant("Width of the message stream") = 31
+    ID_ROW_WIDTH  : Constant("Width of the row address"   ) = clog2(MAX_ROW_COUNT)
+    ID_COL_WIDTH  : Constant("Width of the column address") = clog2(MAX_COLUMN_COUNT)
 
     # Truth table
     TT_WIDTH : Constant("Width of a three input truth table") = 8
 
     # Node memory and loading
-    LOAD_SEG_WIDTH      : Constant("Segment width for accumulated load") = 16
-    NODE_MEM_ADDR_WIDTH : Constant("Width of node memory address"      ) = clog2(MAX_NODE_MEMORY)
-
-    # Node control
-    NODE_PARAM_WIDTH : Constant("Maximum width of a node parameter") = 16
-
-    # Trace
-    TRACE_SECTION_WIDTH : Constant("Bits carried per trace message"     ) = 16
-    TRACE_SELECT_WIDTH  : Constant("Width of the trace section selector") = clog2(MAX_NODE_OUTPUTS / TRACE_SECTION_WIDTH)
+    NODE_MEM_ADDR_WIDTH        : Constant("Address width for node memory"   ) = clog2(MAX_NODE_MEMORY)
+    NODE_MEM_SLOT_WIDTH        : Constant("Width of 16-bit slot"            ) = 16
+    NODE_MEM_SUBSLOT_WIDTH     : Constant("Width of 8-bit sub-slot"         ) = 8
+    NODE_MEM_SLOT_SEL_WIDTH    : Constant("Width of 16-bit slot selector"   ) = 1
+    NODE_MEM_SUBSLOT_SEL_WIDTH : Constant("Width of 8-bit sub-slot selector") = 1
+    NODE_MEM_OFFSET_WIDTH      : Constant("Width of the memory offset"      ) = 2
 
 # ==============================================================================
 # Enumerations
@@ -124,29 +109,16 @@ class ControlRespType:
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
     """ Different message types for nodes in the mesh """
-    LOAD    : Constant("Load data into the node's memory")
-    SIGNAL  : Constant("Carries signal state to and from a node")
-    CONTROL : Constant("Set parameters for the node")
-    TRACE   : Constant("Trace from the output state of a node")
+    LOAD   : Constant("Load data into the node's memory")
+    SIGNAL : Constant("Carries signal state to and from a node")
 
-@packtype.enum(package=NXConstants, mode=Enum.INDEXED)
-class NodeParameter:
-    """ Different control parameters within the node """
-    INSTRUCTIONS : Constant("Number of instructions")
-    LOOPBACK     : Constant("Loopback mask (existing value shifted up by 16 on write)")
-    TRACE        : Constant("Trace output values on every cycle")
-
-@packtype.enum(package=NXConstants, mode=Enum.INDEXED)
-class Operation:
-    """ Operation encoding for instructions """
-    INVERT   : Constant("X = !(A    )")
-    AND      : Constant("X =  (A & B)")
-    NAND     : Constant("X = !(A & B)")
-    OR       : Constant("X =  (A | B)")
-    NOR      : Constant("X = !(A | B)")
-    XOR      : Constant("X =  (A ^ B)")
-    XNOR     : Constant("X = !(A ^ B)")
-    RESERVED : Constant("Reserved instruction")
+@packtype.enum(package=NXConstants, mode=Enum.INDEXED, width=NXConstants.NODE_MEM_OFFSET_WIDTH.value)
+class MemoryOffset:
+    """ Memory offset modes """
+    PRESERVE : Constant("Use the node's current state"               )
+    INVERSE  : Constant("Use the inverse of the node's current state")
+    SET_LOW  : Constant("Use a low offset"                           )
+    SET_HIGH : Constant("Use a high offset"                          )
 
 # ==============================================================================
 # Node Identifier
@@ -155,44 +127,8 @@ class Operation:
 @packtype.struct(package=NXConstants)
 class NodeID:
     """ Identifier for a node """
-    row    : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Row within the mesh")
-    column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Column within the mesh")
-
-# ==============================================================================
-# Instruction Format
-# ==============================================================================
-
-@packtype.struct(package=NXConstants, width=32, pack=Struct.FROM_MSB)
-class Instruction:
-    """ Node instruction encoding """
-    truth    : Scalar(width=NXConstants.TT_WIDTH, desc="Encoded truth table")
-    src_a    : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Source selector A")
-    src_a_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
-    src_b    : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Source selector B")
-    src_b_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
-    src_c    : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Source selector C")
-    src_c_ip : Scalar(width=1, desc="Primary input (1) or a register (0)")
-    tgt_reg  : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Target register")
-    gen_out  : Scalar(width=1, desc="Generate an output message")
-
-# ==============================================================================
-# Output Mappings
-# ==============================================================================
-
-@packtype.struct(package=NXConstants)
-class OutputLookup:
-    """ Node output lookup encoding (lists start and end point of messages) """
-    active : Scalar(width=1,                               desc="Is external output")
-    start  : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Start address")
-    stop   : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Stop address")
-
-@packtype.struct(package=NXConstants)
-class OutputMapping:
-    """ Single node output mapping """
-    row    : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Target row")
-    column : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Target column")
-    index  : Scalar(width=NXConstants.MAX_IOR_WIDTH,  desc="Target index")
-    is_seq : Scalar(width=1,                          desc="Is target sequential")
+    row    : Scalar(width=NXConstants.ID_ROW_WIDTH, desc="Row within the mesh"   )
+    column : Scalar(width=NXConstants.ID_COL_WIDTH, desc="Column within the mesh")
 
 # ==============================================================================
 # Node Message Formats
@@ -201,8 +137,7 @@ class OutputMapping:
 @packtype.struct(package=NXConstants, width=10, pack=Struct.FROM_MSB)
 class NodeHeader:
     """ Header for messages directed to nodes in the mesh """
-    row     : Scalar(width=NXConstants.ADDR_ROW_WIDTH, desc="Row in the mesh")
-    column  : Scalar(width=NXConstants.ADDR_COL_WIDTH, desc="Column in the mesh")
+    target  : NodeID(desc="Target node in the mesh")
     command : NodeCommand(desc="Encoded command")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
@@ -213,42 +148,31 @@ class NodeRaw:
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
 class NodeLoad:
-    """ Load data into a node's memory in segments (accumulated on receive) """
-    header : NodeHeader(desc="Header carrying row, column, and command")
-    last   : Scalar(width=1,                          desc="Marks the final segment")
-    data   : Scalar(width=NXConstants.LOAD_SEG_WIDTH, desc="Segment of data to load")
+    """ Load data into a node's instruction memory """
+    header  : NodeHeader(desc="Header carrying row, column, and command")
+    address : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Row to write into")
+    slot    : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH.value +
+                           NXConstants.NODE_MEM_SUBSLOT_SEL_WIDTH.value,
+                     desc ="16-bit slot select")
+    data    : Scalar(width=NXConstants.NODE_MEM_SUBSLOT_WIDTH,
+                     desc ="Data to write into memory")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
 class NodeSignal:
-    """ Signal state carried to/from a node """
-    header : NodeHeader(desc="Header carrying row, column, and command")
-    index  : Scalar(width=NXConstants.MAX_IOR_WIDTH, desc="Input signal index")
-    is_seq : Scalar(width=1, desc="Is the input signal sequential or combinatorial")
-    state  : Scalar(width=1, desc="Value of the signal")
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class NodeControl:
-    """ Set attributes of a node """
-    header : NodeHeader(desc="Header carrying row, column, and command")
-    param  : NodeParameter(desc="Parameter to update")
-    value  : Scalar(width=NXConstants.NODE_PARAM_WIDTH, desc="Updated value")
-
-@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
-class NodeTrace:
-    """ Trace output state of a node """
-    header : NodeHeader(desc="Header carrying row, column, and command")
-    select : Scalar(width=NXConstants.TRACE_SELECT_WIDTH,  desc="Trace section")
-    trace  : Scalar(width=NXConstants.TRACE_SECTION_WIDTH, desc="Section value")
+    """ Write into a node's data memory """
+    header  : NodeHeader(desc="Header carrying row, column, and command")
+    address : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH,     desc="Row to write into" )
+    slot    : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH, desc="16-bit slot select")
+    offset  : MemoryOffset(desc="Offset mode")
+    data    : Scalar(width=NXConstants.NODE_MEM_SUBSLOT_WIDTH,
+                     desc ="Data to write into memory")
 
 @packtype.union(package=NXConstants)
 class NodeMessage:
     """ Union of different node message types """
-    raw      : NodeRaw(desc="Raw message encoding")
-    load     : NodeLoad(desc="Data load encoding")
-    signal   : NodeSignal(desc="Signal state encoding")
-    control  : NodeControl(desc="Parameter control encoding")
-    trace    : NodeControl(desc="Output trace encoding")
-
+    raw    : NodeRaw(desc="Raw message encoding")
+    load   : NodeLoad(desc="Data load encoding")
+    signal : NodeSignal(desc="Signal state encoding")
 
 # ==============================================================================
 # Control Plane Message Formats
@@ -320,8 +244,6 @@ class ControlResponseParameters:
     timer_width : Scalar(width=clog2(NXConstants.TIMER_WIDTH)+1,        desc="Timer width"        )
     rows        : Scalar(width=clog2(NXConstants.MAX_ROW_COUNT)+1,      desc="Number of rows"     )
     columns     : Scalar(width=clog2(NXConstants.MAX_COLUMN_COUNT)+1,   desc="Number of columns"  )
-    node_ins    : Scalar(width=clog2(NXConstants.MAX_NODE_INPUTS)+1,    desc="Inputs per node"    )
-    node_outs   : Scalar(width=clog2(NXConstants.MAX_NODE_OUTPUTS)+1,   desc="Outputs per node"   )
     node_regs   : Scalar(width=clog2(NXConstants.MAX_NODE_REGISTERS)+1, desc="Registers per node" )
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
@@ -341,9 +263,8 @@ class ControlResponseOutputs:
     """ Control response carrying sections of the output vector """
     format  : ControlRespType(desc="Control response format")
     stamp   : Scalar(width=NXConstants.TIMER_WIDTH.value, desc="Simulation cycle")
-    index   : Scalar(width=clog2(
-        (NXConstants.MAX_COLUMN_COUNT.value * NXConstants.MAX_NODE_OUTPUTS.value) / 96
-    ), desc="Which section of the full outputs is included")
+    index   : Scalar(width=clog2(NXConstants.MAX_MESH_OUTPUTS.value / 96),
+                     desc ="Which section of the full outputs is included")
     section : Scalar(width=96, desc="Section of the outputs")
 
 @packtype.struct(package=NXConstants, width=NXConstants.CONTROL_WIDTH.value, pack=Struct.FROM_MSB)
