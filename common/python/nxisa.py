@@ -60,15 +60,16 @@ class Field:
 
 class OpCode(Field):
 
-    def __init__(self, op : Tuple[str, int]) -> None:
+    def __init__(self, op : str = "LOAD") -> None:
         super().__init__("op", 3, {
-                            "LOAD"   : 0,
-                            "STORE"  : 1,
-                            "BRANCH" : 2,
-                            "SEND"   : 3,
-                            "TRUTH"  : 4,
-                            "ARITH"  : 5,
-                            "SHUFFLE": 6,
+                            "LOAD"       : 0,
+                            "STORE"      : 1,
+                            "BRANCH"     : 2,
+                            "SEND"       : 3,
+                            "TRUTH"      : 4,
+                            "ARITH"      : 5,
+                            "SHUFFLE"    : 6,
+                            "SHUFFLE_ALT": 7,
                         })
         self.op_name  = op.upper()
         self.op_value = self.values[self.op_name]
@@ -99,8 +100,8 @@ class Control(Field):
 
 class Source(Register):
 
-    def __init__(self):
-        super().__init__("src")
+    def __init__(self, name):
+        super().__init__(name)
 
 class Target(Register):
 
@@ -164,7 +165,7 @@ class ArithOp(Control):
     OR  = 3, "OR"  # 11
 
     def __init__(self) -> None:
-        super().__init__("op", 2)
+        super().__init__("func", 2)
 
 class NodeRow(Field):
 
@@ -178,8 +179,8 @@ class NodeColumn(Field):
 
 class Mux(Field):
 
-    def __init__(self) -> None:
-        super().__init__("mux", 3)
+    def __init__(self, name) -> None:
+        super().__init__(name, 3)
 
 # ==============================================================================
 # Instruction Encodings
@@ -336,7 +337,7 @@ class StoreDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("STORE"),
-                         Source(),
+                         Source("src_a"),
                          Mask(),
                          Flag("slot"),
                          Address(),
@@ -347,9 +348,9 @@ class BranchDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("BRANCH"),
-                         Source(),
+                         Source("src_a"),
                          Reserved(3),
-                         Source(),
+                         Source("src_b"),
                          Reserved(3),
                          PC(),
                          Offset(),
@@ -361,7 +362,7 @@ class SendDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("SEND"),
-                         Source(),
+                         Source("src_a"),
                          NodeColumn(),
                          NodeRow(),
                          Flag("slot"),
@@ -374,22 +375,22 @@ class TruthDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("TRUTH"),
-                         Source(),
+                         Source("src_a"),
                          Target(),
-                         Source(),
-                         Source(),
-                         Mux(),
-                         Mux(),
-                         Mux(),
+                         Source("src_b"),
+                         Source("src_c"),
+                         Mux("mux_a"),
+                         Mux("mux_b"),
+                         Mux("mux_c"),
                          Table())
 
 class ArithmeticDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("ARITH"),
-                         Source(),
+                         Source("src_a"),
                          Target(),
-                         Source(),
+                         Source("src_b"),
                          Reserved(13),
                          ArithOp(),
                          Reserved(5))
@@ -398,16 +399,16 @@ class ShuffleDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("SHUFFLE"),
-                         Source(),
+                         Source("src_a"),
                          Target(),
-                         Mux(),
-                         Mux(),
-                         Mux(),
-                         Mux(),
-                         Mux(),
-                         Mux(),
-                         Mux(),
-                         Mux())
+                         Mux("b0"),
+                         Mux("b1"),
+                         Mux("b2"),
+                         Mux("b3"),
+                         Mux("b4"),
+                         Mux("b5"),
+                         Mux("b6"),
+                         Mux("b7"))
         # Forceably move opcode from 30->29 as bit 29 is overloaded by a mux
         self.opcode.lsb = 29
 
