@@ -208,6 +208,9 @@ bool NXNode::evaluate ( bool trigger )
         // Perform the correct operation
         switch (op) {
             case NXISA::OP_LOAD: {
+                // LOAD cannot modify the TRUTH operation's result register
+                assert(f_tgt != 7);
+                // Load from data memory
                 uint32_t word = m_data_memory.read(f_address);
                 m_registers[f_tgt] = (word >> shift) & 0xFF;
                 break;
@@ -259,6 +262,8 @@ bool NXNode::evaluate ( bool trigger )
             }
             case NXISA::OP_SHUFFLE:
             case NXISA::OP_SHUFFLE_ALT: {
+                // Shuffle cannot modify the TRUTH operation's result register
+                assert(f_tgt != 7);
                 // Extract bit selectors
                 uint32_t b0 = NXISA::extract_b0(raw);
                 uint32_t b1 = NXISA::extract_b1(raw);
