@@ -33,7 +33,9 @@ NXMesh::NXMesh (
         m_nodes.push_back(new std::vector<std::shared_ptr<NXNode>>());
         for (uint32_t column = 0; column < m_columns; column++) {
             m_nodes[row]->push_back(std::make_shared<NXNode>(
-                row, column, node_inputs, node_outputs, verbose
+                (node_id_t){ .row    = (uint8_t)row,
+                             .column = (uint8_t)column },
+                verbose
             ));
         }
     }
@@ -51,6 +53,11 @@ NXMesh::NXMesh (
                 node->attach(DIRECTION_EAST, (*m_nodes[row])[column+1]->get_pipe(DIRECTION_WEST));
         }
     }
+}
+
+std::shared_ptr<NXNode> NXMesh::get_node (NXConstants::node_id_t id)
+{
+    return get_node(id.row, id.column);
 }
 
 std::shared_ptr<NXNode> NXMesh::get_node (uint32_t row, uint32_t column)

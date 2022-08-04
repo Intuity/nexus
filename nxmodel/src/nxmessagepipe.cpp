@@ -34,22 +34,6 @@ void NXMessagePipe::enqueue (node_signal_t message)
     m_messages.push(entry);
 }
 
-void NXMessagePipe::enqueue (node_control_t message)
-{
-    entry_t entry;
-    entry.header = message.header;
-    pack_node_control(message, (uint8_t *)&entry.encoded);
-    m_messages.push(entry);
-}
-
-void NXMessagePipe::enqueue (node_trace_t message)
-{
-    entry_t entry;
-    entry.header = message.header;
-    pack_node_trace(message, (uint8_t *)&entry.encoded);
-    m_messages.push(entry);
-}
-
 void NXMessagePipe::enqueue (node_raw_t message)
 {
     entry_t entry;
@@ -96,22 +80,6 @@ void NXMessagePipe::dequeue (node_signal_t & message)
     entry_t front = m_messages.front();
     m_messages.pop();
     message = unpack_node_signal((uint8_t *)&front.encoded);
-}
-
-void NXMessagePipe::dequeue (node_control_t & message)
-{
-    if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
-    entry_t front = m_messages.front();
-    m_messages.pop();
-    message = unpack_node_control((uint8_t *)&front.encoded);
-}
-
-void NXMessagePipe::dequeue (node_trace_t & message)
-{
-    if (m_messages.empty()) assert(!"Called dequeue on empty pipe");
-    entry_t front = m_messages.front();
-    m_messages.pop();
-    message = unpack_node_trace((uint8_t *)&front.encoded);
 }
 
 void NXMessagePipe::dequeue (node_raw_t & message)

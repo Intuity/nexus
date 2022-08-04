@@ -21,7 +21,6 @@
 #include <queue>
 
 #include "nxconstants.hpp"
-#include "nxisa.hpp"
 #include "nxmemory.hpp"
 #include "nxmessagepipe.hpp"
 
@@ -34,15 +33,6 @@ namespace NXModel {
 
     class NXNode {
     public:
-
-        // =====================================================================
-        // Data Structures
-        // =====================================================================
-
-        typedef struct {
-            uint8_t row;
-            uint8_t column;
-        } node_id_t;
 
         // =====================================================================
         // Constructor
@@ -107,13 +97,13 @@ namespace NXModel {
          *
          * @return pointer to instruction memory
          */
-        NXMemory * get_inst_memory ( void ) { return &m_inst_memory };
+        NXMemory * get_inst_memory ( void ) { return &m_inst_memory; }
 
         /** Return the pointer to the data memory
          *
          * @return pointer to data memory
          */
-        NXMemory * get_data_memory ( void ) { return &m_data_memory };
+        NXMemory * get_data_memory ( void ) { return &m_data_memory; }
 
     private:
 
@@ -135,12 +125,12 @@ namespace NXModel {
 
         /** Return the correct target pipe for a message
          *
-         * @param row target row
-         * @param column target column
-         * @return pointer to NXMessagePipe
+         * @param  target   target row
+         * @param  command  Command being sent
+         * @return          pointer to NXMessagePipe
          */
         std::shared_ptr<NXMessagePipe> route (
-            uint32_t row, uint32_t column, node_command_t command
+            node_id_t target, node_command_t command
         );
 
         // =====================================================================

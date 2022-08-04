@@ -72,24 +72,15 @@ void Nexus::run (uint32_t cycles)
         while (!m_egress->is_idle()) {
             node_header_t header = m_egress->next_header();
             switch (header.command) {
-                // Summarise final signal state
-                case NODE_COMMAND_SIGNAL : {
-                    node_signal_t msg;
-                    m_egress->dequeue(msg);
-                    output_key_t key = { msg.header.row, msg.header.column, msg.index };
-                    (*summary)[key] = msg.state;
-                    break;
-                }
-                // Collect trace messages
-                case NODE_COMMAND_TRACE : {
-                    node_trace_t msg;
-                    m_egress->dequeue(msg);
-                    std::cout << "[Nexus] Got trace message from "
-                              << std::dec << (int)msg.header.row << ", "
-                              << std::dec << (int)msg.header.column
-                              << std::endl;
-                    break;
-                }
+                // TODO: Capture output signals
+                // // Summarise final signal state
+                // case NODE_COMMAND_SIGNAL : {
+                //     node_signal_t msg;
+                //     m_egress->dequeue(msg);
+                //     output_key_t key = { msg.header.target.row, msg.header.target.column, msg.index };
+                //     (*summary)[key] = msg.state;
+                //     break;
+                // }
                 // Anything else, just drop
                 default : {
                     m_egress->dequeue_raw();

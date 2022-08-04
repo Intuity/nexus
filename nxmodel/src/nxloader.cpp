@@ -60,16 +60,8 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                       << ", column: " << column << ", loopback 0x"
                       << std::hex << (int)loopback << std::dec << std::endl;
         }
-        for (int idx = 1; idx >= 0; idx -= 1) {
-            node_control_t msg;
-            msg.header.row     = row;
-            msg.header.column  = column;
-            msg.header.command = NODE_COMMAND_CONTROL;
-            msg.param          = NODE_PARAMETER_LOOPBACK;
-            msg.value          = (loopback >> (16 * idx)) & 0xFFFF;
-            model->get_ingress()->enqueue(msg);
-        }
         // Load instructions
+        uint32_t address = 0;
         for (const auto & json_instr : node["instructions"]) {
             uint32_t instr = json_instr;
             if (verbose) {
@@ -78,93 +70,19 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                           << std::hex << std::setw(8) << std::setfill('0') << instr
                           << std::dec << std::endl;
             }
-            // Load over two 16-bit chunks
-            for (uint32_t idx = 0; idx < 2; idx++) {
+            // Load over four 8-bit chunks
+            for (uint32_t idx = 0; idx < 4; idx++) {
                 node_load_t msg;
-                msg.header.row     = row;
-                msg.header.column  = column;
-                msg.header.command = NODE_COMMAND_LOAD;
-                msg.last           = (idx == 1);
-                msg.data           = (instr >> (16 * (1 - idx))) & 0xFFFF;
+                msg.header.target.row    = row;
+                msg.header.target.column = column;
+                msg.header.command       = NODE_COMMAND_LOAD;
+                msg.address              = address;
+                msg.slot                 = idx;
+                msg.data                 = (instr >> (8 * idx)) & 0xFF;
                 model->get_ingress()->enqueue(msg);
             }
-        }
-        // Set the number of instructions
-        node_control_t ctrl_instr;
-        ctrl_instr.header.row     = row;
-        ctrl_instr.header.column  = column;
-        ctrl_instr.header.command = NODE_COMMAND_CONTROL;
-        ctrl_instr.param          = NODE_PARAMETER_INSTRUCTIONS;
-        ctrl_instr.value          = node["instructions"].size();
-        model->get_ingress()->enqueue(ctrl_instr);
-        if (verbose) {
-            std::cout << "[NXLoader] Setting instruction count row: " << row
-                      << ", column: " << column << ", count "
-                      << node["instructions"].size() << std::endl;
-        }
-        // Setup the output lookups
-        uint32_t output_index = 0;
-        uint32_t next_address = node["instructions"].size() + node["outputs"].size();
-        for (const auto & outputs : node["outputs"]) {
-            // Generate the lookup
-            output_lookup_t lookup;
-            lookup.start  = next_address;
-            lookup.stop   = next_address + outputs.size() - 1;
-            lookup.active = (outputs.size() > 0);
-            uint32_t encoded = 0;
-            pack_output_lookup(lookup, (uint8_t *)&encoded);
-            if (verbose) {
-                std::cout << "[NXLoader] Loading lookup - row: " << row
-                          << ", column: " << column << ", start: 0x"
-                          << std::hex << lookup.start << ", stop: 0x"
-                          << lookup.stop << std::dec << ", active: "
-                          << (lookup.active ? "YES" : "NO") << std::endl;
-            }
-            // Load the lookup over two steps
-            for (uint32_t idx = 0; idx < 2; idx++) {
-                node_load_t msg;
-                msg.header.row     = row;
-                msg.header.column  = column;
-                msg.header.command = NODE_COMMAND_LOAD;
-                msg.last           = (idx == 1);
-                msg.data           = (encoded >> (16 * (1 - idx))) & 0xFFFF;
-                model->get_ingress()->enqueue(msg);
-            }
-            // Increment to the next output
-            output_index++;
-            // Offset the address
-            next_address += outputs.size();
-        }
-        // Load the output mappings
-        for (const auto & outputs : node["outputs"]) {
-            for (const auto & mapping : outputs) {
-                // Generate the mapping
-                output_mapping_t entry;
-                entry.row    = mapping["row"];
-                entry.column = mapping["column"];
-                entry.index  = mapping["index"];
-                entry.is_seq = mapping["is_seq"];
-                uint32_t encoded = 0;
-                pack_output_mapping(entry, (uint8_t *)&encoded);
-                if (verbose) {
-                    std::cout << "[NXLoader] Loading mapping - row: " << row
-                              << ", column: " << column
-                              << ", target row: " << (int)entry.row
-                              << ", target column: " << (int)entry.column
-                              << ", target index: " << (int)entry.index
-                              << ", target is seq: " << (int)entry.is_seq << std::endl;
-                }
-                // Load the mapping over two steps
-                for (uint32_t idx = 0; idx < 2; idx++) {
-                    node_load_t msg;
-                    msg.header.row     = row;
-                    msg.header.column  = column;
-                    msg.header.command = NODE_COMMAND_LOAD;
-                    msg.last           = (idx == 1);
-                    msg.data           = (encoded >> (16 * (1 - idx))) & 0xFFFF;
-                    model->get_ingress()->enqueue(msg);
-                }
-            }
+            // Increment address
+            address += 1;
         }
     }
     // Run the mesh until it sinks all of the queued messages

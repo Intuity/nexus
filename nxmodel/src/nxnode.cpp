@@ -131,7 +131,7 @@ bool NXNode::digest (void)
 
             // Otherwise, route it towards the correct node
             } else {
-                route(header.row, header.column, header.command)->enqueue_raw(
+                route(header.target, header.command)->enqueue_raw(
                     m_inbound[idx_pipe]->dequeue_raw()
                 );
             }
@@ -230,7 +230,7 @@ bool NXNode::evaluate ( bool trigger )
                 break;
             }
             case NXISA::OP_SEND: {
-                assert(!"Not yet implemented")
+                assert(!"Not yet implemented");
                 break;
             }
             case NXISA::OP_TRUTH: {
@@ -293,18 +293,17 @@ bool NXNode::evaluate ( bool trigger )
 }
 
 std::shared_ptr<NXMessagePipe> NXNode::route (
-    uint32_t row, uint32_t column, node_command_t command
+    node_id_t target, node_command_t command
 ) {
     // NOTE: Messages routed towards unconnected pipes will be directed to
     //       adjacent pipes in a clockwise order
-    assert(row != m_row || column != m_column || command == NODE_COMMAND_TRACE);
+    assert(target.row != m_id.row || target.column != m_id.column);
     std::shared_ptr<NXMessagePipe> tgt_pipe = NULL;
     uint32_t start;
-    if      (command == NODE_COMMAND_TRACE) start = (int)DIRECTION_SOUTH;
-    else if (column < m_column            ) start = (int)DIRECTION_WEST;
-    else if (column > m_column            ) start = (int)DIRECTION_EAST;
-    else if (row    < m_row               ) start = (int)DIRECTION_NORTH;
-    else                                    start = (int)DIRECTION_SOUTH;
+    if      (target.column < m_id.column) start = (int)DIRECTION_WEST;
+    else if (target.column > m_id.column) start = (int)DIRECTION_EAST;
+    else if (target.row    < m_id.row   ) start = (int)DIRECTION_NORTH;
+    else                                  start = (int)DIRECTION_SOUTH;
     for (int idx_off = 0; idx_off < 4; idx_off++) {
         uint32_t trial = (start + idx_off) % 4;
         if (m_outbound[trial] == NULL) continue;

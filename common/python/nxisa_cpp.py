@@ -30,6 +30,9 @@ for instr in nxisa.InstructionDef.ALL.values():
         fields[field.name] = (lsb, msb)
 
 with open(sys.argv[1], "w", encoding="utf-8") as fh:
+    fh.write("#ifndef __NXISA_HPP__\n")
+    fh.write("#define __NXISA_HPP__\n")
+    fh.write("\n")
     fh.write("namespace NXISA {\n")
     fh.write("\n")
     fh.write("    // Operation encoding\n")
@@ -58,3 +61,5 @@ with open(sys.argv[1], "w", encoding="utf-8") as fh:
         fh.write( " }\n")
     fh.write("\n")
     fh.write("}\n")
+    fh.write("\n")
+    fh.write("#endif // __NXISA_HPP__\n")
