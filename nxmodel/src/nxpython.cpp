@@ -73,7 +73,7 @@ PYBIND11_MODULE(nxmodel, m) {
 
     // Expose classes
     py::class_<Nexus, std::shared_ptr<Nexus>>(m, "Nexus")
-        .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
+        .def(py::init<uint32_t, uint32_t>())
         .def("get_rows",            &Nexus::get_rows           )
         .def("get_columns",         &Nexus::get_columns        )
         .def("get_mesh",            &Nexus::get_mesh           )
@@ -85,14 +85,14 @@ PYBIND11_MODULE(nxmodel, m) {
         .def("pop_output",          &Nexus::pop_output         );
 
     py::class_<NXMesh, std::shared_ptr<NXMesh>>(m, "NXMesh")
-        .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
+        .def(py::init<uint32_t, uint32_t>())
         .def("get_node", static_cast<std::shared_ptr<NXNode> (NXMesh::*)(node_id_t)>(&NXMesh::get_node))
         .def("get_node", static_cast<std::shared_ptr<NXNode> (NXMesh::*)(uint32_t, uint32_t)>(&NXMesh::get_node))
         .def("is_idle",  &NXMesh::is_idle )
         .def("step",     &NXMesh::step    );
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
-        .def(py::init<node_id_t, bool>())
+        .def(py::init<node_id_t>())
         .def("reset",                 &NXNode::reset                )
         .def("attach",                &NXNode::attach               )
         .def("get_pipe",              &NXNode::get_pipe             )

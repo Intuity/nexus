@@ -19,11 +19,16 @@
 #include <vector>
 
 #include <cxxopts.hpp>
+#include <plog/Log.h>
 
 #include "nexus.hpp"
 #include "nxloader.hpp"
+#include "nxlogging.hpp"
 
 int main (int argc, char * argv []) {
+    // Initialise logging
+    Nexus::setup_logging();
+
     // Create instance of cxxopts
     cxxopts::Options parser(
         "nxmodel", "Fast non-timing accurate model of Nexus"
@@ -34,9 +39,6 @@ int main (int argc, char * argv []) {
         // Mesh sizing
         ("r,rows",    "Number of rows",    cxxopts::value<uint32_t>()->default_value("3"))
         ("c,columns", "Number of columns", cxxopts::value<uint32_t>()->default_value("3"))
-        // Node parameters
-        ("i,inputs",  "Inputs per node",  cxxopts::value<uint32_t>()->default_value("32"))
-        ("o,outputs", "Outputs per node", cxxopts::value<uint32_t>()->default_value("32"))
         // Simulation
         ("cycles", "Number of cycles to run for", cxxopts::value<uint32_t>()->default_value("10"))
         // VCD dumping
@@ -60,11 +62,14 @@ int main (int argc, char * argv []) {
     }
 
     // Pickup verbosity
-    bool verbose = (options.count("verbose") != 0);
+    if (options.count("verbose") != 0) plog::get()->setMaxSeverity(plog::debug);
+
+    // Announce
+    PLOGI << "NXModel: Model of Nexus hardware";
 
     // Check positionl arguments
     if (!options["positional"].count()) {
-        std::cerr << "[NXModel] No path to design given" << std::endl;
+        PLOGE << "No path to design given";
         return 1;
     }
     auto & positional = options["positional"].as<std::vector<std::string>>();
@@ -72,21 +77,14 @@ int main (int argc, char * argv []) {
     // Pickup sizing
     uint32_t rows    = options["rows"].as<uint32_t>();
     uint32_t columns = options["columns"].as<uint32_t>();
-    if (verbose) std::cout << "[NXModel] Requested " << rows << "x" << columns << std::endl;
-
-    // Pickup node parameters
-    uint32_t inputs  = options["inputs"].as<uint32_t>();
-    uint32_t outputs = options["outputs"].as<uint32_t>();
-    if (verbose) std::cout << "[NXModel] Node inputs " << inputs << " outputs " << outputs << std::endl;
+    PLOGD << "Requested " << rows << "x" << columns;
 
     // Create the Nexus model
-    NXModel::Nexus * model = new NXModel::Nexus(
-        rows, columns, inputs, outputs, verbose
-    );
+    NXModel::Nexus * model = new NXModel::Nexus(rows, columns);
 
     // Load a design
     std::filesystem::path path = positional[0];
-    NXModel::NXLoader loader(model, std::filesystem::canonical(path), verbose);
+    NXModel::NXLoader loader(model, std::filesystem::canonical(path));
 
     // Run for the requested number of cycles
     uint32_t cycles = options["cycles"].as<uint32_t>();
@@ -100,9 +98,9 @@ int main (int argc, char * argv []) {
     }
 
     // Clean up
-    if (verbose) std::cout << "[NXModel] Cleaning up" << std::endl;
+    PLOGD << "Cleaning up";
     delete model;
-    if (verbose) std::cout << "[NXModel] Exiting" << std::endl;
+    PLOGD << "Exiting";
 
     return 0;
 }

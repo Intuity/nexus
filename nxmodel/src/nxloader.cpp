@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <fstream>
 #include <iomanip>
 
 #include "json.hpp"
@@ -37,8 +38,8 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
     nlohmann::json data;
     fh >> data;
     // Sanity check the design against the model
-    uint32_t design_rows = data["configuration"]["rows"];
-    uint32_t design_cols = data["configuration"]["columns"];
+    unsigned int design_rows = data["rows"].get<unsigned int>();
+    unsigned int design_cols = data["columns"].get<unsigned int>();
     if (verbose) {
         std::cout << "[NXLoader] Opened " << path << " - "
                   << " rows: " << design_rows << ", "
@@ -46,31 +47,26 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                   << std::endl;
     }
     assert(
-        (design_rows == model->get_rows()   ) &&
-        (design_cols == model->get_columns())
+        (design_rows <= model->get_rows()   ) &&
+        (design_cols <= model->get_columns())
     );
     // Load up all of the instructions and output mappings
     for (const auto & node : data["nodes"]) {
-        uint32_t row    = node["row"];
-        uint32_t column = node["column"];
-        // Configure loopback lines
-        uint32_t loopback = node["loopback"];
-        if (verbose) {
-            std::cout << "[NXLoader] Setting loopback row: " << row
-                      << ", column: " << column << ", loopback 0x"
-                      << std::hex << (int)loopback << std::dec << std::endl;
-        }
-        // Load instructions
-        uint32_t address = 0;
-        for (const auto & json_instr : node["instructions"]) {
-            uint32_t instr = json_instr;
+        unsigned int row    = node["row"].get<unsigned int>();
+        unsigned int column = node["column"].get<unsigned int>();
+        // Load hex file into addressed node
+        std::string hex_path = node["hex"].get<std::string>();
+        std::ifstream fh(hex_path, std::fstream::in);
+        unsigned int instr;
+        unsigned int address = 0;
+        while (fh >> std::hex >> instr) {
             if (verbose) {
                 std::cout << "[NXLoader] Loading row: " << row
                           << ", column: " << column << ", instruction: 0x"
                           << std::hex << std::setw(8) << std::setfill('0') << instr
                           << std::dec << std::endl;
             }
-            // Load over four 8-bit chunks
+            // Load in four 8-bit chunks
             for (uint32_t idx = 0; idx < 4; idx++) {
                 node_load_t msg;
                 msg.header.target.row    = row;

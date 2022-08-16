@@ -38,11 +38,8 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        NXNode (
-            node_id_t id,
-            bool      verbose = false
-        )   : m_id          ( id      )
-            , m_verbose     ( verbose )
+        NXNode (node_id_t id)
+            : m_id          ( id      )
             , m_idle        ( true    )
             , m_waiting     ( true    )
             , m_pc          ( 0       )
@@ -56,6 +53,7 @@ namespace NXModel {
                 m_inbound[i]  = std::make_shared<NXMessagePipe>();
                 m_outbound[i] = NULL;
             }
+            reset();
         }
 
         // =====================================================================
@@ -139,9 +137,6 @@ namespace NXModel {
 
         // Mesh location
         node_id_t m_id;
-
-        // Verbosity
-        bool m_verbose;
 
         // Inbound and outbound message pipes
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_inbound;

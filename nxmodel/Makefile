@@ -18,11 +18,13 @@ all: build
 
 # Source directories
 CPP_SRC_DIRS += ./src
+CPP_SRC_DIRS += ../common/cpp
 CPP_SRC_DIRS += ../common/thirdparty/vcd-writer
+CPP_SRC_DIRS += ../common/work
 
 # Include directories
 CPP_INC_DIRS += $(CPP_SRC_DIRS)
-CPP_SRC_DIRS += ../common/work
+CPP_INC_DIRS += ../common/thirdparty/plog/include
 CPP_INC_DIRS += ../common/thirdparty/cxxopts/include
 CPP_INC_DIRS += ../common/thirdparty/json/single_include/nlohmann
 

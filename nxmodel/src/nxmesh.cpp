@@ -14,19 +14,15 @@
 
 #include <assert.h>
 
+#include <plog/Log.h>
+
 #include "nxmesh.hpp"
 
 using namespace NXModel;
 
-NXMesh::NXMesh (
-    uint32_t rows,
-    uint32_t columns,
-    uint32_t node_inputs,
-    uint32_t node_outputs,
-    bool     verbose /* = false */
-)   : m_rows    ( rows    )
+NXMesh::NXMesh (uint32_t rows, uint32_t columns)
+    : m_rows    ( rows    )
     , m_columns ( columns )
-    , m_verbose ( verbose )
 {
     // Create the nodes
     for (uint32_t row = 0; row < m_rows; row++) {
@@ -34,8 +30,7 @@ NXMesh::NXMesh (
         for (uint32_t column = 0; column < m_columns; column++) {
             m_nodes[row]->push_back(std::make_shared<NXNode>(
                 (node_id_t){ .row    = (uint8_t)row,
-                             .column = (uint8_t)column },
-                verbose
+                             .column = (uint8_t)column }
             ));
         }
     }

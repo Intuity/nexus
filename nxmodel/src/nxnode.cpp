@@ -16,6 +16,8 @@
 #include <bitset>
 #include <iomanip>
 
+#include <plog/Log.h>
+
 #include "nxisa.hpp"
 #include "nxnode.hpp"
 
@@ -37,6 +39,7 @@ std::shared_ptr<NXMessagePipe> NXNode::get_pipe (direction_t dirx)
 
 void NXNode::reset (void)
 {
+    // Reset all state
     m_idle        = true;
     m_waiting     = true;
     m_pc          = 0;
@@ -47,6 +50,12 @@ void NXNode::reset (void)
     for (int i = 0; i < 8; i++) m_registers[i] = 0;
     m_inst_memory.clear();
     m_data_memory.clear();
+    // Insert a wait operation into the bottom of instruction memory
+    m_inst_memory.write(0, (
+        (NXISA::OP_BRANCH << NXISA::OP_LSB  ) |
+        (               0 << NXISA::PC_LSB  ) |
+        (               1 << NXISA::IDLE_LSB)
+    ));
 }
 
 bool NXNode::is_idle (void)
@@ -62,6 +71,11 @@ bool NXNode::is_idle (void)
 
 void NXNode::step (bool trigger)
 {
+    // Log on entry
+    PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                 << std::dec << (unsigned int)m_id.column << ") "
+          << "Step " << (trigger ? "with" : "without") << " trigger";
+
     // Digest inbound messages, capturing if combinational updates were received
     bool comb_ips = digest();
 
@@ -72,6 +86,7 @@ void NXNode::step (bool trigger)
 bool NXNode::digest (void)
 {
     bool curr_delta = false;
+
     for (int idx_pipe = 0; idx_pipe < 4; idx_pipe++)
     {
         std::shared_ptr<NXMessagePipe> pipe = m_inbound[idx_pipe];
@@ -82,8 +97,6 @@ bool NXNode::digest (void)
             node_header_t header = pipe->next_header();
             // Is the message targeted at this node?
             if (header.target.row == m_id.row && header.target.column == m_id.column) {
-                // std::cout << "[NXNode " << m_row << ", " << m_column << "] "
-                //           << "Received command " << header.command << std::endl;
                 switch (header.command) {
                     // LOAD: Write into the node's instruction memory
                     case NODE_COMMAND_LOAD: {
@@ -93,6 +106,11 @@ bool NXNode::digest (void)
                         data <<= msg.slot * 8;
                         uint32_t mask = 0xFF;
                         mask <<= msg.slot * 8;
+                        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                                     << std::dec << (unsigned int)m_id.column << ") "
+                              << "Writing " << std::hex << data << " "
+                              << "to "      << std::hex << msg.address << " "
+                              << "mask "    << std::hex << mask;
                         m_inst_memory.write(msg.address, data, mask);
                         break;
                     }
@@ -152,6 +170,10 @@ bool NXNode::evaluate ( bool trigger )
         m_pc         = m_next_pc;
         m_restart_pc = m_next_pc;
         m_offset     = m_next_offset;
+        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+              << std::dec << (unsigned int)m_id.column << ") "
+              << "Triggered @ 0x" << (unsigned int)m_pc << " "
+              << "with offset " << (unsigned int)m_offset;
     // Otherwise restart from the PC last jumped to by a trigger event
     } else {
         m_pc = m_restart_pc;
@@ -213,6 +235,14 @@ bool NXNode::evaluate ( bool trigger )
                 // Load from data memory
                 uint32_t word = m_data_memory.read(f_address);
                 m_registers[f_tgt] = (word >> shift) & 0xFF;
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Load from 0x" << std::hex << f_address << " "
+                      << "with shift " << std::dec << shift << " "
+                      << "into R" << std::hex << f_tgt
+                      << " (0x" << std::hex << (unsigned int)m_registers[f_tgt]
+                      << ")";
                 break;
             }
             case NXISA::OP_STORE: {
@@ -221,6 +251,13 @@ bool NXNode::evaluate ( bool trigger )
                 data <<= shift;
                 mask <<= shift;
                 m_data_memory.write(f_address, data, mask);
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Store from R" << std::hex << f_src_a << " "
+                      << "into 0x" << std::hex << f_address << " "
+                      << "data=0x" << std::hex << data << " "
+                      << "mask=0x" << std::hex << mask;
                 break;
             }
             case NXISA::OP_BRANCH: {
@@ -230,10 +267,30 @@ bool NXNode::evaluate ( bool trigger )
                 m_idle        = (NXISA::extract_idle(raw) != 0);
                 m_next_pc     = f_jump_pc;
                 m_next_offset = offset;
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Branch to 0x" << std::hex << m_next_pc << " "
+                      << (m_idle ? "with" : "without") << " idle";
                 break;
             }
             case NXISA::OP_SEND: {
-                assert(!"Not yet implemented");
+                node_signal_t msg;
+                msg.header.target.row    = NXISA::extract_node_row(raw);
+                msg.header.target.column = NXISA::extract_node_col(raw);
+                msg.header.command       = NODE_COMMAND_SIGNAL;
+                msg.address              = f_address;
+                msg.slot                 = f_slot;
+                msg.offset               = (NXConstants::memory_offset_t)f_offset;
+                msg.data                 = val_a;
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Send 0x" << std::hex << (unsigned int)val_a << " "
+                      << "to (" << std::dec << (unsigned int)msg.header.target.row
+                      << ", " << std::dec << (unsigned int)msg.header.target.column
+                      << ")";
+                route(msg.header.target, NODE_COMMAND_SIGNAL)->enqueue(msg);
                 break;
             }
             case NXISA::OP_TRUTH: {
@@ -246,14 +303,23 @@ bool NXNode::evaluate ( bool trigger )
                 bool bit_b = (((val_b >> mux_b) & 1) != 0);
                 bool bit_c = (((val_c >> mux_c) & 1) != 0);
                 // Apply shifts to the truth table
-                uint32_t table = NXISA::extract_table(raw);
-                if (bit_a) table >>= 1;
-                if (bit_b) table >>= 2;
-                if (bit_c) table >>= 4;
+                uint32_t raw_table = NXISA::extract_table(raw);
+                uint32_t shf_table = raw_table;
+                if (bit_a) shf_table >>= 1;
+                if (bit_b) shf_table >>= 2;
+                if (bit_c) shf_table >>= 4;
                 // Determine the result
-                bool result = ((table & 1) != 0);
+                bool result = ((shf_table & 1) != 0);
                 // Shift into the result register (r7)
                 m_registers[7] = (m_registers[7] << 1) | (result ? 1 : 0);
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Truth operation with table 0x"
+                      << std::hex << (unsigned int)raw_table
+                      << " inputs (" << std::dec
+                      << mux_a << ", " << mux_b << ", " << mux_c << ") -> "
+                      << (result ? "1" : "0");
                 break;
             }
             case NXISA::OP_ARITH: {
@@ -262,6 +328,10 @@ bool NXNode::evaluate ( bool trigger )
             }
             case NXISA::OP_SHUFFLE:
             case NXISA::OP_SHUFFLE_ALT: {
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Shuffle operation";
                 // Shuffle cannot modify the TRUTH operation's result register
                 assert(f_tgt != 7);
                 // Extract bit selectors
@@ -291,6 +361,8 @@ bool NXNode::evaluate ( bool trigger )
             }
         }
 
+        // Increment PC
+        m_pc += 1;
     }
 
     // Return whether the node is now idle

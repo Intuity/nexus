@@ -16,6 +16,8 @@
 #include <chrono>
 #include <sstream>
 
+#include <plog/Log.h>
+
 #include "vcd_writer.h"
 
 #include "nexus.hpp"
@@ -24,18 +26,12 @@ using namespace NXModel;
 
 Nexus::Nexus (
     uint32_t rows,
-    uint32_t columns,
-    uint32_t node_inputs,
-    uint32_t node_outputs,
-    bool     verbose /* = false */
+    uint32_t columns
 )   : m_rows    ( rows          )
     , m_columns ( columns       )
-    , m_verbose ( verbose       )
 {
     // Link the ingress & egress pipes
-    m_mesh    = std::make_shared<NXMesh>(
-        m_rows, m_columns, node_inputs, node_outputs, verbose
-    );
+    m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns);
     m_ingress = m_mesh->get_node(0, 0)->get_pipe(DIRECTION_NORTH);
     m_egress  = std::make_shared<NXMessagePipe>();
     m_mesh->get_node(m_rows-1, 0)->attach(DIRECTION_SOUTH, m_egress);
@@ -43,20 +39,19 @@ Nexus::Nexus (
 
 void Nexus::run (uint32_t cycles)
 {
-    std::cout << "[NXMesh] Running for " << cycles << " cycles" << std::endl;
+    PLOGI << "[Nexus] Running for " << cycles << " cycles";
     // Take timestamp at start of run
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     // Run for the requested number of cycles
     for (uint32_t cycle = 0; cycle < cycles; cycle++) {
-        // std::cout << "[NXMesh] Starting cycle " << cycle << std::endl;
+        PLOGD << "[Nexus] Starting cycle " << cycle;
         // Step until idle
         uint32_t steps = 0;
         do  {
             m_mesh->step((steps == 0));
             steps++;
         } while (!m_mesh->is_idle());
-        // std::cout << "[NXMesh] Finished cycle " << cycle << " in "
-        //           << steps << " steps" << std::endl;
+        PLOGD << "[Nexus] Finished cycle " << cycle << " in " << steps << " steps";
         // Summarise final output state
         summary_t * summary = new summary_t();
         // - Base the summary on the previous cycle
@@ -72,15 +67,16 @@ void Nexus::run (uint32_t cycles)
         while (!m_egress->is_idle()) {
             node_header_t header = m_egress->next_header();
             switch (header.command) {
-                // TODO: Capture output signals
-                // // Summarise final signal state
-                // case NODE_COMMAND_SIGNAL : {
-                //     node_signal_t msg;
-                //     m_egress->dequeue(msg);
-                //     output_key_t key = { msg.header.target.row, msg.header.target.column, msg.index };
-                //     (*summary)[key] = msg.state;
-                //     break;
-                // }
+                // Summarise final signal state
+                case NODE_COMMAND_SIGNAL : {
+                    node_signal_t msg;
+                    m_egress->dequeue(msg);
+                    output_key_t key = { msg.header.target.row,
+                                         msg.header.target.column,
+                                         msg.address };
+                    (*summary)[key] = msg.data;
+                    break;
+                }
                 // Anything else, just drop
                 default : {
                     m_egress->dequeue_raw();
@@ -89,16 +85,14 @@ void Nexus::run (uint32_t cycles)
             }
         }
         // - Summarise the output
-        if (m_verbose) {
-            std::cout << "[Nexus] Cycle " << cycle << " state: " << std::endl;
-            for (typename summary_t::iterator it = summary->begin(); it != summary->end(); it++) {
-                output_key_t key   = it->first;
-                bool         state = it->second;
-                std::cout << " - " << std::get<0>(key)
-                          << ", "  << std::get<1>(key)
-                          << ", "  << std::get<2>(key)
-                          << " = " << state << std::endl;
-            }
+        PLOGD << "[Nexus] Cycle " << cycle << " state: ";
+        for (typename summary_t::iterator it = summary->begin(); it != summary->end(); it++) {
+            output_key_t key   = it->first;
+            uint8_t      state = it->second;
+            PLOGD << " - "               << std::get<0>(key)
+                  << ", "                << std::get<1>(key)
+                  << ", "                << std::get<2>(key)
+                  << " = 0x" << std::hex << (unsigned int)state;
         }
         // Record state
         m_output.push_back(summary);
@@ -108,13 +102,15 @@ void Nexus::run (uint32_t cycles)
     uint64_t delta_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
     uint64_t rate     = delta_ns / ((uint64_t)cycles);
     uint64_t freq     = (1E9 / rate);
-    std::cout << "[Nexus] Achieved frequency of " << freq << " Hz" << std::endl;
+    PLOGI << "[Nexus] Achieved frequency of " << freq << " Hz";
 }
 
 void Nexus::dump_vcd (const std::string path)
 {
-    std::cout << "[Nexus] Writing VCD to " << path << std::endl;
+    PLOGI << "[Nexus] Writing VCD to " << path;
     vcd::VCDWriter writer(path);
+    // Create a cycle count signal
+    vcd::VarPtr cycle = writer.register_var("dut", "cycle", vcd::VariableType::integer, 32);
     // Register all outputs
     std::map<output_key_t, vcd::VarPtr> output_vars;
     for (
@@ -126,25 +122,28 @@ void Nexus::dump_vcd (const std::string path)
         ss << "R" << (int)std::get<0>(key) << "C" << (int)std::get<1>(key)
            << "I" << (int)std::get<2>(key);
         output_vars[key] = writer.register_var(
-            "dut", ss.str().c_str(), vcd::VariableType::reg, 1
+            "dut", ss.str().c_str(), vcd::VariableType::reg, 8
         );
     }
     // Set an initial value for all signals
+    writer.change(cycle, 1, std::bitset<32>(0).to_string());
     for (
         std::map<output_key_t, vcd::VarPtr>::iterator it = output_vars.begin();
         it != output_vars.end(); it++
-    ) writer.change((vcd::VarPtr)it->second, 0, "0");
+    ) writer.change((vcd::VarPtr)it->second, 1, std::bitset<8>(0).to_string());
     // Run through every timestamp
-    int step = 1;
+    int step = 2;
+    PLOGI << "[Nexus] Recording " << std::dec << m_output.size() << " steps";
     while (m_output.size()) {
+        writer.change(cycle, step, std::bitset<32>(step).to_string());
         summary_t * summary = m_output.front();
         for (
             typename summary_t::iterator it = summary->begin();
             it != summary->end(); it++
         ) {
             output_key_t key   = it->first;
-            bool         state = it->second;
-            writer.change(output_vars[key], step, state ? "1" : "0");
+            uint8_t      state = it->second;
+            writer.change(output_vars[key], step, std::bitset<8>(state).to_string());
         }
         step += 1;
         m_output.pop_front();

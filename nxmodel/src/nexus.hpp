@@ -38,19 +38,13 @@ namespace NXModel {
 
         typedef std::tuple<uint32_t, uint32_t, uint32_t> output_key_t;
 
-        typedef std::map<output_key_t, bool> summary_t;
+        typedef std::map<output_key_t, uint8_t> summary_t;
 
         // =====================================================================
         // Constructor
         // =====================================================================
 
-        Nexus (
-            uint32_t rows,
-            uint32_t columns,
-            uint32_t node_inputs,
-            uint32_t node_outputs,
-            bool     verbose = false
-        );
+        Nexus (uint32_t rows, uint32_t columns);
 
         // =====================================================================
         // Public Methods
@@ -119,9 +113,6 @@ namespace NXModel {
         // Sizing
         uint32_t m_rows;
         uint32_t m_columns;
-
-        // Verbosity
-        bool m_verbose;
 
         // Mesh
         std::shared_ptr<NXMesh> m_mesh;

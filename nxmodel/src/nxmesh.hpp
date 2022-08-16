@@ -34,13 +34,7 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        NXMesh (
-            uint32_t rows,
-            uint32_t columns,
-            uint32_t node_inputs,
-            uint32_t node_outputs,
-            bool     verbose = false
-        );
+        NXMesh (uint32_t rows, uint32_t columns);
 
         // =====================================================================
         // Destructor
@@ -91,9 +85,6 @@ namespace NXModel {
         // Sizing
         uint32_t m_rows;
         uint32_t m_columns;
-
-        // Verbosity
-        bool m_verbose;
 
         // Nodes in mesh
         std::vector<std::vector<std::shared_ptr<NXNode>> *> m_nodes;
