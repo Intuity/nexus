@@ -24,11 +24,16 @@ from tabulate import tabulate
 
 class Field:
 
-    def __init__(self, name : str, width : int, values : Optional[Dict[str, int]] = None) -> None:
+    def __init__(self,
+                 name   : str,
+                 width  : int,
+                 values : Optional[Dict[str, int]] = None,
+                 group  : str = None) -> None:
         self.name    = name
         self.width   = width
         self.lsb     = None
         self.values  = values or {}
+        self.group   = group or name
         self.mapping = {}
         if self.values:
             self.__dict__.update(self.values)
@@ -86,8 +91,8 @@ class Reserved(Field):
 
 class Register(Field):
 
-    def __init__(self, name : str) -> None:
-        super().__init__(name, 3)
+    def __init__(self, name : str, group : str = None) -> None:
+        super().__init__(name, 3, group=group)
 
 class Immediate(Field):
 
@@ -101,7 +106,7 @@ class Control(Field):
 class Source(Register):
 
     def __init__(self, name):
-        super().__init__(name)
+        super().__init__(name, group="src")
 
 class Target(Register):
 
@@ -180,7 +185,7 @@ class NodeColumn(Field):
 class Mux(Field):
 
     def __init__(self, name) -> None:
-        super().__init__(name, 3)
+        super().__init__(name, 3, group="mux")
 
 # ==============================================================================
 # Instruction Encodings
@@ -202,12 +207,12 @@ class InstructionDef:
             field.lsb = lsb
             lsb       = field.msb + 1
             # Categorise
-            if field.name in self.fields:
-                if not isinstance(self.fields[field.name], list):
-                    self.fields[field.name] = [self.fields[field.name]]
-                self.fields[field.name].append(field)
+            if field.group in self.fields:
+                if not isinstance(self.fields[field.group], list):
+                    self.fields[field.group] = [self.fields[field.group]]
+                self.fields[field.group].append(field)
             else:
-                self.fields[field.name] = field
+                self.fields[field.group] = field
         self.__dict__.update(self.fields)
         self.opcode.lsb = lsb
         # Sanity check
@@ -307,8 +312,8 @@ class Instance:
                 raise Exception(f"Unknown field '{key}'")
             elif isinstance(instr.fields[key], list) != isinstance(value, list):
                 exp = type(instr.fields[key]).__name__
-                got = type(instr.fields[key]).__name__
-                raise Exception(f"Mismatching field type - expected: {exp}, got: {got}")
+                got = type(value).__name__
+                raise Exception(f"Mismatching field type for '{key}' expected: {exp}, got: {got}")
 
     def encode(self) -> int:
         """ Encode the instance fields using the instruction definition """
@@ -368,7 +373,7 @@ class SendDef(InstructionDef):
                          Flag("slot"),
                          Address(),
                          Offset(),
-                         Flag("Trig"),
+                         Flag("trig"),
                          Reserved(4))
 
 class TruthDef(InstructionDef):
@@ -376,7 +381,7 @@ class TruthDef(InstructionDef):
     def __init__(self) -> None:
         super().__init__(OpCode("TRUTH"),
                          Source("src_a"),
-                         Target(),
+                         Reserved(3),
                          Source("src_b"),
                          Source("src_c"),
                          Mux("mux_a"),
