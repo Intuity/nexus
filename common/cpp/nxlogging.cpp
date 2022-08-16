@@ -22,5 +22,5 @@
 void Nexus::setup_logging (void)
 {
     static plog::ColorConsoleAppender<plog::TxtFormatter> console;
-    plog::init(plog::debug, &console);
+    plog::init(plog::info, &console);
 }

@@ -13,11 +13,10 @@
 # limitations under the License.
 
 from collections import defaultdict
-from functools import lru_cache
+from functools import lru_cache, reduce
 from itertools import product
 from math import ceil
 from statistics import mean
-from typing import Tuple
 
 from tabulate import tabulate
 
@@ -132,6 +131,30 @@ class Operation:
     def __str__(self):
         return self.__repr__()
 
+    def evaluate(self, values):
+        # Gather the finalised input values from sub-operations
+        final = []
+        for term in self.inputs:
+            if term in values:
+                final.append(values[term])
+            elif isinstance(term, Operation):
+                final.append(term.evaluate(values))
+            else:
+                raise Exception("Missing term")
+        # Evaluate
+        if self.gate.op == nxgate_op_t.COND:
+            return final[1:][final[0]]
+        elif self.gate.op == nxgate_op_t.AND:
+            return reduce(lambda x, y: x & y, final)
+        elif self.gate.op == nxgate_op_t.OR:
+            return reduce(lambda x, y: x | y, final)
+        elif self.gate.op == nxgate_op_t.XOR:
+            return reduce(lambda x, y: x ^ y, final)
+        elif self.gate.op == nxgate_op_t.NOT:
+            return [1, 0][final[0]]
+        else:
+            raise Exception("Unsupported operation")
+
 class MemorySlot:
 
     def __init__(self, row, index, paired=None):
@@ -220,10 +243,13 @@ class Memory:
     def place_all(self, signals, is_seq, clear=False):
         if clear and self.last_bit > 0:
             self.bump_slot()
-        start_row, start_slot = self.last_row, self.last_slot
+        # Align before capturing the starting row & slot
+        start_row, start_slot = None, None
         for sig in signals:
             if sig is not None:
-                self.place(sig, is_seq)
+                pl_row, pl_slot, _ = self.place(sig, is_seq)
+                if None in (start_row, start_slot):
+                    start_row, start_slot = pl_row, pl_slot
         return start_row, start_slot
 
     def find(self, signal, default=None):
@@ -386,19 +412,21 @@ def identify_operations(partition):
             work_ins = []
             work_ops = contrib[:]
             for idx_term, term in enumerate(current):
-                # Expand this term
+                # Reuse existing tables
                 if term in tables:
                     work_ins.append(tables[term])
+                # Expand operations which haven't been previously converted
                 elif isinstance(term, Operation):
                     work_ins += term.inputs
                     work_ops.append(term)
                     expanded = True
+                # Anything else append as a direct input
                 else:
                     work_ins.append(term)
                 # Join with the remainder
                 full_ins = work_ins + current[idx_term+1:]
                 if len(set(full_ins)) <= 3:
-                    best_ins = full_ins
+                    best_ins = list(set(full_ins))
                     best_ops = work_ops[:]
             # Update the current state
             current = work_ins[:]
@@ -406,39 +434,15 @@ def identify_operations(partition):
             # If no expansion occurred, stop searching
             if not expanded:
                 break
-        # Build logic function for each term
-        funcs = {}
-        all_ops = [op] + best_ops
-        for input in best_ins:
-            funcs[input.op if isinstance(input, Table) else input] = [1, 0]
-        for step in all_ops[::-1]:
-            # Static encoding of A ? B : C
-            if step.op == nxgate_op_t.COND:
-                # Get terms B+C & expand to 4 bits
-                if_true  = (4 // len(funcs[step.inputs[1]])) * funcs[step.inputs[1]]
-                if_false = (4 // len(funcs[step.inputs[2]])) * funcs[step.inputs[2]]
-                # Concatenate terms together
-                funcs[step] = if_false + if_true
-            # NOT gates invert the term that they carry
-            elif step.op == nxgate_op_t.NOT:
-                inner = funcs[step.inputs[0]]
-                funcs[step] = [[1, 0][x] for x in inner]
-            # Two input terms need to expand a product
-            elif step.op in (nxgate_op_t.OR, nxgate_op_t.AND, nxgate_op_t.XOR):
-                inner_lhs, inner_rhs = [funcs[x] for x in step.inputs]
-                funcs[step] = []
-                for lhs, rhs in product(inner_lhs, inner_rhs):
-                    if step.op == nxgate_op_t.AND:
-                        funcs[step].append(lhs & rhs)
-                    elif step.op == nxgate_op_t.OR:
-                        funcs[step].append(lhs | rhs)
-                    elif step.op == nxgate_op_t.XOR:
-                        funcs[step].append(lhs ^ rhs)
-            # Otherwise unsupported
-            else:
-                raise Exception(f"Unsupported op {step.op}")
-        # Extract the result & expand to fit
-        result = (8 // len(funcs[op])) * funcs[op]
+        # Iterate through the input combinations and evaluate the function
+        result = []
+        for idx in range(1 << len(best_ins)):
+            values = {}
+            for shift, input in enumerate(best_ins):
+                values[input.op if isinstance(input, Table) else input] = ((idx >> shift) & 1)
+            result.append(op.evaluate(values))
+        # Expand result to fill all 8 slots
+        result = (8 // len(result)) * result
         # Create a table
         tables[op] = Table(op, best_ins, result, [op] + best_ops)
 
@@ -673,13 +677,34 @@ def compile_partition(partition):
                 yield Load(tgt    =tgt.index,
                            slot   =(slot // 2),
                            address=row,
-                           offset =(2 | (slot % 2)))
+                           # TODO: Need to alter behaviour based on seq/comb
+                           offset =Load.offset.PRESERVE)
                 trk_usage[(row, slot)].append(("read", len(stream)))
                 trk_read[(row, slot)] += 1
                 tgt.elements = memory.rows[row].slots[slot].elements[:]
             else:
                 # Not found
                 raise Exception(f"Failed to locate signal '{signal}'")
+
+    emitted_flop_cycles = []
+    def emit_flush(cone_idx, exclude=None):
+        # Move value out to a target register (uses shuffle but keeps order)
+        tgt = select_register(cone_idx, exclude=exclude)
+        yield from emit_register_reuse(tgt)
+        yield Shuffle(src=reg_work.index, tgt=tgt.index, mux=list(range(8)))
+        tgt.elements      = reg_work.elements[:]
+        tgt.novel         = True
+        reg_work.elements = [None] * 8
+        # If this is corresponds to a flop update, perform masked store
+        if (selection := flop_cycles.get(cone_idx, None)):
+            emitted_flop_cycles.append(cone_idx)
+            slot_idx, places = selection
+            row, slot        = flop_targets[slot_idx]
+            yield Store(src    =reg_work.index,
+                        mask   =sum(((1 << x) for x in places)),
+                        slot   =(slot // 2),
+                        address=row,
+                        offset =Store.offset.INVERSE)
 
     def emit_operation(cone_idx, cone):
         nonlocal registers
@@ -699,42 +724,14 @@ def compile_partition(partition):
                 references[input].remove(cone)
         # Check if working register has reached a flush point (all registers full)
         if None not in reg_work.elements:
-            # Move value out to a target register (uses shuffle but keeps order)
-            tgt = select_register(cone_idx, exclude=srcs)
-            yield from emit_register_reuse(tgt)
-            yield Shuffle(src=reg_work.index, tgt=tgt.index, mux=list(range(8)))
-            tgt.elements      = reg_work.elements[:]
-            tgt.novel         = True
-            reg_work.elements = [None] * 8
-            # If this is corresponds to a flop update, perform masked store
-            if (selection := flop_cycles.get(cone_idx, None)):
-                slot_idx, places = selection
-                row, slot        = flop_targets[slot_idx]
-                yield Store(src    =reg_work.index,
-                            mask   =sum(((1 << x) for x in places)),
-                            slot   =(slot // 2),
-                            address=row,
-                            offset =Store.offset.PRESERVE)
+            yield from emit_flush(cone_idx, exclude=srcs)
         # Extract and pad the lookup table
         table = 0
         srcs  = [x.index for x in srcs] + ([0] * (3 - len(srcs)))
         table = sum([(x << i) for i, x in enumerate(cone.outputs)])
-        # if len(cone.inputs) == 1:
-        #     srcs  = [srcs[0].index, 0, 0]
-        #     idxs  = [idxs[0]]
-        #     table = sum([(x << i) for i, x in enumerate(cone.outputs * 4)])
-        # elif len(cone.inputs) == 2:
-        #     srcs  = [srcs[0].index, srcs[1].index, 0]
-        #     idxs  = [idxs[0], idxs[1], 0]
-        #     table = sum([(x << i) for i, x in enumerate(cone.outputs * 2)])
-        # elif len(cone.inputs) == 3:
-        #     srcs  = [x.index for x in srcs]
-        #     table = sum([(x << i) for i, x in enumerate(cone.outputs)])
-        # else:
-        #     raise Exception("Unsupported number of inputs")
         assert table >= 0 and table <= 0xFF, "Incorrect table value"
         # Emit an instruction
-        yield Truth(src=srcs, mux=idxs, table=table, tgt=reg_work.index)
+        yield Truth(src=srcs, mux=idxs, table=table)
         # Shift working register and insert new value
         reg_work.elements = [cone] + reg_work.elements[:7]
 
@@ -761,53 +758,134 @@ def compile_partition(partition):
                 truth_flops.append(output.name)
         # TODO: Detect when values are ready for sending to other nodes
 
+    # Flush any flop state left in work register
+    for index in flop_cycles.keys():
+        if index not in emitted_flop_cycles:
+            stream_iter(emit_flush(index))
+
     # Append flop updates not covered by logic
-    # for flop in partition.tgt_flops:
-    #     # Check if flop has already been handled
-    #     if flop.name in truth_flops:
-    #         continue
-    #     # Locate where the flop should be stored
-    #     tgt_row, tgt_slot, tgt_idx = memory.find(flop)
-    #     # Find the signal driving the flop
-    #     signal = sig_table_map.get(flop.inputs[0], flop.inputs[0])
-    #     if getattr(signal, "type", None) == nxsignal_type_t.CONSTANT:
-    #         # TODO: Generate a constant value and write to memory
-    #         continue
-    #     else:
-    #         stream_iter(emit_source_setup(len(stream), signal))
-    #         try:
-    #             src_reg = next(iter(x for x in registers + [reg_work] if signal in x.elements))
-    #         except StopIteration:
-    #             raise Exception(f"Failed to find {signal.name}")
-    #         src_idx = src_reg.elements.index(signal)
-    #         # If bit is not in the right place, swap over
-    #         if tgt_idx != src_idx:
-    #             stream_add(Shuffle(src=src_reg.index,
-    #                             tgt=src_reg.index,
-    #                             mux=[{
-    #                                 src_idx: tgt_idx,
-    #                                 tgt_idx: src_idx
-    #                             }.get(x, x) for x in range(8)]))
-    #             src_reg.elements[tgt_idx], src_reg.elements[src_idx] = (
-    #                 src_reg.elements[src_idx], src_reg.elements[tgt_idx]
-    #             )
-    #         # Write out
-    #         stream_add(Store(src    =src_reg.index,
-    #                          mask   =(1 << tgt_idx),
-    #                          slot   =(tgt_slot // 2),
-    #                          address=tgt_row,
-    #                          offset =Store.offset.PRESERVE))
+    for flop in partition.tgt_flops:
+        # Check if flop has already been handled
+        if flop.name in truth_flops:
+            continue
+        # Locate where the flop should be stored
+        tgt_row, tgt_slot, tgt_idx = memory.find(flop)
+        # Find the signal driving the flop
+        signal = flop.inputs[0]
+        if getattr(signal, "type", None) == nxsignal_type_t.CONSTANT:
+            # TODO: Generate a constant value and write to memory
+            continue
+        else:
+            # Locate the signal in registers or memory
+            stream_iter(emit_source_setup(len(stream), signal))
+            for reg in registers + [reg_work]:
+                if signal.name in (getattr(x, "name", None) for x in reg.elements):
+                    src_reg = reg
+                    src_idx = [getattr(x, "name", None) for x in reg.elements].index(signal.name)
+                    break
+            else:
+                raise Exception(f"Failed to find {signal.name}")
+            # If bit is not in the right place, swap over
+            if tgt_idx != src_idx:
+                stream_add(Shuffle(src=src_reg.index,
+                                tgt=src_reg.index,
+                                mux=[{
+                                    src_idx: tgt_idx,
+                                    tgt_idx: src_idx
+                                }.get(x, x) for x in range(8)]))
+                src_reg.elements[tgt_idx], src_reg.elements[src_idx] = (
+                    src_reg.elements[src_idx], src_reg.elements[tgt_idx]
+                )
+            # Write out
+            stream_add(Store(src    =src_reg.index,
+                             mask   =(1 << tgt_idx),
+                             slot   =(tgt_slot // 2),
+                             address=tgt_row,
+                             offset =Store.offset.PRESERVE))
+
+    print()
+    print("# Inserting port state updates")
+    print()
+
+    # Pack ports into chunks of 8
+    port_mapping = []
+    for port in sorted(partition.tgt_ports, key=lambda x: x.name):
+        if len(port_mapping) == 0 or len(port_mapping[-1]) >= 8:
+            port_mapping.append([])
+        port_mapping[-1].append((port, port.inputs[0]))
+
+    # Build operations to expose port state
+    for idx_map, mapping in enumerate(port_mapping):
+        # # Find any signals currently in registers
+        # locations = []
+        # for _, signal in mapping:
+        #     for idx_reg, reg in enumerate(registers + [reg_work]):
+        #         for idx_elem, elem in enumerate(reg.elements):
+        #             if signal.name == getattr(elem, "name", None):
+        #                 locations.append((idx_reg, idx_elem))
+        #                 break
+        #         else:
+        #             continue
+        #         break
+        #     else:
+        #         locations.append(None)
+        # # If any signals were found, accumulate them
+        # if any((x for x in locations if x is not None)):
+        #     print("Found some signals in registers")
+        #     # TODO: Do something!
+        # Now search for remaining signals in memory
+        mem_locs = defaultdict(dict)
+        for idx, (_, signal) in enumerate(mapping):
+            # # Skip entries which have already been found
+            # if location is not None:
+            #     continue
+            # Locate in the memory
+            row, slot, bit = memory.find(signal)
+            mem_locs[(row, slot)][idx] = bit
+        # For each memory location
+        for (row, slot), entries in mem_locs.items():
+            # Load from the memory location
+            stream_add(Load(tgt    =0,
+                            slot   =(slot // 2),
+                            address=row,
+                            # TODO: Is this right?
+                            offset =Load.offset.INVERSE))
+            # Shuffle bits to match expected order
+            stream_add(Shuffle(src=0,
+                               tgt=0,
+                               mux=[entries.get(x, 0) for x in range(8)]))
+            # Accumulate using memory masking
+            stream_add(Store(src    =0,
+                             mask   =sum((1 << x) for x in entries.keys()),
+                             slot   =0,
+                             address=1023,
+                             offset =Store.offset.SET_LOW))
+        # Read back the value and send it
+        stream_add(Load(tgt    =0,
+                        slot   =0,
+                        address=1023,
+                        offset =Store.offset.SET_LOW))
+        stream_add(Send(src     =0,
+                        node_row=15,
+                        node_col=0,
+                        slot    =0,
+                        address =idx_map,
+                        offset  =0,
+                        trig    =0))
+
 
     # Append a branch to wait for the next trigger
+    print()
+    print("# Inserting loop point")
+    print()
     stream_add(Branch(pc=0,
                       offset=Branch.offset.INVERSE,
                       idle=1,
                       mark=1,
                       comparison=Branch.comparison.WAIT))
 
-    print()
-
     # Instruction stats
+    print()
     print("=" * 80)
     print("Instruction Counts:")
     print(f" - Total  : {len(stream):3d}")
@@ -824,23 +902,16 @@ def compile_partition(partition):
         sub_ops = [x.op for x in table.inputs if isinstance(x, Table)]
         rendered[table.op.gate.name] = table.op.render(include=[table.op] + sub_ops)
 
-    # # Count references
-    # print("=== TABLES ===")
-    # for key, full in rendered.items():
-    #     refs = len([x for x in rendered.values() if key in x])
-    #     print(f"{key} -> {full} -> {refs} times")
-
-    # print(tables[-1].op.prettyprint())
-    # breakpoint()
-    # assert False
-
     # Calculate access deltas
     deltas = {}
     for key, accesses in trk_usage.items():
         deltas[key] = [(y - x) for ((_, x), (_, y)) in zip(accesses, accesses[1:])]
-    min_delta = min(sum(deltas.values(), []))
-    max_delta = max(sum(deltas.values(), []))
-    avg_delta = ceil(mean(sum(deltas.values(), [])))
+    min_delta, max_delta, avg_delta = 0, 0, 0
+    all_deltas = sum(deltas.values(), [])
+    if len(all_deltas) > 0:
+        min_delta = min(all_deltas)
+        max_delta = max(all_deltas)
+        avg_delta = ceil(mean(all_deltas))
 
     # Memory access stats
     write_n_read = set(trk_write.keys()).difference(trk_read.keys())
@@ -863,5 +934,4 @@ def compile_partition(partition):
     print("=" * 80)
     print()
 
-    return stream
-
+    return stream, port_mapping

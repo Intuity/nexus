@@ -14,6 +14,9 @@
 
 from collections import defaultdict
 from itertools import count
+import json
+import math
+from pathlib import Path
 from statistics import mean
 from random import choice, seed
 import os
@@ -497,9 +500,32 @@ print()
 print()
 print("=== NODE COMPILATION ===")
 print()
+registry = {
+    "design"    : sys.argv[1],
+    "seed"      : os.environ.get("NX_SEED", 0),
+    "rows"      : math.ceil(math.sqrt(len(ord_util))),
+    "columns"   : math.ceil(math.sqrt(len(ord_util))),
+    "partitions": len(ord_util),
+    "nodes"     : []
+}
 for partition in ord_util:
-    stream = compile_partition(partition)
+    stream, port_map = compile_partition(partition)
     with open(f"{partition.id}.asm", "w", encoding="utf-8") as fh:
-        fh.write("\n".join([x.to_asm() for x in stream]) + "\n")
+        fh.write("\n".join([f"0x{i:03X} @ {x.to_asm()}" for i, x in enumerate(stream)]) + "\n")
     with open(f"{partition.id}.hex", "w", encoding="utf-8") as fh:
         fh.write("\n".join([f"{x.encode():08X}" for x in stream]) + "\n")
+    root = Path.cwd()
+    registry["nodes"].append({
+        "id"    : partition.id,
+        "row"   : (partition.index // 8),
+        "column": (partition.index  % 8),
+        "index" : partition.index,
+        "gates" : len(partition.all_gates),
+        "flops" : len(partition.tgt_flops),
+        "ports" : [[y[0].name for y in x] for x in port_map],
+        "asm"   : (root / f"{partition.id}.asm").absolute().as_posix(),
+        "hex"   : (root / f"{partition.id}.hex").absolute().as_posix(),
+    })
+
+with open("summary.json", "w", encoding="utf-8") as fh:
+    json.dump(registry, fh, indent=4)

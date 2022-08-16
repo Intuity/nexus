@@ -69,6 +69,9 @@ int main (int argc, const char ** argv) {
         return 1;
     }
 
+    // Pickup verbosity
+    if (options.count("verbose") != 0) plog::get()->setMaxSeverity(plog::debug);
+
     // If help not requested, print standard welcome
     PLOGI << "NXCompile: Compiler for Nexus hardware";
 
