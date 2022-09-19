@@ -13,15 +13,16 @@
 # limitations under the License.
 
 from collections import defaultdict
+from dis import Instruction
 from functools import lru_cache, reduce
-from itertools import product
 from math import ceil
 from statistics import mean
+from typing import Union
 
 from tabulate import tabulate
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort, NXConstant, nxgate_op_t
-from nxisa import Load, Store, Branch, Send, Truth, Arithmetic, Shuffle
+from nxisa import Load, Store, Branch, Send, Truth, Shuffle, Instance, Label
 
 class Table:
 
@@ -334,9 +335,22 @@ def assign_flops(partition, memory, tables):
             slots.append([None] * 8)
             slots[-1][0] = flop
     # Allocate slots in the memory
+    # NOTE: Don't use Memory.place_all as that will tightly pack bits to the LSB
     targets = []
     for slot in slots:
-        targets.append(memory.place_all(slot, is_seq=True, clear=True))
+        # If bit cursor is not 0, bounce to next slot
+        if memory.last_bit != 0:
+            memory.bump_slot()
+        # Ensure that the slot is sequentially aligned
+        memory.align(is_seq=True)
+        targets.append((memory.last_row, memory.last_slot))
+        # Fill in the memory elements
+        for idx, elem in enumerate(slot):
+            memory.slot.elements[idx] = elem
+            if elem is not None:
+                memory.mapping[elem.name] = (memory.last_row, memory.last_slot, idx)
+        # Stop this slot being modified
+        memory.bump_slot()
     # Return the slots and cycle encodings
     return slots, cycles, targets
 
@@ -691,7 +705,10 @@ def compile_partition(partition):
         # Move value out to a target register (uses shuffle but keeps order)
         tgt = select_register(cone_idx, exclude=exclude)
         yield from emit_register_reuse(tgt)
-        yield Shuffle(src=reg_work.index, tgt=tgt.index, mux=list(range(8)))
+        yield Shuffle(src=reg_work.index,
+                      tgt=tgt.index,
+                      mux=list(range(8)),
+                      comment=f"Copy {reg_work.index} to {tgt.index}")
         tgt.elements      = reg_work.elements[:]
         tgt.novel         = True
         reg_work.elements = [None] * 8
@@ -731,7 +748,12 @@ def compile_partition(partition):
         table = sum([(x << i) for i, x in enumerate(cone.outputs)])
         assert table >= 0 and table <= 0xFF, "Incorrect table value"
         # Emit an instruction
-        yield Truth(src=srcs, mux=idxs, table=table)
+        yield Truth(src=srcs,
+                    mux=idxs,
+                    table=table,
+                    comment=cone.name + " - " +
+                            cone.op.render(include=[cone.op] + cone.inputs) +
+                            " - " + ", ".join([x.name for x in cone.inputs]))
         # Shift working register and insert new value
         reg_work.elements = [cone] + reg_work.elements[:7]
 
@@ -739,10 +761,11 @@ def compile_partition(partition):
     counts = defaultdict(lambda: 0)
     print("Generating Instruction Stream:")
     print()
-    def stream_add(instr):
+    def stream_add(instr : Union[Instruction, Label]):
         stream.append(instr)
-        counts[instr.instr.opcode.op_name] += 1
-        print(f"[{len(stream):04d}] {instr.to_asm():40} -> 0x{instr.encode():08X}")
+        if isinstance(instr, Instance):
+            counts[instr.instr.opcode.op_name] += 1
+            print(f"[{len(stream):04d}] {instr.to_asm():40} -> 0x{instr.encode():08X}")
 
     def stream_iter(gen):
         for instr in gen:
@@ -751,6 +774,7 @@ def compile_partition(partition):
                 reg.aging()
 
     truth_flops = []
+    stream_add(Label("compute"))
     for idx, table in enumerate(tables):
         stream_iter(emit_operation(idx, table))
         for output in table.op.gate.outputs:
@@ -759,11 +783,13 @@ def compile_partition(partition):
         # TODO: Detect when values are ready for sending to other nodes
 
     # Flush any flop state left in work register
+    stream_add(Label("flush"))
     for index in flop_cycles.keys():
         if index not in emitted_flop_cycles:
             stream_iter(emit_flush(index))
 
     # Append flop updates not covered by logic
+    stream_add(Label("pipeline"))
     for flop in partition.tgt_flops:
         # Check if flop has already been handled
         if flop.name in truth_flops:
@@ -814,7 +840,8 @@ def compile_partition(partition):
             port_mapping.append([])
         port_mapping[-1].append((port, port.inputs[0]))
 
-    # Build operations to expose port state
+    # Build operations to expose port states
+    stream_add(Label("ports"))
     for idx_map, mapping in enumerate(port_mapping):
         # # Find any signals currently in registers
         # locations = []
@@ -878,6 +905,7 @@ def compile_partition(partition):
     print()
     print("# Inserting loop point")
     print()
+    stream_add(Label("loop"))
     stream_add(Branch(pc=0,
                       offset=Branch.offset.INVERSE,
                       idle=1,
@@ -934,4 +962,10 @@ def compile_partition(partition):
     print("=" * 80)
     print()
 
-    return stream, port_mapping
+    # Dump memory mappings
+    mem_map = defaultdict(lambda: defaultdict(dict))
+    for idx_row, row in enumerate(memory.rows):
+        for idx_slot, slot in enumerate(row.slots):
+            mem_map[idx_row][idx_slot] = [(x.name if x is not None else None) for x in slot.elements]
+
+    return stream, port_mapping, mem_map

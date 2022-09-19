@@ -22,6 +22,7 @@ from random import choice, seed
 import os
 import sys
 
+from nxisa import dump_asm, dump_hex
 from nodecompiler import compile_partition
 
 if "NX_SEED" in os.environ:
@@ -509,11 +510,9 @@ registry = {
     "nodes"     : []
 }
 for partition in ord_util:
-    stream, port_map = compile_partition(partition)
-    with open(f"{partition.id}.asm", "w", encoding="utf-8") as fh:
-        fh.write("\n".join([f"0x{i:03X} @ {x.to_asm()}" for i, x in enumerate(stream)]) + "\n")
-    with open(f"{partition.id}.hex", "w", encoding="utf-8") as fh:
-        fh.write("\n".join([f"{x.encode():08X}" for x in stream]) + "\n")
+    stream, port_map, mem_map = compile_partition(partition)
+    dump_asm(stream, f"{partition.id}.asm")
+    dump_hex(stream, f"{partition.id}.hex")
     root = Path.cwd()
     registry["nodes"].append({
         "id"    : partition.id,
@@ -523,6 +522,7 @@ for partition in ord_util:
         "gates" : len(partition.all_gates),
         "flops" : len(partition.tgt_flops),
         "ports" : [[y[0].name for y in x] for x in port_map],
+        "memory": mem_map,
         "asm"   : (root / f"{partition.id}.asm").absolute().as_posix(),
         "hex"   : (root / f"{partition.id}.hex").absolute().as_posix(),
     })
