@@ -19,6 +19,7 @@ from math import ceil
 from statistics import mean
 from typing import Union
 
+from natsort import natsorted
 from tabulate import tabulate
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort, NXConstant, nxgate_op_t
@@ -158,10 +159,11 @@ class Operation:
 
 class MemorySlot:
 
-    def __init__(self, row, index, paired=None):
+    def __init__(self, row, index, is_seq=False, paired=None):
         self.row      = row
         self.index    = index
         self.paired   = paired
+        self.is_seq   = is_seq
         self.elements = [None] * 8
 
 class MemoryRow:
@@ -344,6 +346,8 @@ def assign_flops(partition, memory, tables):
         # Ensure that the slot is sequentially aligned
         memory.align(is_seq=True)
         targets.append((memory.last_row, memory.last_slot))
+        # Mark slot as sequential
+        memory.slot.is_seq = True
         # Fill in the memory elements
         for idx, elem in enumerate(slot):
             memory.slot.elements[idx] = elem
@@ -660,11 +664,21 @@ def compile_partition(partition):
     def emit_register_reuse(register):
         nonlocal trk_write
         if register.active and register.novel:
-            # Check if any entries actually need preserving?
-            if any((len(references.get(x, [])) > 0) for x in register.elements):
-                row, slot = memory.place_all(register.elements, False, True)
-                trk_write[(row, slot)] += 1
-                trk_usage[(row, slot)].append(("write", len(stream)))
+            # Find any elements which are combinational and are required later
+            to_keep = [None] * 8
+            for idx, elem in enumerate(register.elements):
+                if isinstance(elem, Table) and len(references.get(elem, [])) > 0:
+                    to_keep[idx] = elem
+            # Store to memory
+            # TODO: This could be optimised a lot to pack evicted registers into
+            #       already existing entries
+            if any(to_keep):
+                memory.bump_slot()
+                row, slot = memory.last_row, memory.last_slot
+                for idx, elem in enumerate(to_keep):
+                    if elem is not None:
+                        memory.slot.elements[idx] = elem
+                        memory.mapping[elem.name] = row, slot, idx
                 yield Store(src    =register.index,
                             mask   =0xFF,
                             slot   =(slot // 2),
@@ -688,11 +702,17 @@ def compile_partition(partition):
             # Search in memory
             if mapping := memory.find(signal):
                 row, slot, _ = mapping
+                # For combinational logic, force offset high or low based on slot
+                if isinstance(signal, Table):
+                    offset_mode = 2 | (slot % 2)
+                # For sequential mode, use the current offset state (preserve)
+                else:
+                    offset_mode = Load.offset.PRESERVE
+                # Emit load
                 yield Load(tgt    =tgt.index,
                            slot   =(slot // 2),
                            address=row,
-                           # TODO: Need to alter behaviour based on seq/comb
-                           offset =Load.offset.PRESERVE)
+                           offset =offset_mode)
                 trk_usage[(row, slot)].append(("read", len(stream)))
                 trk_read[(row, slot)] += 1
                 tgt.elements = memory.rows[row].slots[slot].elements[:]
@@ -835,7 +855,7 @@ def compile_partition(partition):
 
     # Pack ports into chunks of 8
     port_mapping = []
-    for port in sorted(partition.tgt_ports, key=lambda x: x.name):
+    for port in natsorted(partition.tgt_ports, key=lambda x: x.name):
         if len(port_mapping) == 0 or len(port_mapping[-1]) >= 8:
             port_mapping.append([])
         port_mapping[-1].append((port, port.inputs[0]))
