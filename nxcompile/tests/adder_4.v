@@ -1,7 +1,7 @@
-// adder
-// Add together the values of two counters
+// adder_4
+// Add together the values of two 4-bit counters
 //
-module adder (
+module adder_4 (
     i_clk, i_rst,
     o_state_0_0, o_state_0_1, o_state_0_2, o_state_0_3,
     o_state_1_0, o_state_1_1, o_state_1_2, o_state_1_3,
@@ -158,4 +158,4 @@ assign o_sum_state_1 = sum_state_q[1];
 assign o_sum_state_2 = sum_state_q[2];
 assign o_sum_state_3 = sum_state_q[3];
 
-endmodule : adder
+endmodule : adder_4
