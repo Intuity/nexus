@@ -38,10 +38,14 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        NXNode (node_id_t id)
-            : m_id          ( id      )
+        NXNode (
+              node_id_t id
+            , bool      en_dump = false
+        )   : m_id          ( id      )
+            , m_en_dump     ( en_dump )
             , m_idle        ( true    )
             , m_waiting     ( true    )
+            , m_cycle       ( 0       )
             , m_pc          ( 0       )
             , m_offset      ( false   )
             , m_restart_pc  ( 0       )
@@ -103,6 +107,12 @@ namespace NXModel {
          */
         NXMemory * get_data_memory ( void ) { return &m_data_memory; }
 
+        /** Enable/disable dumping
+         *
+         * @param enable Enabled when True, disabled when False
+         */
+        void set_dumping( bool enable ) { m_en_dump = enable; }
+
     private:
 
         // =====================================================================
@@ -145,10 +155,12 @@ namespace NXModel {
         // Node memory
         NXMemory m_inst_memory;
         NXMemory m_data_memory;
+        bool     m_en_dump;
 
         // Node state
         bool      m_idle;
         bool      m_waiting;
+        uint32_t  m_cycle;
         uint32_t  m_pc;
         bool      m_offset;
         uint32_t  m_restart_pc;

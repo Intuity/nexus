@@ -16,6 +16,7 @@
 #define __NXMEMORY_HPP__
 
 #include <map>
+#include <fstream>
 
 namespace NXModel {
 
@@ -26,7 +27,9 @@ namespace NXModel {
         // Constructor
         // =====================================================================
 
-        NXMemory ( ) { }
+        NXMemory ( )
+            : m_dump_fh ( NULL )
+        { }
 
         // =====================================================================
         // Public Methods
@@ -61,11 +64,19 @@ namespace NXModel {
          */
         bool populated ( uint32_t address );
 
+        /**
+         * @brief Dump populated areas of memory image to a file
+         * @param path  Where to dump the address
+         * @param cycle Current cycle
+         */
+        void dump ( std::string path, unsigned int cycle );
+
     private:
         // =====================================================================
         // Private Members
         // =====================================================================
-        std::map<uint32_t, uint32_t> m_contents;
+        std::map<uint32_t, uint32_t>   m_contents;
+        std::fstream                 * m_dump_fh;
 
     };
 

@@ -45,7 +45,8 @@ int main (int argc, char * argv []) {
         ("vcd", "Path to write VCD out to", cxxopts::value<std::string>())
         // Debug/verbosity
         ("v,verbose", "Enable verbose output")
-        ("h,help",    "Print help and usage information");
+        ("h,help",    "Print help and usage information")
+        ("dump",      "Enable memory dumping on every cycle (expensive)");
 
     // Setup positional arguments
     parser.add_options()
@@ -85,6 +86,16 @@ int main (int argc, char * argv []) {
     // Load a design
     std::filesystem::path path = positional[0];
     NXModel::NXLoader loader(model, std::filesystem::canonical(path));
+
+    // If required, enable dumping
+    if (options["dump"].count()) {
+        PLOGI << "Enabling memory dumps";
+        for (uint32_t row = 0; row < rows; row++) {
+            for (uint32_t col = 0; col < columns; col++) {
+                model->get_mesh()->get_node(row, col)->set_dumping(true);
+            }
+        }
+    }
 
     // Run for the requested number of cycles
     uint32_t cycles = options["cycles"].as<uint32_t>();

@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <bitset>
 #include <iomanip>
+#include <sstream>
 
 #include <plog/Log.h>
 
@@ -42,6 +43,7 @@ void NXNode::reset (void)
     // Reset all state
     m_idle        = true;
     m_waiting     = true;
+    m_cycle       = 0;
     m_pc          = 0;
     m_offset      = false;
     m_restart_pc  = 0;
@@ -167,9 +169,10 @@ bool NXNode::evaluate ( bool trigger )
 
     // If evaluation caused by a global trigger, adopt next PC & offset
     if (trigger) {
-        m_pc         = m_next_pc;
-        m_restart_pc = m_next_pc;
-        m_offset     = m_next_offset;
+        m_pc          = m_next_pc;
+        m_restart_pc  = m_next_pc;
+        m_offset      = m_next_offset;
+        m_cycle      += 1;
         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
               << std::dec << (unsigned int)m_id.column << ") "
               << "Triggered @ 0x" << (unsigned int)m_pc << " "
@@ -286,10 +289,13 @@ bool NXNode::evaluate ( bool trigger )
                 PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                              << std::dec << (unsigned int)m_id.column << ") "
                       << "@ 0x" << std::hex << m_pc << " "
-                      << "Send 0x" << std::hex << (unsigned int)val_a << " "
+                      << "Send 0x" << std::setw(2) << std::setfill('0')
+                      << std::hex << (unsigned int)val_a << " "
                       << "to (" << std::dec << (unsigned int)msg.header.target.row
                       << ", " << std::dec << (unsigned int)msg.header.target.column
-                      << ")";
+                      << ") address=0x" << std::hex << (unsigned int)msg.address
+                      << ", slot=" << std::dec << (unsigned int)msg.slot
+                      << ", offset=" << std::dec << (unsigned int)msg.offset;
                 route(msg.header.target, NODE_COMMAND_SIGNAL)->enqueue(msg);
                 break;
             }
@@ -318,7 +324,7 @@ bool NXNode::evaluate ( bool trigger )
                       << "Truth operation with table 0x"
                       << std::hex << (unsigned int)raw_table
                       << " inputs (" << std::dec
-                      << mux_a << ", " << mux_b << ", " << mux_c << ") -> "
+                      << bit_a << ", " << bit_b << ", " << bit_c << ") -> "
                       << (result ? "1" : "0");
                 break;
             }
@@ -364,6 +370,16 @@ bool NXNode::evaluate ( bool trigger )
         // Increment PC
         m_pc += 1;
     }
+
+    // If dumping enabled, write out to file
+    if (m_en_dump) {
+        std::stringstream fname;
+        fname << "dump_" << std::dec << (unsigned int)m_id.row
+                  << "_" << (unsigned int)m_id.column
+                  << ".txt";
+        m_data_memory.dump(fname.str(), m_cycle);
+    }
+
 
     // Return whether the node is now idle
     return m_idle;
