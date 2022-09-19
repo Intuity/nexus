@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from tabulate import tabulate
@@ -228,8 +229,8 @@ class InstructionDef:
             parts.append(f"{field.name.upper()}[{field.msb}:{field.lsb}]")
         return parts
 
-    def __call__(self, **fields : Dict[str, Any]) -> "Instance":
-        return Instance(self, **fields)
+    def __call__(self, comment : str = "", **fields : Dict[str, Any]) -> "Instance":
+        return Instance(self, comment=comment, **fields)
 
     def encode(self, fields : Dict[str, Union[int, List[int]]]) -> int:
         """ Encode fields of an operation into an integer value """
@@ -303,9 +304,10 @@ class InstructionDef:
 class Instance:
     """ Holds an instance of an instruction (definition and field values) """
 
-    def __init__(self, instr : InstructionDef, **fields) -> None:
-        self.instr  = instr
-        self.fields = fields
+    def __init__(self, instr : InstructionDef, comment : str = "", **fields) -> None:
+        self.instr   = instr
+        self.comment = comment
+        self.fields  = fields
         # Check fields against the instruction definition
         for key, value in self.fields.items():
             if key not in instr.fields:
@@ -319,12 +321,32 @@ class Instance:
         """ Encode the instance fields using the instruction definition """
         return self.instr.encode(self.fields)
 
-    def to_asm(self) -> str:
+    def to_asm(self, address : Optional[int] = None) -> str:
         """
         Write out the instance fields as an assembly string using the instruction
         definition
         """
-        return self.instr.to_asm(self.fields)
+        base = self.instr.to_asm(self.fields)
+        if address is not None or self.comment:
+            base += " " * max(40 - len(base), 0)
+            base += " //"
+        if address is not None:
+            base += f" @ 0x{address:03X}"
+        if self.comment:
+            base += f" {self.comment}"
+        return base
+
+class Label:
+
+    def __init__(self, label : str):
+        self.__label = label
+
+    @property
+    def label(self):
+        return self.__label
+
+    def to_asm(self):
+        return f"{self.__label}:"
 
 class LoadDef(InstructionDef):
 
@@ -428,6 +450,33 @@ Shuffle    = ShuffleDef()
 
 # Lint guard
 assert all((Load, Store, Branch, Send, Truth, Arithmetic, Shuffle))
+
+# Dump to assembly file
+def dump_asm(stream : List[Union[Instance, Label]], path : Path):
+    address  = 0
+    labelled = False
+    with open(path, "w", encoding="utf-8") as fh:
+        for entry in stream:
+            if isinstance(entry, Label):
+                fh.write(entry.to_asm() + "\n")
+                labelled = True
+            elif isinstance(entry, Instance):
+                pfx = ["", "    "][labelled]
+                fh.write(f"{pfx}{entry.to_asm(address)}\n")
+                address += 1
+            else:
+                raise Exception(f"Unknown stream entry: {entry}")
+
+# Dump to hex file
+def dump_hex(stream : List[Union[Instance, Label]], path : Path):
+    with open(path, "w", encoding="utf-8") as fh:
+        for entry in stream:
+            if isinstance(entry, Label):
+                continue
+            elif isinstance(entry, Instance):
+                fh.write(f"{entry.encode():08X}\n")
+            else:
+                raise Exception(f"Unknown stream entry: {entry}")
 
 # # Check that all encodings present correctly
 # all_parts = [x.display() for x in InstructionDef.ALL.values()]
