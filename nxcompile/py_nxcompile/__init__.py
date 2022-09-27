@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,15 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Get absolute path to script's directory
-abspath=$(realpath $(dirname $0))
-
-# Get path to parent directory (which holds Python modules)
-parent_dir=$(realpath ${abspath}/../)
-
-# Extend PYTHONPATH
-export PYTHONPATH=${parent_dir}/nxcompile:${parent_dir}/nxcompile/work:${parent_dir}/common/python:$PYTHONPATH
-
-# Invoke Python module
-python3 -m py_$(basename $0) $@
