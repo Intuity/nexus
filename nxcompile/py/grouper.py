@@ -23,7 +23,7 @@ import os
 import sys
 
 from nxisa import dump_asm, dump_hex
-from nodecompiler import compile_partition
+from nodecompiler import Node
 
 if "NX_SEED" in os.environ:
     print(f"Seeding with {os.environ['NX_SEED']}")
@@ -509,8 +509,9 @@ registry = {
     "partitions": len(ord_util),
     "nodes"     : []
 }
-for partition in ord_util:
-    stream, port_map, mem_map = compile_partition(partition)
+compilers = [Node(x) for x in ord_util]
+for compiler in compilers:
+    stream, port_map, mem_map = compiler.compile()
     dump_asm(stream, f"{partition.id}.asm")
     dump_hex(stream, f"{partition.id}.hex")
     root = Path.cwd()
