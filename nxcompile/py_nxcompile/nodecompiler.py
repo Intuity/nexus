@@ -17,7 +17,7 @@ from dis import Instruction
 from functools import lru_cache, reduce
 from math import ceil
 from statistics import mean
-from typing import Union
+from typing import Dict, Union
 
 from natsort import natsorted
 from tabulate import tabulate
@@ -287,8 +287,10 @@ class Register:
 
 class Node:
 
-    def __init__(self, partition):
+    def __init__(self, partition, row, column):
         self.partition = partition
+        self.row       = row
+        self.column    = column
         # Announce
         print(f"Compiling partition {self.partition.id}")
         print(f" - Has {len(self.partition.all_gates)} gates")
@@ -312,6 +314,10 @@ class Node:
         print(f" - Compiled {len(self.tables):3d} tables")
         print(f" - Referred {sum(map(len, self.references.values())):3d} times")
         print()
+
+    @property
+    def position(self):
+        return self.row, self.column
 
     def assign_inputs(self):
         # Accumulate inputs based on source partition
@@ -608,7 +614,7 @@ class Node:
 
         return satisfied, refs
 
-    def compile(self):
+    def compile(self, send_targets : Dict[str, "Node"], port_offset : int):
         # Track register usage
         registers = [Register(index=x) for x in range(7)]
 
@@ -897,14 +903,14 @@ class Node:
                                 offset =Load.offset.INVERSE))
                 # Shuffle bits to match expected order
                 stream_add(Shuffle(src=0,
-                                tgt=0,
-                                mux=[entries.get(x, 0) for x in range(8)]))
+                                   tgt=0,
+                                   mux=[entries.get(x, 0) for x in range(8)]))
                 # Accumulate using memory masking
                 stream_add(Store(src    =0,
-                                mask   =sum((1 << x) for x in entries.keys()),
-                                slot   =0,
-                                address=1023,
-                                offset =Store.offset.SET_LOW))
+                                 mask   =sum((1 << x) for x in entries.keys()),
+                                 slot   =0,
+                                 address=1023,
+                                 offset =Store.offset.SET_LOW))
             # Read back the value and send it
             stream_add(Load(tgt    =0,
                             slot   =0,
@@ -914,10 +920,70 @@ class Node:
                             node_row=15,
                             node_col=0,
                             slot    =0,
-                            address =idx_map,
+                            address =port_offset + idx_map,
                             offset  =0,
                             trig    =0))
 
+        print()
+        print("# Inserting node-to-node updates")
+        print()
+
+        # Assess which flop state needs to be sent to which nodes
+        to_send = defaultdict(list)
+        for flop in self.partition.tgt_flops:
+            for target in send_targets.get(flop.name, []):
+                # Skip over this node if it appears
+                if target is self:
+                    continue
+                # Accumulate based on node
+                to_send[target].append(flop)
+
+        # For each node, form messages
+        for node, flops in to_send.items():
+            # Locate each flop within the target node's memory
+            msgs = defaultdict(lambda: [None] * 8)
+            for flop in flops:
+                row, slot, bit = node.memory.find(flop)
+                msgs[(row, slot)][bit] = flop
+            # Assemble the required messages
+            stream_add(Label(f"node_{node.row}_{node.column}"))
+            for (t_address, t_slot), req in msgs.items():
+                # Accumulate each bit from local memory
+                for t_bit, flop in enumerate(req):
+                    if flop is None:
+                        continue
+                    l_row, l_slot, l_bit = self.memory.find(flop)
+                    stream_add(Load(tgt    =0,
+                                    slot   =(l_slot // 2),
+                                    address=l_row,
+                                    offset =Load.offset.INVERSE,
+                                    comment=f"Load flop {flop.name}"))
+                    stream_add(Shuffle(src    =0,
+                                       tgt    =0,
+                                       mux    =[{ t_bit: l_bit,
+                                                  l_bit: t_bit }.get(x, x)
+                                                for x in range(8)],
+                                       comment=f"Move bit {l_bit} to {t_bit}"))
+                    stream_add(Store(src    =0,
+                                     mask   =(1 << t_bit),
+                                     slot   =0,
+                                     address=1023,
+                                     offset =Store.offset.SET_LOW,
+                                     comment=f"Accumulate {flop.name}"))
+                # Send the message
+                stream_add(Load(tgt    =0,
+                                slot   =0,
+                                address=1023,
+                                offset =Load.offset.SET_LOW,
+                                comment="Load accumulated state"))
+                stream_add(Send(src     =0,
+                                node_row=node.row,
+                                node_col=node.column,
+                                slot    =(t_slot // 2),
+                                address =t_address,
+                                offset  =Send.offset.INVERSE,
+                                trig    =0,
+                                comment=f"Send to node {node.position}"))
 
         # Append a branch to wait for the next trigger
         print()
