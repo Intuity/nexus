@@ -110,9 +110,9 @@ bool NXNode::digest (void)
                         mask <<= msg.slot * 8;
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
-                              << "Writing " << std::hex << data << " "
-                              << "to "      << std::hex << msg.address << " "
-                              << "mask "    << std::hex << mask;
+                              << "[INSTR] Writing " << std::hex << data << " "
+                                         << "to "   << std::hex << msg.address << " "
+                                         << "mask " << std::hex << mask;
                         m_inst_memory.write(msg.address, data, mask);
                         break;
                     }
@@ -143,6 +143,11 @@ bool NXNode::digest (void)
                         if (offset  ) shift +=  8;
                         data <<= shift;
                         mask <<= shift;
+                        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                                     << std::dec << (unsigned int)m_id.column << ") "
+                              << "[SIGNAL] Writing " << std::hex << data << " "
+                                          << "to "   << std::hex << msg.address << " "
+                                          << "mask " << std::hex << mask;
                         m_data_memory.write(msg.address, data, mask);
                         break;
                     }
@@ -391,6 +396,10 @@ std::shared_ptr<NXMessagePipe> NXNode::route (
     // NOTE: Messages routed towards unconnected pipes will be directed to
     //       adjacent pipes in a clockwise order
     assert(target.row != m_id.row || target.column != m_id.column);
+    // PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+    //              << std::dec << (unsigned int)m_id.column << ") "
+    //              << "Routing to " << std::dec << (unsigned int)target.row
+    //                       << ", " << std::dec << (unsigned int)target.column;
     std::shared_ptr<NXMessagePipe> tgt_pipe = NULL;
     uint32_t start;
     if      (target.column < m_id.column) start = (int)DIRECTION_WEST;

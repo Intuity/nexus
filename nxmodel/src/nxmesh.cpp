@@ -67,7 +67,10 @@ bool NXMesh::is_idle (void)
     for (uint32_t row = 0; row < m_rows; row++) {
         for (uint32_t column = 0; column < m_columns; column++) {
             is_idle &= (*m_nodes[row])[column]->is_idle();
-            if (!is_idle) break;
+            if (!is_idle) {
+                PLOGD << "Node " << std::dec << row << ", " << column << " is still busy";
+                break;
+            }
         }
         if (!is_idle) break;
     }
