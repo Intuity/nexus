@@ -52,6 +52,7 @@ def main(seed             : int,
          outdir           : str) -> None:
     # Setup logging for C++ objects
     nxcompile.setup_logging()
+    logging.basicConfig(level=logging.INFO)
 
     # Seed random number generation
     logging.info("Setting random seed to %(seed)d", { "seed": seed })
