@@ -78,6 +78,21 @@ void NXNode::step (bool trigger)
                  << std::dec << (unsigned int)m_id.column << ") "
           << "Step " << (trigger ? "with" : "without") << " trigger";
 
+
+    // If evaluation caused by a global trigger, adopt next PC & offset
+    // NOTE: This is done before 'digest' so that 'm_offset' has the correct
+    //       state for locating the next cycle's state
+    if (trigger) {
+        m_pc          = m_next_pc;
+        m_restart_pc  = m_next_pc;
+        m_offset      = m_next_offset;
+        m_cycle      += 1;
+        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+              << std::dec << (unsigned int)m_id.column << ") "
+              << "Triggered @ 0x" << (unsigned int)m_pc << " "
+              << "with offset " << (unsigned int)m_offset;
+    }
+
     // Digest inbound messages, capturing if combinational updates were received
     bool comb_ips = digest();
 
@@ -110,9 +125,9 @@ bool NXNode::digest (void)
                         mask <<= msg.slot * 8;
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
-                              << "[INSTR] Writing " << std::hex << data << " "
-                                         << "to "   << std::hex << msg.address << " "
-                                         << "mask " << std::hex << mask;
+                              << "[INSTR] Writing 0x" << std::hex << data << " "
+                                         << "to 0x"   << std::hex << msg.address << " "
+                                         << "mask 0x" << std::hex << mask;
                         m_inst_memory.write(msg.address, data, mask);
                         break;
                     }
@@ -137,18 +152,16 @@ bool NXNode::digest (void)
                                 assert(!"Unsupported offset");
                         }
                         uint32_t data  = msg.data;
-                        uint32_t mask  = 0xFF;
-                        uint32_t shift = 0;
-                        if (msg.slot) shift += 16;
-                        if (offset  ) shift +=  8;
-                        data <<= shift;
-                        mask <<= shift;
+                        uint32_t shift = (msg.slot * 16) + (offset ? 8 : 0);
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
-                              << "[SIGNAL] Writing " << std::hex << data << " "
-                                          << "to "   << std::hex << msg.address << " "
-                                          << "mask " << std::hex << mask;
-                        m_data_memory.write(msg.address, data, mask);
+                              << "[SIGNAL] Writing 0x" << std::hex << data << " "
+                                          << "to 0x"   << std::hex << msg.address << " "
+                                          << "slot "   << std::dec << (uint32_t)msg.slot << " "
+                                          << "offset " << std::dec << (uint32_t)msg.offset << " "
+                                          << "(-> " << std::dec << (offset ? 1 : 0) << ", "
+                                          << std::dec << (m_offset ? 1 : 0) << ")";
+                        m_data_memory.write(msg.address, data << shift, 0xFF << shift);
                         break;
                     }
                     default: assert(!"Unsupported command received");
@@ -172,20 +185,8 @@ bool NXNode::evaluate ( bool trigger )
     // Should always be waiting at this point
     assert(m_waiting);
 
-    // If evaluation caused by a global trigger, adopt next PC & offset
-    if (trigger) {
-        m_pc          = m_next_pc;
-        m_restart_pc  = m_next_pc;
-        m_offset      = m_next_offset;
-        m_cycle      += 1;
-        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
-              << std::dec << (unsigned int)m_id.column << ") "
-              << "Triggered @ 0x" << (unsigned int)m_pc << " "
-              << "with offset " << (unsigned int)m_offset;
-    // Otherwise restart from the PC last jumped to by a trigger event
-    } else {
-        m_pc = m_restart_pc;
-    }
+    // If not freshly triggered, restart from the last triggered PC
+    if (!trigger) m_pc = m_restart_pc;
 
     // Always clear idle & waiting flags
     m_idle    = false;
@@ -245,26 +246,26 @@ bool NXNode::evaluate ( bool trigger )
                 m_registers[f_tgt] = (word >> shift) & 0xFF;
                 PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                              << std::dec << (unsigned int)m_id.column << ") "
-                      << "@ 0x" << std::hex << m_pc << " "
-                      << "Load from 0x" << std::hex << f_address << " "
-                      << "with shift " << std::dec << shift << " "
-                      << "into R" << std::hex << f_tgt
-                      << " (0x" << std::hex << (unsigned int)m_registers[f_tgt]
-                      << ")";
+                      << "@ 0x" << std::hex << m_pc << " Load into "
+                      << "R" << std::hex << f_tgt << " from "
+                      << "addr=0x" << std::hex << f_address << " "
+                      << "offset=" << std::dec << offset << " "
+                      << "slot=" << std::dec << f_slot << " "
+                      << "(0x" << std::hex << (unsigned int)m_registers[f_tgt] << ")";
                 break;
             }
             case NXISA::OP_STORE: {
                 uint32_t data = val_a;
                 uint32_t mask = NXISA::extract_mask(raw);
-                data <<= shift;
-                mask <<= shift;
-                m_data_memory.write(f_address, data, mask);
+                m_data_memory.write(f_address, data << shift, mask << shift);
                 PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                              << std::dec << (unsigned int)m_id.column << ") "
                       << "@ 0x" << std::hex << m_pc << " "
-                      << "Store from R" << std::hex << f_src_a << " "
-                      << "into 0x" << std::hex << f_address << " "
+                      << "Store from R" << std::hex << f_src_a << " into "
+                      << "addr=0x" << std::hex << f_address << " "
                       << "data=0x" << std::hex << data << " "
+                      << "offset=" << std::dec << offset << " "
+                      << "slot=" << std::dec << f_slot << " "
                       << "mask=0x" << std::hex << mask;
                 break;
             }
