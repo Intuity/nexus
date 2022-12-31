@@ -37,6 +37,7 @@ from .nodecompiler import Node
 @click.option("--node-max-gates",   type=int,     default=512,   help="Maximum gates per node")
 @click.option("--only-optimise",    is_flag=True, default=False, help="Only optimise design")
 @click.option("--only-partition",   is_flag=True, default=False, help="Optimise and partition")
+@click.option("--log",              type=click.Path(dir_okay=False), default=None, help="Log to file")
 @click.argument("netlist", type=click.Path(exists=True, dir_okay=False))
 @click.argument("outdir",  type=click.Path(file_okay=False))
 def main(seed             : int,
@@ -48,11 +49,15 @@ def main(seed             : int,
          node_max_gates   : int,
          only_optimise    : bool,
          only_partition   : bool,
+         log              : str,
          netlist          : str,
          outdir           : str) -> None:
     # Setup logging for C++ objects
     nxcompile.setup_logging()
     logging.basicConfig(level=logging.INFO)
+
+    if log:
+        logging.getLogger().addHandler(logging.FileHandler(log, mode="w", encoding="utf-8"))
 
     # Seed random number generation
     logging.info("Setting random seed to %(seed)d", { "seed": seed })

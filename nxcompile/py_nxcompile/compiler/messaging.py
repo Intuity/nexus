@@ -17,37 +17,43 @@ def node_to_node(node    : Any,
 
     # For each node, form messages
     for target, flops in to_send.items():
-        # Locate each flop within the target node's memory
+        # Group flops together into messages based on the target's memory layout
         msgs = defaultdict(lambda: [None] * 8)
         for flop in flops:
             row, slot, bit = target.memory.find(flop)
             msgs[(row, slot)][bit] = flop
-        # Assemble the required messages
+        # For each required message
         yield Label(f"node_{target.row}_{target.column}")
         for (t_address, t_slot), req in msgs.items():
-            # Accumulate each bit from local memory
+            # Group together bits to load from local memory
+            load_from = defaultdict(list)
             for t_bit, flop in enumerate(req):
                 if flop is None:
                     continue
                 l_row, l_slot, l_bit = node.memory.find(flop)
+                load_from[l_row, l_slot].append((l_bit, t_bit, flop))
+            # Accumulate all of the required state
+            for (l_row, l_slot), selection in load_from.items():
+                # Load bits
                 yield Load(tgt    =0,
                            slot   =(l_slot // 2),
                            address=l_row,
                            offset =Load.offset.INVERSE,
-                           comment=f"Load flop {flop.name}")
-                if t_bit != l_bit:
-                    yield Shuffle(src    =0,
-                                  tgt    =0,
-                                  mux    =[{ t_bit: l_bit,
-                                             l_bit: t_bit }.get(x, x)
-                                          for x in range(8)],
-                                  comment=f"Move bit {l_bit} to {t_bit}")
+                           comment=f"Load flops {', '.join(f.name for _, _, f in selection)}")
+                # Check if bit rearrangement is required
+                mapping = { t: l for l, t, _ in selection }
+                if any((l != t) for l, t, _ in selection):
+                    yield Shuffle(src    = 0,
+                                  tgt    = 0,
+                                  mux    =[mapping.get(x, x) for x in range(8)],
+                                  comment=f"Apply bit mapping {mapping}")
+                # Accumulate
                 yield Store(src    =0,
-                            mask   =(1 << t_bit),
+                            mask   =sum((1 << t) for _, t, _ in selection),
                             slot   =0,
                             address=1023,
                             offset =Store.offset.SET_LOW,
-                            comment=f"Accumulate {flop.name}")
+                            comment="Accumulate flops")
             # Send the message
             yield Load(tgt    =0,
                         slot   =0,
