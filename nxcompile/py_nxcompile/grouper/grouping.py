@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from orderedset import OrderedSet
+
 class Grouping:
 
     GROUP_ID = 0
@@ -22,12 +24,12 @@ class Grouping:
         Grouping.GROUP_ID += 1
         # Capture arguments
         self.target    = target
-        self.src_ports = list(set(src_ports))
-        self.src_flops = list(set(src_flops))
-        self.tgt_ports = list(set(tgt_ports))
-        self.gates     = list(set(gates))
-        self.drives_to = set()
-        self.driven_by = set()
+        self.src_ports = list(OrderedSet(src_ports))
+        self.src_flops = list(OrderedSet(src_flops))
+        self.tgt_ports = list(OrderedSet(tgt_ports))
+        self.gates     = list(OrderedSet(gates))
+        self.drives_to = OrderedSet()
+        self.driven_by = OrderedSet()
         self.partition = None
 
     @property

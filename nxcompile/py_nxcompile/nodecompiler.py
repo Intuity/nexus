@@ -14,276 +14,22 @@
 
 from collections import defaultdict
 from dis import Instruction
-from functools import lru_cache, reduce
+from functools import lru_cache
 from math import ceil
 from statistics import mean
 from typing import Dict, Union
 
 from natsort import natsorted
-from tabulate import tabulate
+from orderedset import OrderedSet
 
-from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort, nxgate_op_t
+from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort
 from nxisa import Load, Store, Branch, Send, Truth, Shuffle, Instance, Label
 
-class Table:
-
-    ID = 0
-
-    def __init__(self, op, inputs, outputs, ops):
-        self.id       = Table.ID
-        Table.ID     += 1
-        self.op       = op
-        self.inputs   = inputs
-        self.outputs  = outputs
-        self.ops      = ops
-
-    @property
-    def name(self):
-        return f"TT{self.id}"
-
-    @property
-    def all_inputs(self):
-        return self.inputs + sum((x.all_inputs for x in self.inputs if isinstance(x, Table)), [])
-
-    def explode(self):
-        for input in self.inputs:
-            if isinstance(input, Table):
-                yield from input.explode()
-        yield self
-
-    def display(self):
-        print(tabulate(
-            [
-                ([y for y in f"{x:0{len(self.inputs)}b}"] + [self.outputs[x]])
-                for x in range(2 ** len(self.inputs))
-            ],
-            headers=[x.name for x in self.inputs] + ["R"],
-        ))
-
-class Operation:
-
-    def __init__(self, gate, *inputs):
-        self.gate   = gate
-        self.inputs = list(inputs)
-
-    @property
-    def op(self):
-        return self.gate.op
-
-    def sub_ops(self):
-        for input in self.inputs:
-            if isinstance(input, Operation):
-                yield input
-                yield from input.sub_ops()
-
-    def render(self, include=None):
-        if include and self not in include:
-            return f"<{self.gate.name}>"
-        def name(obj):
-            if isinstance(obj, NXPort):
-                return "P:" + obj.name
-            elif isinstance(obj, NXFlop):
-                return "F:" + obj.name
-            else:
-                return obj.render(include=include)
-        if self.op == nxgate_op_t.COND:
-            return (
-                "(" + name(self.inputs[0]) + ") ? " +
-                "(" + name(self.inputs[1]) + ") : " +
-                "(" + name(self.inputs[2]) + ")"
-            )
-        elif self.op == nxgate_op_t.NOT:
-            return "!(" + name(self.inputs[0]) + ")"
-        else:
-            op_str = {
-                nxgate_op_t.AND : " & ",
-                nxgate_op_t.OR  : " | ",
-                nxgate_op_t.XOR : " ^ ",
-            }[self.op]
-            return op_str.join([("(" + name(x) + ")") for x in self.inputs])
-
-    def prettyprint(self):
-        op_str   = self.render()
-        pretty   = ""
-        brackets = 0
-        indents  = []
-        for idx, char in enumerate(op_str):
-            next = op_str[idx+1] if (idx + 1) < len(op_str) else None
-            if char == "(":
-                brackets += 1
-                if next == "(":
-                    indents.append(brackets)
-                    pretty += "(\n" + ((len(indents) * 4) * " ")
-                else:
-                    pretty += "("
-            elif char == ")":
-                if brackets in indents:
-                    indents.pop()
-                    pretty += "\n" + ((len(indents) * 4) * " ") + ")"
-                else:
-                    pretty += ")"
-                brackets -= 1
-            else:
-                pretty += char
-        return pretty
-
-    def __repr__(self) -> str:
-        return self.render()
-
-    def __str__(self):
-        return self.__repr__()
-
-    def evaluate(self, values):
-        # Gather the finalised input values from sub-operations
-        final = []
-        for term in self.inputs:
-            if term in values:
-                final.append(values[term])
-            elif isinstance(term, Operation):
-                final.append(term.evaluate(values))
-            else:
-                raise Exception("Missing term")
-        # Evaluate
-        if self.gate.op == nxgate_op_t.COND:
-            return final[1:][final[0]]
-        elif self.gate.op == nxgate_op_t.AND:
-            return reduce(lambda x, y: x & y, final)
-        elif self.gate.op == nxgate_op_t.OR:
-            return reduce(lambda x, y: x | y, final)
-        elif self.gate.op == nxgate_op_t.XOR:
-            return reduce(lambda x, y: x ^ y, final)
-        elif self.gate.op == nxgate_op_t.NOT:
-            return [1, 0][final[0]]
-        else:
-            raise Exception("Unsupported operation")
-
-class MemorySlot:
-
-    def __init__(self, row, index, is_seq=False, paired=None):
-        self.row      = row
-        self.index    = index
-        self.paired   = paired
-        self.is_seq   = is_seq
-        self.elements = [None] * 8
-
-class MemoryRow:
-
-    def __init__(self, memory, index):
-        self.memory = memory
-        self.index  = index
-        self.slots  = [MemorySlot(self, x) for x in range(4)]
-
-    def pair(self, start_idx):
-        assert (start_idx % 2) == 0, f"Can't pair slot index {start_idx}"
-        self.slots[start_idx  ].paired = self.slots[start_idx+1]
-        self.slots[start_idx+1].paired = self.slots[start_idx  ]
-
-class Memory:
-
-    def __init__(self):
-        self.rows      = [MemoryRow(self, 0)]
-        self.last_row  = 0
-        self.last_slot = 0
-        self.last_bit  = 0
-        self.mapping   = {}
-
-    @property
-    def row(self):
-        return self.rows[self.last_row]
-
-    @property
-    def slot(self):
-        return self.rows[self.last_row].slots[self.last_slot]
-
-    def bump_row(self) -> MemoryRow:
-        self.rows.append(MemoryRow(self, self.last_row))
-        self.last_row  += 1
-        self.last_slot  = 0
-        return self.rows[-1]
-
-    def bump_slot(self):
-        self.last_slot += 1
-        self.last_bit   = 0
-        if self.last_slot >= 4:
-            self.bump_row()
-
-    def align(self, is_seq):
-        align16 = ((self.last_slot % 2) == 0)
-        paired  = (self.slot.paired is not None)
-        # For sequential placements...
-        if is_seq:
-            # If not aligned to a 16-bit boundary, then align up
-            if not align16:
-                self.bump_slot()
-                paired = (self.slot.paired is not None)
-            # If aligned but not paired...
-            if not paired:
-                # If some elements already in slot, bump by two slots
-                if self.last_bit > 0:
-                    self.bump_slot()
-                    self.bump_slot()
-                # Pair the slot and its neighbour
-                self.row.pair(self.last_slot)
-        # For combinatorial placements, if paired then bump to the next free slot
-        elif paired:
-            self.bump_slot()
-            self.bump_slot()
-
-    def place(self, signal, is_seq):
-        # Align to the next suitable point
-        self.align(is_seq)
-        # Place signal in the slot
-        self.slot.elements[self.last_bit] = signal
-        # Track where signal has been placed
-        self.mapping[signal.name] = (self.last_row, self.last_slot, self.last_bit)
-        # Increment bit position
-        self.last_bit += 1
-        if self.last_bit >= 8:
-            self.bump_slot()
-        # Return the placement
-        return self.mapping[signal.name]
-
-    def place_all(self, signals, is_seq, clear=False):
-        if clear and self.last_bit > 0:
-            self.bump_slot()
-        # Align before capturing the starting row & slot
-        start_row, start_slot = None, None
-        for sig in signals:
-            if sig is not None:
-                pl_row, pl_slot, _ = self.place(sig, is_seq)
-                if None in (start_row, start_slot):
-                    start_row, start_slot = pl_row, pl_slot
-        return start_row, start_slot
-
-    def find(self, signal, default=None):
-        return self.mapping.get(signal.name, default)
-
-class Register:
-
-    def __init__(self, index, width=8):
-        self.index    = index
-        self.elements = [None] * width
-        self.age      = 0
-        self.active   = False
-        self.novel    = False
-
-    def __getitem__(self, key):
-        return self.elements[key]
-
-    def __setitem__(self, key, val):
-        self.elements[key]
-
-    def activate(self):
-        self.active = True
-
-    def deactivate(self):
-        self.active = False
-
-    def aging(self):
-        self.age = (self.age + 1) if self.active else 0
-
-    def __iter__(self):
-        return self.elements
+from .compiler.memory import Memory
+from .compiler.messaging import node_to_node
+from .compiler.operation import Operation
+from .compiler.register import Register
+from .compiler.table import Table
 
 class Node:
 
@@ -322,7 +68,7 @@ class Node:
     def assign_inputs(self):
         # Accumulate inputs based on source partition
         # NOTE: Excludes signals from own partition
-        inputs = defaultdict(lambda: set())
+        inputs = defaultdict(OrderedSet)
         for group in self.partition.groups:
             for source in group.driven_by:
                 if source.partition.id != self.partition.id:
@@ -412,6 +158,7 @@ class Node:
             # Fill in the memory elements
             for idx, elem in enumerate(slot):
                 self.memory.slot.elements[idx] = elem
+                self.memory.next_slot.elements[idx] = elem
                 if elem is not None:
                     self.memory.mapping[elem.name] = (self.memory.last_row, self.memory.last_slot, idx)
             # Stop this slot being modified
@@ -421,7 +168,7 @@ class Node:
 
     def assign_outputs(self):
         # Accumulate outputs based on target partition
-        outputs = defaultdict(lambda: set())
+        outputs = defaultdict(OrderedSet)
         for group in self.partition.groups:
             for target in group.drives_to:
                 if target.partition.id != self.partition.id:
@@ -503,7 +250,7 @@ class Node:
                     # Join with the remainder
                     full_ins = work_ins + current[idx_term+1:]
                     if len(set(full_ins)) <= 3:
-                        best_ins = list(set(full_ins))
+                        best_ins = list(OrderedSet(full_ins))
                         best_ops = work_ops[:]
                 # Update the current state
                 current = work_ins[:]
@@ -580,7 +327,7 @@ class Node:
         tables = list(tables.values())
 
         # Build table-to-table references
-        refs = defaultdict(lambda: set())
+        refs = defaultdict(OrderedSet)
         for table in tables:
             # Track tables using other tables as inputs
             for input in table.inputs:
@@ -713,13 +460,15 @@ class Node:
                     else:
                         offset_mode = Load.offset.PRESERVE
                     # Emit load
+                    elements = self.memory.rows[row].slots[slot].elements
                     yield Load(tgt    =tgt.index,
-                            slot   =(slot // 2),
-                            address=row,
-                            offset =offset_mode)
+                               slot   =(slot // 2),
+                               address=row,
+                               offset =offset_mode,
+                               comment=f"Loading R{tgt.index} with {', '.join((x.name if x else '-') for x in elements)}")
                     trk_usage[(row, slot)].append(("read", len(stream)))
                     trk_read[(row, slot)] += 1
-                    tgt.elements = self.memory.rows[row].slots[slot].elements[:]
+                    tgt.elements = elements[:]
                 else:
                     # Not found
                     raise Exception(f"Failed to locate signal '{signal}'")
@@ -730,9 +479,9 @@ class Node:
             tgt = select_register(cone_idx, exclude=exclude)
             yield from emit_register_reuse(tgt)
             yield Shuffle(src=reg_work.index,
-                        tgt=tgt.index,
-                        mux=list(range(8)),
-                        comment=f"Copy {reg_work.index} to {tgt.index}")
+                          tgt=tgt.index,
+                          mux=list(range(8)),
+                          comment=f"Copy {reg_work.index} to {tgt.index}")
             tgt.elements      = reg_work.elements[:]
             tgt.novel         = True
             reg_work.elements = [None] * 8
@@ -741,11 +490,13 @@ class Node:
                 emitted_flop_cycles.append(cone_idx)
                 slot_idx, places = selection
                 row, slot        = self.flop_targets[slot_idx]
+                names            = [self.memory.rows[row].slots[slot].elements[x].name for x in places]
                 yield Store(src    =reg_work.index,
                             mask   =sum(((1 << x) for x in places)),
                             slot   =(slot // 2),
                             address=row,
-                            offset =Store.offset.INVERSE)
+                            offset =Store.offset.INVERSE,
+                            comment=f"Flushing out {', '.join(names)}")
 
         def emit_operation(cone_idx, cone):
             nonlocal registers
@@ -851,7 +602,7 @@ class Node:
                                 mask   =(1 << tgt_idx),
                                 slot   =(tgt_slot // 2),
                                 address=tgt_row,
-                                offset =Store.offset.PRESERVE))
+                                offset =Store.offset.INVERSE))
 
         print()
         print("# Inserting port state updates")
@@ -928,62 +679,8 @@ class Node:
         print("# Inserting node-to-node updates")
         print()
 
-        # Assess which flop state needs to be sent to which nodes
-        to_send = defaultdict(list)
-        for flop in self.partition.tgt_flops:
-            for target in send_targets.get(flop.name, []):
-                # Skip over this node if it appears
-                if target is self:
-                    continue
-                # Accumulate based on node
-                to_send[target].append(flop)
-
-        # For each node, form messages
-        for node, flops in to_send.items():
-            # Locate each flop within the target node's memory
-            msgs = defaultdict(lambda: [None] * 8)
-            for flop in flops:
-                row, slot, bit = node.memory.find(flop)
-                msgs[(row, slot)][bit] = flop
-            # Assemble the required messages
-            stream_add(Label(f"node_{node.row}_{node.column}"))
-            for (t_address, t_slot), req in msgs.items():
-                # Accumulate each bit from local memory
-                for t_bit, flop in enumerate(req):
-                    if flop is None:
-                        continue
-                    l_row, l_slot, l_bit = self.memory.find(flop)
-                    stream_add(Load(tgt    =0,
-                                    slot   =(l_slot // 2),
-                                    address=l_row,
-                                    offset =Load.offset.INVERSE,
-                                    comment=f"Load flop {flop.name}"))
-                    stream_add(Shuffle(src    =0,
-                                       tgt    =0,
-                                       mux    =[{ t_bit: l_bit,
-                                                  l_bit: t_bit }.get(x, x)
-                                                for x in range(8)],
-                                       comment=f"Move bit {l_bit} to {t_bit}"))
-                    stream_add(Store(src    =0,
-                                     mask   =(1 << t_bit),
-                                     slot   =0,
-                                     address=1023,
-                                     offset =Store.offset.SET_LOW,
-                                     comment=f"Accumulate {flop.name}"))
-                # Send the message
-                stream_add(Load(tgt    =0,
-                                slot   =0,
-                                address=1023,
-                                offset =Load.offset.SET_LOW,
-                                comment="Load accumulated state"))
-                stream_add(Send(src     =0,
-                                node_row=node.row,
-                                node_col=node.column,
-                                slot    =(t_slot // 2),
-                                address =t_address,
-                                offset  =Send.offset.INVERSE,
-                                trig    =0,
-                                comment=f"Send to node {node.position}"))
+        for op in node_to_node(self, send_targets):
+            stream_add(op)
 
         # Append a branch to wait for the next trigger
         print()
@@ -1023,8 +720,8 @@ class Node:
             avg_delta = ceil(mean(all_deltas))
 
         # Memory access stats
-        write_n_read = set(trk_write.keys()).difference(trk_read.keys())
-        read_n_write = set(trk_read.keys()).difference(trk_write.keys())
+        write_n_read = OrderedSet(trk_write.keys()).difference(trk_read.keys())
+        read_n_write = OrderedSet(trk_read.keys()).difference(trk_write.keys())
         sorted_reads = sorted(trk_read.items(), key=lambda x: x[1])
         print("=" * 80)
         print("Memory Accesses:")

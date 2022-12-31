@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from orderedset import OrderedSet
+
 class Partition:
 
     def __init__(self, index, limits, all_parts, tgt_flop_map):
@@ -39,18 +41,18 @@ class Partition:
         self.groups.remove(group)
 
     def aggregate(self):
-        self.tgt_flops = set()
-        self.src_flops = set()
-        self.src_ports = set()
-        self.tgt_ports = set()
-        self.all_gates = set()
+        self.tgt_flops = OrderedSet()
+        self.src_flops = OrderedSet()
+        self.src_ports = OrderedSet()
+        self.tgt_ports = OrderedSet()
+        self.all_gates = OrderedSet()
         for group in self.groups:
             self.tgt_flops.add(group.target)
             self.tgt_flop_map[group.target.name] = self
-            self.src_flops = self.src_flops.union(set(group.src_flops))
-            self.src_ports = self.src_ports.union(set(group.src_ports))
-            self.tgt_ports = self.tgt_ports.union(set(group.tgt_ports))
-            self.all_gates = self.all_gates.union(set(group.gates))
+            self.src_flops = self.src_flops.union(OrderedSet(group.src_flops))
+            self.src_ports = self.src_ports.union(OrderedSet(group.src_ports))
+            self.tgt_ports = self.tgt_ports.union(OrderedSet(group.tgt_ports))
+            self.all_gates = self.all_gates.union(OrderedSet(group.gates))
 
     @property
     def empty(self):
@@ -109,7 +111,7 @@ class Partition:
                 if group in groups:
                     continue
                 part_src_flops += [x.name for x in group.src_flops]
-            other_flops += list(set(part_src_flops))
+            other_flops += list(OrderedSet(part_src_flops))
         # Count the total number of places each target flop needs to talk to
         flop_outputs = sum([other_flops.count(x.name) for x in all_tgt_flops])
         # Assemble the requirements

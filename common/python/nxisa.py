@@ -317,6 +317,9 @@ class Instance:
                 got = type(value).__name__
                 raise Exception(f"Mismatching field type for '{key}' expected: {exp}, got: {got}")
 
+    def __repr__(self) -> str:
+        return f"<nxisa::{self.instr.opcode.op_name:7s}: {self.fields}>"
+
     def encode(self) -> int:
         """ Encode the instance fields using the instruction definition """
         return self.instr.encode(self.fields)
@@ -340,6 +343,9 @@ class Label:
 
     def __init__(self, label : str):
         self.__label = label
+
+    def __repr__(self) -> str:
+        return f"<nxisa::Label \"{self.label}\">"
 
     @property
     def label(self):
