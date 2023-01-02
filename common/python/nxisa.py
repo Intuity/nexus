@@ -73,7 +73,7 @@ class OpCode(Field):
                             "BRANCH"     : 2,
                             "SEND"       : 3,
                             "TRUTH"      : 4,
-                            "ARITH"      : 5,
+                            "PICK"       : 5,
                             "SHUFFLE"    : 6,
                             "SHUFFLE_ALT": 7,
                         })
@@ -118,6 +118,11 @@ class Address(Immediate):
 
     def __init__(self) -> None:
         super().__init__("address", 10)
+
+class ShortAddress(Immediate):
+
+    def __init__(self) -> None:
+        super().__init__("short_address", 6)
 
 class PC(Immediate):
 
@@ -417,16 +422,23 @@ class TruthDef(InstructionDef):
                          Mux("mux_c"),
                          Table())
 
-class ArithmeticDef(InstructionDef):
+class PickDef(InstructionDef):
 
     def __init__(self) -> None:
-        super().__init__(OpCode("ARITH"),
+        super().__init__(OpCode("PICK"),
                          Source("src_a"),
-                         Target(),
-                         Source("src_b"),
-                         Reserved(13),
-                         ArithOp(),
-                         Reserved(5))
+                         Field("mask_2_0", 3),
+                         Field("p0", 3),
+                         Field("mask_3", 1),
+                         Flag("upper"),
+                         Flag("slot"),
+                         ShortAddress(),
+                         Field("p1", 3),
+                         Field("p2_0", 1),
+                         Offset(),
+                         Field("p3", 3),
+                         Field("p2_2_1", 2))
+
 
 class ShuffleDef(InstructionDef):
 
@@ -446,16 +458,16 @@ class ShuffleDef(InstructionDef):
         self.opcode.lsb = 29
 
 # Build instruction encodings
-Load       = LoadDef()
-Store      = StoreDef()
-Branch     = BranchDef()
-Send       = SendDef()
-Truth      = TruthDef()
-Arithmetic = ArithmeticDef()
-Shuffle    = ShuffleDef()
+Load    = LoadDef()
+Store   = StoreDef()
+Branch  = BranchDef()
+Send    = SendDef()
+Truth   = TruthDef()
+Pick    = PickDef()
+Shuffle = ShuffleDef()
 
 # Lint guard
-assert all((Load, Store, Branch, Send, Truth, Arithmetic, Shuffle))
+assert all((Load, Store, Branch, Send, Truth, Pick, Shuffle))
 
 # Dump to assembly file
 def dump_asm(stream : List[Union[Instance, Label]], path : Path):

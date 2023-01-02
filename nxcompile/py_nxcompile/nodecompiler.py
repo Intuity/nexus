@@ -679,8 +679,10 @@ class Node:
         print("# Inserting node-to-node updates")
         print()
 
+        pre_n2n = len(stream)
         for op in node_to_node(self, send_targets):
             stream_add(op)
+        post_n2n = len(stream)
 
         # Append a branch to wait for the next trigger
         print()
@@ -697,7 +699,9 @@ class Node:
         print()
         print("=" * 80)
         print("Instruction Counts:")
-        print(f" - Total  : {len(stream):3d}")
+        total_wo_label = len([x for x in stream if not isinstance(x, Label)])
+        print(f" - Total  : {total_wo_label:3d}")
+        print(f" - M vs C : {post_n2n - pre_n2n} vs {pre_n2n} ({((post_n2n-pre_n2n)/total_wo_label)*100:05.02f}%)")
         for key, count in counts.items():
             print(f" - {key:7s}: {count:3d}")
         print("=" * 80)
