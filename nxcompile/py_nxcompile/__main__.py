@@ -25,7 +25,7 @@ from nxisa import dump_asm, dump_hex
 import nxcompile
 
 from .grouper import group_logic
-from .nodecompiler import Node
+from .compiler import Node
 
 @click.command()
 @click.option("--seed",             type=int,     default=  0,   help="Specify a random seed")
@@ -54,7 +54,9 @@ def main(seed             : int,
          outdir           : str) -> None:
     # Setup logging for C++ objects
     nxcompile.setup_logging()
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s [%(levelname)s] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
 
     if log:
         logging.getLogger().addHandler(logging.FileHandler(log, mode="w", encoding="utf-8"))

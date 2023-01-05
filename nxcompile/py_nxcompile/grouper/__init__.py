@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from collections import defaultdict
 from itertools import count
 from statistics import mean
@@ -77,43 +78,27 @@ def group_logic(module, limits):
             x for x in groups.values() if group in x.driven_by if x != group
         }
 
-    print(f"Formed {len(groups)} logic groupings:")
+    logging.info(f"Formed {len(groups)} logic groupings:")
     ordered = sorted(groups.values(), key=lambda x: x.complexity)
-    print(f" - Minimum Gates      : {ordered[0].complexity}")
-    print(f" - Maximum Gates      : {ordered[-1].complexity}")
-    print(f" - Average Gates      : {mean([x.complexity for x in ordered])}")
-    print(f" - Minimum Flops+Ports: {min([len(x.src_ports)+len(x.src_flops) for x in ordered])}")
-    print(f" - Maximum Flops+Ports: {max([len(x.src_ports)+len(x.src_flops) for x in ordered])}")
-    print(f" - Average Flops+Ports: {mean([len(x.src_ports)+len(x.src_flops) for x in ordered])}")
+    logging.info(f" - Minimum Gates      : {ordered[0].complexity}")
+    logging.info(f" - Maximum Gates      : {ordered[-1].complexity}")
+    logging.info(f" - Average Gates      : {mean([x.complexity for x in ordered])}")
+    logging.info(f" - Minimum Flops+Ports: {min([len(x.src_ports)+len(x.src_flops) for x in ordered])}")
+    logging.info(f" - Maximum Flops+Ports: {max([len(x.src_ports)+len(x.src_flops) for x in ordered])}")
+    logging.info(f" - Average Flops+Ports: {mean([len(x.src_ports)+len(x.src_flops) for x in ordered])}")
 
-    print()
-    print(f"Gathered {len(buckets)} different buckets at interval {bkt_int}")
+    logging.info(f"Gathered {len(buckets)} different buckets at interval {bkt_int}")
     for bkt_key, bucket in sorted(buckets.items(), key=lambda x: x[0]):
         bkt_min = bkt_key * bkt_int
         bkt_max = bkt_min + bkt_int - 1
-        print(f" - {bkt_min:4d} to {bkt_max:4d}: {len(bucket)}")
-
-    # # Look at how many groups each flop contributes to
-    # contribs = []
-    # for entry in groups:
-    #     contribs.append(len([x for x in groups if entry.target.name in [y.name for y in x.src_flops]]))
-    # contribs.sort()
-
-    # print()
-    # print(f"Minimum contributions of a flop: {contribs[0]}")
-    # print(f"Maximum contributions of a flop: {contribs[-1]}")
-    # print(f"Average contributions of a flop: {mean(contribs)}")
-
-    # breakpoint()
+        logging.info(f" - {bkt_min:4d} to {bkt_max:4d}: {len(bucket)}")
 
     # Form partitions based on the logic
     partitions   = []
     tgt_flop_map = {}
 
     # Initial partition contains everything
-    print()
-    print("=== INITIAL PARTITIONING ===")
-    print()
+    logging.info("=== INITIAL PARTITIONING ===")
     partitions.append(Partition(0, limits, partitions, tgt_flop_map))
     for group in groups.values():
         partitions[0].add_group(group)
@@ -131,7 +116,7 @@ def group_logic(module, limits):
                 continue
             # Is there more than one group in the partition
             if len(partition.groups) == 1:
-                print(f"Partition {partition.idx} is too big but cannot be subdivided")
+                logging.warning(f"Partition {partition.idx} is too big but cannot be subdivided")
                 continue
             # Flag that this partition doesn't fit
             all_fit = False
@@ -152,7 +137,7 @@ def group_logic(module, limits):
             def count_all(ptn_0, ptn_1):
                 return sum([count_cross(x, ptn_0) for x in ptn_1.groups])
             last_count = count_all(part_a, part_b)
-            print(f"{part_a.id}, {part_b.id} pre-optimisation : {last_count:5d}")
+            logging.debug(f"{part_a.id}, {part_b.id} pre-optimisation : {last_count:5d}")
             for opt_idx in count():
                 # Determine crossing costs of each group
                 crs_a2b, crs_b2a = [], []
@@ -194,7 +179,7 @@ def group_logic(module, limits):
                 if swaps == 0:
                     break
             # Log improvement
-            print(f"{part_a.id}, {part_b.id} post-optimisation: {count_all(part_a, part_b):5d} ({opt_idx+1} passes)")
+            logging.info(f"{part_a.id}, {part_b.id} post-optimisation: {count_all(part_a, part_b):5d} ({opt_idx+1} passes)")
             # Update aggregations
             part_a.aggregate()
             part_b.aggregate()
@@ -206,29 +191,24 @@ def group_logic(module, limits):
             break
 
     # Print out a summary (ordered by maximum utilisation)
-    print()
-    print("=== AFTER PARTITIONING ===")
-    print()
+    logging.info("=== AFTER PARTITIONING ===")
     num_fits = 0
     ord_util = sorted(partitions, key=lambda x: max(x.utilisation().values()), reverse=True)
     for partition in ord_util:
-        print(partition.report())
+        logging.info(partition.report())
         if all(partition.fits().values()):
             num_fits += 1
-    print()
-    print(f"{num_fits} partitions out of {len(partitions)} fit")
-    print()
+    logging.info(f"{num_fits} partitions out of {len(partitions)} fit")
 
     # For violating partitions, attempt to relocate groups
-    print("=== PARTITION RELAXATION ===")
-    print()
+    logging.info("=== PARTITION RELAXATION ===")
     with_space = [x for x in ord_util if all(x.fits().values())]
     for src_part in ord_util:
         # If partition already fits, skip it
         if all(src_part.fits().values()):
             continue
         # Order the partition's groups by complexity
-        print(f"Relocating logic from {src_part.id} ({len(src_part.groups)} groups)")
+        logging.debug(f"Relocating logic from {src_part.id} ({len(src_part.groups)} groups)")
         for group in sorted(src_part.groups, key=lambda x: x.complexity, reverse=True):
             # Try relocating a group into another partition
             # NOTE: Only search through partitions with space
@@ -237,7 +217,6 @@ def group_logic(module, limits):
                 if tgt_part is src_part or not tgt_part.can_fit(group):
                     continue
                 # Otherwise move the group
-                # print(f"   + Moving group {group.id} from {src_part.id} to {tgt_part.id}")
                 src_part.remove_group(group)
                 tgt_part.add_group(group)
                 tgt_part.aggregate()
@@ -246,34 +225,29 @@ def group_logic(module, limits):
             src_part.aggregate()
             # If partition now fits, break out
             if all(src_part.fits().values()):
-                print(f" >> {src_part.id} now fits ({len(src_part.groups)} groups)")
+                logging.debug(f" >> {src_part.id} now fits ({len(src_part.groups)} groups)")
                 with_space.append(src_part)
                 break
         # If got here, must never have achieved fit
         else:
-            print(f" >> {src_part.id} still doesn't fit ({len(src_part.groups)} groups)")
+            logging.warning(f" >> {src_part.id} still doesn't fit ({len(src_part.groups)} groups)")
 
     # Print out a summary (ordered by maximum utilisation)
-    print()
-    print("=== AFTER RELAXATION ===")
-    print()
+    logging.info("=== AFTER RELAXATION ===")
     num_fits = 0
     ord_util = sorted(partitions, key=lambda x: max(x.utilisation().values()), reverse=True)
     for partition in ord_util:
-        print(partition.report())
+        logging.info(partition.report())
         if all(partition.fits().values()):
             num_fits += 1
-    print()
-    print(f"{num_fits} partitions out of {len(partitions)} fit")
-    print()
+    logging.info(f"{num_fits} partitions out of {len(partitions)} fit")
 
     # Attempt to merge partitions to free up some nodes
-    print("=== PARTITION MERGING ===")
-    print()
+    logging.info("=== PARTITION MERGING ===")
     for src_idx, src_part in enumerate(ord_util[::-1]):
         for tgt_part in ord_util[::-1][src_idx+1:]:
             if tgt_part.can_merge(src_part):
-                print(f"Merging {src_part.id} with {tgt_part.id}")
+                logging.info(f"Merging {src_part.id} with {tgt_part.id}")
                 for group in src_part.groups[:]:
                     src_part.remove_group(group)
                     tgt_part.add_group(group)
@@ -282,22 +256,17 @@ def group_logic(module, limits):
                 break
 
     # Print out a summary (ordered by maximum utilisation)
-    print()
-    print("=== AFTER MERGING ===")
-    print()
+    logging.info("=== AFTER MERGING ===")
     num_fits = 0
     ord_util = sorted(partitions, key=lambda x: max(x.utilisation().values()), reverse=True)
     for partition in ord_util:
-        print(partition.report())
+        logging.info(partition.report())
         if all(partition.fits().values()):
             num_fits += 1
-    print()
-    print(f"{num_fits} partitions out of {len(partitions)} fit")
-    print()
+    logging.info(f"{num_fits} partitions out of {len(partitions)} fit")
 
     # Split partitions that are still violating
-    print("=== PARTITION SPLITTING ===")
-    print()
+    logging.info("=== PARTITION SPLITTING ===")
     empty_parts = [x for x in ord_util if not any(x.usage().values())]
     if len(empty_parts) > 0:
         for part in ord_util:
@@ -309,7 +278,7 @@ def group_logic(module, limits):
                 break
             empty = empty_parts.pop(0)
             # Split groups evenly
-            print(f"Splitting {part.id} into {empty.id}")
+            logging.debug(f"Splitting {part.id} into {empty.id}")
             while len(part.groups) > len(empty.groups):
                 empty.add_group(part.groups[0])
                 part.remove_group(part.groups[0])
@@ -320,26 +289,22 @@ def group_logic(module, limits):
     partitions = [x for x in partitions if not x.empty]
 
     # Summarise partitioning
-    print()
-    print("=== PARTITIONING SUMMARY ===")
-    print()
+    logging.info("=== PARTITIONING SUMMARY ===")
     num_fits  = 0
     num_over  = 0
     num_empty = 0
     ord_util  = sorted(partitions, key=lambda x: max(x.utilisation().values()), reverse=True)
     for partition in ord_util:
-        print(partition.report())
+        logging.info(partition.report())
         if not any(partition.usage().values()):
             num_empty += 1
         elif all(partition.fits().values()):
             num_fits += 1
         else:
             num_over += 1
-    print()
 
-    print(f">> {num_over:3d}/{len(partitions):3d} do not fit")
-    print(f">> {num_fits:3d}/{len(partitions):3d} fit")
-    print(f">> {num_empty:3d}/{len(partitions):3d} empty")
-    print()
+    logging.info(f">> {num_over:3d}/{len(partitions):3d} do not fit")
+    logging.info(f">> {num_fits:3d}/{len(partitions):3d} fit")
+    logging.info(f">> {num_empty:3d}/{len(partitions):3d} empty")
 
     return ord_util

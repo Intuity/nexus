@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from collections import defaultdict
 from dis import Instruction
 from functools import lru_cache
@@ -25,11 +26,11 @@ from ordered_set import OrderedSet
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort
 from nxisa import Load, Store, Branch, Send, Truth, Shuffle, Instance, Label
 
-from .compiler.memory import Memory
-from .compiler.messaging import node_to_node
-from .compiler.operation import Operation
-from .compiler.register import Register
-from .compiler.table import Table
+from .memory import Memory
+from .messaging import node_to_node
+from .operation import Operation
+from .register import Register
+from .table import Table
 
 class Node:
 
@@ -38,10 +39,9 @@ class Node:
         self.row       = row
         self.column    = column
         # Announce
-        print(f"Compiling partition {self.partition.id}")
-        print(f" - Has {len(self.partition.all_gates)} gates")
-        print(f" - Has {len(self.partition.tgt_flops)} flops")
-        print()
+        logging.info(f"Compiling partition {self.partition.id}")
+        logging.info(f" - Has {len(self.partition.all_gates)} gates")
+        logging.info(f" - Has {len(self.partition.tgt_flops)} flops")
         # Create a memory
         self.memory = Memory()
         # Identify all of the required logic tables
@@ -51,15 +51,13 @@ class Node:
         self.flop_slots, self.flop_cycles, self.flop_targets = self.assign_flops()
         self.output_slots = self.assign_outputs()
         # Debug
-        print("Slot Allocation:")
-        print(f" - Requires {self.num_input_slots:3d} input slots")
-        print(f" - Requires {len(self.flop_slots):3d} flop slots")
-        print(f" - Requires {len(self.output_slots):3d} output slots")
-        print()
-        print("Logic Tables:")
-        print(f" - Compiled {len(self.tables):3d} tables")
-        print(f" - Referred {sum(map(len, self.references.values())):3d} times")
-        print()
+        logging.info("Slot Allocation:")
+        logging.info(f" - Requires {self.num_input_slots:3d} input slots")
+        logging.info(f" - Requires {len(self.flop_slots):3d} flop slots")
+        logging.info(f" - Requires {len(self.output_slots):3d} output slots")
+        logging.info("Logic Tables:")
+        logging.info(f" - Compiled {len(self.tables):3d} tables")
+        logging.info(f" - Referred {sum(map(len, self.references.values())):3d} times")
 
     @property
     def position(self):
@@ -277,7 +275,7 @@ class Node:
                     table.inputs[idx] = tables[input]
 
         # Eliminate truth tables which are not referenced
-        print(f"Compiled {len(tables)} tables")
+        logging.debug(f"Compiled {len(tables)} tables")
         while True:
             # Freshly count references
             refs = defaultdict(lambda: 0)
@@ -294,10 +292,10 @@ class Node:
                     del tables[op]
                     dropped += 1
             # If no terms dropped, break out
-            print(f"Dropped {dropped} tables")
+            logging.debug(f"Dropped {dropped} tables")
             if dropped == 0:
                 break
-        print(f"There are {len(tables)} remaining tables")
+        logging.debug(f"There are {len(tables)} remaining tables")
 
         # Sum all included operations
         all_ins = []
@@ -317,11 +315,11 @@ class Node:
             else:
                 complex_ops += 1
 
-        print(f"All Inputs : {len(set(all_ins))}")
-        print(f"All Ops    : {len(set(all_ops))}")
-        print(f"All Tgts   : {len(set(all_tgt))}")
-        print(f"Simple Ops : {simple_ops}")
-        print(f"Complex Ops: {complex_ops}")
+        logging.debug(f"All Inputs : {len(set(all_ins))}")
+        logging.debug(f"All Ops    : {len(set(all_ops))}")
+        logging.debug(f"All Tgts   : {len(set(all_tgt))}")
+        logging.debug(f"Simple Ops : {simple_ops}")
+        logging.debug(f"Complex Ops: {complex_ops}")
 
         # Convert tables to a list
         tables = list(tables.values())
@@ -534,13 +532,12 @@ class Node:
 
         # Assemble the computation stream
         counts = defaultdict(lambda: 0)
-        print("Generating Instruction Stream:")
-        print()
+        logging.debug("Generating Instruction Stream:")
         def stream_add(instr : Union[Instruction, Label]):
             stream.append(instr)
             if isinstance(instr, Instance):
                 counts[instr.instr.opcode.op_name] += 1
-                print(f"[{len(stream):04d}] {instr.to_asm():40} -> 0x{instr.encode():08X}")
+                logging.debug(f"[{len(stream):04d}] {instr.to_asm():40} -> 0x{instr.encode():08X}")
 
         def stream_iter(gen):
             for instr in gen:
@@ -604,9 +601,7 @@ class Node:
                                 address=tgt_row,
                                 offset =Store.offset.INVERSE))
 
-        print()
-        print("# Inserting port state updates")
-        print()
+        logging.debug("# Inserting port state updates")
 
         # Pack ports into chunks of 8
         port_mapping = []
@@ -675,9 +670,7 @@ class Node:
                             offset  =0,
                             trig    =0))
 
-        print()
-        print("# Inserting node-to-node updates")
-        print()
+        logging.debug("# Inserting node-to-node updates")
 
         pre_n2n = len(stream)
         for op in node_to_node(self, send_targets):
@@ -685,9 +678,7 @@ class Node:
         post_n2n = len(stream)
 
         # Append a branch to wait for the next trigger
-        print()
-        print("# Inserting loop point")
-        print()
+        logging.debug("# Inserting loop point")
         stream_add(Label("loop"))
         stream_add(Branch(pc=0,
                         offset=Branch.offset.INVERSE,
@@ -696,16 +687,14 @@ class Node:
                         comparison=Branch.comparison.WAIT))
 
         # Instruction stats
-        print()
-        print("=" * 80)
-        print("Instruction Counts:")
+        logging.info("=" * 80)
+        logging.info(f"{self.position} Instruction Counts:")
         total_wo_label = len([x for x in stream if not isinstance(x, Label)])
-        print(f" - Total  : {total_wo_label:3d}")
-        print(f" - M vs C : {post_n2n - pre_n2n} vs {pre_n2n} ({((post_n2n-pre_n2n)/total_wo_label)*100:05.02f}%)")
+        logging.info(f" - Total  : {total_wo_label:3d}")
+        logging.info(f" - M vs C : {post_n2n - pre_n2n} vs {pre_n2n} ({((post_n2n-pre_n2n)/total_wo_label)*100:05.02f}%)")
         for key, count in counts.items():
-            print(f" - {key:7s}: {count:3d}")
-        print("=" * 80)
-        print()
+            logging.info(f" - {key:7s}: {count:3d}")
+        logging.info("=" * 80)
 
         rendered = {}
         for table in self.tables:
@@ -727,22 +716,21 @@ class Node:
         write_n_read = OrderedSet(trk_write.keys()).difference(trk_read.keys())
         read_n_write = OrderedSet(trk_read.keys()).difference(trk_write.keys())
         sorted_reads = sorted(trk_read.items(), key=lambda x: x[1])
-        print("=" * 80)
-        print("Memory Accesses:")
-        print(f" - Total Writes       : {sum(trk_write.values()):4d}")
-        print(f" - Total Reads        : {sum(trk_read.values()):4d}")
-        print(f" - Most Read Address  : {sorted_reads[-1][0]} ({sorted_reads[-1][1]} times)")
-        print(f" - Written Not Read   : {len(write_n_read):4d}")
-        print(f" - Read Not Written   : {len(read_n_write):4d}")
-        print(f" - Register Selections: {trk_select:4d}")
-        print(f" - Inactive Evictions : {trk_evict_inactive:4d}")
-        print(f" - Novel Evictions    : {trk_evict_novel:4d}")
-        print(f" - Not Novel Evictions: {trk_evict_notnovel:4d}")
-        print(f" - Minimum Residency  : {min_delta:4d}")
-        print(f" - Maximum Residency  : {max_delta:4d}")
-        print(f" - Average Residency  : {avg_delta:4d}")
-        print("=" * 80)
-        print()
+        logging.info("=" * 80)
+        logging.info(f"{self.position} Memory Accesses:")
+        logging.info(f" - Total Writes       : {sum(trk_write.values()):4d}")
+        logging.info(f" - Total Reads        : {sum(trk_read.values()):4d}")
+        logging.info(f" - Most Read Address  : {sorted_reads[-1][0]} ({sorted_reads[-1][1]} times)")
+        logging.info(f" - Written Not Read   : {len(write_n_read):4d}")
+        logging.info(f" - Read Not Written   : {len(read_n_write):4d}")
+        logging.info(f" - Register Selections: {trk_select:4d}")
+        logging.info(f" - Inactive Evictions : {trk_evict_inactive:4d}")
+        logging.info(f" - Novel Evictions    : {trk_evict_novel:4d}")
+        logging.info(f" - Not Novel Evictions: {trk_evict_notnovel:4d}")
+        logging.info(f" - Minimum Residency  : {min_delta:4d}")
+        logging.info(f" - Maximum Residency  : {max_delta:4d}")
+        logging.info(f" - Average Residency  : {avg_delta:4d}")
+        logging.info("=" * 80)
 
         # Dump memory mappings
         mem_map = defaultdict(lambda: defaultdict(dict))

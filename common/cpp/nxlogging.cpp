@@ -19,8 +19,34 @@
 
 #include "nxlogging.hpp"
 
+using namespace plog;
+
+util::nstring plog::NexusLogFormatter::header ()
+{
+    return util::nstring();
+}
+
+util::nstring plog::NexusLogFormatter::format ( const Record & record )
+{
+    tm t;
+    util::localtime_s(&t, &record.getTime().time);
+
+    util::nostringstream ss;
+    ss << (t.tm_year + 1900) << "-"
+       << std::setfill(PLOG_NSTR('0')) << std::setw(2) << t.tm_mon + 1 << PLOG_NSTR("-")
+       << std::setfill(PLOG_NSTR('0')) << std::setw(2) << t.tm_mday << PLOG_NSTR(" ");
+    ss << std::setfill(PLOG_NSTR('0')) << std::setw(2) << t.tm_hour << PLOG_NSTR(":")
+       << std::setfill(PLOG_NSTR('0')) << std::setw(2) << t.tm_min << PLOG_NSTR(":")
+       << std::setfill(PLOG_NSTR('0')) << std::setw(2) << t.tm_sec << PLOG_NSTR(" ");
+    ss << PLOG_NSTR("[") << severityToString(record.getSeverity()) << PLOG_NSTR("] ");
+    ss << record.getMessage() << PLOG_NSTR("\n");
+
+    return ss.str();
+}
+
+
 void Nexus::setup_logging (void)
 {
-    static plog::ColorConsoleAppender<plog::TxtFormatter> console;
-    plog::init(plog::info, &console);
+    static ColorConsoleAppender<NexusLogFormatter> console;
+    init(info, &console);
 }

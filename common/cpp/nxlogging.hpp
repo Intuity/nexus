@@ -15,6 +15,18 @@
 #ifndef __NXLOGGING_HPP__
 #define __NXLOGGING_HPP__
 
+#include <plog/Record.h>
+#include <plog/Util.h>
+
+namespace plog
+{
+    class NexusLogFormatter {
+    public:
+        static util::nstring header ();
+        static util::nstring format ( const Record & record );
+    };
+}
+
 namespace Nexus {
 
     void setup_logging ( void );
