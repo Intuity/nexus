@@ -21,6 +21,7 @@ SYN_WORK_DIR       ?= work
 SYN_SCRIPT_PATH    ?= $(SYN_WORK_DIR)/yosys.do
 SYN_LOG_PATH       ?= $(SYN_WORK_DIR)/yosys.log
 SYN_OUTPUT_NETLIST ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP)_nl.v
+SYN_OUTPUT_JSON    ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP)_aig.json
 SYN_OUTPUT_RPT     ?= $(abspath $(SYN_WORK_DIR))/$(DESIGN_TOP).rpt
 
 MAKE_DIRS += $(SYN_WORK_DIR)
@@ -62,6 +63,8 @@ endif
 	$(PRECMD)echo "techmap;" >> $@
 	$(PRECMD)echo "log --> Writing out simple Verilog netlist;" >> $@
 	$(PRECMD)echo "write_verilog -noattr $(SYN_OUTPUT_NETLIST);" >> $@
+	$(PRECMD)echo "log --> Writing out design to JSON $(SYN_OUTPUT_JSON);" >> $@
+	$(PRECMD)echo "write_json -aig $(SYN_OUTPUT_JSON);" >> $@
 	$(PRECMD)echo "log --> Reporting statistics;" >> $@
 	$(PRECMD)echo "tee -o $(SYN_OUTPUT_RPT) stat -tech xilinx;" >> $@
 
