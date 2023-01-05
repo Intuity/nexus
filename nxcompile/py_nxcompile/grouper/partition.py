@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from orderedset import OrderedSet
+from ordered_set import OrderedSet
 
 class Partition:
 

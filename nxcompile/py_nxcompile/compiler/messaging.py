@@ -6,7 +6,7 @@ from nxisa import Instance, Load, Shuffle, Store, Send, Label, Pick
 def node_to_node(node    : Any,
                  mapping : Dict[str, Any]) -> Iterable[Instance]:
     # Allocate memory to accumulate messages
-    next_ptr = 1023, 3
+    next_ptr = 127, 3
     def allocate():
         nonlocal next_ptr
         curr_row, curr_slot = next_ptr

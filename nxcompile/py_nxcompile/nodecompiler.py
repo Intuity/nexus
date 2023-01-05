@@ -20,7 +20,7 @@ from statistics import mean
 from typing import Dict, Union
 
 from natsort import natsorted
-from orderedset import OrderedSet
+from ordered_set import OrderedSet
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort
 from nxisa import Load, Store, Branch, Send, Truth, Shuffle, Instance, Label
