@@ -112,6 +112,10 @@ void NXParser::handle (const VariableSymbol & symbol) {
         if (!exists || m_module->get_signal(sig_name)->m_type != NXSignal::FLOP) {
             auto flop = std::make_shared<NXFlop>(sig_name);
             m_module->add_flop(flop);
+            // Link port to the flop replacing it in the expansion
+            if (exists && m_expansions[sig_name][0]->m_type == NXSignal::PORT) {
+                m_expansions[sig_name][0]->add_input(flop);
+            }
             m_expansions[sig_name] = NXSignalList({flop});
         }
     } else if (symbol.getType().isPackedArray()) {
@@ -131,8 +135,15 @@ void NXParser::handle (const VariableSymbol & symbol) {
                 if (!exists || m_module->get_signal(flop_name.str())->m_type != NXSignal::FLOP) {
                     auto flop = std::make_shared<NXFlop>(flop_name.str());
                     m_module->add_flop(flop);
-                    if (exists) m_expansions[sig_name][idx] = flop;
-                    else        m_expansions[sig_name].push_back(flop);
+                    if (exists) {
+                        // Link port to the flop replacing it in the expansion
+                        if (m_expansions[sig_name][idx]->m_type == NXSignal::PORT) {
+                            m_expansions[sig_name][idx]->add_input(flop);
+                        }
+                        m_expansions[sig_name][idx] = flop;
+                    } else {
+                        m_expansions[sig_name].push_back(flop);
+                    }
                 }
             }
         } else {

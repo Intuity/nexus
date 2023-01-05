@@ -27,6 +27,7 @@ def group_logic(module, limits):
     groups  = {}
     bkt_int = 20
     buckets = defaultdict(lambda: [])
+    portlkp = { x.name: x for x in module.ports }
 
     for flop in module.flops:
         # Define function to chase through logic & collect gates, flops, and ports
@@ -60,6 +61,9 @@ def group_logic(module, limits):
         for entry in flop.outputs:
             if entry.is_type(nxsignal_type_t.PORT):
                 tgt_ports.append(entry)
+        # Also check to see if this flop is exposed as a port
+        if port := portlkp.get(flop.name, None):
+            tgt_ports.append(port)
         # Append the grouping
         group = Grouping(flop, ports, tgt_ports, flops, gates)
         groups[group.target.name] = group
