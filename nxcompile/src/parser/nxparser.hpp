@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <list>
+#include <vector>
 
 #include <slang/types/AllTypes.h>
 #include <slang/symbols/ASTVisitor.h>
@@ -116,7 +117,7 @@ namespace Nexus {
     private:
 
         typedef std::shared_ptr<NXSignal> NXSignalPtr;
-        typedef std::list< NXSignalPtr > NXSignalList;
+        typedef std::vector<NXSignalPtr>  NXSignalList;
 
         std::shared_ptr<NXModule>                 m_module;
         std::map< std::string, NXSignalList >     m_expansions;

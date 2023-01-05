@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <vector>
 
+#include <plog/Log.h>
+
 #include "nxflop.hpp"
 #include "nxgate.hpp"
 #include "nxport.hpp"
@@ -71,6 +73,10 @@ namespace Nexus {
 
         std::shared_ptr<NXSignal> get_signal ( std::string name )
         {
+            if (!has_signal(name)) {
+                PLOGE << "Failed to locate signal " << name;
+                assert(!"Cannot locate named signal");
+            }
             assert(has_signal(name));
             return m_signals[name];
         }

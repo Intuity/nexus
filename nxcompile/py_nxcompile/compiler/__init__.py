@@ -34,10 +34,11 @@ from .table import Table
 
 class Node:
 
-    def __init__(self, partition, row, column):
+    def __init__(self, partition, row, column, max_instr):
         self.partition = partition
         self.row       = row
         self.column    = column
+        self.max_instr = max_instr
         # Announce
         logging.info(f"Compiling partition {self.partition.id}")
         logging.info(f" - Has {len(self.partition.all_gates)} gates")
@@ -737,5 +738,10 @@ class Node:
         for idx_row, row in enumerate(self.memory.rows):
             for idx_slot, slot in enumerate(row.slots):
                 mem_map[idx_row][idx_slot] = [(x.name if x is not None else None) for x in slot.elements]
+
+        # Check if this node violates maximum instructions
+        if total_wo_label > self.max_instr:
+            logging.error(f"Node {self.position} has {total_wo_label} instructions "
+                          f"(maximum allowed {self.max_instr})")
 
         return stream, port_mapping, mem_map

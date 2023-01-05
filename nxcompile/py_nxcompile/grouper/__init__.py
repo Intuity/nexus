@@ -179,7 +179,7 @@ def group_logic(module, limits):
                 if swaps == 0:
                     break
             # Log improvement
-            logging.info(f"{part_a.id}, {part_b.id} post-optimisation: {count_all(part_a, part_b):5d} ({opt_idx+1} passes)")
+            logging.debug(f"{part_a.id}, {part_b.id} post-optimisation: {count_all(part_a, part_b):5d} ({opt_idx+1} passes)")
             # Update aggregations
             part_a.aggregate()
             part_b.aggregate()

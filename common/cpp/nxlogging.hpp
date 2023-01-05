@@ -29,7 +29,7 @@ namespace plog
 
 namespace Nexus {
 
-    void setup_logging ( void );
+    void setup_logging ( bool verbose = false );
 
 }
 

@@ -108,7 +108,8 @@ void NXParser::handle (const PortSymbol & symbol) {
 void NXParser::handle (const VariableSymbol & symbol) {
     std::string sig_name = static_cast<std::string>(symbol.name);
     if (symbol.getType().isScalar()) {
-        if (!m_module->has_signal(sig_name)) {
+        bool exists = m_module->has_signal(sig_name);
+        if (!exists || m_module->get_signal(sig_name)->m_type != NXSignal::FLOP) {
             auto flop = std::make_shared<NXFlop>(sig_name);
             m_module->add_flop(flop);
             m_expansions[sig_name] = NXSignalList({flop});
@@ -126,10 +127,12 @@ void NXParser::handle (const VariableSymbol & symbol) {
             for (int idx = rng_lo; idx <= rng_hi; idx++) {
                 std::stringstream flop_name;
                 flop_name << sig_name << "___X" << std::dec << idx;
-                if (!m_module->has_signal(flop_name.str())) {
+                bool exists = m_module->has_signal(flop_name.str());
+                if (!exists || m_module->get_signal(flop_name.str())->m_type != NXSignal::FLOP) {
                     auto flop = std::make_shared<NXFlop>(flop_name.str());
                     m_module->add_flop(flop);
-                    m_expansions[sig_name].push_back(flop);
+                    if (exists) m_expansions[sig_name][idx] = flop;
+                    else        m_expansions[sig_name].push_back(flop);
                 }
             }
         } else {

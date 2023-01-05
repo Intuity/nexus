@@ -45,8 +45,9 @@ util::nstring plog::NexusLogFormatter::format ( const Record & record )
 }
 
 
-void Nexus::setup_logging (void)
+void Nexus::setup_logging ( bool verbose /* = false */ )
 {
     static ColorConsoleAppender<NexusLogFormatter> console;
     init(info, &console);
+    if (verbose) plog::get()->setMaxSeverity(plog::debug);
 }
