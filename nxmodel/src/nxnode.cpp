@@ -334,8 +334,48 @@ bool NXNode::evaluate ( bool trigger )
                       << (result ? "1" : "0");
                 break;
             }
-            case NXISA::OP_ARITH: {
-                assert(!"Not yet implemented");
+            case NXISA::OP_PICK: {
+                // Extract bit selectors
+                uint32_t p0 = NXISA::extract_p0(raw);
+                uint32_t p1 = NXISA::extract_p1(raw);
+                uint32_t p2 = (NXISA::extract_p2_2_1(raw) << 1) |
+                              (NXISA::extract_p2_0(raw)   << 0);
+                uint32_t p3 = NXISA::extract_p3(raw);
+                // Extract mask
+                uint32_t mask = (NXISA::extract_mask_3(raw)   << 3) |
+                                (NXISA::extract_mask_2_0(raw) << 0);
+                // Extract upper/lower
+                uint32_t upper = NXISA::extract_upper(raw);
+                // Extract short address
+                uint32_t short_address = NXISA::extract_short_address(raw);
+                // Grab the 4 bits
+                uint32_t b0 = (val_a >> p0) & 1;
+                uint32_t b1 = (val_a >> p1) & 1;
+                uint32_t b2 = (val_a >> p2) & 1;
+                uint32_t b3 = (val_a >> p3) & 1;
+                // Join together
+                uint32_t picked = (b3 << 7) | (b2 << 6) | (b1 << 5) | (b0 << 4) |
+                                  (b3 << 3) | (b2 << 2) | (b1 << 1) | (b0 << 0);
+                // Log operation
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Pick - R" << std::dec << f_src_a << " "
+                      << "(0x" << std::hex << (unsigned int)val_a << ") "
+                      << "- P0=" << std::dec << p0 << " (0x" << std::hex << b0 << ")"
+                      << ", P1=" << std::dec << p1 << " (0x" << std::hex << b1 << ")"
+                      << ", P2=" << std::dec << p2 << " (0x" << std::hex << b2 << ")"
+                      << ", P3=" << std::dec << p3 << " (0x" << std::hex << b3 << ") "
+                      << "(data=0x" << std::hex << picked << ") "
+                      << "mask=0x" << std::hex << mask << " "
+                      << "bits=" << (upper ? "7:4" : "3:0") << " "
+                      << "address=0x" << std::hex << short_address;
+                // Align the mask
+                if (upper) mask <<= 4;
+                // Write to memory
+                m_data_memory.write(64 + short_address,
+                                    picked << shift,
+                                    mask << shift);
                 break;
             }
             case NXISA::OP_SHUFFLE:
