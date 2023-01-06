@@ -25,8 +25,8 @@ Shuffle = ShuffleDef()
 assert all((Memory, Wait, Truth, Pick, Shuffle))
 
 # Pseudo-encodings
-def Load(address, offset, tgt, comment=""):
-    return Memory(offset      =offset,
+def Load(address, slot, tgt, comment=""):
+    return Memory(slot        =slot,
                   address_6_0 =(address & 0x7F),
                   mode        =Memory.mode.LOAD,
                   tgt         =tgt,
@@ -36,8 +36,8 @@ def Load(address, offset, tgt, comment=""):
                   src         =0,
                   comment     =comment)
 
-def Store(src, address, offset, comment=""):
-    return Memory(offset      =offset,
+def Store(src, address, slot, comment=""):
+    return Memory(slot        =slot,
                   address_6_0 =(address & 0x7F),
                   address_10_7=((address >> 7) & 0x0F),
                   mode        =Memory.mode.STORE,
@@ -47,8 +47,8 @@ def Store(src, address, offset, comment=""):
                   src         =src,
                   comment     =comment)
 
-def Send(src, row, column, address, offset, comment=""):
-    return Memory(offset=offset,
+def Send(src, row, column, address, slot, comment=""):
+    return Memory(slot        =slot,
                   address_6_0 =(address & 0x7F),
                   address_10_7=((address >> 7) & 0x0F),
                   mode        =Memory.mode.SEND,

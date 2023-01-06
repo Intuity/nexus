@@ -41,11 +41,11 @@ with open(sys.argv[1], "w", encoding="utf-8") as fh:
         fh.write(f"        {',' if idx else ' '} OP_{key.upper()} = {val}\n")
     fh.write("    } opcode_t;\n")
     fh.write("\n")
-    fh.write("    // Offset encoding\n")
+    fh.write("    // Slot encoding\n")
     fh.write("    typedef enum {\n")
-    for idx, (key, val) in enumerate(nxisa.fields.Offset().values.items()):
-        fh.write(f"        {',' if idx else ' '} OFFSET_{key.upper()} = {val}\n")
-    fh.write("    } offset_t;\n")
+    for idx, (key, val) in enumerate(nxisa.fields.Slot().values.items()):
+        fh.write(f"        {',' if idx else ' '} SLOT_{key.upper()} = {val}\n")
+    fh.write("    } slot_t;\n")
     fh.write("\n")
     fh.write("    // Memory mode encoding\n")
     fh.write("    typedef enum {\n")

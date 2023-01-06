@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from .base import Reserved
-from .fields import (OpCode, Address_10_7, Address_6_0, Offset, MemoryMode,
+from .fields import (OpCode, Address_10_7, Address_6_0, Slot, MemoryMode,
                      Source, Target, SendRow, SendColumn, Mux, Mask, Flag,
                      Table)
 from .instrdef import InstructionDef
@@ -24,7 +24,7 @@ class MemoryDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("MEMORY"),
-                         Offset(),
+                         Slot(),
                          Address_6_0(),
                          MemoryMode(),
                          Target(),
@@ -64,7 +64,7 @@ class PickDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("PICK"),
-                         Offset(),
+                         Slot(),
                          Address_6_0(),
                          Flag("upper"),
                          Mask(),

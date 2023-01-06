@@ -40,16 +40,16 @@ class OpCode(Field):
         return self.extract(value) == self.op_value
 
 
-class Offset(Field):
+class Slot(Field):
     """ Selects between the upper or lower 8-bit slot in the memory row """
 
     def __init__(self) -> None:
-        super().__init__("offset",
+        super().__init__("slot",
                          2, {
                             "PRESERVE": 0,
                             "INVERSE" : 1,
-                            "SET_LOW" : 2,
-                            "SET_HIGH": 3,
+                            "LOWER"   : 2,
+                            "UPPER"   : 3,
                          })
 
 
