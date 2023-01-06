@@ -41,22 +41,22 @@ std::shared_ptr<NXMessagePipe> NXNode::get_pipe (direction_t dirx)
 void NXNode::reset (void)
 {
     // Reset all state
-    m_idle        = true;
-    m_waiting     = true;
-    m_cycle       = 0;
-    m_pc          = 0;
-    m_offset      = false;
-    m_restart_pc  = 0;
-    m_next_pc     = 0;
-    m_next_offset = false;
+    m_idle       = true;
+    m_waiting    = true;
+    m_cycle      = 0;
+    m_pc         = 0;
+    m_slot       = false;
+    m_restart_pc = 0;
+    m_next_pc    = 0;
+    m_next_slot  = false;
     for (int i = 0; i < 8; i++) m_registers[i] = 0;
     m_inst_memory.clear();
     m_data_memory.clear();
     // Insert a wait operation into the bottom of instruction memory
     m_inst_memory.write(0, (
-        (NXISA::OP_BRANCH << NXISA::OP_LSB  ) |
-        (               0 << NXISA::PC_LSB  ) |
-        (               1 << NXISA::IDLE_LSB)
+        (NXISA::OP_WAIT << NXISA::OP_LSB  ) |
+        (             1 << NXISA::PC0_LSB ) |
+        (             1 << NXISA::IDLE_LSB)
     ));
 }
 
@@ -79,18 +79,18 @@ void NXNode::step (bool trigger)
           << "Step " << (trigger ? "with" : "without") << " trigger";
 
 
-    // If evaluation caused by a global trigger, adopt next PC & offset
-    // NOTE: This is done before 'digest' so that 'm_offset' has the correct
+    // If evaluation caused by a global trigger, adopt next PC & slot
+    // NOTE: This is done before 'digest' so that 'm_slot' has the correct
     //       state for locating the next cycle's state
     if (trigger) {
         m_pc          = m_next_pc;
         m_restart_pc  = m_next_pc;
-        m_offset      = m_next_offset;
+        m_slot        = m_next_slot;
         m_cycle      += 1;
         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
               << std::dec << (unsigned int)m_id.column << ") "
               << "Triggered @ 0x" << (unsigned int)m_pc << " "
-              << "with offset " << (unsigned int)m_offset;
+              << "with slot " << (unsigned int)m_slot;
     }
 
     // Digest inbound messages, capturing if combinational updates were received
@@ -119,10 +119,11 @@ bool NXNode::digest (void)
                     case NODE_COMMAND_LOAD: {
                         node_load_t msg;
                         pipe->dequeue(msg);
-                        uint32_t data = msg.data;
-                        data <<= msg.slot * 8;
-                        uint32_t mask = 0xFF;
-                        mask <<= msg.slot * 8;
+                        uint32_t data  = msg.data;
+                        uint32_t mask  = 0xFF;
+                        uint32_t shift = ((msg.address & 1) ? 16 : 0) + (msg.slot ? 8 : 0);
+                        data <<= shift;
+                        mask <<= shift;
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
                               << "[INSTR] Writing 0x" << std::hex << data << " "
@@ -135,32 +136,31 @@ bool NXNode::digest (void)
                     case NODE_COMMAND_SIGNAL: {
                         node_signal_t msg;
                         pipe->dequeue(msg);
-                        bool offset = m_offset;
-                        switch (msg.offset) {
-                            case MEMORY_OFFSET_PRESERVE:
+                        bool slot = m_slot;
+                        switch (msg.slot) {
+                            case MEMORY_SLOT_PRESERVE:
                                 break;
-                            case MEMORY_OFFSET_INVERSE:
-                                offset = !offset;
+                            case MEMORY_SLOT_INVERSE:
+                                slot = !slot;
                                 break;
-                            case MEMORY_OFFSET_SET_LOW:
-                                offset = false;
+                            case MEMORY_SLOT_LOWER:
+                                slot = false;
                                 break;
-                            case MEMORY_OFFSET_SET_HIGH:
-                                offset = true;
+                            case MEMORY_SLOT_UPPER:
+                                slot = true;
                                 break;
                             default:
-                                assert(!"Unsupported offset");
+                                assert(!"Unsupported slot");
                         }
                         uint32_t data  = msg.data;
-                        uint32_t shift = (msg.slot * 16) + (offset ? 8 : 0);
+                        uint32_t shift = slot ? 8 : 0;
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
                               << "[SIGNAL] Writing 0x" << std::hex << data << " "
                                           << "to 0x"   << std::hex << msg.address << " "
                                           << "slot "   << std::dec << (uint32_t)msg.slot << " "
-                                          << "offset " << std::dec << (uint32_t)msg.offset << " "
-                                          << "(-> " << std::dec << (offset ? 1 : 0) << ", "
-                                          << std::dec << (m_offset ? 1 : 0) << ")";
+                                          << "(-> "    << std::dec << (slot ? 1 : 0) << ", "
+                                          << std::dec << (m_slot ? 1 : 0) << ")";
                         m_data_memory.write(msg.address, data << shift, 0xFF << shift);
                         break;
                     }
@@ -201,119 +201,128 @@ bool NXNode::evaluate ( bool trigger )
         NXISA::opcode_t op = (NXISA::opcode_t)NXISA::extract_op(raw);
 
         // Extract common fields
-        uint32_t        f_src_a   = NXISA::extract_src_a(raw);
-        uint32_t        f_src_b   = NXISA::extract_src_b(raw);
-        uint32_t        f_src_c   = NXISA::extract_src_c(raw);
-        uint32_t        f_tgt     = NXISA::extract_tgt(raw);
-        uint32_t        f_slot    = NXISA::extract_slot(raw);
-        uint32_t        f_address = NXISA::extract_address(raw);
-        NXISA::offset_t f_offset  = (NXISA::offset_t)NXISA::extract_offset(raw);
-        uint32_t        f_jump_pc = NXISA::extract_pc(raw);
+        // - Source & target registers
+        uint32_t      f_src_a        = NXISA::extract_src_a(raw);
+        uint32_t      f_src_b        = NXISA::extract_src_b(raw);
+        uint32_t      f_src_c        = NXISA::extract_src_c(raw);
+        uint32_t      f_tgt          = NXISA::extract_tgt(raw);
+        // - Mux selectors
+        uint32_t      f_mux_0        = NXISA::extract_mux_0(raw);
+        uint32_t      f_mux_1        = NXISA::extract_mux_1(raw);
+        uint32_t      f_mux_2        = NXISA::extract_mux_2(raw);
+        uint32_t      f_mux_3        = NXISA::extract_mux_3(raw);
+        uint32_t      f_mux_4        = NXISA::extract_mux_4(raw);
+        uint32_t      f_mux_5        = NXISA::extract_mux_5(raw);
+        uint32_t      f_mux_6        = NXISA::extract_mux_6(raw);
+        uint32_t      f_mux_7        = NXISA::extract_mux_7(raw);
+        // - Address components
+        uint32_t      f_address_10_7 = NXISA::extract_address_10_7(raw);
+        uint32_t      f_address_6_0  = NXISA::extract_address_6_0(raw);
+        uint32_t      f_address      = (f_address_10_7 << 7) | f_address_6_0;
+        NXISA::slot_t f_slot         = (NXISA::slot_t)NXISA::extract_slot(raw);
 
         // Pickup register values
         uint8_t val_a = m_registers[f_src_a];
         uint8_t val_b = m_registers[f_src_b];
         uint8_t val_c = m_registers[f_src_c];
 
-        // Determine offset state for this instruction
-        bool offset = m_offset;
-        switch (f_offset) {
-            case NXISA::OFFSET_PRESERVE:
+        // Determine slot state for this instruction
+        bool slot = m_slot;
+        switch (f_slot) {
+            case NXISA::SLOT_PRESERVE:
                 break;
-            case NXISA::OFFSET_INVERSE:
-                offset = !offset;
+            case NXISA::SLOT_INVERSE:
+                slot = !slot;
                 break;
-            case NXISA::OFFSET_SET_HIGH:
-                offset = true;
+            case NXISA::SLOT_UPPER:
+                slot = true;
                 break;
-            case NXISA::OFFSET_SET_LOW:
-                offset = false;
+            case NXISA::SLOT_LOWER:
+                slot = false;
                 break;
             default:
-                assert(!"Unsupported offset");
+                assert(!"Unsupported slot");
         }
 
-        // Work out shift based on offset state and field
-        uint32_t shift = (f_slot ? 16 : 0) + (offset ? 8 : 0);
+        // Work out shift based on slot
+        uint32_t shift = slot ? 8 : 0;
 
         // Perform the correct operation
         switch (op) {
-            case NXISA::OP_LOAD: {
-                // LOAD cannot modify the TRUTH operation's result register
-                assert(f_tgt != 7);
-                // Load from data memory
-                uint32_t word = m_data_memory.read(f_address);
-                m_registers[f_tgt] = (word >> shift) & 0xFF;
-                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
-                             << std::dec << (unsigned int)m_id.column << ") "
-                      << "@ 0x" << std::hex << m_pc << " Load into "
-                      << "R" << std::hex << f_tgt << " from "
-                      << "addr=0x" << std::hex << f_address << " "
-                      << "offset=" << std::dec << offset << " "
-                      << "slot=" << std::dec << f_slot << " "
-                      << "(0x" << std::hex << (unsigned int)m_registers[f_tgt] << ")";
-                break;
+            case NXISA::OP_MEMORY: {
+                switch ((NXISA::mem_mode_t)NXISA::extract_mode(raw)) {
+                    case NXISA::MEM_LOAD: {
+                        // Loads cannot modify the truth table shift register
+                        assert(f_tgt != 7);
+                        // Load from data memory
+                        uint16_t data = m_data_memory.read(f_address);
+                        m_registers[f_tgt] = (data >> shift) & 0xFF;
+                        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                                     << std::dec << (unsigned int)m_id.column << ") "
+                              << "@ 0x" << std::hex << m_pc << " Load into "
+                              << "R" << std::hex << f_tgt << " from "
+                              << "addr=0x" << std::hex << f_address << " "
+                              << "slot=" << std::dec << f_slot << " "
+                              << "(0x" << std::hex << (unsigned int)m_registers[f_tgt] << ")";
+                        break;
+                    }
+                    case NXISA::MEM_STORE: {
+                        uint32_t data = val_a;
+                        uint32_t mask = (NXISA::extract_send_row(raw) << 4) |
+                                        (NXISA::extract_send_col(raw) << 0);
+                        m_data_memory.write(f_address, data << shift, mask << shift);
+                        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                                     << std::dec << (unsigned int)m_id.column << ") "
+                              << "@ 0x" << std::hex << m_pc << " "
+                              << "Store from R" << std::hex << f_src_a << " into "
+                              << "addr=0x" << std::hex << f_address << " "
+                              << "data=0x" << std::hex << data << " "
+                              << "slot=" << std::dec << f_slot << " "
+                              << "mask=0x" << std::hex << mask;
+                        break;
+                    }
+                    case NXISA::MEM_SEND: {
+                        node_signal_t msg;
+                        msg.header.target.row    = NXISA::extract_send_row(raw);
+                        msg.header.target.column = NXISA::extract_send_col(raw);
+                        msg.header.command       = NODE_COMMAND_SIGNAL;
+                        msg.address              = f_address;
+                        msg.slot                 = (NXConstants::memory_slot_t)f_slot;
+                        msg.data                 = val_a;
+                        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                                     << std::dec << (unsigned int)m_id.column << ") "
+                              << "@ 0x" << std::hex << m_pc << " "
+                              << "Send 0x" << std::setw(2) << std::setfill('0')
+                              << std::hex << (unsigned int)val_a << " "
+                              << "to (" << std::dec << (unsigned int)msg.header.target.row
+                              << ", " << std::dec << (unsigned int)msg.header.target.column
+                              << ") address=0x" << std::hex << (unsigned int)msg.address
+                              << ", slot=" << std::dec << (unsigned int)msg.slot;
+                        route(msg.header.target, NODE_COMMAND_SIGNAL)->enqueue(msg);
+                        break;
+                    }
+                    default: {
+                        assert(!"Unsupported memory operation mode");
+                    }
+                }
+
             }
-            case NXISA::OP_STORE: {
-                uint32_t data = val_a;
-                uint32_t mask = NXISA::extract_mask(raw);
-                m_data_memory.write(f_address, data << shift, mask << shift);
+            case NXISA::OP_WAIT: {
+                m_waiting = true;
+                m_idle    = (NXISA::extract_idle(raw) != 0);
+                m_next_pc = (NXISA::extract_pc0(raw) != 0) ? 0 : (m_pc + 1);
                 PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                              << std::dec << (unsigned int)m_id.column << ") "
                       << "@ 0x" << std::hex << m_pc << " "
-                      << "Store from R" << std::hex << f_src_a << " into "
-                      << "addr=0x" << std::hex << f_address << " "
-                      << "data=0x" << std::hex << data << " "
-                      << "offset=" << std::dec << offset << " "
-                      << "slot=" << std::dec << f_slot << " "
-                      << "mask=0x" << std::hex << mask;
-                break;
-            }
-            case NXISA::OP_BRANCH: {
-                // NOTE: Not fully implemented as likely to be simplified in the
-                //       final ISA as branching not required
-                m_waiting     = true;
-                m_idle        = (NXISA::extract_idle(raw) != 0);
-                m_next_pc     = f_jump_pc;
-                m_next_offset = offset;
-                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
-                             << std::dec << (unsigned int)m_id.column << ") "
-                      << "@ 0x" << std::hex << m_pc << " "
-                      << "Branch to 0x" << std::hex << m_next_pc << " "
+                      << "Waiting to go to 0x" << std::hex << m_next_pc << " "
                       << (m_idle ? "with" : "without") << " idle";
                 break;
             }
-            case NXISA::OP_SEND: {
-                node_signal_t msg;
-                msg.header.target.row    = NXISA::extract_node_row(raw);
-                msg.header.target.column = NXISA::extract_node_col(raw);
-                msg.header.command       = NODE_COMMAND_SIGNAL;
-                msg.address              = f_address;
-                msg.slot                 = f_slot;
-                msg.offset               = (NXConstants::memory_offset_t)f_offset;
-                msg.data                 = val_a;
-                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
-                             << std::dec << (unsigned int)m_id.column << ") "
-                      << "@ 0x" << std::hex << m_pc << " "
-                      << "Send 0x" << std::setw(2) << std::setfill('0')
-                      << std::hex << (unsigned int)val_a << " "
-                      << "to (" << std::dec << (unsigned int)msg.header.target.row
-                      << ", " << std::dec << (unsigned int)msg.header.target.column
-                      << ") address=0x" << std::hex << (unsigned int)msg.address
-                      << ", slot=" << std::dec << (unsigned int)msg.slot
-                      << ", offset=" << std::dec << (unsigned int)msg.offset;
-                route(msg.header.target, NODE_COMMAND_SIGNAL)->enqueue(msg);
-                break;
-            }
             case NXISA::OP_TRUTH: {
-                // Pickup the mux values
-                uint32_t mux_a = NXISA::extract_mux_a(raw);
-                uint32_t mux_b = NXISA::extract_mux_b(raw);
-                uint32_t mux_c = NXISA::extract_mux_c(raw);
                 // Extract the selected bit from each source
-                bool bit_a = (((val_a >> mux_a) & 1) != 0);
-                bool bit_b = (((val_b >> mux_b) & 1) != 0);
-                bool bit_c = (((val_c >> mux_c) & 1) != 0);
+                bool bit_a = (((val_a >> f_mux_0) & 1) != 0);
+                bool bit_b = (((val_b >> f_mux_1) & 1) != 0);
+                bool bit_c = (((val_c >> f_mux_2) & 1) != 0);
                 // Apply shifts to the truth table
                 uint32_t raw_table = NXISA::extract_table(raw);
                 uint32_t shf_table = raw_table;
@@ -335,24 +344,15 @@ bool NXNode::evaluate ( bool trigger )
                 break;
             }
             case NXISA::OP_PICK: {
-                // Extract bit selectors
-                uint32_t p0 = NXISA::extract_p0(raw);
-                uint32_t p1 = NXISA::extract_p1(raw);
-                uint32_t p2 = (NXISA::extract_p2_2_1(raw) << 1) |
-                              (NXISA::extract_p2_0(raw)   << 0);
-                uint32_t p3 = NXISA::extract_p3(raw);
                 // Extract mask
-                uint32_t mask = (NXISA::extract_mask_3(raw)   << 3) |
-                                (NXISA::extract_mask_2_0(raw) << 0);
+                uint32_t mask = NXISA::extract_mask(raw);
                 // Extract upper/lower
                 uint32_t upper = NXISA::extract_upper(raw);
-                // Extract short address
-                uint32_t short_address = NXISA::extract_short_address(raw);
                 // Grab the 4 bits
-                uint32_t b0 = (val_a >> p0) & 1;
-                uint32_t b1 = (val_a >> p1) & 1;
-                uint32_t b2 = (val_a >> p2) & 1;
-                uint32_t b3 = (val_a >> p3) & 1;
+                uint32_t b0 = (val_a >> f_mux_0) & 1;
+                uint32_t b1 = (val_a >> f_mux_1) & 1;
+                uint32_t b2 = (val_a >> f_mux_2) & 1;
+                uint32_t b3 = (val_a >> f_mux_3) & 1;
                 // Join together
                 uint32_t picked = (b3 << 7) | (b2 << 6) | (b1 << 5) | (b0 << 4) |
                                   (b3 << 3) | (b2 << 2) | (b1 << 1) | (b0 << 0);
@@ -362,18 +362,18 @@ bool NXNode::evaluate ( bool trigger )
                       << "@ 0x" << std::hex << m_pc << " "
                       << "Pick - R" << std::dec << f_src_a << " "
                       << "(0x" << std::hex << (unsigned int)val_a << ") "
-                      << "- P0=" << std::dec << p0 << " (0x" << std::hex << b0 << ")"
-                      << ", P1=" << std::dec << p1 << " (0x" << std::hex << b1 << ")"
-                      << ", P2=" << std::dec << p2 << " (0x" << std::hex << b2 << ")"
-                      << ", P3=" << std::dec << p3 << " (0x" << std::hex << b3 << ") "
+                      << "- P0=" << std::dec << f_mux_0 << " (0x" << std::hex << b0 << ")"
+                      << ", P1=" << std::dec << f_mux_1 << " (0x" << std::hex << b1 << ")"
+                      << ", P2=" << std::dec << f_mux_2 << " (0x" << std::hex << b2 << ")"
+                      << ", P3=" << std::dec << f_mux_3 << " (0x" << std::hex << b3 << ") "
                       << "(data=0x" << std::hex << picked << ") "
                       << "mask=0x" << std::hex << mask << " "
                       << "bits=" << (upper ? "7:4" : "3:0") << " "
-                      << "address=0x" << std::hex << short_address;
+                      << "address=0x" << std::hex << f_address_6_0;
                 // Align the mask
                 if (upper) mask <<= 4;
                 // Write to memory
-                m_data_memory.write(64 + short_address,
+                m_data_memory.write(128 + f_address_6_0,
                                     picked << shift,
                                     mask << shift);
                 break;
@@ -386,25 +386,16 @@ bool NXNode::evaluate ( bool trigger )
                       << "Shuffle operation";
                 // Shuffle cannot modify the TRUTH operation's result register
                 assert(f_tgt != 7);
-                // Extract bit selectors
-                uint32_t b0 = NXISA::extract_b0(raw);
-                uint32_t b1 = NXISA::extract_b1(raw);
-                uint32_t b2 = NXISA::extract_b2(raw);
-                uint32_t b3 = NXISA::extract_b3(raw);
-                uint32_t b4 = NXISA::extract_b4(raw);
-                uint32_t b5 = NXISA::extract_b5(raw);
-                uint32_t b6 = NXISA::extract_b6(raw);
-                uint32_t b7 = NXISA::extract_b7(raw);
                 // Update target register with the selections
                 m_registers[f_tgt] = (
-                    (((val_a >> b0) & 1) << 0) |
-                    (((val_a >> b1) & 1) << 1) |
-                    (((val_a >> b2) & 1) << 2) |
-                    (((val_a >> b3) & 1) << 3) |
-                    (((val_a >> b4) & 1) << 4) |
-                    (((val_a >> b5) & 1) << 5) |
-                    (((val_a >> b6) & 1) << 6) |
-                    (((val_a >> b7) & 1) << 7)
+                    (((val_a >> f_mux_0) & 1) << 0) |
+                    (((val_a >> f_mux_1) & 1) << 1) |
+                    (((val_a >> f_mux_2) & 1) << 2) |
+                    (((val_a >> f_mux_3) & 1) << 3) |
+                    (((val_a >> f_mux_4) & 1) << 4) |
+                    (((val_a >> f_mux_5) & 1) << 5) |
+                    (((val_a >> f_mux_6) & 1) << 6) |
+                    (((val_a >> f_mux_7) & 1) << 7)
                 );
                 break;
             }

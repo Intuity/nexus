@@ -47,10 +47,10 @@ namespace NXModel {
             , m_waiting     ( true    )
             , m_cycle       ( 0       )
             , m_pc          ( 0       )
-            , m_offset      ( false   )
+            , m_slot        ( false   )
             , m_restart_pc  ( 0       )
             , m_next_pc     ( 0       )
-            , m_next_offset ( false   )
+            , m_next_slot   ( false   )
         {
             m_registers = new uint8_t[8];
             for (int i = 0; i < 4; i++) {
@@ -99,13 +99,13 @@ namespace NXModel {
          *
          * @return pointer to instruction memory
          */
-        NXMemory * get_inst_memory ( void ) { return &m_inst_memory; }
+        NXMemory<uint32_t, 32> * get_inst_memory ( void ) { return &m_inst_memory; }
 
         /** Return the pointer to the data memory
          *
          * @return pointer to data memory
          */
-        NXMemory * get_data_memory ( void ) { return &m_data_memory; }
+        NXMemory<uint16_t, 16> * get_data_memory ( void ) { return &m_data_memory; }
 
         /** Enable/disable dumping
          *
@@ -153,19 +153,19 @@ namespace NXModel {
         std::array<std::shared_ptr<NXMessagePipe>, 4> m_outbound;
 
         // Node memory
-        NXMemory m_inst_memory;
-        NXMemory m_data_memory;
-        bool     m_en_dump;
+        NXMemory<uint32_t, 32> m_inst_memory;
+        NXMemory<uint16_t, 16> m_data_memory;
+        bool                   m_en_dump;
 
         // Node state
         bool      m_idle;
         bool      m_waiting;
         uint32_t  m_cycle;
         uint32_t  m_pc;
-        bool      m_offset;
+        bool      m_slot;
         uint32_t  m_restart_pc;
         uint32_t  m_next_pc;
-        bool      m_next_offset;
+        bool      m_next_slot;
         uint8_t * m_registers;
 
     };

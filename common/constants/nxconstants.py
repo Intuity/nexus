@@ -38,7 +38,7 @@ class NXConstants:
     # Maximum sizes
     MAX_ROW_COUNT      : Constant("Maximum number of rows"              ) = 16
     MAX_COLUMN_COUNT   : Constant("Maximum number of columns"           ) = 16
-    MAX_NODE_MEMORY    : Constant("Maximum memory rows per node"        ) = 1024
+    MAX_NODE_MEMORY    : Constant("Maximum 16-bit memory rows per node" ) = 2048
     MAX_NODE_REGISTERS : Constant("Maximum number of registers per node") = 8
     MAX_MESH_OUTPUTS   : Constant("Maximum outputs of the mesh"         ) = MAX_COLUMN_COUNT * 32
 
@@ -66,12 +66,10 @@ class NXConstants:
     TT_WIDTH : Constant("Width of a three input truth table") = 8
 
     # Node memory and loading
-    NODE_MEM_ADDR_WIDTH        : Constant("Address width for node memory"   ) = clog2(MAX_NODE_MEMORY)
-    NODE_MEM_SLOT_WIDTH        : Constant("Width of 16-bit slot"            ) = 16
-    NODE_MEM_SUBSLOT_WIDTH     : Constant("Width of 8-bit sub-slot"         ) = 8
-    NODE_MEM_SLOT_SEL_WIDTH    : Constant("Width of 16-bit slot selector"   ) = 1
-    NODE_MEM_SUBSLOT_SEL_WIDTH : Constant("Width of 8-bit sub-slot selector") = 1
-    NODE_MEM_OFFSET_WIDTH      : Constant("Width of the memory offset"      ) = 2
+    NODE_MEM_ADDR_WIDTH      : Constant("Address width for node memory") = clog2(MAX_NODE_MEMORY)
+    NODE_MEM_SLOT_WIDTH      : Constant("Width of a memory slot"       ) = 8
+    NODE_MEM_SLOT_MODE_WIDTH : Constant("Width of the slot mode"       ) = 2
+    NODE_MEM_SLOT_SEL_WIDTH  : Constant("Width of the slot selector"   ) = 1
 
 # ==============================================================================
 # Enumerations
@@ -112,13 +110,13 @@ class NodeCommand:
     LOAD   : Constant("Load data into the node's memory")
     SIGNAL : Constant("Carries signal state to and from a node")
 
-@packtype.enum(package=NXConstants, mode=Enum.INDEXED, width=NXConstants.NODE_MEM_OFFSET_WIDTH.value)
-class MemoryOffset:
-    """ Memory offset modes """
+@packtype.enum(package=NXConstants, mode=Enum.INDEXED, width=NXConstants.NODE_MEM_SLOT_MODE_WIDTH.value)
+class MemorySlot:
+    """ Memory slot modes """
     PRESERVE : Constant("Use the node's current state"               )
     INVERSE  : Constant("Use the inverse of the node's current state")
-    SET_LOW  : Constant("Use a low offset"                           )
-    SET_HIGH : Constant("Use a high offset"                          )
+    LOWER    : Constant("Explicitly use the lower slot"              )
+    UPPER    : Constant("Explicitly use the upper slot"              )
 
 # ==============================================================================
 # Node Identifier
@@ -151,20 +149,17 @@ class NodeLoad:
     """ Load data into a node's instruction memory """
     header  : NodeHeader(desc="Header carrying row, column, and command")
     address : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Row to write into")
-    slot    : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH.value +
-                           NXConstants.NODE_MEM_SUBSLOT_SEL_WIDTH.value,
-                     desc ="16-bit slot select")
-    data    : Scalar(width=NXConstants.NODE_MEM_SUBSLOT_WIDTH,
+    slot    : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH, desc="Slot selection")
+    data    : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH,
                      desc ="Data to write into memory")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
 class NodeSignal:
     """ Write into a node's data memory """
     header  : NodeHeader(desc="Header carrying row, column, and command")
-    address : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH,     desc="Row to write into" )
-    slot    : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH, desc="16-bit slot select")
-    offset  : MemoryOffset(desc="Offset mode")
-    data    : Scalar(width=NXConstants.NODE_MEM_SUBSLOT_WIDTH,
+    address : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Row to write into")
+    slot    : MemorySlot(desc="Slot mode")
+    data    : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH,
                      desc ="Data to write into memory")
 
 @packtype.union(package=NXConstants)
