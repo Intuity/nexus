@@ -2,253 +2,106 @@
 
 ## Encodings Table
 
-<style>
-table {
-    font-family:monospace;
-}
-table th, table td {
-    padding:3px;
-}
-table td, table th {
-    text-align:center;
-}
-table td {
-    border:1px solid #666;
-}
-table tr td:first-child, table tr th:first-child {
-    text-align:right;
-    border:none;
-    padding-right:10px;
-}
-</style>
-<table>
-    <tr>
-        <th>Instruction</th>
-        <th>31</th>
-        <th>30</th>
-        <th>29</th>
-        <th>28</th>
-        <th>27</th>
-        <th>26</th>
-        <th>25</th>
-        <th>24</th>
-        <th>23</th>
-        <th>22</th>
-        <th>21</th>
-        <th>20</th>
-        <th>19</th>
-        <th>18</th>
-        <th>17</th>
-        <th>16</th>
-        <th>15</th>
-        <th>14</th>
-        <th>13</th>
-        <th>12</th>
-        <th>11</th>
-        <th>10</th>
-        <th>9</th>
-        <th>8</th>
-        <th>7</th>
-        <th>6</th>
-        <th>5</th>
-        <th>4</th>
-        <th>3</th>
-        <th>2</th>
-        <th>1</th>
-        <th>0</th>
-    </tr>
-    <tr>
-        <td>LOAD</td>
-        <td colspan="3">000</td>
-        <td colspan="5">RSVD</td>
-        <td colspan="2">OFFSET</td>
-        <td colspan="10">ADDRESS</td>
-        <td colspan="1">SLOT</td>
-        <td colspan="5">RSVD</td>
-        <td colspan="3">TGT</td>
-        <td colspan="3">RSVD</td>
-    </tr>
-    <tr>
-        <td>STORE</td>
-        <td colspan="3">001</td>
-        <td colspan="5">RSVD</td>
-        <td colspan="2">OFFSET</td>
-        <td colspan="10">ADDRESS</td>
-        <td colspan="1">SLOT</td>
-        <td colspan="8">MASK</td>
-        <td colspan="3">SRC</td>
-    </tr>
-    <tr>
-        <td>BRANCH</td>
-        <td colspan="3">010</td>
-        <td colspan="1">MARK</td>
-        <td colspan="3">COMP</td>
-        <td colspan="1">IDLE</td>
-        <td colspan="2">OFFSET</td>
-        <td colspan="10">PC</td>
-        <td colspan="3">RSVD</td>
-        <td colspan="3">SRC_B</td>
-        <td colspan="3">RSVD</td>
-        <td colspan="3">SRC_A</td>
-    </tr>
-    <tr>
-        <td>SEND</td>
-        <td colspan="3">011</td>
-        <td colspan="4">RSVD</td>
-        <td colspan="1">TRIG</td>
-        <td colspan="2">OFFSET</td>
-        <td colspan="10">ADDRESS</td>
-        <td colspan="1">SLOT</td>
-        <td colspan="4">NODE_ROW</td>
-        <td colspan="4">NODE_COL</td>
-        <td colspan="3">SRC</td>
-    </tr>
-    <tr>
-        <td>TRUTH</td>
-        <td colspan="3">100</td>
-        <td colspan="8">TABLE</td>
-        <td colspan="3">MUX_C</td>
-        <td colspan="3">MUX_B</td>
-        <td colspan="3">MUX_A</td>
-        <td colspan="3">SRC_C</td>
-        <td colspan="3">SRC_B</td>
-        <td colspan="3">RSVD</td>
-        <td colspan="3">SRC_A</td>
-    </tr>
-    <tr>
-        <td>ARITH</td>
-        <td colspan="3">101</td>
-        <td colspan="5">RSVD</td>
-        <td colspan="2">OP</td>
-        <td colspan="13">RSVD</td>
-        <td colspan="3">SRC_B</td>
-        <td colspan="3">TGT</td>
-        <td colspan="3">SRC_A</td>
-    </tr>
-    <tr>
-        <td>SHUFL</td>
-        <td colspan="2">11</td>
-        <td colspan="3">B7</td>
-        <td colspan="3">B6</td>
-        <td colspan="3">B5</td>
-        <td colspan="3">B4</td>
-        <td colspan="3">B3</td>
-        <td colspan="3">B2</td>
-        <td colspan="3">B1</td>
-        <td colspan="3">B0</td>
-        <td colspan="3">TGT</td>
-        <td colspan="3">SRC</td>
-    </tr>
-</table>
+![Instruction Encodings](./images/nexus_instruction_encoding.png)
 
-## `LOAD` & `STORE`
+## `WAIT`
 
-These operations manipulate the data memory of the node, and share the following
-fields:
+The first instruction is used to stall execution until a trigger pulse arrives
+from the controller, it carries two arguments:
 
- * `ADDRESS` - 10-bit address allows access to the entire 1024 entry memory;
- * `SLOT` - each memory entry is 32-bit, but the node handles this as 2x16-bit
-   slots - this bit selects between the lower (`[15:0]`) and upper (`[31:16]`)
-   slots;
- * `OFFSET` - each 16-bit slot is split into 2x8-bit sub-slots and this field
-   controls which sub-slot is selected;
+ * `PC0` - when set, the program counter will reset to `0` when the trigger pulse
+   arrives (effectively restarting the program), otherwise it will continue
+   executing from the next instruction;
+ * `IDLE` - when set, the node's `IDLE` flag will be set high to indicate that
+   it's evaluation for this cycle is complete.
 
-The `LOAD` instruction also has a 3-bit `TGT` register field, while the `STORE`
-instruction has a 3-bit `SRC` register field. The `STORE` instruction also has
-an 8-bit `MASK` field which controls which bits are updated in the sub-slot.
+## `MEMORY`
 
-The encoding of the `OFFSET` field is as follows:
+This operation can perform load operations from the node's local memory and store
+operations to both the node's local memory and any remote node's memory (in the
+latter case this is known as a 'send').
 
- * `2b00` - use the node's default offset mode (set by a `BRANCH` instruction);
- * `2b01` - use the inverse of the node's default state;
- * `2b10` - force use of the lower sub-slot;
- * `2b11` - force use of the upper sub-slot;
+The `MODE` field encodes the desired behaviour:
 
-The full 12-bit address of the 8-bit element of the memory can be expressed as:
+ * `LOAD` (`2b00`) - performs a load operation from local memory;
+ * `STORE` (`2b01`) - performs a store operation to local memory;
+ * `SEND` (`2b10`) - sends data via the mesh to update data in a remote memory.
+
+In all cases, the address is encoded by 3 fields:
+
+ * `ADDRESS[10:7]` and `ADDRESS[6:0]` refer to a specific 16-bit element within
+   the local or remote memory;
+ * `SLOT` selects between the upper and lower 8-bits of the 16-bit element.
+
+The slot is encoded to support double buffering. Each node maintains a local bit
+of state which alternates on each simulated cycle, allowing memory operations to
+alternately target different 8-bit chunks.
+
+ * `PRESERVE` (`2b00`) - uses the node's current slot state;
+ * `INVERSE` (`2b01`) - uses the inverse of the node's current slot state;
+ * `LOWER` (`2b10`) - forces use of the lower 8-bit slot;
+ * `UPPER` (`2b11`) - forces use of the upper 8-bit slot.
+
+Therefore the full 12-bit address of the 8-bit element of the memory can be
+expressed as:
 
 ```
-full_address = { ADDRESS[9:0], SLOT, OFFSET[1] ? OFFSET[0] : (OFFSET[0] ^ DEFAULT) };
+full_address = { ADDRESS[10:0], SLOT[1] ? SLOT[0] : (SLOT[0] ^ STATE) };
 ```
 
-## `BRANCH`
+For `SEND` operations, bits `10:3` form the address of the target node encoded
+as a 4-bit `ROW` and 4-bit `COLUMN`.
 
-This operation allows the program counter to be manipulated, along with the
-`IDLE` and default `SUBSLOT` state of the node:
+For `STORE` operations, bits `10:3` (`MASK`) hold an 8-bit mask which is used to
+select which bits of the 8-bit slot should be updated.
 
- * `PC` - 10-bit target address to jump to if branch evaluates successfully;
- * `SRC_A` - 3-bit source register field as the first input to the comparison;
- * `SRC_B` - 3-bit source register field as the second input to the comparison;
- * `IDLE` - whether to set the node's `IDLE` bit if the branch is taken;
- * `COMP` - 3-bit selector as to the comparison to perform;
- * `OFFSET` - 2-bit mode to update the node's default `OFFSET`;
- * `MARK` - whether to update the re-trigger address when the branch is taken;
+For `SEND` and `STORE` operations, bits `2:0` (`SRC_A`) encode the source register
+to take the value to write to memory.
 
-The encoding of the `COMP` field is as follows:
-
- * `3b000` - unconditional branch (`JUMP`);
- * `3b001` - unconditional branch after next trigger received (`WAIT`);
- * `3b010` - conditional branch if `SRC_A == SRC_B` (i.e. `BEQ`);
- * `3b011` - conditional branch if `SRC_A != SRC_B` (i.e. `BNE`);
- * `3b100` - conditional branch if `SRC_A >= SRC_B` (i.e. `BGE`);
- * `3b101` - conditional branch if `SRC_A <  SRC_B` (i.e. `BLT`);
- * `3b110` - conditional branch if `SRC_A == 0` (i.e. `BEQZ`);
- * `3b111` - conditional branch if `SRC_A != 0` (i.e. `BNEZ`);
-
-The encoding of the `OFFSET` field is similar to `LOAD` & `STORE`:
-
- * `2b00` - does not alter the node's default `OFFSET` state;
- * `2b01` - sets the node's default `OFFSET` state to the inverse of its current
-   value;
- * `2b10` - forces the node's default `OFFSET` state to `0`;
- * `2b10` - forces the node's default `OFFSET` state to `1`;
-
-## `SEND`
-
-Queues up a 8-bit atom of data to send to any other node in the system:
-
- * `SRC` - 3-bit source register of data to send;
- * `NODE_ROW` - 4-bit row of the node to send to in the mesh;
- * `NODE_COL` - 4-bit column of the node to send to in the mesh;
- * `ADDRESS` - 10-bit address of the 32-bit memory entry in the target node;
- * `SLOT` - target slot selection (same as `STORE`, but targeting another node);
- * `OFFSET` - target sub-slot selection (same as `STORE`, but targeting another node);
- * `TRIG` - whether to re-trigger evaluation in the target node from the last mark;
+For `LOAD` operations, bits `17:15` (`TGT`) encode the target register to store
+the data read from the memory.
 
 ## `TRUTH`
 
 Performs logical operations on up to 3x8-bit sources:
 
  * `SRC_A`, `SRC_B`, `SRC_C` - input register selections;
- * `MUX_A`, `MUX_B`, `MUX_C` - bit selection from each of the input registers;
+ * `MUX_2`, `MUX_1`, `MUX_0` - bit selection from each of the input registers;
  * `TABLE` - encoded truth table;
 
 The `TRUTH` instruction does not have a target register, instead the result is
 always placed into register 7. Register 7 is a shift register, and each new
 value is inserted at bit 0 with existing entries shifted up one place.
 
-## `ARITH`
+## `PICK`
 
-Perform arithmetic operations on 2x8-bit sources:
+Selects up to 4-bits from a register and writes them to a limited area of the
+data memory, this is particularly useful for shortening 'gather' sequences when
+preparing messages to send to other nodes to update signal state.
 
- * `SRC_A`, `SRC_B` - input register selections;
- * `TGT` - target register selection;
- * `OP` - 2-bit encoded operation to perform;
+ * `SRC_A` - input register selection;
+ * `MUX_[3:0]` - selection values for each of the 4-bits to gather from the
+   source register;
+ * `MASK` - masks which bits selected using the `MUX_N` fields should be written
+   to the local memory;
+ * `UPPER` - selects the upper or lower 4-bits of the 8-bit slot within the memory;
+ * `ADDRESS[6:0]` - a shortened address to select 16-bit elements within a limited
+   range of the memory;
+ * `SLOT` - selects the upper or lower 8-bit slot within the 16-bit element,
+   using the same encoding mentioned above for the `MEMORY` operation.
 
-The encoding of the `OP` field is as follows:
+The address range of the `PICK` instruction is limited, and is offset from the
+base of the memory by `64`. That is to say that the minimum address is `0x40`
+and the maximum address is `0xBF`.
 
- * `2b00` - perform `SRC_A + SRC_B`;
- * `2b01` - perform `SRC_A - SRC_B` (unsigned);
- * `2b10` - perform an `AND` reduction on `SRC_A` (e.g. `TGT = {8{&(SRC_A)}});`);
- * `2b10` - perform an `OR` reduction on `SRC_A` (e.g. `TGT = {8{|(SRC_A)}});`);
-
-## `SHUFL`
+## `SHUFFLE`
 
 Rearranges the bits of an source register into an arbitrary order:
 
- * `SRC` - input register selection;
+ * `SRC_A` - input register selection;
  * `TGT` - target register selection;
- * `B[7-0]` - selection values for each bit in the target register from each bit
-   in the source register.
+ * `MUX_[7-0]` - selection values for each bit in the target register from each
+   bit in the source register.
 
 Note that this register overloads bit 29 from being the operation encoding, to
 being the MSB of the `B7` mux control.
