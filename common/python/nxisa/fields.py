@@ -20,10 +20,10 @@ class OpCode(Field):
     shortened to 2-bits wide for SHUFFLE.
     """
 
-    def __init__(self, op : str = "MEMORY") -> None:
+    def __init__(self, op : str = "WAIT") -> None:
         super().__init__("op", 3, {
-                            "MEMORY"     : 0,
-                            "WAIT"       : 1,
+                            "WAIT"       : 0,
+                            "MEMORY"     : 1,
                             "TRUTH"      : 2,
                             "PICK"       : 3,
                             "RESERVED4"  : 4,

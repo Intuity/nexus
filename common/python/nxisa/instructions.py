@@ -24,14 +24,14 @@ class MemoryDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("MEMORY"),
-                         Slot(),
-                         Address_6_0(),
-                         MemoryMode(),
-                         Target(),
-                         Address_10_7(),
-                         SendRow(),
+                         Source("src_a"),
                          SendColumn(),
-                         Source("src_a"))
+                         SendRow(),
+                         Address_10_7(),
+                         Target(),
+                         MemoryMode(),
+                         Address_6_0(),
+                         Slot())
 
 
 class WaitDef(InstructionDef):
@@ -39,9 +39,9 @@ class WaitDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("WAIT"),
-                         Flag("pc0"),
+                         Reserved(27),
                          Flag("idle"),
-                         Reserved(27))
+                         Flag("pc0"))
 
 
 class TruthDef(InstructionDef):
@@ -49,14 +49,14 @@ class TruthDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("TRUTH"),
-                         Table(),
-                         Source("src_c"),
-                         Reserved(3),
-                         Source("src_b"),
-                         Mux("mux_2"),
-                         Mux("mux_1"),
+                         Source("src_a"),
                          Mux("mux_0"),
-                         Source("src_a"))
+                         Mux("mux_1"),
+                         Mux("mux_2"),
+                         Source("src_b"),
+                         Reserved(3),
+                         Source("src_c"),
+                         Table())
 
 
 class PickDef(InstructionDef):
@@ -64,15 +64,15 @@ class PickDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("PICK"),
-                         Slot(),
-                         Address_6_0(),
-                         Flag("upper"),
-                         Mask(),
-                         Mux("mux_3"),
-                         Mux("mux_2"),
-                         Mux("mux_1"),
+                         Source("src_a"),
                          Mux("mux_0"),
-                         Source("src_a"))
+                         Mux("mux_1"),
+                         Mux("mux_2"),
+                         Mux("mux_3"),
+                         Mask(),
+                         Flag("upper"),
+                         Address_6_0(),
+                         Slot())
 
 
 class ShuffleDef(InstructionDef):
@@ -80,13 +80,15 @@ class ShuffleDef(InstructionDef):
 
     def __init__(self) -> None:
         super().__init__(OpCode("SHUFFLE"),
-                         Mux("mux_7"),
-                         Mux("mux_6"),
-                         Mux("mux_5"),
-                         Mux("mux_4"),
-                         Target(),
-                         Mux("mux_3"),
-                         Mux("mux_2"),
-                         Mux("mux_1"),
+                         Source("src_a"),
                          Mux("mux_0"),
-                         Source("src_a"))
+                         Mux("mux_1"),
+                         Mux("mux_2"),
+                         Mux("mux_3"),
+                         Target(),
+                         Mux("mux_4"),
+                         Mux("mux_5"),
+                         Mux("mux_6"),
+                         Mux("mux_7"))
+        # Forceably move opcode from 30->29 as bit 29 is overloaded by a mux
+        self.opcode.lsb = 29

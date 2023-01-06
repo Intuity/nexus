@@ -119,17 +119,18 @@ bool NXNode::digest (void)
                     case NODE_COMMAND_LOAD: {
                         node_load_t msg;
                         pipe->dequeue(msg);
-                        uint32_t data  = msg.data;
-                        uint32_t mask  = 0xFF;
-                        uint32_t shift = ((msg.address & 1) ? 16 : 0) + (msg.slot ? 8 : 0);
+                        uint32_t data    = msg.data;
+                        uint32_t mask    = 0xFF;
+                        uint32_t shift   = ((msg.address & 1) ? 16 : 0) + (msg.slot ? 8 : 0);
+                        uint32_t address = (msg.address >> 1);
                         data <<= shift;
                         mask <<= shift;
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
-                              << "[INSTR] Writing 0x" << std::hex << data << " "
-                                         << "to 0x"   << std::hex << msg.address << " "
-                                         << "mask 0x" << std::hex << mask;
-                        m_inst_memory.write(msg.address, data, mask);
+                              << "[INSTR] Writing 0x" << std::hex << std::setw(8) << std::setfill('0') << data << " "
+                                         << "to 0x"   << std::hex << address << " "
+                                         << "mask 0x" << std::hex << std::setw(8) << std::setfill('0') << mask;
+                        m_inst_memory.write(address, data, mask);
                         break;
                     }
                     // SIGNAL: Write into the node's data memory
@@ -260,7 +261,7 @@ bool NXNode::evaluate ( bool trigger )
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
                               << "@ 0x" << std::hex << m_pc << " Load into "
-                              << "R" << std::hex << f_tgt << " from "
+                              << "R" << std::hex << (unsigned int)f_tgt << " from "
                               << "addr=0x" << std::hex << f_address << " "
                               << "slot=" << std::dec << f_slot << " "
                               << "(0x" << std::hex << (unsigned int)m_registers[f_tgt] << ")";
@@ -274,7 +275,7 @@ bool NXNode::evaluate ( bool trigger )
                         PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                                      << std::dec << (unsigned int)m_id.column << ") "
                               << "@ 0x" << std::hex << m_pc << " "
-                              << "Store from R" << std::hex << f_src_a << " into "
+                              << "Store from R" << std::hex << (unsigned int)f_src_a << " into "
                               << "addr=0x" << std::hex << f_address << " "
                               << "data=0x" << std::hex << data << " "
                               << "slot=" << std::dec << f_slot << " "
@@ -305,12 +306,13 @@ bool NXNode::evaluate ( bool trigger )
                         assert(!"Unsupported memory operation mode");
                     }
                 }
-
+                break;
             }
             case NXISA::OP_WAIT: {
-                m_waiting = true;
-                m_idle    = (NXISA::extract_idle(raw) != 0);
-                m_next_pc = (NXISA::extract_pc0(raw) != 0) ? 0 : (m_pc + 1);
+                m_waiting   = true;
+                m_idle      = (NXISA::extract_idle(raw) != 0);
+                m_next_pc   = (NXISA::extract_pc0(raw) != 0) ? 0 : (m_pc + 1);
+                m_next_slot = !m_slot;
                 PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                              << std::dec << (unsigned int)m_id.column << ") "
                       << "@ 0x" << std::hex << m_pc << " "
@@ -369,21 +371,17 @@ bool NXNode::evaluate ( bool trigger )
                       << "(data=0x" << std::hex << picked << ") "
                       << "mask=0x" << std::hex << mask << " "
                       << "bits=" << (upper ? "7:4" : "3:0") << " "
-                      << "address=0x" << std::hex << f_address_6_0;
+                      << "address=0x" << std::hex << (64 + f_address_6_0);
                 // Align the mask
                 if (upper) mask <<= 4;
                 // Write to memory
-                m_data_memory.write(128 + f_address_6_0,
+                m_data_memory.write(64 + f_address_6_0,
                                     picked << shift,
                                     mask << shift);
                 break;
             }
             case NXISA::OP_SHUFFLE:
             case NXISA::OP_SHUFFLE_ALT: {
-                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
-                             << std::dec << (unsigned int)m_id.column << ") "
-                      << "@ 0x" << std::hex << m_pc << " "
-                      << "Shuffle operation";
                 // Shuffle cannot modify the TRUTH operation's result register
                 assert(f_tgt != 7);
                 // Update target register with the selections
@@ -397,6 +395,22 @@ bool NXNode::evaluate ( bool trigger )
                     (((val_a >> f_mux_6) & 1) << 6) |
                     (((val_a >> f_mux_7) & 1) << 7)
                 );
+                // Log the action
+                PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                             << std::dec << (unsigned int)m_id.column << ") "
+                      << "@ 0x" << std::hex << m_pc << " "
+                      << "Shuffle R" << std::dec << (unsigned int)f_src_a << " "
+                      << "(value 0x" << std::hex << (unsigned int)val_a << ") "
+                      << "-> R" << std::dec << (unsigned int)f_tgt << " "
+                      << "B0=" << std::dec << f_mux_0 << " "
+                      << "B1=" << std::dec << f_mux_1 << " "
+                      << "B2=" << std::dec << f_mux_2 << " "
+                      << "B3=" << std::dec << f_mux_3 << " "
+                      << "B4=" << std::dec << f_mux_4 << " "
+                      << "B5=" << std::dec << f_mux_5 << " "
+                      << "B6=" << std::dec << f_mux_6 << " "
+                      << "B7=" << std::dec << f_mux_7 << " "
+                      << "(result 0x" << std::hex << (unsigned int)m_registers[f_tgt] << ")";
                 break;
             }
             default: {

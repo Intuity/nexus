@@ -14,6 +14,7 @@
 
 #include <fstream>
 #include <iomanip>
+#include <plog/Log.h>
 
 #include "json.hpp"
 
@@ -40,12 +41,9 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
     // Sanity check the design against the model
     unsigned int design_rows = data["rows"].get<unsigned int>();
     unsigned int design_cols = data["columns"].get<unsigned int>();
-    if (verbose) {
-        std::cout << "[NXLoader] Opened " << path << " - "
-                  << " rows: " << design_rows << ", "
-                  << " columns: " << design_cols
-                  << std::endl;
-    }
+    PLOGD << "[NXLoader] Opened " << path << " - "
+          << " rows: " << design_rows << ", "
+          << " columns: " << design_cols;
     assert(
         (design_rows <= model->get_rows()   ) &&
         (design_cols <= model->get_columns())
@@ -60,20 +58,19 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
         unsigned int instr;
         unsigned int address = 0;
         while (fh >> std::hex >> instr) {
-            if (verbose) {
-                std::cout << "[NXLoader] Loading row: " << row
-                          << ", column: " << column << ", instruction: 0x"
-                          << std::hex << std::setw(8) << std::setfill('0') << instr
-                          << std::dec << std::endl;
-            }
+            PLOGD << "[NXLoader] Loading row: " << row
+                  << ", column: " << column
+                  << ", address: 0x" << std::hex << address
+                  << ", instruction: 0x"
+                  << std::hex << std::setw(8) << std::setfill('0') << instr;
             // Load in four 8-bit chunks
             for (uint32_t idx = 0; idx < 4; idx++) {
                 node_load_t msg;
                 msg.header.target.row    = row;
                 msg.header.target.column = column;
                 msg.header.command       = NODE_COMMAND_LOAD;
-                msg.address              = address;
-                msg.slot                 = idx;
+                msg.address              = (address << 1) + (idx / 2);
+                msg.slot                 = (idx % 2);
                 msg.data                 = (instr >> (8 * idx)) & 0xFF;
                 model->get_ingress()->enqueue(msg);
             }
@@ -82,14 +79,13 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
         }
     }
     // Run the mesh until it sinks all of the queued messages
+    PLOGD << "[NXLoader] All messages queued, waiting for idle";
     uint32_t steps = 0;
     while (!model->get_mesh()->is_idle()) {
         model->get_mesh()->step(false);
         steps++;
     }
-    if (verbose) {
-        std::cout << "[NXLoader] Ran mesh for " << steps << " steps" << std::endl;
-    }
+    PLOGD << "[NXLoader] Ran mesh for " << steps << " steps";
     // Close the file
     fh.close();
 }
