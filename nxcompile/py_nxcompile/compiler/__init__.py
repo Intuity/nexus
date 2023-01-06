@@ -24,7 +24,7 @@ from natsort import natsorted
 from ordered_set import OrderedSet
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort
-from nxisa import Load, Store, Branch, Send, Truth, Shuffle, Instance, Label
+from nxisa import Load, Store, Wait, Send, Truth, Shuffle, Instance, Label
 
 from .memory import Memory
 from .messaging import node_to_node
@@ -77,16 +77,15 @@ class Node:
         # Assign inputs to slots in the memory
         num_slots = 0
         for signals in filter(lambda x: len(x) > 0, map(list, inputs.values())):
-            for offset in range(0, len(signals), 8):
-                # TODO: Cope with combinatorial sources
-                self.memory.place_all(signals[offset:offset+8], True)
+            self.memory.align()
+            for index, signal in enumerate(signals):
+                self.memory.slot_pair_lower[index % 8]  = signal
+                self.memory.slot_pair_upper[index % 8] = signal
                 num_slots += 1
-            # Bump to avoid mixing signals from different source partitions
-            self.memory.bump_slot()
-        # Bump and align to make next placement safe
-        if self.memory.last_bit != 0:
-            self.memory.bump_slot()
-        self.memory.align(True)
+                if (index % 8) == 7:
+                    self.memory.add_row()
+        # Ensure a fresh row for future placements
+        self.memory.align()
         return num_slots
 
     def assign_flops(self):
@@ -143,25 +142,17 @@ class Node:
                 slots.append([None] * 8)
                 slots[-1][0] = flop
         # Allocate slots in the memory
-        # NOTE: Don't use Memory.place_all as that will tightly pack bits to the LSB
         targets = []
         for slot in slots:
-            # If bit cursor is not 0, bounce to next slot
-            if self.memory.last_bit != 0:
-                self.memory.bump_slot()
-            # Ensure that the slot is sequentially aligned
-            self.memory.align(is_seq=True)
+            # Ensure that this is a fresh row
+            self.memory.align()
             targets.append((self.memory.last_row, self.memory.last_slot))
-            # Mark slot as sequential
-            self.memory.slot.is_seq = True
             # Fill in the memory elements
             for idx, elem in enumerate(slot):
-                self.memory.slot.elements[idx] = elem
-                self.memory.next_slot.elements[idx] = elem
-                if elem is not None:
-                    self.memory.mapping[elem.name] = (self.memory.last_row, self.memory.last_slot, idx)
-            # Stop this slot being modified
-            self.memory.bump_slot()
+                self.memory.slot_pair_lower[idx] = elem
+                self.memory.slot_pair_upper[idx] = elem
+        # Ensure a fresh row for future placements
+        self.memory.align()
         # Return the slots and cycle encodings
         return slots, cycles, targets
 
@@ -427,13 +418,11 @@ class Node:
                     row, slot = self.memory.last_row, self.memory.last_slot
                     for idx, elem in enumerate(to_keep):
                         if elem is not None:
-                            self.memory.slot.elements[idx] = elem
-                            self.memory.mapping[elem.name] = row, slot, idx
+                            self.memory.slot[idx] = elem
                     yield Store(src    =register.index,
                                 mask   =0xFF,
-                                slot   =(slot // 2),
                                 address=row,
-                                offset =(2 | (slot % 2)))
+                                slot   =(2 | (slot % 2)))
             register.activate()
             register.age   = 0
             register.novel = False
@@ -457,17 +446,15 @@ class Node:
                         offset_mode = 2 | (slot % 2)
                     # For sequential mode, use the current offset state (preserve)
                     else:
-                        offset_mode = Load.offset.PRESERVE
+                        offset_mode = Load.slot.PRESERVE
                     # Emit load
-                    elements = self.memory.rows[row].slots[slot].elements
+                    tgt.elements = self.memory[row][slot].elements
                     yield Load(tgt    =tgt.index,
-                               slot   =(slot // 2),
+                               slot   =offset_mode,
                                address=row,
-                               offset =offset_mode,
-                               comment=f"Loading R{tgt.index} with {', '.join((x.name if x else '-') for x in elements)}")
+                               comment=f"Loading R{tgt.index} with {', '.join((x.name if x else '-') for x in tgt.elements)}")
                     trk_usage[(row, slot)].append(("read", len(stream)))
                     trk_read[(row, slot)] += 1
-                    tgt.elements = elements[:]
                 else:
                     # Not found
                     raise Exception(f"Failed to locate signal '{signal}'")
@@ -489,12 +476,11 @@ class Node:
                 emitted_flop_cycles.append(cone_idx)
                 slot_idx, places = selection
                 row, slot        = self.flop_targets[slot_idx]
-                names            = [self.memory.rows[row].slots[slot].elements[x].name for x in places]
+                names            = [self.memory[row][slot][x].name for x in places]
                 yield Store(src    =reg_work.index,
                             mask   =sum(((1 << x) for x in places)),
-                            slot   =(slot // 2),
+                            slot   =Store.slot.INVERSE,
                             address=row,
-                            offset =Store.offset.INVERSE,
                             comment=f"Flushing out {', '.join(names)}")
 
         def emit_operation(cone_idx, cone):
@@ -510,6 +496,7 @@ class Node:
                         idxs.append([getattr(x, "name", None) for x in reg.elements].index(input.name))
                         break
                 else:
+                    breakpoint()
                     raise Exception("Failed to locate input")
                 if isinstance(input, Table) and input in self.references and cone in self.references[input]:
                     self.references[input].remove(cone)
@@ -597,10 +584,9 @@ class Node:
                     )
                 # Write out
                 stream_add(Store(src    =src_reg.index,
-                                mask   =(1 << tgt_idx),
-                                slot   =(tgt_slot // 2),
-                                address=tgt_row,
-                                offset =Store.offset.INVERSE))
+                                 mask   =(1 << tgt_idx),
+                                 address=tgt_row,
+                                 slot   =Store.slot.INVERSE))
 
         logging.debug("# Inserting port state updates")
 
@@ -644,32 +630,27 @@ class Node:
             for (row, slot), entries in mem_locs.items():
                 # Load from the memory location
                 stream_add(Load(tgt    =0,
-                                slot   =(slot // 2),
-                                address=row,
-                                # TODO: Is this right?
-                                offset =Load.offset.INVERSE))
+                                slot   =Load.slot.INVERSE,
+                                address=row))
                 # Shuffle bits to match expected order
-                stream_add(Shuffle(src=0,
-                                   tgt=0,
-                                   mux=[entries.get(x, 0) for x in range(8)]))
+                if any((x != y) for x, y in entries.items()):
+                    stream_add(Shuffle(src=0,
+                                       tgt=0,
+                                       mux=[entries.get(x, 0) for x in range(8)]))
                 # Accumulate using memory masking
                 stream_add(Store(src    =0,
                                  mask   =sum((1 << x) for x in entries.keys()),
-                                 slot   =0,
-                                 address=1023,
-                                 offset =Store.offset.SET_LOW))
+                                 slot   =Store.slot.LOWER,
+                                 address=2047))
             # Read back the value and send it
             stream_add(Load(tgt    =0,
-                            slot   =0,
-                            address=1023,
-                            offset =Store.offset.SET_LOW))
-            stream_add(Send(src     =0,
-                            node_row=15,
-                            node_col=0,
-                            slot    =0,
-                            address =port_offset + idx_map,
-                            offset  =0,
-                            trig    =0))
+                            slot   =Load.slot.LOWER,
+                            address=2047))
+            stream_add(Send(src    =0,
+                            row    =15,
+                            column =0,
+                            slot   =Send.slot.LOWER,
+                            address=port_offset + idx_map))
 
         logging.debug("# Inserting node-to-node updates")
 
@@ -681,11 +662,7 @@ class Node:
         # Append a branch to wait for the next trigger
         logging.debug("# Inserting loop point")
         stream_add(Label("loop"))
-        stream_add(Branch(pc=0,
-                        offset=Branch.offset.INVERSE,
-                        idle=1,
-                        mark=1,
-                        comparison=Branch.comparison.WAIT))
+        stream_add(Wait(pc0=1, idle=1))
 
         # Instruction stats
         logging.info("=" * 80)

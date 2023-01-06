@@ -1,3 +1,17 @@
+# Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from collections import defaultdict
 from typing import Any, Dict, Iterable
 
@@ -6,11 +20,11 @@ from nxisa import Instance, Load, Shuffle, Store, Send, Label, Pick
 def node_to_node(node    : Any,
                  mapping : Dict[str, Any]) -> Iterable[Instance]:
     # Allocate memory to accumulate messages
-    next_ptr = 127, 3
+    next_ptr = 127, 1
     def allocate():
         nonlocal next_ptr
         curr_row, curr_slot = next_ptr
-        next_ptr = (curr_row - 1, 3) if curr_slot == 0 else (curr_row, curr_slot - 1)
+        next_ptr = (curr_row - 1, 1) if curr_slot == 0 else (curr_row, curr_slot - 1)
         return curr_row, curr_slot
     pointers = defaultdict(allocate)
     selections = defaultdict(lambda: defaultdict(list))
@@ -30,9 +44,8 @@ def node_to_node(node    : Any,
     for (l_row, l_slot), targets in selections.items():
         # Load data from memory
         yield Load(tgt    =0,
-                   slot   =(l_slot // 2),
                    address=l_row,
-                   offset =Load.offset.INVERSE,
+                   slot   =Load.slot.INVERSE,
                    comment=f"Load data from 0x{l_row:x} slot {l_slot}")
         # For each target, perform pick or shuffle+store
         for (a_row, a_slot), bits in targets.items():
@@ -41,32 +54,20 @@ def node_to_node(node    : Any,
             pick_msb = not set(mapping.keys()).difference({4,5,6,7})
             if pick_lsb:
                 mask = sum((1 << x) for x in mapping.keys())
-                yield Pick(src          =0,
-                           short_address=(a_row % 64),
-                           slot         =(a_slot // 2),
-                           offset       =[Store.offset.SET_LOW, Store.offset.SET_HIGH][a_slot % 2],
-                           upper        =0,
-                           p0           =mapping.get(0, 0),
-                           p1           =mapping.get(1, 0),
-                           p2_0         =(mapping.get(2, 0) & 0x1),
-                           p2_2_1       =((mapping.get(2, 0) >> 1) & 0x3),
-                           p3           =mapping.get(3, 0),
-                           mask_2_0     =(mask & 0x7),
-                           mask_3       =((mask >> 3) & 0x1))
+                yield Pick(src        =0,
+                           address_6_0=(a_row % 64),
+                           slot       =[Pick.slot.LOWER, Pick.slot.UPPER][a_slot],
+                           upper      =0,
+                           mux        =[mapping.get(x, 0) for x in range(4)],
+                           mask       =mask)
             elif pick_msb:
                 mask = sum((1 << x) for x in mapping.keys())
-                yield Pick(src          =0,
-                           short_address=(a_row % 64),
-                           slot         =(a_slot // 2),
-                           offset       =[Store.offset.SET_LOW, Store.offset.SET_HIGH][a_slot % 2],
-                           upper        =1,
-                           p0           =mapping.get(4, 0),
-                           p1           =mapping.get(5, 0),
-                           p2_0         =(mapping.get(6, 0) & 0x1),
-                           p2_2_1       =((mapping.get(6, 0) >> 1) & 0x3),
-                           p3           =mapping.get(7, 0),
-                           mask_2_0     =((mask >> 4) & 0x7),
-                           mask_3       =((mask >> 7) & 0x1))
+                yield Pick(src        =0,
+                           address_6_0=(a_row % 64),
+                           slot       =[Pick.slot.LOWER, Pick.slot.UPPER][a_slot],
+                           upper      =1,
+                           mux        =[mapping.get(x, 0) for x in range(4, 8)],
+                           mask       =mask)
             else:
                 needs_shuffle = any((l != t) for l, t in bits)
                 if needs_shuffle:
@@ -77,9 +78,8 @@ def node_to_node(node    : Any,
                                   comment=f"Apply bit mapping {mapping}")
                 yield Store(src    =[0, 1][needs_shuffle],
                             mask   =sum((1 << t) for _, t in bits),
-                            slot   =(a_slot // 2),
                             address=a_row,
-                            offset =[Store.offset.SET_LOW, Store.offset.SET_HIGH][a_slot % 2],
+                            slot   =[Store.slot.LOWER, Store.slot.UPPER][a_slot],
                             comment="Accumulate data")
 
     # Send accumulated messages
@@ -87,14 +87,11 @@ def node_to_node(node    : Any,
         yield Label(f"node_{node_row}_{node_col}_{t_row}_{t_slot}")
         yield Load(tgt    =0,
                    address=a_row,
-                   slot   =(a_slot // 2),
-                   offset =[Store.offset.SET_LOW, Store.offset.SET_HIGH][(a_slot % 2)],
+                   slot   =[Load.slot.LOWER, Load.slot.UPPER][a_slot],
                    comment="Load accumulated state")
-        yield Send(src     =0,
-                   node_row=node_row,
-                   node_col=node_col,
-                   address =t_row,
-                   slot    =(t_slot // 2),
-                   offset  =Send.offset.INVERSE,
-                   trig    =0,
+        yield Send(src    =0,
+                   row    =node_row,
+                   column =node_col,
+                   address=t_row,
+                   slot   =Send.slot.INVERSE,
                    comment=f"Send to node {node_row}, {node_col}")
