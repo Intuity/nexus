@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .base import Label
+from .instrdef import Instance
 from .instructions import MemoryDef, WaitDef, TruthDef, PickDef, ShuffleDef
+from .utility import dump_asm, dump_hex
+
+assert all((Instance, Label, dump_asm, dump_hex))
 
 # Create instruction objects
 Memory  = MemoryDef()
@@ -36,14 +41,14 @@ def Load(address, slot, tgt, comment=""):
                   src         =0,
                   comment     =comment)
 
-def Store(src, address, slot, comment=""):
+def Store(src, address, slot, mask, comment=""):
     return Memory(slot        =slot,
                   address_6_0 =(address & 0x7F),
                   address_10_7=((address >> 7) & 0x0F),
                   mode        =Memory.mode.STORE,
                   tgt         =0,
-                  send_row    =0,
-                  send_col    =0,
+                  send_row    =((mask >> 4) & 0x0F),
+                  send_col    =((mask     ) & 0x0F),
                   src         =src,
                   comment     =comment)
 
@@ -57,3 +62,7 @@ def Send(src, row, column, address, slot, comment=""):
                   send_col    =column,
                   src         =src,
                   comment     =comment)
+
+Load.slot  = Memory.slot
+Store.slot = Memory.slot
+Send.slot  = Memory.slot

@@ -61,11 +61,12 @@ class InstructionDef:
         """ Encode fields of an operation into an integer value """
         encoded = self.opcode.op_value << self.opcode.lsb
         for key, value in fields.items():
+            f_def = self.fields[key]
             if isinstance(value, list):
                 for field, entry in zip(self.fields[key], value):
-                    encoded |= (entry & field.mask) << field.lsb
+                    encoded |= (f_def[0].decode(entry) & field.mask) << field.lsb
             else:
-                encoded |= (value & self.fields[key].mask) << self.fields[key].lsb
+                encoded |= (f_def.decode(value) & self.fields[key].mask) << self.fields[key].lsb
         return encoded
 
     @classmethod
@@ -144,7 +145,7 @@ class Instance:
                 raise Exception(f"Mismatching field type for '{key}' expected: {exp}, got: {got}")
             # Apply value encoding to the instruction
             if isinstance(value, list):
-                self.fields[key] = list(map(instr.fields[key].encode, value))
+                self.fields[key] = list(map(instr.fields[key][0].encode, value))
             else:
                 self.fields[key] = instr.fields[key].encode(value)
 

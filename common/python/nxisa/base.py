@@ -44,6 +44,10 @@ class Field:
         """ Apply encoding mapping to value """
         return self.mapping.get(value, value)
 
+    def decode(self, value):
+        """ Apply decoding mapping to value """
+        return self.values.get(value, value)
+
     def extract(self, value : int) -> int:
         """ Extract the value of the field from a fully encoded instruction """
         return (value >> self.lsb) & self.mask
