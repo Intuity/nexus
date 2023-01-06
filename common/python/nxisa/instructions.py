@@ -1,0 +1,92 @@
+# Copyright 2021, Peter Birch, mailto:peter@lightlogic.co.uk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from .base import Reserved
+from .fields import (OpCode, Address_10_7, Address_6_0, Offset, MemoryMode,
+                     Source, Target, SendRow, SendColumn, Mux, Mask, Flag,
+                     Table)
+from .instrdef import InstructionDef
+
+
+class MemoryDef(InstructionDef):
+    """ Perform load/store to local memory, or send to a remote node's memory """
+
+    def __init__(self) -> None:
+        super().__init__(OpCode("MEMORY"),
+                         Offset(),
+                         Address_6_0(),
+                         MemoryMode(),
+                         Target(),
+                         Address_10_7(),
+                         SendRow(),
+                         SendColumn(),
+                         Source("src_a"))
+
+
+class WaitDef(InstructionDef):
+    """ Stall execution and wait for the next trigger pulse """
+
+    def __init__(self) -> None:
+        super().__init__(OpCode("WAIT"),
+                         Flag("pc0"),
+                         Flag("idle"),
+                         Reserved(27))
+
+
+class TruthDef(InstructionDef):
+    """ Evaluate a 3 input truth table """
+
+    def __init__(self) -> None:
+        super().__init__(OpCode("TRUTH"),
+                         Table(),
+                         Source("src_c"),
+                         Reserved(3),
+                         Source("src_b"),
+                         Mux("mux_2"),
+                         Mux("mux_1"),
+                         Mux("mux_0"),
+                         Source("src_a"))
+
+
+class PickDef(InstructionDef):
+    """ Pick 3 bits from a register and store to a (short) memory address """
+
+    def __init__(self) -> None:
+        super().__init__(OpCode("PICK"),
+                         Offset(),
+                         Address_6_0(),
+                         Flag("upper"),
+                         Mask(),
+                         Mux("mux_3"),
+                         Mux("mux_2"),
+                         Mux("mux_1"),
+                         Mux("mux_0"),
+                         Source("src_a"))
+
+
+class ShuffleDef(InstructionDef):
+    """ Rearrange the 8 bits of a register into an arbitrary order """
+
+    def __init__(self) -> None:
+        super().__init__(OpCode("SHUFFLE"),
+                         Mux("mux_7"),
+                         Mux("mux_6"),
+                         Mux("mux_5"),
+                         Mux("mux_4"),
+                         Target(),
+                         Mux("mux_3"),
+                         Mux("mux_2"),
+                         Mux("mux_1"),
+                         Mux("mux_0"),
+                         Source("src_a"))

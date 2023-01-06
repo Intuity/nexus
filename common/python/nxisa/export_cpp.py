@@ -18,9 +18,9 @@ import nxisa
 
 # Extract field positions
 fields = {}
-for instr in nxisa.InstructionDef.ALL.values():
+for instr in nxisa.instrdef.InstructionDef.ALL.values():
     for field in [instr.opcode] + instr.all_fields:
-        if isinstance(field, nxisa.Reserved):
+        if isinstance(field, nxisa.base.Reserved):
             continue
         lsb, msb = fields.get(field.name, (None, None))
         if lsb is None or field.lsb < lsb:
@@ -37,15 +37,21 @@ with open(sys.argv[1], "w", encoding="utf-8") as fh:
     fh.write("\n")
     fh.write("    // Operation encoding\n")
     fh.write("    typedef enum {\n")
-    for idx, (key, val) in enumerate(nxisa.OpCode().values.items()):
+    for idx, (key, val) in enumerate(nxisa.fields.OpCode().values.items()):
         fh.write(f"        {',' if idx else ' '} OP_{key.upper()} = {val}\n")
     fh.write("    } opcode_t;\n")
     fh.write("\n")
     fh.write("    // Offset encoding\n")
     fh.write("    typedef enum {\n")
-    for idx, (key, val) in enumerate(nxisa.Offset().values.items()):
+    for idx, (key, val) in enumerate(nxisa.fields.Offset().values.items()):
         fh.write(f"        {',' if idx else ' '} OFFSET_{key.upper()} = {val}\n")
     fh.write("    } offset_t;\n")
+    fh.write("\n")
+    fh.write("    // Memory mode encoding\n")
+    fh.write("    typedef enum {\n")
+    for idx, (key, val) in enumerate(nxisa.fields.MemoryMode().values.items()):
+        fh.write(f"        {',' if idx else ' '} MEM_{key.upper()} = {val}\n")
+    fh.write("    } mem_mode_t;\n")
     fh.write("\n")
     fh.write("    // Field positions\n")
     for key, (lsb, msb) in fields.items():

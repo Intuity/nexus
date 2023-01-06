@@ -36,6 +36,9 @@ PACKTYPE_RENDER += html
 PACKTYPE_OPTS += $(addprefix --render ,$(PACKTYPE_RENDER))
 PACKTYPE_OPTS += $(if $(findstring yes,$(DEBUG)),--debug,)
 
+# Extend path
+export PYTHONPATH := $(PYTHONPATH):$(abspath python)
+
 # ==============================================================================
 # Rules
 # ==============================================================================
@@ -45,9 +48,9 @@ $(WORKING_DIR)/%.d: $(PACKTYPE_SPEC_DIR)/%.py | $(WORKING_DIR)
 	$(PACKTYPE) $< $(WORKING_DIR) $(PACKTYPE_OPTS)
 	$(PREFIX)touch $@
 
-$(WORKING_DIR)/nxisa.hpp: python/nxisa.py python/nxisa_cpp.py | $(WORKING_DIR)
+$(WORKING_DIR)/nxisa.hpp: $(wildcard python/nxisa/*.py) | $(WORKING_DIR)
 	@echo "# Generating NXISA definitions"
-	$(PREFIX)python3 python/nxisa_cpp.py $@
+	$(PREFIX)python3 -m nxisa.export_cpp $@
 
 .PHONY: generate
 generate: $(addprefix $(WORKING_DIR)/,$(patsubst %.py,%.d,$(notdir $(PACKTYPE_SPECS)))) $(WORKING_DIR)/nxisa.hpp
