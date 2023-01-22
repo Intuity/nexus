@@ -15,150 +15,34 @@
 `include "nx_common.svh"
 
 // nx_node_core
-// Evaluates instruction sequence against input values and internal register
-// state to produce outputs
+// Execution core of each node that evaluates the instruction sequence
 //
 module nx_node_core
 import NXConstants::*;
 #(
-      parameter INPUTS     = 32
-    , parameter OUTPUTS    = 32
-    , parameter REGISTERS  = 16
-    , parameter RAM_ADDR_W = 10
-    , parameter RAM_DATA_W = 32
+      localparam RAM_ADDR_W = 10
+    , localparam RAM_DATA_W = 32
+    , localparam RAM_STRB_W =  4
 ) (
-      input  logic                        i_clk
-    , input  logic                        i_rst
-    // I/O from simulated logic
-    , input  logic [ INPUTS-1:0]          i_inputs
-    , output logic [OUTPUTS-1:0]          o_outputs
-    // Execution controls
-    , input  logic [NODE_PARAM_WIDTH-1:0] i_populated
-    , input  logic                        i_trigger
-    , output logic                        o_idle
-    // Instruction fetch
-    , output logic [RAM_ADDR_W-1:0]       o_instr_addr
-    , output logic                        o_instr_rd_en
-    , input  logic [RAM_DATA_W-1:0]       i_instr_rd_data
-    , input  logic                        i_instr_stall
+      input  logic                  i_clk
+    , input  logic                  i_rst
+    // Control signals
+    , output logic                  o_idle
+    , input  logic                  i_trigger
+    // Instruction RAM
+    , output logic [RAM_ADDR_W-1:0] o_inst_addr
+    , output logic                  o_inst_rd_en
+    , input  logic [RAM_DATA_W-1:0] i_inst_rd_data
+    // Data RAM
+    , output logic [RAM_ADDR_W-1:0] o_data_addr
+    , output logic [RAM_DATA_W-1:0] o_data_wr_data
+    , output logic [RAM_STRB_W-1:0] o_data_wr_strb
+    , output logic                  o_data_rd_en
+    , input  logic [RAM_DATA_W-1:0] i_data_rd_data
+    // Outbound messages
+    , input  node_message_t         o_send_data
+    , input  logic                  o_send_valid
+    , output logic                  i_send_ready
 );
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-localparam OUTPUT_IDX_W = $clog2(OUTPUTS);
-localparam REG_IDX_W    = $clog2(REGISTERS);
-
-// =============================================================================
-// Internal signals and state
-// =============================================================================
-
-// Pipeline state
-`DECLARE_DQ(1, fetch_active, i_clk, i_rst, 'd0)
-`DECLARE_DQ(1, delay_active, i_clk, i_rst, 'd0)
-`DECLARE_DQ(1, exec_active,  i_clk, i_rst, 'd0)
-
-// Fetch state
-`DECLARE_DQ(RAM_ADDR_W, pc,           i_clk, i_rst, 'd0)
-`DECLARE_DQ(1,          held_trigger, i_clk, i_rst, 'd0)
-
-logic start_fetch;
-
-// Execute state
-instruction_t decoded;
-logic         exec_run, exec_output, result;
-logic [2:0]   table_index;
-
-`DECLARE_DQ(REGISTERS,     working,     i_clk, i_rst, {REGISTERS{1'b0}})
-`DECLARE_DQ(OUTPUTS,       outputs,     i_clk, i_rst, {OUTPUTS{1'b0}})
-`DECLARE_DQ(MAX_IOR_WIDTH, output_idx,  i_clk, i_rst, {OUTPUT_IDX_W{1'b0}})
-
-// =============================================================================
-// Determine idleness
-// =============================================================================
-
-assign o_idle = !fetch_active_q && !delay_active_q && !exec_active_q && !held_trigger_q;
-
-// =============================================================================
-// Fetch handling
-// =============================================================================
-
-// Postpone a trigger arriving during active execution
-assign held_trigger = (i_trigger || held_trigger_q) && fetch_active_q;
-
-// Start fetch from idle if a trigger is presented (or one was postponed)
-assign start_fetch = !fetch_active_q && (held_trigger_q || i_trigger);
-
-// Track fetch state
-assign fetch_active = (start_fetch || fetch_active_q) && (pc_q != i_populated[RAM_ADDR_W-1:0]);
-
-// Increment PC when active and not stalled
-assign pc = fetch_active ? (i_instr_stall ? pc_q : (pc_q + 'd1)) : 'd0;
-
-// Drive outputs
-assign o_instr_addr  = pc_q;
-assign o_instr_rd_en = fetch_active;
-
-// =============================================================================
-// Fetch delay
-// =============================================================================
-
-// Compensate for the pipelining of the RAM
-assign delay_active = fetch_active_q;
-
-// =============================================================================
-// Execution
-// =============================================================================
-
-// Pipeline state from fetch
-assign exec_active = delay_active_q;
-
-// Determine if execute is active
-assign exec_run = exec_active && !i_instr_stall;
-
-// Decode the instruction
-assign decoded = i_instr_rd_data[$bits(instruction_t)-1:0];
-
-// Mux the correct input values
-assign table_index = {
-    (decoded.src_a_ip ? i_inputs[decoded.src_a] : working_q[decoded.src_a[REG_IDX_W-1:0]]),
-    (decoded.src_b_ip ? i_inputs[decoded.src_b] : working_q[decoded.src_b[REG_IDX_W-1:0]]),
-    (decoded.src_c_ip ? i_inputs[decoded.src_c] : working_q[decoded.src_c[REG_IDX_W-1:0]])
-};
-
-// Lookup result in the truth table
-assign result = |((decoded.truth >> table_index) & 'd1);
-
-// Update the working registers
-generate
-for (genvar idx = 0; idx < REGISTERS; idx++) begin : gen_working_reg
-    assign working[idx] = (
-        (exec_run && decoded.tgt_reg[REG_IDX_W-1:0] == idx)
-            ? result : working_q[idx]
-    );
-end
-endgenerate
-
-// Determine if an output should be generated
-assign exec_output = exec_run && decoded.gen_out;
-
-// Update the output vector if required
-generate
-for (genvar idx = 0; idx < OUTPUTS; idx++) begin : gen_output
-    assign outputs[idx] = (
-        (exec_output && output_idx_q == idx) ? result : outputs_q[idx]
-    );
-end
-endgenerate
-
-// Increment the output index whenever an output is generated, reset to zero
-// when execution goes idle
-assign output_idx =  exec_output ? (output_idx_q + 'd1) : (
-                    !exec_active ? 'd0
-                                 : output_idx_q);
-
-// Drive outputs
-assign o_outputs = outputs_q;
 
 endmodule : nx_node_core

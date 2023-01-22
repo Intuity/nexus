@@ -15,129 +15,71 @@
 `include "nx_common.svh"
 
 // nx_node_decoder
-// Decode messages and maintain the state of inputs to the node, this includes
-// configuration parameters and the loopback mask.
+// A single node with messages interfaces in each cardinal direction
 //
 module nx_node_decoder
-import NXConstants::*;
+import NXConstants::*,
+       nx_primitives::ROUND_ROBIN;
 #(
-      parameter INPUTS     = 32
-    , parameter RAM_ADDR_W = 10
-    , parameter RAM_DATA_W = 32
+      localparam RAM_ADDR_W = 10
+    , localparam RAM_DATA_W = 32
+    , localparam RAM_STRB_W =  4
 ) (
-      input  logic                        i_clk
-    , input  logic                        i_rst
+      input  logic                          i_clk
+    , input  logic                          i_rst
     // Control signals
-    , output logic                        o_idle
-    // Inbound message stream
-    , input  node_message_t               i_msg_data
-    , input  logic                        i_msg_valid
-    , output logic                        o_msg_ready
-    // Write interface to node's memory (driven by node_load_t)
-    , output logic [RAM_ADDR_W-1:0]       o_ram_addr
-    , output logic [RAM_DATA_W-1:0]       o_ram_wr_data
-    , output logic                        o_ram_wr_en
-    // Input signal state (driven by node_signal_t)
-    , output logic [$clog2(INPUTS)-1:0]   o_input_index
-    , output logic                        o_input_value
-    , output logic                        o_input_is_seq
-    , output logic                        o_input_update
-    // Control parameters (driven by node_control_t)
-    , output logic [NODE_PARAM_WIDTH-1:0] o_num_instr
-    , output logic [INPUTS-1:0]           o_loopback_mask
-    , output logic                        o_trace_en
+    , input  node_id_t                      i_node_id
+    , output logic                          o_idle
+    // Inbound interfaces
+    , input  logic [3:0][MESSAGE_WIDTH-1:0] i_inbound_data
+    , input  logic [3:0]                    i_inbound_valid
+    , output logic [3:0]                    o_inbound_ready
+    // Bypass interface
+    , input  node_message_t                 o_bypass_data
+    , input  logic                          o_bypass_valid
+    , output logic                          i_bypass_ready
+    // Instruction RAM
+    , output logic [RAM_ADDR_W-1:0]         o_inst_addr
+    , output logic [RAM_DATA_W-1:0]         o_inst_wr_data
+    , output logic [RAM_STRB_W-1:0]         o_inst_wr_strb
+    // Data RAM
+    , output logic [RAM_ADDR_W-1:0]         o_data_addr
+    , output logic [RAM_DATA_W-1:0]         o_data_wr_data
+    , output logic [RAM_STRB_W-1:0]         o_data_wr_strb
 );
 
 // =============================================================================
-// Internal signals and state
+// Signals
 // =============================================================================
 
-// Message type decode
-logic is_msg_load, is_msg_signal, is_msg_control;
-
-// Node memory loading
-`DECLARE_DQ(RAM_ADDR_W,     load_address, i_clk, i_rst, 'd0)
-`DECLARE_DQ(LOAD_SEG_WIDTH, load_segment, i_clk, i_rst, 'd0)
-
-// Control parameters
-logic is_ctrl_instr, is_ctrl_lb, is_ctrl_trace;
-`DECLARE_DQ(NODE_PARAM_WIDTH, ctrl_num_instr, i_clk, i_rst, 'd0)
-`DECLARE_DQ(INPUTS,           ctrl_lb_mask,   i_clk, i_rst, 'd0)
-`DECLARE_DQ(1,                ctrl_trace_en,  i_clk, i_rst, 'd0)
+// Inbound stream arbiter
+node_message_t arb_data;
+logic          arb_valid, arb_ready, arb_match;
 
 // =============================================================================
-// Control signals
+// Inbound Arbiter
 // =============================================================================
 
-// Idle unless a valid signal is presented
-assign o_idle = !i_msg_valid;
-
-// Tie ready permanently high (messages always consumed in a single cycle)
-assign o_msg_ready = 'b1;
-
-// =============================================================================
-// Identify message type
-// =============================================================================
-
-assign is_msg_load    = i_msg_valid && o_msg_ready && (i_msg_data.raw.header.command == NODE_COMMAND_LOAD    );
-assign is_msg_signal  = i_msg_valid && o_msg_ready && (i_msg_data.raw.header.command == NODE_COMMAND_SIGNAL  );
-assign is_msg_control = i_msg_valid && o_msg_ready && (i_msg_data.raw.header.command == NODE_COMMAND_CONTROL );
-
-// =============================================================================
-// Load command handling
-// =============================================================================
-
-// Construct the output (only write on the 'last' load)
-assign o_ram_addr    = load_address_q;
-assign o_ram_wr_data = { load_segment_q, i_msg_data.load.data };
-assign o_ram_wr_en   = is_msg_load && i_msg_data.load.last;
-
-// Increment the address whenever a write is made
-assign load_address = load_address_q + (o_ram_wr_en ? 'd1 : 'd0);
-
-// Clear out the held data whenever a write occurs, else pickup the new value
-assign load_segment = o_ram_wr_en ? 'd0 :
-                      is_msg_load ? i_msg_data.load.data
-                                  : load_segment_q;
-
-// =============================================================================
-// Signal state handling
-// =============================================================================
-
-// Expose to the control block
-assign o_input_index  = i_msg_data.signal.index[$clog2(INPUTS)-1:0];
-assign o_input_value  = i_msg_data.signal.state;
-assign o_input_is_seq = i_msg_data.signal.is_seq;
-assign o_input_update = is_msg_signal;
-
-// =============================================================================
-// Control parameters
-// =============================================================================
-
-// Detect different control writes
-assign is_ctrl_instr = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_INSTRUCTIONS);
-assign is_ctrl_lb    = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_LOOPBACK    );
-assign is_ctrl_trace = (is_msg_control && i_msg_data.control.param == NODE_PARAMETER_TRACE       );
-
-// Update held instruction count
-assign ctrl_num_instr = (
-    is_ctrl_instr ? i_msg_data.control.value : ctrl_num_instr_q
+nx_stream_arbiter #(
+      .STREAMS          ( 4               )
+    , .SCHEME           ( ROUND_ROBIN     )
+) u_arbiter (
+      .i_clk            ( i_clk           )
+    , .i_rst            ( i_rst           )
+    // Inbound message streams
+    , .i_inbound_data   ( i_inbound_data  )
+    , .i_inbound_valid  ( i_inbound_valid )
+    , .o_inbound_ready  ( o_inbound_ready )
+    // Outbound stream
+    , .o_outbound_data  ( arb_data        )
+    , .o_outbound_valid ( arb_valid       )
+    , .i_outbound_ready ( arb_ready       )
 );
 
-// Update loopback mask
-assign ctrl_lb_mask = (
-    is_ctrl_lb ? { ctrl_lb_mask_q[(INPUTS-NODE_PARAM_WIDTH)-1:0], i_msg_data.control.value }
-               : ctrl_lb_mask_q
+// Detect if the arbitrated stream targets this node
+assign arb_match = (
+    (arb_data.raw.header.row    == i_node_id.row   ) &&
+    (arb_data.raw.header.column == i_node_id.column)
 );
-
-// Update trace enable
-assign ctrl_trace_en = (
-    is_ctrl_trace ? i_msg_data.control.value[0] : ctrl_trace_en_q
-);
-
-// Expose parameters to the control block
-assign o_num_instr     = ctrl_num_instr_q;
-assign o_loopback_mask = ctrl_lb_mask_q;
-assign o_trace_en      = ctrl_trace_en_q;
 
 endmodule : nx_node_decoder

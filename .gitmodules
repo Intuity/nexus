@@ -28,3 +28,6 @@
 [submodule "common/thirdparty/plog"]
 	path = common/thirdparty/plog
 	url = https://github.com/SergiusTheBest/plog.git
+[submodule "common/thirdparty/forastero"]
+	path = common/thirdparty/forastero
+	url = git@github.com:Intuity/forastero.git

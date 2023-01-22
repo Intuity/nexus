@@ -15,21 +15,12 @@
 `include "nx_common.svh"
 
 // nx_node
-// A single logic node with inbound and outbound message interfaces, ready to be
-// tiled into a grid
+// A single node with messages interfaces in each cardinal direction
 //
 module nx_node
 import NXConstants::*,
-       nx_primitives::ROUND_ROBIN,
        nx_primitives::ORDINAL;
-#(
-      parameter INPUTS     = 32
-    , parameter OUTPUTS    = 32
-    , parameter REGISTERS  = 16
-    , parameter RAM_ADDR_W = 10
-    , parameter RAM_DATA_W = 32
-    , parameter EXT_INPUTS =  0
-) (
+(
       input  logic                          i_clk
     , input  logic                          i_rst
     // Control signals
@@ -47,25 +38,22 @@ import NXConstants::*,
     , output logic [3:0]                    o_outbound_valid
     , input  logic [3:0]                    i_outbound_ready
     , input  logic [3:0]                    i_outbound_present
-    // External inputs
-    , input  logic                          i_ext_inputs_en
-    , input  logic [INPUTS-1:0]             i_ext_inputs
 );
 
+localparam RAM_ADDR_W = 10;
+localparam RAM_DATA_W = 32;
+localparam RAM_STRB_W =  4;
+
 // =============================================================================
-// Signals & State
+// Signals
 // =============================================================================
 
-// Idle and trigger signal chaining
-`DECLARE_DQ(1, idle,    i_clk, i_rst, 'd0)
-`DECLARE_DQ(1, trigger, i_clk, i_rst, 'd0)
-
-// Idle control
-logic idle_core, idle_dcd, idle_ctrl, idle_dist;
-
-// Inbound stream arbiter
-node_message_t arb_data;
-logic          arb_valid, arb_ready, arb_match;
+// Instruction and data RAMs
+logic [RAM_ADDR_W-1:0] inst_addr_a, inst_addr_b, data_addr_a, data_addr_b;
+logic [RAM_DATA_W-1:0] inst_wr_data_a, inst_rd_data_b,
+                       data_wr_data_a, data_wr_data_b, data_rd_data_b;
+logic [RAM_STRB_W-1:0] inst_wr_strb_a, data_wr_strb_a, data_wr_strb_b;
+logic                  inst_rd_en_b, data_rd_en_b;
 
 // Stream combiner
 // NOTE: Not using node_message_t is a workaround for Icarus Verilog
@@ -77,86 +65,96 @@ node_message_t outbound_data;
 logic          outbound_valid, outbound_ready;
 direction_t    outbound_dir;
 
-// Message decoder
-logic                        dcd_valid, dcd_ready;
-logic [RAM_ADDR_W-1:0]       dcd_wr_addr;
-logic [RAM_DATA_W-1:0]       dcd_wr_data;
-logic                        dcd_wr_en;
-logic [$clog2(INPUTS)-1:0]   dcd_input_index;
-logic                        dcd_input_value, dcd_input_is_seq, dcd_input_update;
-logic [NODE_PARAM_WIDTH-1:0] dcd_num_instr;
-logic [INPUTS-1:0]           dcd_loopback_mask;
-logic                        dcd_trace_en;
+// Idle signals
+logic decd_idle, dist_idle, core_idle;
 
-// Controller
-logic [RAM_ADDR_W-1:0] ctrl_rd_addr;
-logic [RAM_DATA_W-1:0] ctrl_rd_data;
-logic                  ctrl_rd_en;
-
-// Logic core
-logic [INPUTS-1:0]     core_inputs;
-logic [OUTPUTS-1:0]    core_outputs;
-logic                  core_trigger;
-logic [RAM_ADDR_W-1:0] core_rd_addr;
-logic [RAM_DATA_W-1:0] core_rd_data;
-logic                  core_rd_en, core_rd_stall;
+// Core
+node_message_t send_data;
+logic          send_valid, send_ready;
 
 // =============================================================================
-// Trigger and Idle Chaining
+// Instruction RAM
 // =============================================================================
 
-// Determine local idleness
-assign idle = (
-    (&{ idle_core, idle_dcd, idle_ctrl, idle_dist }) && !dcd_valid && !(|comb_valid)
+nx_ram #(
+      .ADDRESS_WIDTH ( RAM_ADDR_W )
+    , .DATA_WIDTH    ( RAM_DATA_W )
+    , .BYTE_WR_EN_A  ( 1          )
+    , .BYTE_WR_EN_B  ( 1          )
+    , .REGISTER_A_RD ( 1          )
+    , .REGISTER_B_RD ( 1          )
+) u_inst_ram (
+      .i_clk_a     ( i_clk             )
+    , .i_rst_a     ( i_rst             )
+    , .i_addr_a    ( inst_addr_a       )
+    , .i_wr_data_a ( inst_wr_data_a    )
+    , .i_wr_en_a   ( inst_wr_strb_a    )
+    , .i_en_a      ( (|inst_wr_strb_a) )
+    , .o_rd_data_a (                   )
+      .i_clk_b     ( i_clk             )
+    , .i_rst_b     ( i_rst             )
+    , .i_addr_b    ( inst_addr_b       )
+    , .i_wr_data_b ( RAM_DATA_W'd0     )
+    , .i_wr_en_b   ( RAM_STRB_W'd0     )
+    , .i_en_b      ( inst_rd_en_b      )
+    , .o_rd_data_b ( inst_rd_data_b    )
 );
 
-// Chain idle signal through the node
-assign o_idle = idle_q && i_idle;
-
-// Chain trigger signal
-assign trigger   = i_trigger;
-assign o_trigger = trigger_q;
-
 // =============================================================================
-// Inbound Stream Arbiter
+// Data RAM
 // =============================================================================
 
-nx_stream_arbiter #(
-      .STREAMS          ( 4               )
-    , .SCHEME           ( ROUND_ROBIN     )
-) u_arbiter (
-      .i_clk            ( i_clk           )
-    , .i_rst            ( i_rst           )
-    // Inbound message streams
-    , .i_inbound_data   ( i_inbound_data  )
-    , .i_inbound_valid  ( i_inbound_valid )
-    , .o_inbound_ready  ( o_inbound_ready )
-    // Outbound stream
-    , .o_outbound_data  ( arb_data        )
-    , .o_outbound_valid ( arb_valid       )
-    , .i_outbound_ready ( arb_ready       )
+nx_ram #(
+      .ADDRESS_WIDTH ( RAM_ADDR_W )
+    , .DATA_WIDTH    ( RAM_DATA_W )
+    , .BYTE_WR_EN_A  ( 1          )
+    , .BYTE_WR_EN_B  ( 1          )
+    , .REGISTER_A_RD ( 1          )
+    , .REGISTER_B_RD ( 1          )
+) u_data_ram (
+      .i_clk_a     ( i_clk                             )
+    , .i_rst_a     ( i_rst                             )
+    , .i_addr_a    ( data_addr_a                       )
+    , .i_wr_data_a ( data_wr_data_a                    )
+    , .i_wr_en_a   ( data_wr_strb_a                    )
+    , .i_en_a      ( (|data_wr_strb_a)                 )
+    , .o_rd_data_a (                                   )
+      .i_clk_b     ( i_clk                             )
+    , .i_rst_b     ( i_rst                             )
+    , .i_addr_b    ( data_addr_b                       )
+    , .i_wr_data_b ( data_wr_data_b                    )
+    , .i_wr_en_b   ( data_wr_strb_b                    )
+    , .i_en_b      ( (|data_wr_strb_b) || data_rd_en_b )
+    , .o_rd_data_b ( data_rd_data_b                    )
 );
 
-// Link arbitrated data up to the combiner's bypass port
-assign comb_data[0] = arb_data;
+// =============================================================================
+// Messaging
+// =============================================================================
 
-// Detect if the arbitrated stream targets this node
-assign arb_match = (
-    (arb_data.raw.header.row     == i_node_id.row     ) &&
-    (arb_data.raw.header.column  == i_node_id.column  ) &&
-    (arb_data.raw.header.command != NODE_COMMAND_TRACE)
+nx_node_decoder u_decoder (
+      .i_clk           ( i_clk           )
+    , .i_rst           ( i_rst           )
+    // Control signals
+    , .i_node_id       ( i_node_id       )
+    , .o_idle          ( decd_idle       )
+    // Inbound interfaces
+    , .i_inbound_data  ( i_inbound_data  )
+    , .i_inbound_valid ( i_inbound_valid )
+    , .o_inbound_ready ( o_inbound_ready )
+    // Bypass interface
+    , .o_bypass_data   ( comb_data[0]    )
+    , .o_bypass_valid  ( comb_valid[0]   )
+    , .i_bypass_ready  ( comb_ready[0]   )
+    // Instruction RAM
+    , .o_inst_addr     ( inst_addr_a     )
+    , .o_inst_wr_data  ( inst_wr_data_a  )
+    , .o_inst_wr_strb  ( inst_wr_strb_a  )
+    // Data RAM
+    , .o_data_addr     ( data_addr_a     )
+    , .o_data_wr_data  ( data_wr_data_a  )
+    , .o_data_wr_strb  ( data_wr_strb_a  )
 );
-
-// Discern decode from bypass traffic
-assign dcd_valid     = arb_valid &&  arb_match;
-assign comb_valid[0] = arb_valid && !arb_match;
-
-// Qualify the ready signal
-assign arb_ready = (dcd_ready && arb_match) || (comb_ready[0] && !arb_match);
-
-// =============================================================================
-// Internal Stream Combiner
-// =============================================================================
 
 nx_stream_arbiter #(
       .STREAMS          ( 2              )
@@ -174,188 +172,47 @@ nx_stream_arbiter #(
     , .i_outbound_ready ( outbound_ready )
 );
 
-// =============================================================================
-// Distributor
-// =============================================================================
-
-// Determine target direction based on several factors:
-//  - TRACE messages are always routed to the south (or west if absent)
-//  - Target row & column set the initial direction
-//  - If a particular direction is absent, routes to the next clockwise stream
-//  - Route horizontally (east-west) first, route vertically as a lower priority
-//
-always_comb begin : comb_outbound_dir
-    logic is_trc, lt_row, gt_row, lt_col, gt_col;
-    is_trc = (outbound_data.raw.header.command == NODE_COMMAND_TRACE);
-    lt_row = (outbound_data.raw.header.row      < i_node_id.row     );
-    gt_row = (outbound_data.raw.header.row      > i_node_id.row     );
-    lt_col = (outbound_data.raw.header.column   < i_node_id.column  );
-    gt_col = (outbound_data.raw.header.column   > i_node_id.column  );
-    casez ({ lt_row, gt_row, lt_col, gt_col, is_trc, i_outbound_present })
-        // Route TRACE messages south:
-        // <R    >R    <C    >C   TRC   PRSNT
-        { 1'b?, 1'b?, 1'b?, 1'b?, 1'b1, 4'b?1?? }: outbound_dir = DIRECTION_SOUTH;
-        { 1'b?, 1'b?, 1'b?, 1'b?, 1'b1, 4'b?0?? }: outbound_dir = DIRECTION_WEST;
-        // Route horizontally:
-        // <R    >R    <C    >C   TRC   PRSNT
-        { 1'b?, 1'b?, 1'b1, 1'b0, 1'b0, 4'b1??? }: outbound_dir = DIRECTION_WEST;
-        { 1'b?, 1'b?, 1'b1, 1'b0, 1'b0, 4'b0??? }: outbound_dir = DIRECTION_NORTH;
-        { 1'b?, 1'b?, 1'b0, 1'b1, 1'b0, 4'b??1? }: outbound_dir = DIRECTION_EAST;
-        { 1'b?, 1'b?, 1'b0, 1'b1, 1'b0, 4'b??0? }: outbound_dir = DIRECTION_SOUTH;
-        // Route vertically:
-        // <R    >R    <C    >C   TRC   PRSNT
-        { 1'b1, 1'b0, 1'b0, 1'b0, 1'b0, 4'b???1 }: outbound_dir = DIRECTION_NORTH;
-        { 1'b1, 1'b0, 1'b0, 1'b0, 1'b0, 4'b???0 }: outbound_dir = DIRECTION_EAST;
-        { 1'b0, 1'b1, 1'b0, 1'b0, 1'b0, 4'b?1?? }: outbound_dir = DIRECTION_SOUTH;
-        { 1'b0, 1'b1, 1'b0, 1'b0, 1'b0, 4'b?0?? }: outbound_dir = DIRECTION_WEST;
-        default: outbound_dir = DIRECTION_NORTH;
-    endcase
-end
-
-nx_stream_distributor #(
-      .STREAMS          ( 4                )
-) u_distributor (
-      .i_clk            ( i_clk            )
-    , .i_rst            ( i_rst            )
-    // Idle flag
-    , .o_idle           ( idle_dist        )
-    // Inbound message stream
-    , .i_inbound_dir    ( outbound_dir     )
-    , .i_inbound_data   ( outbound_data    )
-    , .i_inbound_valid  ( outbound_valid   )
-    , .o_inbound_ready  ( outbound_ready   )
-    // Outbound message streams
-    , .o_outbound_data  ( o_outbound_data  )
-    , .o_outbound_valid ( o_outbound_valid )
-    , .i_outbound_ready ( i_outbound_ready )
-);
-
-// =============================================================================
-// Decoder
-// =============================================================================
-
-nx_node_decoder #(
-      .INPUTS          ( INPUTS            )
-    , .RAM_ADDR_W      ( RAM_ADDR_W        )
-    , .RAM_DATA_W      ( RAM_DATA_W        )
-) u_decoder (
-      .i_clk           ( i_clk             )
-    , .i_rst           ( i_rst             )
+nx_node_distributor u_distributor (
+      .i_clk              ( i_clk              )
+    , .i_rst              ( i_rst              )
     // Control signals
-    , .o_idle          ( idle_dcd          )
-    // Inbound message stream
-    , .i_msg_data      ( comb_data[0]      )
-    , .i_msg_valid     ( dcd_valid         )
-    , .o_msg_ready     ( dcd_ready         )
-    // Write interface to node's memory (driven by node_load_t)
-    , .o_ram_addr      ( dcd_wr_addr       )
-    , .o_ram_wr_data   ( dcd_wr_data       )
-    , .o_ram_wr_en     ( dcd_wr_en         )
-    // Input signal state (driven by node_signal_t)
-    , .o_input_index   ( dcd_input_index   )
-    , .o_input_value   ( dcd_input_value   )
-    , .o_input_is_seq  ( dcd_input_is_seq  )
-    , .o_input_update  ( dcd_input_update  )
-    // Control parameters (driven by node_control_t)
-    , .o_num_instr     ( dcd_num_instr     )
-    , .o_loopback_mask ( dcd_loopback_mask )
-    , .o_trace_en      ( dcd_trace_en      )
+    , .i_node_id          ( i_node_id          )
+    , .o_idle             ( dist_idle          )
+    // Message to send
+    , .i_outbound_data    ( outbound_data      )
+    , .i_outbound_valid   ( outbound_valid     )
+    , .o_outbound_ready   ( outbound_ready     )
+    // Outbound interfaces
+    , .o_external_data    ( o_outbound_data    )
+    , .o_external_valid   ( o_outbound_valid   )
+    , .i_external_ready   ( i_outbound_ready   )
+    , .i_external_present ( i_outbound_present )
 );
 
 // =============================================================================
-// Control
+// Execution Core
 // =============================================================================
 
-nx_node_control #(
-      .INPUTS          ( INPUTS            )
-    , .OUTPUTS         ( OUTPUTS           )
-    , .RAM_ADDR_W      ( RAM_ADDR_W        )
-    , .RAM_DATA_W      ( RAM_DATA_W        )
-    , .EXT_INPUTS      ( EXT_INPUTS        )
-) u_control (
-      .i_clk           ( i_clk             )
-    , .i_rst           ( i_rst             )
+nx_node_core u_core (
+      .i_clk          ( i_clk          )
+    , .i_rst          ( i_rst          )
     // Control signals
-    , .i_node_id       ( i_node_id         )
-    , .i_trace_en      ( dcd_trace_en      )
-    , .i_trigger       ( i_trigger         )
-    , .o_idle          ( idle_ctrl         )
-    // Inputs from decoder
-    , .i_loopback_mask ( dcd_loopback_mask )
-    , .i_input_index   ( dcd_input_index   )
-    , .i_input_value   ( dcd_input_value   )
-    , .i_input_is_seq  ( dcd_input_is_seq  )
-    , .i_input_update  ( dcd_input_update  )
-    , .i_num_instr     ( dcd_num_instr     )
-    // Output message stream
-    , .o_msg_data      ( comb_data[1]      )
-    , .o_msg_valid     ( comb_valid[1]     )
-    , .i_msg_ready     ( comb_ready[1]     )
-    // Interface to store
-    , .o_ram_addr      ( ctrl_rd_addr      )
-    , .o_ram_rd_en     ( ctrl_rd_en        )
-    , .i_ram_rd_data   ( ctrl_rd_data      )
-    // Interface to logic core
-    , .o_core_trigger  ( core_trigger      )
-    , .i_core_idle     ( idle_core         )
-    , .o_core_inputs   ( core_inputs       )
-    , .i_core_outputs  ( core_outputs      )
-    // External inputs
-    , .i_ext_inputs_en ( i_ext_inputs_en   )
-    , .i_ext_inputs    ( i_ext_inputs      )
-);
-
-// =============================================================================
-// Data Store
-// =============================================================================
-
-nx_node_store #(
-      .RAM_ADDR_W    ( RAM_ADDR_W    )
-    , .RAM_DATA_W    ( RAM_DATA_W    )
-    , .REGISTER_A_RD ( 1             )
-    , .REGISTER_B_RD ( 0             )
-) u_store (
-      .i_clk         ( i_clk         )
-    , .i_rst         ( i_rst         )
-    // Write port
-    , .i_wr_addr     ( dcd_wr_addr   )
-    , .i_wr_data     ( dcd_wr_data   )
-    , .i_wr_en       ( dcd_wr_en     )
-    // Read ports
-    // - A
-    , .i_a_rd_addr   ( core_rd_addr  )
-    , .i_a_rd_en     ( core_rd_en    )
-    , .o_a_rd_data   ( core_rd_data  )
-    , .o_a_rd_stall  ( core_rd_stall )
-    // - B
-    , .i_b_rd_addr   ( ctrl_rd_addr  )
-    , .i_b_rd_en     ( ctrl_rd_en    )
-    , .o_b_rd_data   ( ctrl_rd_data  )
-);
-
-// =============================================================================
-// Logic Core
-// =============================================================================
-
-nx_node_core #(
-      .INPUTS          ( INPUTS         )
-    , .OUTPUTS         ( OUTPUTS        )
-    , .REGISTERS       ( REGISTERS      )
-) u_core (
-      .i_clk           ( i_clk          )
-    , .i_rst           ( i_rst          )
-    // I/O from simulated logic
-    , .i_inputs        ( core_inputs    )
-    , .o_outputs       ( core_outputs   )
-    // Execution controls
-    , .i_populated     ( dcd_num_instr  )
-    , .i_trigger       ( core_trigger   )
-    , .o_idle          ( idle_core      )
-    // Instruction fetch
-    , .o_instr_addr    ( core_rd_addr   )
-    , .o_instr_rd_en   ( core_rd_en     )
-    , .i_instr_rd_data ( core_rd_data   )
-    , .i_instr_stall   ( core_rd_stall  )
+    , .o_idle         ( core_idle      )
+    , .i_trigger      ( i_trigger      )
+    // Instruction RAM
+    , .o_inst_addr    ( inst_addr_b    )
+    , .o_inst_rd_en   ( inst_rd_en_b   )
+    , .i_inst_rd_data ( inst_rd_data_b )
+    // Data RAM
+    , .o_data_addr    ( data_addr_b    )
+    , .o_data_wr_data ( data_wr_data_b )
+    , .o_data_wr_strb ( data_wr_strb_b )
+    , .o_data_rd_en   ( data_rd_en_b   )
+    , .i_data_rd_data ( data_rd_data_b )
+    // Outbound messages
+    , .o_send_data    ( send_data      )
+    , .o_send_valid   ( send_valid     )
+    , .i_send_ready   ( send_ready     )
 );
 
 endmodule : nx_node
