@@ -12,62 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import randint
-
-from cocotb_bus.monitors import Monitor
-from cocotb.triggers import RisingEdge, ClockCycles
+from cocotb.triggers import RisingEdge
 from cocotb.utils import get_sim_time
 
-from nxconstants import Direction
-
+from forastero import BaseMonitor
 from .common import StreamTransaction
 
-class StreamResponder(Monitor):
+class StreamResponder(BaseMonitor):
     """ Testbench driver acting as a responder to a stream interface """
-
-    def __init__(
-        self, entity, clock, reset, intf, delays=True, name="StreamResponder",
-        probability=0.5,
-    ):
-        """ Initialise the StreamResponder instance.
-
-        Args:
-            entity     : Pointer to the testbench/DUT
-            clock      : Clock signal for the interface
-            reset      : Reset signal for the interface
-            intf       : Interface
-            delays     : Enable randomised backpressure (defaults to True)
-            name       : Optional name of the driver (defaults to StreamResponder)
-            probability: Probability of delay
-        """
-        self.name        = name
-        self.entity      = entity
-        self.clock       = clock
-        self.reset       = reset
-        self.intf        = intf
-        self.delays      = delays
-        self.probability = probability
-        super().__init__()
 
     async def _monitor_recv(self):
         """ Capture stream events and randomise the ready signal """
+        # Wait for a cycle
+        await RisingEdge(self.clock)
+        # Loop forever
         while True:
             # Wait for the next clock edge
-            await RisingEdge(self.clock)
-            # Clear interface on reset
             if self.reset == 1:
-                self.intf.ready <= 1
+                self.intf.set("ready", 1)
+                await RisingEdge(self.clock)
                 continue
             # Capture a request
-            if self.intf.valid == 1 and self.intf.ready == 1:
+            if self.intf.get("valid") and self.intf.get("ready", 1):
                 self._recv(StreamTransaction(
+                    timestamp=get_sim_time(units="ns"),
                     data     =int(self.intf.data),
                     last     =(self.intf.get("last", 0) == 1),
-                    direction=Direction(self.intf.get("dir", 0)),
-                    timestamp=get_sim_time(units="ns"),
                 ))
-            # Generate random backpressure
-            if self.delays and randint(0, 99) < int(100 * self.probability):
-                self.intf.ready <= 0
-                await ClockCycles(self.clock, randint(1, 10))
-                self.intf.ready <= 1
+            # Wait for the next cycle
+            await RisingEdge(self.clock)

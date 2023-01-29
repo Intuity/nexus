@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import IntEnum
-
-from ..io_common import BaseIO
+from forastero import BaseIO
 
 class StreamIO(BaseIO):
     """ Message stream interface between nodes """
@@ -27,6 +25,8 @@ class StreamIO(BaseIO):
             name: Name of the signal - acts as a prefix
             role: Role of this signal on the DUT boundary
         """
-        super().__init__(
-            dut, name, role, ["data", "last", "valid", "dir"], ["ready"]
-        )
+        super().__init__(dut,
+                         name,
+                         role,
+                         ["data", "last", "valid"],
+                         ["ready"])

@@ -14,11 +14,9 @@
 
 from dataclasses import dataclass, field
 
-from nxconstants import Direction
-
 @dataclass
 class StreamTransaction:
-    data      : int       = 0
-    last      : bool      = False
-    direction : Direction = Direction.NORTH
-    timestamp : int       = field(default=0, compare=False)
+    """ Captures data transferred through Nexus stream interface """
+    timestamp : int  = field(default=0, compare=False)
+    data      : int  = 0
+    last      : bool = False

@@ -81,7 +81,7 @@ logic [REG_WIDTH-1:0] src_a, src_b, src_c;
 logic [REG_WIDTH-1:0] muxsel;
 
 // Memory
-`DECLARE_DQ(        1, rd_pend,        i_clk, i_rst, 'd1)
+`DECLARE_DQ(        1, rd_pend,        i_clk, i_rst, 'd0)
 `DECLARE_DQ(REG_IDX_W, rd_pend_target, i_clk, i_rst, 'd0)
 `DECLARE_DQ(        2, rd_pend_slot,   i_clk, i_rst, 'd0)
 
@@ -137,8 +137,8 @@ assign is_pause   = (!pause_q) && (instruction.memory.op == NXISA::OP_PAUSE );
 assign is_memory  = (!pause_q) && (instruction.memory.op == NXISA::OP_MEMORY);
 assign is_truth   = (!pause_q) && (instruction.memory.op == NXISA::OP_TRUTH );
 assign is_pick    = (!pause_q) && (instruction.memory.op == NXISA::OP_PICK  );
-assign is_shuffle = (!pause_q) && (instruction.memory.op inside { NXISA::OP_SHUFFLE,
-                                                                  NXISA::OP_SHUFFLE_ALT });
+assign is_shuffle = (!pause_q) && ((instruction.memory.op == NXISA::OP_SHUFFLE) ||
+                                   (instruction.memory.op == NXISA::OP_SHUFFLE_ALT));
 assign is_load    = is_memory && (instruction.memory.mode == NXISA::MEM_LOAD );
 assign is_store   = is_memory && (instruction.memory.mode == NXISA::MEM_STORE);
 assign is_send    = is_memory && (instruction.memory.mode == NXISA::MEM_SEND );
