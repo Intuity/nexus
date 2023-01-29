@@ -42,7 +42,6 @@ import NXConstants::*,
 
 localparam RAM_ADDR_W = 10;
 localparam RAM_DATA_W = 32;
-localparam RAM_STRB_W =  4;
 
 // =============================================================================
 // Signals
@@ -52,7 +51,7 @@ localparam RAM_STRB_W =  4;
 logic [RAM_ADDR_W-1:0] inst_addr_a, inst_addr_b, data_addr_a, data_addr_b;
 logic [RAM_DATA_W-1:0] inst_wr_data_a, inst_rd_data_b,
                        data_wr_data_a, data_wr_data_b, data_rd_data_b;
-logic [RAM_STRB_W-1:0] inst_wr_strb_a, data_wr_strb_a, data_wr_strb_b;
+logic [RAM_DATA_W-1:0] inst_wr_strb_a, data_wr_strb_a, data_wr_strb_b;
 logic                  inst_rd_en_b, data_rd_en_b;
 
 // Stream combiner
@@ -63,14 +62,12 @@ logic [1:0]                    comb_valid, comb_ready;
 // Outbound stream distributor
 node_message_t outbound_data;
 logic          outbound_valid, outbound_ready;
-direction_t    outbound_dir;
 
 // Idle signals
 logic decd_idle, dist_idle, core_idle;
 
-// Core
-node_message_t send_data;
-logic          send_valid, send_ready;
+// Slot
+logic slot;
 
 // =============================================================================
 // Instruction RAM
@@ -79,8 +76,8 @@ logic          send_valid, send_ready;
 nx_ram #(
       .ADDRESS_WIDTH ( RAM_ADDR_W )
     , .DATA_WIDTH    ( RAM_DATA_W )
-    , .BYTE_WR_EN_A  ( 1          )
-    , .BYTE_WR_EN_B  ( 1          )
+    , .BIT_WR_EN_A   ( 1          )
+    , .BIT_WR_EN_B   ( 1          )
     , .REGISTER_A_RD ( 1          )
     , .REGISTER_B_RD ( 1          )
 ) u_inst_ram (
@@ -91,11 +88,11 @@ nx_ram #(
     , .i_wr_en_a   ( inst_wr_strb_a    )
     , .i_en_a      ( (|inst_wr_strb_a) )
     , .o_rd_data_a (                   )
-      .i_clk_b     ( i_clk             )
+    , .i_clk_b     ( i_clk             )
     , .i_rst_b     ( i_rst             )
     , .i_addr_b    ( inst_addr_b       )
-    , .i_wr_data_b ( RAM_DATA_W'd0     )
-    , .i_wr_en_b   ( RAM_STRB_W'd0     )
+    , .i_wr_data_b ( RAM_DATA_W'(0)    )
+    , .i_wr_en_b   ( RAM_DATA_W'(0)    )
     , .i_en_b      ( inst_rd_en_b      )
     , .o_rd_data_b ( inst_rd_data_b    )
 );
@@ -107,8 +104,8 @@ nx_ram #(
 nx_ram #(
       .ADDRESS_WIDTH ( RAM_ADDR_W )
     , .DATA_WIDTH    ( RAM_DATA_W )
-    , .BYTE_WR_EN_A  ( 1          )
-    , .BYTE_WR_EN_B  ( 1          )
+    , .BIT_WR_EN_A   ( 1          )
+    , .BIT_WR_EN_B   ( 1          )
     , .REGISTER_A_RD ( 1          )
     , .REGISTER_B_RD ( 1          )
 ) u_data_ram (
@@ -119,7 +116,7 @@ nx_ram #(
     , .i_wr_en_a   ( data_wr_strb_a                    )
     , .i_en_a      ( (|data_wr_strb_a)                 )
     , .o_rd_data_a (                                   )
-      .i_clk_b     ( i_clk                             )
+    , .i_clk_b     ( i_clk                             )
     , .i_rst_b     ( i_rst                             )
     , .i_addr_b    ( data_addr_b                       )
     , .i_wr_data_b ( data_wr_data_b                    )
@@ -138,6 +135,7 @@ nx_node_decoder u_decoder (
     // Control signals
     , .i_node_id       ( i_node_id       )
     , .o_idle          ( decd_idle       )
+    , .i_slot          ( slot            )
     // Inbound interfaces
     , .i_inbound_data  ( i_inbound_data  )
     , .i_inbound_valid ( i_inbound_valid )
@@ -199,6 +197,7 @@ nx_node_core u_core (
     // Control signals
     , .o_idle         ( core_idle      )
     , .i_trigger      ( i_trigger      )
+    , .o_slot         ( slot           )
     // Instruction RAM
     , .o_inst_addr    ( inst_addr_b    )
     , .o_inst_rd_en   ( inst_rd_en_b   )
@@ -210,9 +209,16 @@ nx_node_core u_core (
     , .o_data_rd_en   ( data_rd_en_b   )
     , .i_data_rd_data ( data_rd_data_b )
     // Outbound messages
-    , .o_send_data    ( send_data      )
-    , .o_send_valid   ( send_valid     )
-    , .i_send_ready   ( send_ready     )
+    , .o_send_data    ( comb_data[1]   )
+    , .o_send_valid   ( comb_valid[1]  )
+    , .i_send_ready   ( comb_ready[1]  )
 );
+
+// =============================================================================
+// Idle & Trigger
+// =============================================================================
+
+assign o_idle    = &{i_idle, decd_idle, dist_idle, core_idle};
+assign o_trigger = i_trigger;
 
 endmodule : nx_node

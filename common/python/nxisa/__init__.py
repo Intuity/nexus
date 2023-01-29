@@ -14,20 +14,20 @@
 
 from .base import Label
 from .instrdef import Instance
-from .instructions import MemoryDef, WaitDef, TruthDef, PickDef, ShuffleDef
+from .instructions import MemoryDef, PauseDef, TruthDef, PickDef, ShuffleDef
 from .utility import dump_asm, dump_hex
 
 assert all((Instance, Label, dump_asm, dump_hex))
 
 # Create instruction objects
 Memory  = MemoryDef()
-Wait    = WaitDef()
+Pause   = PauseDef()
 Truth   = TruthDef()
 Pick    = PickDef()
 Shuffle = ShuffleDef()
 
 # Lint guard
-assert all((Memory, Wait, Truth, Pick, Shuffle))
+assert all((Memory, Pause, Truth, Pick, Shuffle))
 
 # Pseudo-encodings
 def Load(address, slot, tgt, comment=""):

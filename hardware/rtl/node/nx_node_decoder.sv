@@ -23,29 +23,29 @@ import NXConstants::*,
 #(
       localparam RAM_ADDR_W = 10
     , localparam RAM_DATA_W = 32
-    , localparam RAM_STRB_W =  4
 ) (
       input  logic                          i_clk
     , input  logic                          i_rst
     // Control signals
     , input  node_id_t                      i_node_id
     , output logic                          o_idle
+    , input  logic                          i_slot
     // Inbound interfaces
     , input  logic [3:0][MESSAGE_WIDTH-1:0] i_inbound_data
     , input  logic [3:0]                    i_inbound_valid
     , output logic [3:0]                    o_inbound_ready
     // Bypass interface
-    , input  node_message_t                 o_bypass_data
-    , input  logic                          o_bypass_valid
-    , output logic                          i_bypass_ready
+    , output node_message_t                 o_bypass_data
+    , output logic                          o_bypass_valid
+    , input  logic                          i_bypass_ready
     // Instruction RAM
     , output logic [RAM_ADDR_W-1:0]         o_inst_addr
     , output logic [RAM_DATA_W-1:0]         o_inst_wr_data
-    , output logic [RAM_STRB_W-1:0]         o_inst_wr_strb
+    , output logic [RAM_DATA_W-1:0]         o_inst_wr_strb
     // Data RAM
     , output logic [RAM_ADDR_W-1:0]         o_data_addr
     , output logic [RAM_DATA_W-1:0]         o_data_wr_data
-    , output logic [RAM_STRB_W-1:0]         o_data_wr_strb
+    , output logic [RAM_DATA_W-1:0]         o_data_wr_strb
 );
 
 // =============================================================================
@@ -55,6 +55,15 @@ import NXConstants::*,
 // Inbound stream arbiter
 node_message_t arb_data;
 logic          arb_valid, arb_ready, arb_match;
+
+// Decode
+logic is_msg_load, is_msg_signal;
+
+// =============================================================================
+// Idle
+// =============================================================================
+
+assign o_idle = !(|i_inbound_valid);
 
 // =============================================================================
 // Inbound Arbiter
@@ -78,8 +87,43 @@ nx_stream_arbiter #(
 
 // Detect if the arbitrated stream targets this node
 assign arb_match = (
-    (arb_data.raw.header.row    == i_node_id.row   ) &&
-    (arb_data.raw.header.column == i_node_id.column)
+    (arb_data.raw.header.target.row    == i_node_id.row   ) &&
+    (arb_data.raw.header.target.column == i_node_id.column)
 );
+
+// Qualify bypass if not matched
+assign o_bypass_data   = arb_data;
+assign o_bypass_valid  = arb_valid && !arb_match;
+assign arb_ready       = arb_match || i_bypass_ready;
+
+// =============================================================================
+// Decoding
+// =============================================================================
+
+// Detect the type of message
+assign is_msg_load   = arb_match && (arb_data.raw.header.command == NODE_COMMAND_LOAD  );
+assign is_msg_signal = arb_match && (arb_data.raw.header.command == NODE_COMMAND_SIGNAL);
+
+// Instruction RAM interface
+assign o_inst_addr    = arb_data.load.address[10:1];
+assign o_inst_wr_data = {4{arb_data.load.data}};
+assign o_inst_wr_strb = (
+    {24'd0, {8{is_msg_load}}} << {arb_data.load.address[0], arb_data.load.slot, 3'd0}
+);
+
+// Data RAM interface
+assign o_data_addr    = arb_data.signal.address[10:1];
+assign o_data_wr_data = {4{arb_data.signal.data}};
+
+always_comb begin : comb_data_slot
+    logic slot;
+    case (arb_data.signal.slot)
+        MEMORY_SLOT_PRESERVE: slot =  i_slot;
+        MEMORY_SLOT_INVERSE : slot = ~i_slot;
+        MEMORY_SLOT_UPPER   : slot = 1'b1;
+        MEMORY_SLOT_LOWER   : slot = 1'b0;
+    endcase
+    o_data_wr_strb = {24'd0, {8{is_msg_signal}}} << {arb_data.signal.address[0], slot, 3'd0};
+end
 
 endmodule : nx_node_decoder

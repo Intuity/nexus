@@ -45,11 +45,11 @@ direction_t outbound_dir;
 //
 always_comb begin : comb_outbound_dir
     logic lt_row, gt_row, lt_col, gt_col;
-    lt_row = (i_outbound_data.raw.header.row    < i_node_id.row   );
-    gt_row = (i_outbound_data.raw.header.row    > i_node_id.row   );
-    lt_col = (i_outbound_data.raw.header.column < i_node_id.column);
-    gt_col = (i_outbound_data.raw.header.column > i_node_id.column);
-    casez ({ lt_row, gt_row, lt_col, gt_col, i_outbound_present })
+    lt_row = (i_outbound_data.raw.header.target.row    < i_node_id.row   );
+    gt_row = (i_outbound_data.raw.header.target.row    > i_node_id.row   );
+    lt_col = (i_outbound_data.raw.header.target.column < i_node_id.column);
+    gt_col = (i_outbound_data.raw.header.target.column > i_node_id.column);
+    casez ({ lt_row, gt_row, lt_col, gt_col, i_external_present })
         // Route horizontally:
         // <R    >R    <C    >C   PRSNT
         { 1'b?, 1'b?, 1'b1, 1'b0, 4'b1??? }: outbound_dir = DIRECTION_WEST;

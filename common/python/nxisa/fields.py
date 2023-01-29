@@ -20,9 +20,9 @@ class OpCode(Field):
     shortened to 2-bits wide for SHUFFLE.
     """
 
-    def __init__(self, op : str = "WAIT") -> None:
+    def __init__(self, op : str = "PAUSE") -> None:
         super().__init__("op", 3, {
-                            "WAIT"       : 0,
+                            "PAUSE"      : 0,
                             "MEMORY"     : 1,
                             "TRUTH"      : 2,
                             "PICK"       : 3,
@@ -140,8 +140,8 @@ class Flag(Control):
         super().__init__(name, 1)
 
 
-class Table(Field):
+class Truth(Field):
     """ Encoded 3 input truth table (8-bit wide) """
 
     def __init__(self) -> None:
-        super().__init__("table", 8)
+        super().__init__("truth", 8)

@@ -15,7 +15,7 @@
 from .base import Reserved
 from .fields import (OpCode, Address_10_7, Address_6_0, Slot, MemoryMode,
                      Source, Target, SendRow, SendColumn, Mux, Mask, Flag,
-                     Table)
+                     Truth)
 from .instrdef import InstructionDef
 
 
@@ -34,11 +34,11 @@ class MemoryDef(InstructionDef):
                          Slot())
 
 
-class WaitDef(InstructionDef):
+class PauseDef(InstructionDef):
     """ Stall execution and wait for the next trigger pulse """
 
     def __init__(self) -> None:
-        super().__init__(OpCode("WAIT"),
+        super().__init__(OpCode("PAUSE"),
                          Reserved(27),
                          Flag("idle"),
                          Flag("pc0"))
@@ -56,7 +56,7 @@ class TruthDef(InstructionDef):
                          Source("src_b"),
                          Reserved(3),
                          Source("src_c"),
-                         Table())
+                         Truth())
 
 
 class PickDef(InstructionDef):

@@ -21,10 +21,10 @@ module nx_ram #(
     , parameter DEPTH         = 1024
     , parameter REGISTER_A_RD = 0
     , parameter REGISTER_B_RD = 0
-    , parameter BYTE_WR_EN_A  = 0
-    , parameter BYTE_WR_EN_B  = 0
-    , parameter WSTRB_A_WIDTH = (BYTE_WR_EN_A ? (DATA_WIDTH / 8) : 1)
-    , parameter WSTRB_B_WIDTH = (BYTE_WR_EN_B ? (DATA_WIDTH / 8) : 1)
+    , parameter BIT_WR_EN_A   = 0
+    , parameter BIT_WR_EN_B   = 0
+    , parameter WSTRB_A_WIDTH = (BIT_WR_EN_A ? DATA_WIDTH : 1)
+    , parameter WSTRB_B_WIDTH = (BIT_WR_EN_B ? DATA_WIDTH : 1)
 ) (
     // Port A
       input  logic                     i_clk_a
@@ -45,30 +45,24 @@ module nx_ram #(
 );
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-localparam FULL_WSTRB_WIDTH = (DATA_WIDTH / 8);
-
-// =============================================================================
 // Resolve Write Strobes
 // =============================================================================
 
-logic [FULL_WSTRB_WIDTH-1:0] wstrb_a, wstrb_b;
+logic [DATA_WIDTH-1:0] wstrb_a, wstrb_b;
 
 generate
-if (BYTE_WR_EN_A) begin
+if (BIT_WR_EN_A) begin
     assign wstrb_a = i_wr_en_a;
 end else begin
-    assign wstrb_a = {FULL_WSTRB_WIDTH{i_wr_en_a}};
+    assign wstrb_a = {DATA_WIDTH{i_wr_en_a}};
 end
 endgenerate
 
 generate
-if (BYTE_WR_EN_B) begin
+if (BIT_WR_EN_B) begin
     assign wstrb_b = i_wr_en_b;
 end else begin
-    assign wstrb_b = {FULL_WSTRB_WIDTH{i_wr_en_b}};
+    assign wstrb_b = {DATA_WIDTH{i_wr_en_b}};
 end
 endgenerate
 
@@ -83,16 +77,6 @@ reg [DATA_WIDTH-1:0] memory [DEPTH-1:0];
 logic [DATA_WIDTH-1:0] rd_a_data_q, rd_a_data_dly_q;
 logic [DATA_WIDTH-1:0] rd_b_data_q, rd_b_data_dly_q;
 
-// Create bitwise masks
-logic [DATA_WIDTH-1:0] wmask_a, wmask_b;
-
-generate
-for (genvar idx = 0; idx < (DATA_WIDTH / 8); idx++) begin : gen_wmask
-    assign wmask_a[(idx*8)+:8] = {8{wstrb_a[idx]}};
-    assign wmask_b[(idx*8)+:8] = {8{wstrb_b[idx]}};
-end
-endgenerate
-
 // Optional pipelining of output
 assign o_rd_data_a = REGISTER_A_RD ? rd_a_data_dly_q : rd_a_data_q;
 assign o_rd_data_b = REGISTER_B_RD ? rd_b_data_dly_q : rd_b_data_q;
@@ -106,8 +90,8 @@ always_ff @(posedge i_clk_a, posedge i_rst_a) begin : ff_read_a
         if (i_en_a) begin
             if (|i_wr_en_a) begin
                 memory[i_addr_a] <= (
-                    (i_wr_data_a      &  wmask_a) |
-                    (memory[i_addr_a] & ~wmask_a)
+                    (i_wr_data_a      &  wstrb_a) |
+                    (memory[i_addr_a] & ~wstrb_a)
                 );
             end else begin
                 rd_a_data_q <= memory[i_addr_a];
@@ -125,8 +109,8 @@ always_ff @(posedge i_clk_b, posedge i_rst_b) begin : ff_read_b
         if (i_en_b) begin
             if (|i_wr_en_b) begin
                 memory[i_addr_b] <= (
-                    (i_wr_data_b      &  wmask_b) |
-                    (memory[i_addr_b] & ~wmask_b)
+                    (i_wr_data_b      &  wstrb_b) |
+                    (memory[i_addr_b] & ~wstrb_b)
                 );
             end else begin
                 rd_b_data_q <= memory[i_addr_b];

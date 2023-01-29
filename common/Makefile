@@ -49,11 +49,15 @@ $(WORKING_DIR)/%.d: $(PACKTYPE_SPEC_DIR)/%.py | $(WORKING_DIR)
 	$(PREFIX)touch $@
 
 $(WORKING_DIR)/nxisa.hpp: $(wildcard python/nxisa/*.py) | $(WORKING_DIR)
-	@echo "# Generating NXISA definitions"
+	@echo "# Generating NXISA C++ definitions"
 	$(PREFIX)python3 -m nxisa.export_cpp $@
 
+$(WORKING_DIR)/NXISA.sv: $(wildcard python/nxisa/*.py) | $(WORKING_DIR)
+	@echo "# Generating NXISA SV definitions"
+	$(PREFIX)python3 -m nxisa.export_sv $@
+
 .PHONY: generate
-generate: $(addprefix $(WORKING_DIR)/,$(patsubst %.py,%.d,$(notdir $(PACKTYPE_SPECS)))) $(WORKING_DIR)/nxisa.hpp
+generate: $(addprefix $(WORKING_DIR)/,$(patsubst %.py,%.d,$(notdir $(PACKTYPE_SPECS)))) $(WORKING_DIR)/nxisa.hpp $(WORKING_DIR)/NXISA.sv
 
 .PHONY: setup_surelog
 setup_surelog:

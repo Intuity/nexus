@@ -147,11 +147,12 @@ class NodeRaw:
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
 class NodeLoad:
     """ Load data into a node's instruction memory """
-    header  : NodeHeader(desc="Header carrying row, column, and command")
-    address : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Row to write into")
-    slot    : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH, desc="Slot selection")
-    data    : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH,
-                     desc ="Data to write into memory")
+    header   : NodeHeader(desc="Header carrying row, column, and command")
+    address  : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH, desc="Row to write into")
+    slot     : Scalar(width=NXConstants.NODE_MEM_SLOT_SEL_WIDTH, desc="Slot selection")
+    reserved : Scalar(width=1, desc="Reserved field")
+    data     : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH,
+                      desc ="Data to write into memory")
 
 @packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
 class NodeSignal:
