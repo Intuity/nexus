@@ -29,4 +29,4 @@ class StreamIO(BaseIO):
                          name,
                          role,
                          ["data", "last", "valid"],
-                         ["ready"])
+                         ["ready", "present"])

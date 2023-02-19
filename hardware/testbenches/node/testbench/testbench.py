@@ -34,10 +34,6 @@ class Testbench(BaseBench):
                                        output=self.dut.o_trigger)
         self.idle    = SimpleNamespace(input =self.dut.i_idle,
                                        output=self.dut.o_idle)
-        self.present = [self.dut.i_ob_north_present,
-                        self.dut.i_ob_east_present,
-                        self.dut.i_ob_south_present,
-                        self.dut.i_ob_west_present]
         # Register message interface initiator & responder drivers
         for dirx in ("north", "east", "south", "west"):
             self.register_driver(f"ib_{dirx}",
@@ -46,14 +42,14 @@ class Testbench(BaseBench):
                                                  self.rst,
                                                  StreamIO(self.dut,
                                                           f"ib_{dirx}",
-                                                          IORole.INITIATOR)))
+                                                          IORole.RESPONDER)))
             self.register_monitor(f"ob_{dirx}",
                                   StreamResponder(self,
                                                   self.clk,
                                                   self.rst,
                                                   StreamIO(self.dut,
                                                            f"ob_{dirx}",
-                                                           IORole.RESPONDER)))
+                                                           IORole.INITIATOR)))
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
@@ -61,6 +57,3 @@ class Testbench(BaseBench):
         self.node_id.value       = 0
         self.idle.input.value    = 1
         self.trigger.input.value = 0
-        for init in self.inbound : init.intf.initialise(IORole.INITIATOR)
-        for resp in self.outbound: resp.intf.initialise(IORole.RESPONDER)
-        for flag in self.present : flag.value = 1
