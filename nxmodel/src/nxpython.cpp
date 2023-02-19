@@ -92,7 +92,7 @@ PYBIND11_MODULE(nxmodel, m) {
         .def("step",     &NXMesh::step    );
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
-        .def(py::init<node_id_t>())
+        .def(py::init<uint8_t, uint8_t, bool>())
         .def("reset",                 &NXNode::reset                )
         .def("attach",                &NXNode::attach               )
         .def("get_pipe",              &NXNode::get_pipe             )

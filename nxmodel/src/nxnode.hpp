@@ -60,6 +60,12 @@ namespace NXModel {
             reset();
         }
 
+        NXNode (
+              uint8_t row
+            , uint8_t column
+            , bool    en_dump = false
+        ) : NXNode((node_id_t){ row, column }, en_dump) {}
+
         // =====================================================================
         // Public Methods
         // =====================================================================

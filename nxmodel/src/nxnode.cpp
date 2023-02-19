@@ -54,9 +54,9 @@ void NXNode::reset (void)
     m_data_memory.clear();
     // Insert a wait operation into the bottom of instruction memory
     m_inst_memory.write(0, (
-        (NXISA::OP_WAIT << NXISA::OP_LSB  ) |
-        (             1 << NXISA::PC0_LSB ) |
-        (             1 << NXISA::IDLE_LSB)
+        (NXISA::OP_PAUSE << NXISA::OP_LSB  ) |
+        (              1 << NXISA::PC0_LSB ) |
+        (              1 << NXISA::IDLE_LSB)
     ));
 }
 
@@ -308,7 +308,7 @@ bool NXNode::evaluate ( bool trigger )
                 }
                 break;
             }
-            case NXISA::OP_WAIT: {
+            case NXISA::OP_PAUSE: {
                 m_waiting   = true;
                 m_idle      = (NXISA::extract_idle(raw) != 0);
                 m_next_pc   = (NXISA::extract_pc0(raw) != 0) ? 0 : (m_pc + 1);
@@ -326,7 +326,7 @@ bool NXNode::evaluate ( bool trigger )
                 bool bit_b = (((val_b >> f_mux_1) & 1) != 0);
                 bool bit_c = (((val_c >> f_mux_2) & 1) != 0);
                 // Apply shifts to the truth table
-                uint32_t raw_table = NXISA::extract_table(raw);
+                uint32_t raw_table = NXISA::extract_truth(raw);
                 uint32_t shf_table = raw_table;
                 if (bit_a) shf_table >>= 1;
                 if (bit_b) shf_table >>= 2;
