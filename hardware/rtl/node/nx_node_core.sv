@@ -19,6 +19,7 @@
 //
 module nx_node_core
 import NXConstants::*;
+import NXISA::*;
 #(
       localparam RAM_ADDR_W = 10
     , localparam RAM_DATA_W = 32
@@ -69,12 +70,13 @@ logic stall;
 `DECLARE_DQT(pc_t, pc_execute, i_clk, i_rst, 'd0)
 
 // Decode
-NXISA::instruction_t instruction;
-logic                is_pause, is_memory, is_load, is_store, is_send, is_truth,
-                     is_pick, is_shuffle;
+instruction_t instruction;
+logic         is_pause, is_memory, is_load, is_store, is_send, is_truth,
+              is_pick, is_shuffle;
 
 // Registers
 `DECLARE_DQ_ARRAY(REG_WIDTH, REG_COUNT, regfile, i_clk, i_rst, 'd0)
+logic [REG_WIDTH-1:0] r7_result;
 logic [REG_WIDTH-1:0] reg_rd_data;
 logic [REG_WIDTH-1:0] reg_forward [REG_COUNT-1:0];
 logic [REG_WIDTH-1:0] src_a, src_b, src_c;
@@ -97,6 +99,9 @@ logic       truth_result;
 // Messages
 `DECLARE_DQT(node_message_t, send_msg, i_clk, i_rst, 'd0)
 `DECLARE_DQ (             1, send_vld, i_clk, i_rst, 'd0)
+
+node_id_t     trgt_id;
+node_header_t header;
 node_signal_t to_send;
 
 // =============================================================================
@@ -130,14 +135,14 @@ assign o_inst_rd_en = !pause;
 assign pc_execute = stall ? pc_execute_q : pc_fetch_q;
 
 // Type cast raw data onto the instruction union
-assign instruction = NXISA::instruction_t'(i_inst_rd_data);
+assign instruction = i_inst_rd_data;
 
 // Identify the operation
 assign is_pause   = (!pause_q) && (instruction.memory.op == NXISA::OP_PAUSE );
 assign is_memory  = (!pause_q) && (instruction.memory.op == NXISA::OP_MEMORY);
 assign is_truth   = (!pause_q) && (instruction.memory.op == NXISA::OP_TRUTH );
 assign is_pick    = (!pause_q) && (instruction.memory.op == NXISA::OP_PICK  );
-assign is_shuffle = (!pause_q) && ((instruction.memory.op == NXISA::OP_SHUFFLE) ||
+assign is_shuffle = (!pause_q) && ((instruction.memory.op == NXISA::OP_SHUFFLE    ) ||
                                    (instruction.memory.op == NXISA::OP_SHUFFLE_ALT));
 assign is_load    = is_memory && (instruction.memory.mode == NXISA::MEM_LOAD );
 assign is_store   = is_memory && (instruction.memory.mode == NXISA::MEM_STORE);
@@ -157,13 +162,13 @@ assign reg_rd_data = (rd_pend_slot_q == 'd3) ? i_data_rd_data[31:24] :
 assign reg_forward[REG_COUNT-1] = regfile_q[REG_COUNT-1];
 
 // R0-R6 require register forwarding
-always_comb begin : comb_forwarding
-    for (int idx = 0; idx < (REG_COUNT - 1); idx++) begin
-        reg_forward[idx] = (
-            (rd_pend_q && (rd_pend_target_q == idx[2:0])) ? reg_rd_data : regfile_q[idx]
-        );
-    end
+generate
+for (genvar idx = 0; idx < (REG_COUNT - 1); idx++) begin
+    assign reg_forward[idx] = (
+        (rd_pend_q && (rd_pend_target_q == idx[2:0])) ? reg_rd_data : regfile_q[idx]
+    );
 end
+endgenerate
 
 // Pickup the source registers (for MEMORY, TRUTH, PICK, and SHUFFLE)
 assign src_a = reg_forward[instruction.truth.src_a];
@@ -186,9 +191,12 @@ assign muxsel[7] = src_a[instruction.shuffle.mux_7];
 // =============================================================================
 
 always_comb begin : comb_reg_write
-    for (int idx = 0; idx < (REG_COUNT - 1); idx++) begin
+    for (int idx = 0; idx < REG_COUNT; idx++) begin
+        // R7 can only be updated by truth table operations
+        if (idx == 7) begin
+            regfile[idx] = r7_result;
         // SHUFFLE is the only operation which can directly write to a register
-        if (is_shuffle && (instruction.shuffle.tgt == idx[2:0])) begin
+        end else if (is_shuffle && (instruction.shuffle.tgt == idx[2:0])) begin
             regfile[idx] = muxsel;
         // LOAD operations write to registers a cycle later (RAM latency)
         end else if (rd_pend_q && (rd_pend_target_q == idx[2:0])) begin
@@ -262,22 +270,30 @@ assign truth_select[1] = src_b[instruction.truth.mux_1];
 assign truth_select[2] = src_c[instruction.truth.mux_2];
 
 // Calculate result
-assign truth_result = instruction.truth.truth[truth_select];
+always_comb begin : comb_truth
+    truth_result = (instruction.truth.truth >> truth_select) & 1'd1;
+end
 
 // Shift result into register 7
-assign regfile[7] = is_truth ? { regfile_q[7][7:1], truth_result }
-                             : regfile_q[7];
+assign r7_result = is_truth ? { regfile_q[7][7:1], truth_result } : regfile_q[7];
 
 // =============================================================================
 // Send Message
 // =============================================================================
 
-assign to_send.header.command       = NODE_COMMAND_SIGNAL;
-assign to_send.header.target.column = instruction.memory.send_col;
-assign to_send.header.target.row    = instruction.memory.send_row;
-assign to_send.address              = {addr_10_7, addr_6_0};
-assign to_send.slot                 = instruction.memory.slot;
-assign to_send.data                 = src_a;
+// Form the target ID
+assign trgt_id.row     = instruction.memory.send_row;
+assign trgt_id.column  = instruction.memory.send_col;
+
+// Form the header
+assign header.target   = trgt_id;
+assign header.command  = NODE_COMMAND_SIGNAL;
+
+// Form the message
+assign to_send.header  = header;
+assign to_send.address = {addr_10_7, addr_6_0};
+assign to_send.slot    = instruction.memory.slot;
+assign to_send.data    = src_a;
 
 assign {send_msg, send_vld} = (
     (send_vld_q && !i_send_ready) ? {send_msg_q, 1'b1   }

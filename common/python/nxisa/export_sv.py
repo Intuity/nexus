@@ -61,6 +61,8 @@ with open(sys.argv[1], "w", encoding="utf-8") as fh:
         for field in [instr.opcode] + instr.all_fields:
             if isinstance(field, nxisa.base.Reserved):
                 fh.write(f"        logic [{field.width-1}:0] {field.name};\n")
+            elif instr is nxisa.Shuffle and field is instr.opcode:
+                fh.write(f"        logic [1:0] {field.name};\n")
             else:
                 fh.write(f"        f_{type(field).__name__.lower()}_t {field.name};\n")
         fh.write(f"    {'}'} {name.replace('Def', '').lower()}_t;\n\n")
