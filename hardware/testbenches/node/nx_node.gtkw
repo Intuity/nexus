@@ -1,17 +1,18 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sun Feb 19 17:57:36 2023
+[*] Sun Feb 19 18:55:31 2023
 [*]
 [dumpfile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/sim.lxt"
-[dumpfile_mtime] "Sun Feb 19 17:56:36 2023"
-[dumpfile_size] 5553
+[dumpfile_mtime] "Sun Feb 19 18:53:44 2023"
+[dumpfile_size] 1010358
 [savefile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/nx_node.gtkw"
 [timestart] 0
 [size] 1853 1401
 [pos] -1 -1
-*-15.562669 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-14.247013 83000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
+[treeopen] testbench.u_dut.u_decoder.
 [sst_width] 282
 [signals_width] 333
 [sst_expanded] 1
@@ -294,7 +295,7 @@ testbench.o_ib_west_ready[0]
 -Inbound
 @200
 -
-@800200
+@c00200
 -Outbound
 @800022
 testbench.o_ob_north_data[30:0]
@@ -368,14 +369,14 @@ testbench.o_ob_east_data[30:0]
 (3)testbench.o_ob_east_data[30:0]
 @1401200
 -group_end
-@c00025
+@c00024
 #{column} (4)testbench.o_ob_east_data[30:0] (5)testbench.o_ob_east_data[30:0] (6)testbench.o_ob_east_data[30:0] (7)testbench.o_ob_east_data[30:0]
 @28
 (4)testbench.o_ob_east_data[30:0]
 (5)testbench.o_ob_east_data[30:0]
 (6)testbench.o_ob_east_data[30:0]
 (7)testbench.o_ob_east_data[30:0]
-@1401201
+@1401200
 -group_end
 @c00028
 #{command} (8)testbench.o_ob_east_data[30:0] (9)testbench.o_ob_east_data[30:0]
@@ -542,23 +543,37 @@ testbench.i_ob_west_present[0]
 -
 @22
 testbench.outbound_present[3:0]
-@1000200
+@1401200
 -Outbound
 @200
 -
 @800200
 -Decoder
+@22
+testbench.u_dut.u_decoder.arb_data[30:0]
+@28
+testbench.u_dut.u_decoder.arb_ready[0]
+testbench.u_dut.u_decoder.arb_valid[0]
+testbench.u_dut.u_decoder.arb_match[0]
 @200
 -
+@22
+testbench.u_dut.u_decoder.o_inst_addr[9:0]
+testbench.u_dut.u_decoder.o_inst_wr_data[31:0]
+testbench.u_dut.u_decoder.o_inst_wr_strb[31:0]
+@201
 -
--
+@22
+testbench.u_dut.u_decoder.o_data_addr[9:0]
+testbench.u_dut.u_decoder.o_data_wr_data[31:0]
+testbench.u_dut.u_decoder.o_data_wr_strb[31:0]
 @1000200
 -Decoder
 @200
 -
 @401200
 -i_node_id[7:0]
-@800200
+@c00200
 -Routing
 @800022
 testbench.u_dut.outbound_data[30:0]
@@ -637,16 +652,16 @@ testbench.u_dut.outbound_data[30:0]
 -group_end
 @200
 -
-@1000200
+@1401200
 -Routing
 @200
 -
-@800200
+@c00200
 -Store
 @200
 -
 -
-@1000200
+@1401200
 -Store
 @200
 -

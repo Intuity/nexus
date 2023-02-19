@@ -15,9 +15,11 @@
 from types import SimpleNamespace
 
 from forastero import BaseBench, IORole
+
 from drivers.stream.io import StreamIO
 from drivers.stream.init import StreamInitiator
 from drivers.stream.resp import StreamResponder
+from nxmodel import NXNode
 
 class Testbench(BaseBench):
 
@@ -50,6 +52,8 @@ class Testbench(BaseBench):
                                                   StreamIO(self.dut,
                                                            f"ob_{dirx}",
                                                            IORole.INITIATOR)))
+        # Create model instance
+        self.model = NXNode(0, 0, False)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
@@ -57,3 +61,4 @@ class Testbench(BaseBench):
         self.node_id.value       = 0
         self.idle.input.value    = 1
         self.trigger.input.value = 0
+        self.model.reset()

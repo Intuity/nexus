@@ -17,15 +17,11 @@ from cocotb.triggers import ClockCycles
 from ..testbench import Testbench
 
 @Testbench.testcase()
-async def sanity(dut):
+async def sanity(tb):
     """ Basic testcase """
-    # Reset the DUT
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
     # Run for 100 clock cycles
-    dut.info("Running for 100 clock cycles")
-    await ClockCycles(dut.clk, 100)
+    tb.info("Running for 100 clock cycles")
+    await ClockCycles(tb.clk, 100)
 
     # All done!
-    dut.info("Finished counting cycles")
+    tb.info("Finished counting cycles")

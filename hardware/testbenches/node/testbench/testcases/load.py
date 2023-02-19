@@ -12,59 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from random import choice, randint
+from random import choice, randint, random
 
 from cocotb.triggers import ClockCycles
 
-from nxconstants import (NodeCommand, NodeLoad, NodeID, LOAD_SEG_WIDTH,
-                         MAX_ROW_COUNT, MAX_COLUMN_COUNT)
+from nxconstants import NodeCommand, NodeHeader, NodeID, NodeLoad
+from drivers.stream.common import StreamTransaction
 
-from ..testbench import testcase
+from ..testbench import Testbench
 
-@testcase()
-async def load(dut):
-    """ Load instructions into a node via messages """
-    # Reset the DUT
-    dut.info("Resetting the DUT")
-    await dut.reset()
+@Testbench.testcase()
+async def load_instr(tb):
+    """ Write random data into the instruction memory """
+    # Generate a memory image to load
+    image    = []
+    sequence = []
+    for i_row in range(1024):
+        image.append(row := [])
+        for i_slot in range(4):
+            row.append(randint(0, 255))
+            sequence.append((i_row, i_slot))
 
-    # Pickup parameters from the design
-    ram_addr_w = int(dut.RAM_ADDR_W)
-    ram_data_w = int(dut.RAM_DATA_W)
+    # Randomise the order to load the image
+    sequence.sort(key=lambda _: random())
 
-    # Decide on a row and column
-    node_id = NodeID(
-        row   =randint(0, MAX_ROW_COUNT-1   ),
-        column=randint(0, MAX_COLUMN_COUNT-1),
-    )
-    dut.node_id <= node_id.pack()
+    # Append a transaction to a random stream interface
+    inbound = [tb.ib_north, tb.ib_east, tb.ib_south, tb.ib_west]
+    for i_row, i_slot in sequence:
+        driver = choice(inbound)
+        msg = NodeLoad(header =NodeHeader(target =NodeID(row=0, column=0).pack(),
+                                          command=NodeCommand.LOAD).pack(),
+                       address=(i_row << 1) | (i_slot >> 1),
+                       slot   =(i_slot & 0x1),
+                       data   =image[i_row][i_slot])
+        driver.append(StreamTransaction(data=msg.pack()))
 
-    # Select an inbound pipe
-    inbound = choice(dut.inbound)
+    # Wait for all drivers to go idle
+    for driver in inbound:
+        await driver.idle()
 
-    # Load random data into the node
-    loaded = []
-    chunks = ram_data_w // LOAD_SEG_WIDTH
-    mask   = (1 << LOAD_SEG_WIDTH) - 1
-    for _ in range(randint(10, (1 << ram_addr_w) - 1)):
-        data = randint(0, (1 << ram_data_w) - 1)
-        loaded.append(data)
-        for chunk in range(ram_data_w // LOAD_SEG_WIDTH):
-            msg = NodeLoad()
-            msg.header.row     = node_id.row
-            msg.header.column  = node_id.column
-            msg.header.command = NodeCommand.LOAD
-            msg.data           = (data >> ((chunks - chunk - 1) * LOAD_SEG_WIDTH)) & mask
-            msg.last           = (chunk == (chunks - 1))
-            inbound.append(msg.pack())
+    # Allow for some settling time
+    await ClockCycles(tb.clk, 10)
 
-    # Wait for the driver to go idle
-    dut.info(f"Waiting for {len(loaded)} loads to complete")
-    await inbound.idle()
-    await ClockCycles(dut.clk, 10)
-
-    # Check the contents of the RAM
-    for idx, exp_data in enumerate(loaded):
-        rtl_data = int(dut.dut.u_dut.u_store.u_ram.memory[idx])
-        assert exp_data == rtl_data, \
-            f"Memory @ 0x{idx:08X}: RTL 0x{rtl_data:08X} != EXP 0x{exp_data:08X}"
+    # Check the state of the memory
+    for i_row, row in enumerate(image):
+        exp_data = sum((x << (i * 8) for i, x in enumerate(row)), 0)
+        got_data = int(tb.dut.u_dut.u_inst_ram.memory[i_row].value)
+        if exp_data != got_data:
+            tb.error(f"Mismatch at row {i_row} - G: 0x{exp_data:08X} 0x{got_data:08X}")
