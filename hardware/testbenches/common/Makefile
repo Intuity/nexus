@@ -64,7 +64,7 @@ PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../..)
 PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../common/python)
 PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../common/work)
 PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../nxmodel/work)
-PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../thirdparty/forastero)
+PYTHON_PATHS += $(abspath $(COMMON_DIR)/../../../common/thirdparty/forastero)
 export PYTHONPATH := $(subst $(SPACE),:,$(PYTHON_PATHS)):$(PYTHONPATH)
 
 .PHONY: run results.xml

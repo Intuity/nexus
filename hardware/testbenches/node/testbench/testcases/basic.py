@@ -14,9 +14,9 @@
 
 from cocotb.triggers import ClockCycles
 
-from ..testbench import testcase
+from ..testbench import Testbench
 
-@testcase()
+@Testbench.testcase()
 async def sanity(dut):
     """ Basic testcase """
     # Reset the DUT
