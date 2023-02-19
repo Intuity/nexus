@@ -271,7 +271,7 @@ assign truth_select[2] = src_c[instruction.truth.mux_2];
 
 // Calculate result
 always_comb begin : comb_truth
-    truth_result = (instruction.truth.truth >> truth_select) & 1'd1;
+    truth_result = (instruction.truth.truth >> truth_select);
 end
 
 // Shift result into register 7
