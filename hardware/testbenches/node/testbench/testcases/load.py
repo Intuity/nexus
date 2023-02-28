@@ -39,7 +39,7 @@ async def load_instr(tb):
     # Append a transaction to a random stream interface
     for i_row, i_slot in sequence:
         driver = choice(tb.all_inbound)
-        msg = NodeLoad(header =NodeHeader(target =tb.node_id.value,
+        msg = NodeLoad(header =NodeHeader(target =tb.node_id.pack(),
                                           command=NodeCommand.LOAD).pack(),
                        address=(i_row << 1) | (i_slot >> 1),
                        slot   =(i_slot & 0x1),
@@ -78,7 +78,7 @@ async def load_data(tb):
     # Append a transaction to a random stream interface
     for i_row, i_slot in sequence:
         driver = choice(tb.all_inbound)
-        msg = NodeSignal(header =NodeHeader(target =tb.node_id.value,
+        msg = NodeSignal(header =NodeHeader(target =tb.node_id.pack(),
                                             command=NodeCommand.SIGNAL).pack(),
                          address=(i_row << 1) | (i_slot >> 1),
                          slot   =[MemorySlot.LOWER, MemorySlot.UPPER][(i_slot & 0x1)],
