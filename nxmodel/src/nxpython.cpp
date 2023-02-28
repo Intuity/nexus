@@ -93,13 +93,14 @@ PYBIND11_MODULE(nxmodel, m) {
 
     py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
         .def(py::init<uint8_t, uint8_t, bool>())
-        .def("reset",                 &NXNode::reset                )
-        .def("attach",                &NXNode::attach               )
-        .def("get_pipe",              &NXNode::get_pipe             )
-        .def("is_idle",               &NXNode::is_idle              )
-        .def("step",                  &NXNode::step                 )
-        .def("get_inst_memory",       &NXNode::get_inst_memory      )
-        .def("get_data_memory",       &NXNode::get_data_memory      );
+        .def("reset",           &NXNode::reset          )
+        .def("set_node_id",     static_cast<void (NXNode::*)(uint8_t, uint8_t)>(&NXNode::set_node_id))
+        .def("attach",          &NXNode::attach         )
+        .def("get_pipe",        &NXNode::get_pipe       )
+        .def("is_idle",         &NXNode::is_idle        )
+        .def("step",            &NXNode::step           )
+        .def("get_inst_memory", &NXNode::get_inst_memory)
+        .def("get_data_memory", &NXNode::get_data_memory);
 
     py::class_<NXMessagePipe, std::shared_ptr<NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())

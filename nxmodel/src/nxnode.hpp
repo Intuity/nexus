@@ -70,6 +70,19 @@ namespace NXModel {
         // Public Methods
         // =====================================================================
 
+        /** Change the node's ID (row and column position)
+         *
+         * @param node_id new node ID
+         */
+        void set_node_id (node_id_t node_id);
+
+        /** Change the node's ID (row and column position)
+         *
+         * @param row    new node row
+         * @param column new node column
+         */
+        void set_node_id (uint8_t row, uint8_t column);
+
         /** Attach an outbound pipe
          *
          * @param dirx direction of the outbound pipe

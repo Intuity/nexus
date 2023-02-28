@@ -25,6 +25,17 @@
 using namespace NXModel;
 using namespace NXConstants;
 
+void NXNode::set_node_id (node_id_t node_id)
+{
+    m_id = node_id;
+}
+
+void NXNode::set_node_id (uint8_t row, uint8_t column)
+{
+    m_id.row    = row;
+    m_id.column = column;
+}
+
 void NXNode::attach (direction_t dirx, std::shared_ptr<NXMessagePipe> pipe)
 {
     assert(dirx >= 0 && ((uint32_t)dirx) < 4);
