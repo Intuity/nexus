@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
+
 from cocotb.triggers import RisingEdge
 from cocotb.utils import get_sim_time
 
@@ -26,6 +28,7 @@ class StreamResponder(BaseMonitor):
         # Wait for a cycle
         await RisingEdge(self.clock)
         # Loop forever
+        sequence = itertools.count()
         while True:
             # Wait for the next clock edge
             if self.reset == 1:
@@ -36,6 +39,7 @@ class StreamResponder(BaseMonitor):
             if self.intf.get("valid") and self.intf.get("ready", 1):
                 self._recv(StreamTransaction(
                     timestamp=get_sim_time(units="ns"),
+                    sequence =next(sequence),
                     data     =int(self.intf.data),
                     last     =(self.intf.get("last", 0) == 1),
                 ))

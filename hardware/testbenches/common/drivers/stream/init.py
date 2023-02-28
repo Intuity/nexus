@@ -37,6 +37,7 @@ class StreamInitiator(BaseDriver):
         # Wait for reset to clear
         while self.reset == 1: await RisingEdge(self.clock)
         # Setup the interface
+        self.sniff(transaction)
         self.intf.set("data",  transaction.data)
         self.intf.set("last",  [0, 1][transaction.last])
         self.intf.set("valid", 1)

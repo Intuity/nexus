@@ -18,5 +18,6 @@ from dataclasses import dataclass, field
 class StreamTransaction:
     """ Captures data transferred through Nexus stream interface """
     timestamp : int  = field(default=0, compare=False)
+    sequence  : int  = field(default=0, compare=False)
     data      : int  = 0
     last      : bool = False
