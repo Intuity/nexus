@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from random import randint
 from types import SimpleNamespace
 
 from forastero import BaseBench, IORole
 
 from drivers.stream.io import StreamIO
+from drivers.stream.common import StreamTransaction
 from drivers.stream.init import StreamInitiator
 from drivers.stream.resp import StreamResponder
-from nxmodel import NXNode
+from nxconstants import NodeID
+from nxmodel import direction_t, NXMessagePipe, NXNode, node_raw_t, pack_node_raw, unpack_node_raw
 
 class Testbench(BaseBench):
 
@@ -30,8 +33,9 @@ class Testbench(BaseBench):
             dut: Pointer to the DUT
         """
         super().__init__(dut, clk="clk", rst="rst")
+        # Store the node ID
+        self.node_id = NodeID(row=0, column=0)
         # Wrap I/Os
-        self.node_id = self.dut.i_node_id
         self.trigger = SimpleNamespace(input =self.dut.i_trigger,
                                        output=self.dut.o_trigger)
         self.idle    = SimpleNamespace(input =self.dut.i_idle,
@@ -44,7 +48,8 @@ class Testbench(BaseBench):
                                                  self.rst,
                                                  StreamIO(self.dut,
                                                           f"ib_{dirx}",
-                                                          IORole.RESPONDER)))
+                                                          IORole.RESPONDER),
+                                                 sniffer=self.drive_model))
             self.register_monitor(f"ob_{dirx}",
                                   StreamResponder(self,
                                                   self.clk,
@@ -52,13 +57,50 @@ class Testbench(BaseBench):
                                                   StreamIO(self.dut,
                                                            f"ob_{dirx}",
                                                            IORole.INITIATOR)))
+        # Create an array of all inbound & outbound interfaces
+        self.all_inbound = [self.ib_north, self.ib_east, self.ib_south, self.ib_west]
+        self.all_outbound = [self.ob_north, self.ob_east, self.ob_south, self.ob_west]
         # Create model instance
-        self.model = NXNode(0, 0, False)
+        self.model          = NXNode(0, 0, False)
+        self.model_inbound  = [self.model.get_pipe(direction_t(x)) for x in range(4)]
+        self.model_outbound = [NXMessagePipe() for _ in range(4)]
+        for idx, pipe in enumerate(self.model_outbound):
+            self.model.attach(direction_t(idx), pipe)
 
     async def initialise(self):
         """ Initialise the DUT's I/O """
         await super().initialise()
-        self.node_id.value       = 0
+        for ob in self.all_outbound:
+            ob.intf.set("present", 1)
+        self.node_id = NodeID(row=randint(0, 15), column=randint(0, 15))
+        self.dut.i_node_id.value = self.node_id.pack()
         self.idle.input.value    = 1
         self.trigger.input.value = 0
         self.model.reset()
+        self.model.set_node_id(self.node_id.row, self.node_id.column)
+
+    def drive_model(self,
+                    driver : StreamInitiator,
+                    packet : StreamTransaction) -> None:
+        """ Apply the same stimulus to the model as the design """
+        # Queue the packet into the model
+        if driver is self.ib_north:
+            self.model_inbound[direction_t.NORTH].enqueue(unpack_node_raw(packet.data))
+        elif driver is self.ib_east:
+            self.model_inbound[direction_t.EAST].enqueue(unpack_node_raw(packet.data))
+        elif driver is self.ib_south:
+            self.model_inbound[direction_t.SOUTH].enqueue(unpack_node_raw(packet.data))
+        elif driver is self.ib_west:
+            self.model_inbound[direction_t.WEST].enqueue(unpack_node_raw(packet.data))
+        # Wait for the model to digest and return to idle
+        while True:
+            self.model.step(False)
+            if self.model.is_idle():
+                break
+        # Pickup any outbound packets
+        for idx, ob in enumerate(self.model_outbound):
+            while not ob.is_idle():
+                raw = node_raw_t()
+                ob.dequeue(raw)
+                tran = StreamTransaction(data=pack_node_raw(raw))
+                self.all_outbound[idx].expected.append(tran)

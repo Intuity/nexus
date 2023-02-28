@@ -1,18 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sun Feb 19 18:55:31 2023
+[*] Tue Feb 28 20:04:23 2023
 [*]
 [dumpfile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/sim.lxt"
-[dumpfile_mtime] "Sun Feb 19 18:53:44 2023"
-[dumpfile_size] 1010358
+[dumpfile_mtime] "Tue Feb 28 19:59:03 2023"
+[dumpfile_size] 7753
 [savefile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/nx_node.gtkw"
 [timestart] 0
 [size] 1853 1401
 [pos] -1 -1
-*-14.247013 83000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-14.084281 95000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_decoder.
+[treeopen] testbench.u_dut.u_distributor.
 [sst_width] 282
 [signals_width] 333
 [sst_expanded] 1
@@ -295,7 +296,7 @@ testbench.o_ib_west_ready[0]
 -Inbound
 @200
 -
-@c00200
+@800200
 -Outbound
 @800022
 testbench.o_ob_north_data[30:0]
@@ -543,7 +544,7 @@ testbench.i_ob_west_present[0]
 -
 @22
 testbench.outbound_present[3:0]
-@1401200
+@1000200
 -Outbound
 @200
 -
@@ -561,7 +562,7 @@ testbench.u_dut.u_decoder.arb_match[0]
 testbench.u_dut.u_decoder.o_inst_addr[9:0]
 testbench.u_dut.u_decoder.o_inst_wr_data[31:0]
 testbench.u_dut.u_decoder.o_inst_wr_strb[31:0]
-@201
+@200
 -
 @22
 testbench.u_dut.u_decoder.o_data_addr[9:0]
@@ -573,86 +574,94 @@ testbench.u_dut.u_decoder.o_data_wr_strb[31:0]
 -
 @401200
 -i_node_id[7:0]
-@c00200
+@800200
 -Routing
 @800022
-testbench.u_dut.outbound_data[30:0]
+testbench.u_dut.u_distributor.i_node_id[7:0]
 @c00024
-#{row} (0)testbench.u_dut.outbound_data[30:0] (1)testbench.u_dut.outbound_data[30:0] (2)testbench.u_dut.outbound_data[30:0] (3)testbench.u_dut.outbound_data[30:0]
++{column} #{row} (0)testbench.u_dut.u_distributor.i_node_id[7:0] (1)testbench.u_dut.u_distributor.i_node_id[7:0] (2)testbench.u_dut.u_distributor.i_node_id[7:0] (3)testbench.u_dut.u_distributor.i_node_id[7:0]
 @28
-(0)testbench.u_dut.outbound_data[30:0]
-(1)testbench.u_dut.outbound_data[30:0]
-(2)testbench.u_dut.outbound_data[30:0]
-(3)testbench.u_dut.outbound_data[30:0]
+(0)testbench.u_dut.u_distributor.i_node_id[7:0]
+(1)testbench.u_dut.u_distributor.i_node_id[7:0]
+(2)testbench.u_dut.u_distributor.i_node_id[7:0]
+(3)testbench.u_dut.u_distributor.i_node_id[7:0]
 @1401200
 -group_end
 @c00024
-#{column} (4)testbench.u_dut.outbound_data[30:0] (5)testbench.u_dut.outbound_data[30:0] (6)testbench.u_dut.outbound_data[30:0] (7)testbench.u_dut.outbound_data[30:0]
++{row} #{column} (4)testbench.u_dut.u_distributor.i_node_id[7:0] (5)testbench.u_dut.u_distributor.i_node_id[7:0] (6)testbench.u_dut.u_distributor.i_node_id[7:0] (7)testbench.u_dut.u_distributor.i_node_id[7:0]
 @28
-(4)testbench.u_dut.outbound_data[30:0]
-(5)testbench.u_dut.outbound_data[30:0]
-(6)testbench.u_dut.outbound_data[30:0]
-(7)testbench.u_dut.outbound_data[30:0]
+(4)testbench.u_dut.u_distributor.i_node_id[7:0]
+(5)testbench.u_dut.u_distributor.i_node_id[7:0]
+(6)testbench.u_dut.u_distributor.i_node_id[7:0]
+(7)testbench.u_dut.u_distributor.i_node_id[7:0]
 @1401200
 -group_end
-@c00028
-#{command} (8)testbench.u_dut.outbound_data[30:0] (9)testbench.u_dut.outbound_data[30:0]
+@200
+-
+@800022
+testbench.u_dut.u_distributor.i_outbound_data[30:0]
+@c00023
+#{column} (0)testbench.u_dut.u_distributor.i_outbound_data[30:0] (1)testbench.u_dut.u_distributor.i_outbound_data[30:0] (2)testbench.u_dut.u_distributor.i_outbound_data[30:0] (3)testbench.u_dut.u_distributor.i_outbound_data[30:0]
 @28
-(8)testbench.u_dut.outbound_data[30:0]
-(9)testbench.u_dut.outbound_data[30:0]
-@1401200
+(0)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(1)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(2)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(3)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+@1401201
 -group_end
 @c00022
-#{payload} (10)testbench.u_dut.outbound_data[30:0] (11)testbench.u_dut.outbound_data[30:0] (12)testbench.u_dut.outbound_data[30:0] (13)testbench.u_dut.outbound_data[30:0] (14)testbench.u_dut.outbound_data[30:0] (15)testbench.u_dut.outbound_data[30:0] (16)testbench.u_dut.outbound_data[30:0] (17)testbench.u_dut.outbound_data[30:0] (18)testbench.u_dut.outbound_data[30:0] (19)testbench.u_dut.outbound_data[30:0] (20)testbench.u_dut.outbound_data[30:0] (21)testbench.u_dut.outbound_data[30:0] (22)testbench.u_dut.outbound_data[30:0] (23)testbench.u_dut.outbound_data[30:0] (24)testbench.u_dut.outbound_data[30:0] (25)testbench.u_dut.outbound_data[30:0] (26)testbench.u_dut.outbound_data[30:0] (27)testbench.u_dut.outbound_data[30:0] (28)testbench.u_dut.outbound_data[30:0] (29)testbench.u_dut.outbound_data[30:0] (30)testbench.u_dut.outbound_data[30:0]
+#{row} (4)testbench.u_dut.u_distributor.i_outbound_data[30:0] (5)testbench.u_dut.u_distributor.i_outbound_data[30:0] (6)testbench.u_dut.u_distributor.i_outbound_data[30:0] (7)testbench.u_dut.u_distributor.i_outbound_data[30:0]
 @28
-(10)testbench.u_dut.outbound_data[30:0]
-(11)testbench.u_dut.outbound_data[30:0]
-(12)testbench.u_dut.outbound_data[30:0]
-(13)testbench.u_dut.outbound_data[30:0]
-(14)testbench.u_dut.outbound_data[30:0]
-(15)testbench.u_dut.outbound_data[30:0]
-(16)testbench.u_dut.outbound_data[30:0]
-(17)testbench.u_dut.outbound_data[30:0]
-(18)testbench.u_dut.outbound_data[30:0]
-(19)testbench.u_dut.outbound_data[30:0]
-(20)testbench.u_dut.outbound_data[30:0]
-(21)testbench.u_dut.outbound_data[30:0]
-(22)testbench.u_dut.outbound_data[30:0]
-(23)testbench.u_dut.outbound_data[30:0]
-(24)testbench.u_dut.outbound_data[30:0]
-(25)testbench.u_dut.outbound_data[30:0]
-(26)testbench.u_dut.outbound_data[30:0]
-(27)testbench.u_dut.outbound_data[30:0]
-(28)testbench.u_dut.outbound_data[30:0]
-(29)testbench.u_dut.outbound_data[30:0]
-(30)testbench.u_dut.outbound_data[30:0]
+(4)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(5)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(6)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(7)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+@1401200
+-group_end
+@28
++{command} (8)testbench.u_dut.u_distributor.i_outbound_data[30:0]
++{reserved} (9)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+@c00022
+#{payload} (10)testbench.u_dut.u_distributor.i_outbound_data[30:0] (11)testbench.u_dut.u_distributor.i_outbound_data[30:0] (12)testbench.u_dut.u_distributor.i_outbound_data[30:0] (13)testbench.u_dut.u_distributor.i_outbound_data[30:0] (14)testbench.u_dut.u_distributor.i_outbound_data[30:0] (15)testbench.u_dut.u_distributor.i_outbound_data[30:0] (16)testbench.u_dut.u_distributor.i_outbound_data[30:0] (17)testbench.u_dut.u_distributor.i_outbound_data[30:0] (18)testbench.u_dut.u_distributor.i_outbound_data[30:0] (19)testbench.u_dut.u_distributor.i_outbound_data[30:0] (20)testbench.u_dut.u_distributor.i_outbound_data[30:0] (21)testbench.u_dut.u_distributor.i_outbound_data[30:0] (22)testbench.u_dut.u_distributor.i_outbound_data[30:0] (23)testbench.u_dut.u_distributor.i_outbound_data[30:0] (24)testbench.u_dut.u_distributor.i_outbound_data[30:0] (25)testbench.u_dut.u_distributor.i_outbound_data[30:0] (26)testbench.u_dut.u_distributor.i_outbound_data[30:0] (27)testbench.u_dut.u_distributor.i_outbound_data[30:0] (28)testbench.u_dut.u_distributor.i_outbound_data[30:0] (29)testbench.u_dut.u_distributor.i_outbound_data[30:0] (30)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+@28
+(10)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(11)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(12)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(13)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(14)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(15)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(16)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(17)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(18)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(19)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(20)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(21)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(22)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(23)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(24)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(25)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(26)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(27)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(28)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(29)testbench.u_dut.u_distributor.i_outbound_data[30:0]
+(30)testbench.u_dut.u_distributor.i_outbound_data[30:0]
 @1401200
 -group_end
 @1001200
 -group_end
-@200
--
-@c00024
-#{row} (4)testbench.u_dut.i_node_id[7:0] (5)testbench.u_dut.i_node_id[7:0] (6)testbench.u_dut.i_node_id[7:0] (7)testbench.u_dut.i_node_id[7:0]
-@28
-(4)testbench.u_dut.i_node_id[7:0]
-(5)testbench.u_dut.i_node_id[7:0]
-(6)testbench.u_dut.i_node_id[7:0]
-(7)testbench.u_dut.i_node_id[7:0]
-@1401200
--group_end
-@c00024
-#{column} (0)testbench.u_dut.i_node_id[7:0] (1)testbench.u_dut.i_node_id[7:0] (2)testbench.u_dut.i_node_id[7:0] (3)testbench.u_dut.i_node_id[7:0]
-@28
-(0)testbench.u_dut.i_node_id[7:0]
-(1)testbench.u_dut.i_node_id[7:0]
-(2)testbench.u_dut.i_node_id[7:0]
-(3)testbench.u_dut.i_node_id[7:0]
-@1401200
 -group_end
 @200
 -
-@1401200
+@28
+testbench.u_dut.u_distributor.comb_outbound_dir.gt_col[0]
+testbench.u_dut.u_distributor.comb_outbound_dir.gt_row[0]
+testbench.u_dut.u_distributor.comb_outbound_dir.lt_col[0]
+testbench.u_dut.u_distributor.comb_outbound_dir.lt_row[0]
+@200
+-
+@28
+testbench.u_dut.u_distributor.outbound_dir[1:0]
+@1000200
 -Routing
 @200
 -

@@ -15,54 +15,28 @@
 from random import choice, randint
 
 from drivers.stream.common import StreamTransaction
-from nxconstants import (Direction, NodeCommand, NodeID, NodeRaw, MAX_ROW_COUNT,
-                         MAX_COLUMN_COUNT, MESSAGE_WIDTH)
+from nxconstants import NodeRaw, MAX_ROW_COUNT, MAX_COLUMN_COUNT, MESSAGE_WIDTH
 
-from ..testbench import testcase
+from ..testbench import Testbench
 
-@testcase()
-async def routing(dut):
+@Testbench.testcase()
+async def routing(tb):
     """ Exercise message routing through a node """
-    # Reset the DUT
-    dut.info("Resetting the DUT")
-    await dut.reset()
-
-    # Decide on a row and column
-    node_id = NodeID(
-        row   =randint(0, MAX_ROW_COUNT-1   ),
-        column=randint(0, MAX_COLUMN_COUNT-1),
-    )
-    dut.node_id <= node_id.pack()
-
     # Select an inbound interface
-    inbound = choice(dut.inbound)
+    inbound = choice(tb.all_inbound)
 
     # Queue up many packets
-    for _ in range(1000):
+    for idx in range(1000):
         # Generate a random message
         msg = NodeRaw()
         msg.unpack(randint(0, (1 << MESSAGE_WIDTH) - 1))
 
         # Select a different target row and column
         while True:
-            msg.header.row    = randint(0, MAX_ROW_COUNT-1)
-            msg.header.column = randint(0, MAX_COLUMN_COUNT-1)
-            if (msg.header.row, msg.header.column) != (node_id.row, node_id.column):
+            msg.header.target.row    = randint(0, MAX_ROW_COUNT-1)
+            msg.header.target.column = randint(0, MAX_COLUMN_COUNT-1)
+            if (msg.header.target.row, msg.header.target.column) != (tb.node_id.row, tb.node_id.column):
                 break
 
         # Queue up the inbound message
-        inbound.append(StreamTransaction(data=msg.pack()))
-
-        # Queue up the message onto the right outbound queue
-        if msg.header.command == NodeCommand.TRACE:
-            dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
-        elif msg.header.column < node_id.column:
-            dut.expected[int(Direction.WEST)].append(StreamTransaction(data=msg.pack()))
-        elif msg.header.column > node_id.column:
-            dut.expected[int(Direction.EAST)].append(StreamTransaction(data=msg.pack()))
-        elif msg.header.row < node_id.row:
-            dut.expected[int(Direction.NORTH)].append(StreamTransaction(data=msg.pack()))
-        elif msg.header.row > node_id.row:
-            dut.expected[int(Direction.SOUTH)].append(StreamTransaction(data=msg.pack()))
-        else:
-            raise Exception("Could not route message")
+        inbound.append(StreamTransaction(sequence=idx, data=msg.pack()))

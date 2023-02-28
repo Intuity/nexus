@@ -13,8 +13,5 @@
 # limitations under the License.
 
 from .basic import *
-# from .execute import *
-# from .external import *
 from .load import *
-# from .params import *
-# from .routing import *
+from .routing import *
