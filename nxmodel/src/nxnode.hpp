@@ -107,6 +107,12 @@ namespace NXModel {
          */
         bool is_idle (void);
 
+        /** Determine if the node is waiting
+         *
+         * @return True if waiting, False if not
+         */
+        bool is_waiting (void);
+
         /** Performs a single step of execution
          *
          * @param trigger whether this is the start of a new tick
@@ -131,6 +137,19 @@ namespace NXModel {
          * @param enable Enabled when True, disabled when False
          */
         void set_dumping( bool enable ) { m_en_dump = enable; }
+
+        /** Get the current program counter
+         *
+         * @return current program counter as an unsigned integer
+         */
+        uint32_t get_pc ( void ) { return m_pc; }
+
+        /** Get the value of a register
+         *
+         * @param index the register index to retrieve
+         * @return current register value
+         */
+        uint8_t get_register ( uint32_t index ) { return m_registers[index]; }
 
     private:
 

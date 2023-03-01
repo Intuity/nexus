@@ -98,9 +98,12 @@ PYBIND11_MODULE(nxmodel, m) {
         .def("attach",          &NXNode::attach         )
         .def("get_pipe",        &NXNode::get_pipe       )
         .def("is_idle",         &NXNode::is_idle        )
+        .def("is_waiting",      &NXNode::is_waiting     )
         .def("step",            &NXNode::step           )
         .def("get_inst_memory", &NXNode::get_inst_memory)
-        .def("get_data_memory", &NXNode::get_data_memory);
+        .def("get_data_memory", &NXNode::get_data_memory)
+        .def("get_pc",          &NXNode::get_pc         )
+        .def("get_register",    &NXNode::get_register   );
 
     py::class_<NXMessagePipe, std::shared_ptr<NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())

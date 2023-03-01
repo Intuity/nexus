@@ -82,6 +82,11 @@ bool NXNode::is_idle (void)
     );
 }
 
+bool NXNode::is_waiting (void)
+{
+    return m_waiting;
+}
+
 void NXNode::step (bool trigger)
 {
     // Log on entry
