@@ -109,7 +109,7 @@ node_signal_t to_send;
 // Slot
 // =============================================================================
 
-assign slot = (i_trigger && idle_q) ? (~slot_q) : slot_q;
+assign slot = (i_trigger && pause_q) ? (~slot_q) : slot_q;
 
 assign o_slot = slot_q;
 
