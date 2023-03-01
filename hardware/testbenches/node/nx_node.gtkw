@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Wed Mar  1 15:33:08 2023
+[*] Wed Mar  1 18:38:44 2023
 [*]
 [dumpfile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/sim.lxt"
-[dumpfile_mtime] "Wed Mar  1 15:32:51 2023"
-[dumpfile_size] 1561400
+[dumpfile_mtime] "Wed Mar  1 18:38:31 2023"
+[dumpfile_size] 1868702
 [savefile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/nx_node.gtkw"
-[timestart] 16483590
+[timestart] 0
 [size] 1853 1401
 [pos] -1 -1
-*-12.365889 16996930 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-21.580225 17157000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_core.
@@ -670,9 +670,13 @@ testbench.u_dut.u_distributor.outbound_dir[1:0]
 -
 @800200
 -Execute
-@24
+@29
+testbench.u_dut.u_core.slot_q[0]
+@200
+-
+@22
 testbench.u_dut.u_core.pc_fetch_q[9:0]
-@c00023
+@c00022
 testbench.u_dut.u_core.i_inst_rd_data[31:0]
 @28
 (0)testbench.u_dut.u_core.i_inst_rd_data[31:0]
@@ -707,7 +711,7 @@ testbench.u_dut.u_core.i_inst_rd_data[31:0]
 (29)testbench.u_dut.u_core.i_inst_rd_data[31:0]
 (30)testbench.u_dut.u_core.i_inst_rd_data[31:0]
 (31)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401201
+@1401200
 -group_end
 @28
 testbench.u_dut.u_core.inst_valid_q[0]
@@ -946,6 +950,7 @@ testbench.u_dut.u_core.regfile_q[63:0]
 -group_end
 @200
 -
+-
 @800022
 testbench.u_dut.u_core.trgt_id[7:0]
 @c00024
@@ -972,8 +977,21 @@ testbench.u_dut.u_core.trgt_id[7:0]
 testbench.u_dut.u_core.send_msg[30:0]
 @28
 testbench.u_dut.u_core.send_vld[0]
+@200
+-
+@22
+testbench.u_dut.u_core.o_data_addr[9:0]
+@28
+testbench.u_dut.u_core.o_data_rd_en[0]
+@22
+testbench.u_dut.u_core.o_data_wr_data[31:0]
+testbench.u_dut.u_core.o_data_wr_strb[31:0]
 @1001200
 -group_end
+@22
+testbench.u_dut.u_core.i_data_rd_data[31:0]
+@24
+testbench.u_dut.u_core.rd_pend_target_q[2:0]
 @1000200
 -Execute
 @200

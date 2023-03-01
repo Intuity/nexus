@@ -52,14 +52,21 @@ async def execute(tb):
                 fvals[group] = [_rand_fval(x) for x in entry]
             else:
                 fvals[group] = _rand_fval(entry)
+        # If this is a SEND operation, don't send to this node
+        while (instr is Memory and
+               fvals["mode"] == "SEND" and
+               fvals["send_row"] == tb.node_id.row and
+               fvals["send_col"] == tb.node_id.column):
+            fvals["send_row"] = randint(0, 15)
+            fvals["send_col"] = randint(0, 15)
         # The final instruction must be a PAUSE with IDLE set
         if instr_idx == 1023:
             instr = Pause
             fvals = { "idle": True, "pc0": choice((True, False)) }
         # Encode the instruction
         encoded = instr.encode(fields=fvals)
-        if instr_idx < 10:
-            tb.info(f"INSTR {instr_idx:2d} - 0x{encoded:08X} - {instr.opcode.op_name} - {fvals}")
+        # if instr_idx < 10:
+        #     tb.info(f"INSTR {instr_idx:2d} - 0x{encoded:08X} - {instr.opcode.op_name} - {fvals}")
         # Load into memory
         for seg_idx in range(4):
             msg = NodeLoad(header =NodeHeader(target =tb.node_id.pack(),
@@ -94,50 +101,53 @@ async def execute(tb):
                      f"DUT: 0x{dut_row:08X} [{' ' if dut_row == mdl_row else '!'}]")
         assert mdl_row == dut_row
 
-    # Trigger the model and allow it to run to a idle/waiting state
-    tb.info("Triggering the model")
-    tb.drive_model(trigger=True, check_wait=True)
+    for idx_pass in range(30):
+        tb.info(f"Starting pass {idx_pass}")
 
-    # Trigger the DUT
-    tb.info("Triggering the DUT")
-    await RisingEdge(tb.clk)
-    tb.trigger.input.value = 1
-    await RisingEdge(tb.clk)
-    tb.trigger.input.value = 0
+        # Trigger the model and allow it to run to a idle/waiting state
+        tb.info("Triggering the model")
+        tb.drive_model(trigger=True, check_wait=True)
 
-    # Wait for the DUT to become active
-    tb.info("Waiting for DUT to become active")
-    while tb.idle.output.value == 1:
+        # Trigger the DUT
+        tb.info("Triggering the DUT")
         await RisingEdge(tb.clk)
-
-    # Wait for the DUT to pause
-    tb.info("Waiting for DUT to pause")
-    while tb.dut.u_dut.u_core.pause_q.value == 0:
+        tb.trigger.input.value = 1
         await RisingEdge(tb.clk)
+        tb.trigger.input.value = 0
 
-    # Check the PC
-    mdl_pc = tb.model.get_pc()
-    dut_pc = int(tb.dut.u_dut.u_core.pc_fetch_q.value)
-    tb.info(f"PC - Model: 0x{mdl_pc:04X}, DUT: 0x{dut_pc:04X}")
-    assert mdl_pc == dut_pc, "PC mismatch between model and DUT"
+        # Wait for the DUT to become active
+        tb.info("Waiting for DUT to become active")
+        while tb.dut.u_dut.u_core.pause_q.value == 1:
+            await RisingEdge(tb.clk)
 
-    # Check the registers
-    mismatches = 0
-    for reg_idx in range(8):
-        mdl_val = tb.model.get_register(reg_idx)
-        dut_val = int(tb.dut.u_dut.u_core.regfile_q.value[((7-reg_idx)*8):((7-reg_idx)*8)+7])
-        tb.info(f"R{reg_idx} - Model: 0x{mdl_val:02X}, DUT: 0x{dut_val:02X} [{' ' if dut_val == mdl_val else '!'}]")
-        mismatches += (mdl_val != dut_val)
+        # Wait for the DUT to pause
+        tb.info("Waiting for DUT to pause")
+        while tb.dut.u_dut.u_core.pause_q.value == 0:
+            await RisingEdge(tb.clk)
 
-    # Check the memory state
-    for row in range(1024):
-        mdl_row = ((tb.model.read_data_memory((row * 2) + 1) << 16) |
-                   (tb.model.read_data_memory((row * 2)    )      ))
-        dut_row = int(tb.dut.u_dut.u_data_ram.memory[row].value)
-        if mdl_row != dut_row:
-            tb.error(f"Data {row:4d} - Model: 0x{mdl_row:08X}, "
-                     f"DUT: 0x{dut_row:08X} [{' ' if dut_row == mdl_row else '!'}]")
-        mismatches += (mdl_row != dut_row)
+        # Check the PC
+        mdl_pc = tb.model.get_pc()
+        dut_pc = int(tb.dut.u_dut.u_core.pc_fetch_q.value)
+        tb.info(f"PC - Model: 0x{mdl_pc:04X}, DUT: 0x{dut_pc:04X}")
+        assert mdl_pc == dut_pc, "PC mismatch between model and DUT"
 
-    # Check for any mismatches
-    assert mismatches == 0, f"{mismatches} mismatches between model and DUT"
+        # Check the registers
+        mismatches = 0
+        for reg_idx in range(8):
+            mdl_val = tb.model.get_register(reg_idx)
+            dut_val = int(tb.dut.u_dut.u_core.regfile_q.value[((7-reg_idx)*8):((7-reg_idx)*8)+7])
+            tb.info(f"R{reg_idx} - Model: 0x{mdl_val:02X}, DUT: 0x{dut_val:02X} [{' ' if dut_val == mdl_val else '!'}]")
+            mismatches += (mdl_val != dut_val)
+
+        # Check the memory state
+        for row in range(1024):
+            mdl_row = ((tb.model.read_data_memory((row * 2) + 1) << 16) |
+                    (tb.model.read_data_memory((row * 2)    )      ))
+            dut_row = int(tb.dut.u_dut.u_data_ram.memory[row].value)
+            if mdl_row != dut_row:
+                tb.error(f"Data {row:4d} - Model: 0x{mdl_row:08X}, "
+                        f"DUT: 0x{dut_row:08X} [{' ' if dut_row == mdl_row else '!'}]")
+            mismatches += (mdl_row != dut_row)
+
+        # Check for any mismatches
+        assert mismatches == 0, f"{mismatches} mismatches between model and DUT"
