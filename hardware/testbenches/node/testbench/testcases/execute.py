@@ -58,7 +58,7 @@ async def execute(tb):
             fvals = { "idle": True, "pc0": choice((True, False)) }
         # Encode the instruction
         encoded = instr.encode(fields=fvals)
-        if instr_idx < 20:
+        if instr_idx < 10:
             tb.info(f"INSTR {instr_idx:2d} - 0x{encoded:08X} - {instr.opcode.op_name} - {fvals}")
         # Load into memory
         for seg_idx in range(4):
@@ -83,6 +83,16 @@ async def execute(tb):
     tb.info("Waiting for instructions and memory to be loaded")
     await tb.ib_north.idle()
     await ClockCycles(tb.clk, 10)
+
+    # Check the memory state before running the program
+    for row in range(1024):
+        mdl_row = ((tb.model.read_data_memory((row * 2) + 1) << 16) |
+                   (tb.model.read_data_memory((row * 2)    )      ))
+        dut_row = int(tb.dut.u_dut.u_data_ram.memory[row].value)
+        if mdl_row != dut_row:
+            tb.error(f"Data {row:4d} - Model: 0x{mdl_row:08X}, "
+                     f"DUT: 0x{dut_row:08X} [{' ' if dut_row == mdl_row else '!'}]")
+        assert mdl_row == dut_row
 
     # Trigger the model and allow it to run to a idle/waiting state
     tb.info("Triggering the model")
@@ -118,4 +128,16 @@ async def execute(tb):
         dut_val = int(tb.dut.u_dut.u_core.regfile_q.value[((7-reg_idx)*8):((7-reg_idx)*8)+7])
         tb.info(f"R{reg_idx} - Model: 0x{mdl_val:02X}, DUT: 0x{dut_val:02X} [{' ' if dut_val == mdl_val else '!'}]")
         mismatches += (mdl_val != dut_val)
+
+    # Check the memory state
+    for row in range(1024):
+        mdl_row = ((tb.model.read_data_memory((row * 2) + 1) << 16) |
+                   (tb.model.read_data_memory((row * 2)    )      ))
+        dut_row = int(tb.dut.u_dut.u_data_ram.memory[row].value)
+        if mdl_row != dut_row:
+            tb.error(f"Data {row:4d} - Model: 0x{mdl_row:08X}, "
+                     f"DUT: 0x{dut_row:08X} [{' ' if dut_row == mdl_row else '!'}]")
+        mismatches += (mdl_row != dut_row)
+
+    # Check for any mismatches
     assert mismatches == 0, f"{mismatches} mismatches between model and DUT"

@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 from forastero import BaseBench, IORole
 
+import nxmodel
 from drivers.stream.io import StreamIO
 from drivers.stream.common import StreamTransaction
 from drivers.stream.init import StreamInitiator
@@ -61,6 +62,7 @@ class Testbench(BaseBench):
         self.all_inbound = [self.ib_north, self.ib_east, self.ib_south, self.ib_west]
         self.all_outbound = [self.ob_north, self.ob_east, self.ob_south, self.ob_west]
         # Create model instance
+        # nxmodel.setup_logging(True)
         self.model          = NXNode(0, 0, False)
         self.model_inbound  = [self.model.get_pipe(direction_t(x)) for x in range(4)]
         self.model_outbound = [NXMessagePipe() for _ in range(4)]
