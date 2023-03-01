@@ -58,7 +58,7 @@ with open(sys.argv[1], "w", encoding="utf-8") as fh:
     fh.write("    // Instruction structs\n")
     for name, instr in nxisa.instrdef.InstructionDef.ALL.items():
         fh.write("    typedef struct packed {\n")
-        for field in [instr.opcode] + instr.all_fields:
+        for field in [instr.opcode] + instr.all_fields[::-1]:
             if isinstance(field, nxisa.base.Reserved):
                 fh.write(f"        logic [{field.width-1}:0] {field.name};\n")
             elif instr is nxisa.Shuffle and field is instr.opcode:
