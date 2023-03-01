@@ -132,6 +132,13 @@ namespace NXModel {
          */
         NXMemory<uint16_t, 16> * get_data_memory ( void ) { return &m_data_memory; }
 
+        /** Read an entry from the memory
+         *
+         * @param address row within the memory to read
+         * @return data from the memory
+         */
+        uint16_t read_data_memory ( unsigned int address ) { return m_data_memory.read(address); }
+
         /** Enable/disable dumping
          *
          * @param enable Enabled when True, disabled when False

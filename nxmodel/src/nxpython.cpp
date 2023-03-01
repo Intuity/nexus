@@ -19,10 +19,9 @@
 
 #include "nexus.hpp"
 #include "nxloader.hpp"
+#include "nxlogging.hpp"
 
 namespace py = pybind11;
-
-using namespace NXModel;
 
 PYBIND11_MODULE(nxmodel, m) {
     // Expose enumerations
@@ -35,13 +34,16 @@ PYBIND11_MODULE(nxmodel, m) {
 
     // Expose structs
     py::class_<NXConstants::node_id_t>(m, "node_id_t")
-        .def(py::init([]() { node_id_t _; return _; }));
+        .def(py::init([]() { NXConstants::node_id_t _; return _; }));
     py::class_<NXConstants::node_load_t>(m, "node_load_t")
-        .def(py::init([]() { node_load_t _; return _; }));
+        .def(py::init([]() { NXConstants::node_load_t _; return _; }));
     py::class_<NXConstants::node_signal_t>(m, "node_signal_t")
-        .def(py::init([]() { node_signal_t _; return _; }));
+        .def(py::init([]() { NXConstants::node_signal_t _; return _; }));
     py::class_<NXConstants::node_raw_t>(m, "node_raw_t")
-        .def(py::init([]() { node_raw_t _; return _; }));
+        .def(py::init([]() { NXConstants::node_raw_t _; return _; }));
+
+    // Expose log control functions
+    m.def("setup_logging", &Nexus::setup_logging);
 
     // Expose packing functions
     m.def("pack_node_load", [](NXConstants::node_load_t msg) -> uint32_t {
@@ -72,53 +74,54 @@ PYBIND11_MODULE(nxmodel, m) {
     });
 
     // Expose classes
-    py::class_<Nexus, std::shared_ptr<Nexus>>(m, "Nexus")
+    py::class_<NXModel::Nexus, std::shared_ptr<NXModel::Nexus>>(m, "Nexus")
         .def(py::init<uint32_t, uint32_t>())
-        .def("get_rows",            &Nexus::get_rows           )
-        .def("get_columns",         &Nexus::get_columns        )
-        .def("get_mesh",            &Nexus::get_mesh           )
-        .def("get_ingress",         &Nexus::get_ingress        )
-        .def("get_egress",          &Nexus::get_egress         )
-        .def("run",                 &Nexus::run                )
-        .def("dump_vcd",            &Nexus::dump_vcd           )
-        .def("is_output_available", &Nexus::is_output_available)
-        .def("pop_output",          &Nexus::pop_output         );
+        .def("get_rows",            &NXModel::Nexus::get_rows           )
+        .def("get_columns",         &NXModel::Nexus::get_columns        )
+        .def("get_mesh",            &NXModel::Nexus::get_mesh           )
+        .def("get_ingress",         &NXModel::Nexus::get_ingress        )
+        .def("get_egress",          &NXModel::Nexus::get_egress         )
+        .def("run",                 &NXModel::Nexus::run                )
+        .def("dump_vcd",            &NXModel::Nexus::dump_vcd           )
+        .def("is_output_available", &NXModel::Nexus::is_output_available)
+        .def("pop_output",          &NXModel::Nexus::pop_output         );
 
-    py::class_<NXMesh, std::shared_ptr<NXMesh>>(m, "NXMesh")
+    py::class_<NXModel::NXMesh, std::shared_ptr<NXModel::NXMesh>>(m, "NXMesh")
         .def(py::init<uint32_t, uint32_t>())
-        .def("get_node", static_cast<std::shared_ptr<NXNode> (NXMesh::*)(node_id_t)>(&NXMesh::get_node))
-        .def("get_node", static_cast<std::shared_ptr<NXNode> (NXMesh::*)(uint32_t, uint32_t)>(&NXMesh::get_node))
-        .def("is_idle",  &NXMesh::is_idle )
-        .def("step",     &NXMesh::step    );
+        .def("get_node", static_cast<std::shared_ptr<NXModel::NXNode> (NXModel::NXMesh::*)(NXConstants::node_id_t)>(&NXModel::NXMesh::get_node))
+        .def("get_node", static_cast<std::shared_ptr<NXModel::NXNode> (NXModel::NXMesh::*)(uint32_t, uint32_t)>(&NXModel::NXMesh::get_node))
+        .def("is_idle",  &NXModel::NXMesh::is_idle )
+        .def("step",     &NXModel::NXMesh::step    );
 
-    py::class_<NXNode, std::shared_ptr<NXNode>>(m, "NXNode")
+    py::class_<NXModel::NXNode, std::shared_ptr<NXModel::NXNode>>(m, "NXNode")
         .def(py::init<uint8_t, uint8_t, bool>())
-        .def("reset",           &NXNode::reset          )
-        .def("set_node_id",     static_cast<void (NXNode::*)(uint8_t, uint8_t)>(&NXNode::set_node_id))
-        .def("attach",          &NXNode::attach         )
-        .def("get_pipe",        &NXNode::get_pipe       )
-        .def("is_idle",         &NXNode::is_idle        )
-        .def("is_waiting",      &NXNode::is_waiting     )
-        .def("step",            &NXNode::step           )
-        .def("get_inst_memory", &NXNode::get_inst_memory)
-        .def("get_data_memory", &NXNode::get_data_memory)
-        .def("get_pc",          &NXNode::get_pc         )
-        .def("get_register",    &NXNode::get_register   );
+        .def("reset",            &NXModel::NXNode::reset           )
+        .def("set_node_id",      static_cast<void (NXModel::NXNode::*)(uint8_t, uint8_t)>(&NXModel::NXNode::set_node_id))
+        .def("attach",           &NXModel::NXNode::attach          )
+        .def("get_pipe",         &NXModel::NXNode::get_pipe        )
+        .def("is_idle",          &NXModel::NXNode::is_idle         )
+        .def("is_waiting",       &NXModel::NXNode::is_waiting      )
+        .def("step",             &NXModel::NXNode::step            )
+        .def("get_inst_memory",  &NXModel::NXNode::get_inst_memory )
+        .def("get_data_memory",  &NXModel::NXNode::get_data_memory )
+        .def("read_data_memory", &NXModel::NXNode::read_data_memory)
+        .def("get_pc",           &NXModel::NXNode::get_pc          )
+        .def("get_register",     &NXModel::NXNode::get_register    );
 
-    py::class_<NXMessagePipe, std::shared_ptr<NXMessagePipe>>(m, "NXMessagePipe")
+    py::class_<NXModel::NXMessagePipe, std::shared_ptr<NXModel::NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_load_t     )>(&NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_signal_t   )>(&NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXMessagePipe::*)(node_raw_t      )>(&NXMessagePipe::enqueue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_load_t    &)>(&NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_signal_t  &)>(&NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXMessagePipe::*)(node_raw_t     &)>(&NXMessagePipe::dequeue))
-        .def("enqueue_raw", &NXMessagePipe::enqueue_raw)
-        .def("dequeue_raw", &NXMessagePipe::dequeue_raw)
-        .def("is_idle",     &NXMessagePipe::is_idle)
-        .def("next_header", &NXMessagePipe::next_header)
-        .def("next_type",   &NXMessagePipe::next_type);
+        .def("enqueue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_load_t     )>(&NXModel::NXMessagePipe::enqueue))
+        .def("enqueue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_signal_t   )>(&NXModel::NXMessagePipe::enqueue))
+        .def("enqueue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_raw_t      )>(&NXModel::NXMessagePipe::enqueue))
+        .def("dequeue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_load_t    &)>(&NXModel::NXMessagePipe::dequeue))
+        .def("dequeue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_signal_t  &)>(&NXModel::NXMessagePipe::dequeue))
+        .def("dequeue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_raw_t     &)>(&NXModel::NXMessagePipe::dequeue))
+        .def("enqueue_raw", &NXModel::NXMessagePipe::enqueue_raw)
+        .def("dequeue_raw", &NXModel::NXMessagePipe::dequeue_raw)
+        .def("is_idle",     &NXModel::NXMessagePipe::is_idle)
+        .def("next_header", &NXModel::NXMessagePipe::next_header)
+        .def("next_type",   &NXModel::NXMessagePipe::next_type);
 
-    py::class_<NXLoader>(m, "NXLoader")
-        .def(py::init<Nexus *, std::string>());
+    py::class_<NXModel::NXLoader>(m, "NXLoader")
+        .def(py::init<NXModel::Nexus *, std::string>());
 }

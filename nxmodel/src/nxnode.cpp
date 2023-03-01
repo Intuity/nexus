@@ -355,10 +355,14 @@ bool NXNode::evaluate ( bool trigger )
                              << std::dec << (unsigned int)m_id.column << ") "
                       << "@ 0x" << std::hex << m_pc << " "
                       << "Truth operation with table 0x"
-                      << std::hex << (unsigned int)raw_table
+                      << std::hex << (unsigned int)raw_table << " "
+                      << "SRC A " << std::dec << (unsigned int)f_src_a << " (0x" << std::hex << (unsigned int)val_a << ") "
+                      << "SRC B " << std::dec << (unsigned int)f_src_b << " (0x" << std::hex << (unsigned int)val_b << ") "
+                      << "SRC C " << std::dec << (unsigned int)f_src_c << " (0x" << std::hex << (unsigned int)val_c << ") "
                       << " inputs (" << std::dec
                       << bit_a << ", " << bit_b << ", " << bit_c << ") -> "
-                      << (result ? "1" : "0");
+                      << (result ? "1" : "0") << " -> 0x"
+                      << std::hex << (unsigned int)m_registers[7];
                 break;
             }
             case NXISA::OP_PICK: {
@@ -391,7 +395,7 @@ bool NXNode::evaluate ( bool trigger )
                 // Align the mask
                 if (upper) mask <<= 4;
                 // Write to memory
-                m_data_memory.write(64 + f_address_6_0,
+                m_data_memory.write(128 + f_address_6_0,
                                     picked << shift,
                                     mask << shift);
                 break;
