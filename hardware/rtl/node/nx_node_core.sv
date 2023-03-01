@@ -252,11 +252,22 @@ end
 assign o_data_addr    = full_addr;
 assign o_data_wr_data = is_store ? {4{src_a}} : {8{muxsel[3:0]}};
 assign o_data_rd_en   = is_load;
+
 assign o_data_wr_strb = (
-    {24'd0, {
-        {4{(is_pick &&  instruction.pick.upper) || is_store}},
-        {4{(is_pick && !instruction.pick.upper) || is_store}}
-    }} << {full_slot, 3'd0}
+    {
+        24'd0, ((
+                    {
+                        {4{(is_pick &&  instruction.pick.upper)}},
+                        {4{(is_pick && !instruction.pick.upper)}}
+                    } & {
+                        instruction.pick.mask,
+                        instruction.pick.mask
+                    }
+                ) | (
+                    {8{is_store}} & {instruction.memory.send_row,
+                                     instruction.memory.send_col}
+                ))
+    } << {full_slot, 3'd0}
 );
 
 // Track pending read
