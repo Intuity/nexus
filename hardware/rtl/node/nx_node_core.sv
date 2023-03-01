@@ -68,6 +68,7 @@ logic stall;
 // Program counter
 `DECLARE_DQT(pc_t, pc_fetch,   i_clk, i_rst, 'd0)
 `DECLARE_DQT(pc_t, pc_execute, i_clk, i_rst, 'd0)
+`DECLARE_DQ (   1, inst_valid, i_clk, i_rst, 'd0)
 
 // Decode
 instruction_t instruction;
@@ -127,6 +128,9 @@ assign pc_fetch = stall ? (pc0_q ? 'd0 : pc_fetch_q)
 assign o_inst_addr  = pc_fetch;
 assign o_inst_rd_en = !pause;
 
+// Pipeline read signal as instruction valid
+assign inst_valid = o_inst_rd_en;
+
 // =============================================================================
 // Decode
 // =============================================================================
@@ -138,12 +142,12 @@ assign pc_execute = stall ? pc_execute_q : pc_fetch_q;
 assign instruction = i_inst_rd_data;
 
 // Identify the operation
-assign is_pause   = (!pause_q) && (instruction.memory.op == NXISA::OP_PAUSE );
-assign is_memory  = (!pause_q) && (instruction.memory.op == NXISA::OP_MEMORY);
-assign is_truth   = (!pause_q) && (instruction.memory.op == NXISA::OP_TRUTH );
-assign is_pick    = (!pause_q) && (instruction.memory.op == NXISA::OP_PICK  );
-assign is_shuffle = (!pause_q) && ((instruction.memory.op == NXISA::OP_SHUFFLE    ) ||
-                                   (instruction.memory.op == NXISA::OP_SHUFFLE_ALT));
+assign is_pause   = inst_valid_q && (instruction.memory.op == NXISA::OP_PAUSE );
+assign is_memory  = inst_valid_q && (instruction.memory.op == NXISA::OP_MEMORY);
+assign is_truth   = inst_valid_q && (instruction.memory.op == NXISA::OP_TRUTH );
+assign is_pick    = inst_valid_q && (instruction.memory.op == NXISA::OP_PICK  );
+assign is_shuffle = inst_valid_q && ((instruction.memory.op == NXISA::OP_SHUFFLE    ) ||
+                                     (instruction.memory.op == NXISA::OP_SHUFFLE_ALT));
 assign is_load    = is_memory && (instruction.memory.mode == NXISA::MEM_LOAD );
 assign is_store   = is_memory && (instruction.memory.mode == NXISA::MEM_STORE);
 assign is_send    = is_memory && (instruction.memory.mode == NXISA::MEM_SEND );
@@ -275,7 +279,7 @@ always_comb begin : comb_truth
 end
 
 // Shift result into register 7
-assign r7_result = is_truth ? { regfile_q[7][7:1], truth_result } : regfile_q[7];
+assign r7_result = is_truth ? { regfile_q[7][6:0], truth_result } : regfile_q[7];
 
 // =============================================================================
 // Send Message
@@ -286,8 +290,9 @@ assign trgt_id.row     = instruction.memory.send_row;
 assign trgt_id.column  = instruction.memory.send_col;
 
 // Form the header
-assign header.target   = trgt_id;
-assign header.command  = NODE_COMMAND_SIGNAL;
+assign header.target     = trgt_id;
+assign header.command    = NODE_COMMAND_SIGNAL;
+assign header._padding_0 = 'd0;
 
 // Form the message
 assign to_send.header  = header;

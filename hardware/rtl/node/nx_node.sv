@@ -78,8 +78,8 @@ nx_ram #(
     , .DATA_WIDTH    ( RAM_DATA_W )
     , .BIT_WR_EN_A   ( 1          )
     , .BIT_WR_EN_B   ( 1          )
-    , .REGISTER_A_RD ( 1          )
-    , .REGISTER_B_RD ( 1          )
+    , .REGISTER_A_RD ( 0          )
+    , .REGISTER_B_RD ( 0          )
 ) u_inst_ram (
       .i_clk_a     ( i_clk             )
     , .i_rst_a     ( i_rst             )
@@ -106,8 +106,8 @@ nx_ram #(
     , .DATA_WIDTH    ( RAM_DATA_W )
     , .BIT_WR_EN_A   ( 1          )
     , .BIT_WR_EN_B   ( 1          )
-    , .REGISTER_A_RD ( 1          )
-    , .REGISTER_B_RD ( 1          )
+    , .REGISTER_A_RD ( 0          )
+    , .REGISTER_B_RD ( 0          )
 ) u_data_ram (
       .i_clk_a     ( i_clk                             )
     , .i_rst_a     ( i_rst                             )
