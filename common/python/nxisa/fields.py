@@ -26,8 +26,6 @@ class OpCode(Field):
                             "MEMORY"     : 1,
                             "TRUTH"      : 2,
                             "PICK"       : 3,
-                            "RESERVED4"  : 4,
-                            "RESERVED5"  : 5,
                             "SHUFFLE"    : 6,
                             "SHUFFLE_ALT": 7,
                         })
@@ -115,10 +113,9 @@ class MemoryMode(Field):
     def __init__(self) -> None:
         super().__init__("mode",
                          2, {
-                            "LOAD"     : 0,
-                            "STORE"    : 1,
-                            "SEND"     : 2,
-                            "RESERVED3": 3,
+                            "LOAD" : 0,
+                            "STORE": 1,
+                            "SEND" : 2,
                          })
 
 
