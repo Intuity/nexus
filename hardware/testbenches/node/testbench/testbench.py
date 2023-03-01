@@ -80,22 +80,25 @@ class Testbench(BaseBench):
         self.model.set_node_id(self.node_id.row, self.node_id.column)
 
     def drive_model(self,
-                    driver : StreamInitiator,
-                    packet : StreamTransaction) -> None:
+                    driver      : StreamInitiator   = None,
+                    transaction : StreamTransaction = None,
+                    trigger     : bool              = False,
+                    check_wait  : bool              = False) -> None:
         """ Apply the same stimulus to the model as the design """
-        # Queue the packet into the model
-        if driver is self.ib_north:
-            self.model_inbound[direction_t.NORTH].enqueue(unpack_node_raw(packet.data))
-        elif driver is self.ib_east:
-            self.model_inbound[direction_t.EAST].enqueue(unpack_node_raw(packet.data))
-        elif driver is self.ib_south:
-            self.model_inbound[direction_t.SOUTH].enqueue(unpack_node_raw(packet.data))
-        elif driver is self.ib_west:
-            self.model_inbound[direction_t.WEST].enqueue(unpack_node_raw(packet.data))
+        # Queue the transaction into the model
+        if transaction:
+            if driver is self.ib_north:
+                self.model_inbound[direction_t.NORTH].enqueue(unpack_node_raw(transaction.data))
+            elif driver is self.ib_east:
+                self.model_inbound[direction_t.EAST].enqueue(unpack_node_raw(transaction.data))
+            elif driver is self.ib_south:
+                self.model_inbound[direction_t.SOUTH].enqueue(unpack_node_raw(transaction.data))
+            elif driver is self.ib_west:
+                self.model_inbound[direction_t.WEST].enqueue(unpack_node_raw(transaction.data))
         # Wait for the model to digest and return to idle
         while True:
-            self.model.step(False)
-            if self.model.is_idle():
+            self.model.step(trigger)
+            if self.model.is_idle() or (check_wait and self.model.is_waiting()):
                 break
         # Pickup any outbound packets
         for idx, ob in enumerate(self.model_outbound):
