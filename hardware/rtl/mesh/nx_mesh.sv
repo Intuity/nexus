@@ -20,13 +20,8 @@
 module nx_mesh
 import NXConstants::*;
 #(
-      parameter ROWS       = 3
-    , parameter COLUMNS    = 3
-    , parameter INPUTS     = 32
-    , parameter OUTPUTS    = 32
-    , parameter REGISTERS  = 16
-    , parameter RAM_ADDR_W = 10
-    , parameter RAM_DATA_W = 32
+      parameter ROWS    = 3
+    , parameter COLUMNS = 3
 ) (
       input  logic                         i_clk
     , input  logic                         i_rst
@@ -43,11 +38,14 @@ import NXConstants::*;
     , output logic                         o_outbound_valid
     , input  logic                         i_outbound_ready
     // Aggregated outputs
-    , output logic [(COLUMNS*OUTPUTS)-1:0] o_outputs
+    , output logic [(COLUMNS*8)-1:0]       o_outputs
     // Memory inputs
     , input  logic [TOP_MEM_COUNT-1:0]     i_mem_enable
     , input  logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] i_mem_rd_data
 );
+
+logic _unused;
+assign _unused = &{1'b0, i_mem_enable, i_mem_rd_data};
 
 // =============================================================================
 // Internal Signals
@@ -89,11 +87,6 @@ assign o_agg_idle  = all_agg_idle_q;
 generate
 for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
     for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_columns
-
-        // Determine if this node has external inputs
-        localparam HAS_EXT_INPUTS = (
-            (idx_row == 0) && (idx_col >= (COLUMNS - TOP_MEM_COUNT))
-        );
 
         // Construct ID
         node_id_t node_id;
@@ -161,26 +154,8 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
                            : chain_trigger[idx_col][idx_row-1]
         );
 
-        // External inputs
-        logic              ext_inputs_en;
-        logic [INPUTS-1:0] ext_inputs;
-        if (HAS_EXT_INPUTS) begin
-            assign ext_inputs_en = i_mem_enable[idx_col + TOP_MEM_COUNT - COLUMNS];
-            assign ext_inputs    = i_mem_rd_data[idx_col + TOP_MEM_COUNT - COLUMNS];
-        end else begin
-            assign ext_inputs_en = 'd0;
-            assign ext_inputs    = 'd0;
-        end
-
         // Node instance
-        nx_node #(
-              .INPUTS             ( INPUTS                          )
-            , .OUTPUTS            ( OUTPUTS                         )
-            , .REGISTERS          ( REGISTERS                       )
-            , .RAM_ADDR_W         ( RAM_ADDR_W                      )
-            , .RAM_DATA_W         ( RAM_DATA_W                      )
-            , .EXT_INPUTS         ( HAS_EXT_INPUTS                  )
-        ) u_node (
+        nx_node u_node (
               .i_clk              ( i_clk                           )
             , .i_rst              ( i_rst                           )
             // Control signals
@@ -198,9 +173,6 @@ for (genvar idx_row = 0; idx_row < ROWS; idx_row++) begin : gen_rows
             , .o_outbound_valid   ( mesh_ob_valid[idx_col][idx_row] )
             , .i_outbound_ready   ( node_ob_ready                   )
             , .i_outbound_present ( node_ob_present                 )
-            // External inputs
-            , .i_ext_inputs_en    ( ext_inputs_en                   )
-            , .i_ext_inputs       ( ext_inputs                      )
         );
 
     end
@@ -232,10 +204,10 @@ for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_aggregators
 
     // - Final column is tied off
     if (idx_col == (COLUMNS - 1)) begin
-        logic _unused;
-        assign thru_data  = 'd0;
-        assign thru_valid = 'd0;
-        assign _unused    = &{ 1'b0, thru_ready };
+        logic _unused_col;
+        assign thru_data   = 'd0;
+        assign thru_valid  = 'd0;
+        assign _unused_col = &{ 1'b0, thru_ready };
 
     // - All other columns are linked to their neighbour
     end else begin
@@ -247,7 +219,7 @@ for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_aggregators
 
     // Instance the aggregator
     nx_aggregator #(
-          .OUTPUTS             ( OUTPUTS                                         )
+          .OUTPUTS             ( 8                                               )
     ) u_agg (
           .i_clk               ( i_clk                                           )
         , .i_rst               ( i_rst                                           )
@@ -255,7 +227,7 @@ for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_aggregators
         , .i_node_id           ( agg_id                                          )
         , .o_idle              ( agg_idle[idx_col]                               )
         // Output signals
-        , .o_outputs           ( o_outputs[idx_col*OUTPUTS+:OUTPUTS]             )
+        , .o_outputs           ( o_outputs[idx_col*8+:8]                         )
         // Inbound interface from mesh
         , .i_inbound_data      ( mesh_ob_data[idx_col][ROWS-1][DIRECTION_SOUTH]  )
         , .i_inbound_valid     ( mesh_ob_valid[idx_col][ROWS-1][DIRECTION_SOUTH] )

@@ -18,13 +18,8 @@
 module nexus
 import NXConstants::*;
 #(
-      parameter ROWS       =  3
-    , parameter COLUMNS    =  3
-    , parameter INPUTS     = 32
-    , parameter OUTPUTS    = 32
-    , parameter REGISTERS  = 16
-    , parameter RAM_ADDR_W = 10
-    , parameter RAM_DATA_W = 32
+      parameter ROWS    = 3
+    , parameter COLUMNS = 3
 ) (
       input  logic              i_clk
     , input  logic              i_rst
@@ -48,7 +43,7 @@ import NXConstants::*;
 // Constants
 // =============================================================================
 
-localparam MESH_OUTPUTS = COLUMNS * OUTPUTS;
+localparam MESH_OUTPUTS = COLUMNS * 8;
 
 // =============================================================================
 // Internal Signals
@@ -86,9 +81,6 @@ nx_reset u_reset_stretch (
 nx_control #(
       .ROWS             ( ROWS             )
     , .COLUMNS          ( COLUMNS          )
-    , .INPUTS           ( INPUTS           )
-    , .OUTPUTS          ( OUTPUTS          )
-    , .REGISTERS        ( REGISTERS        )
 ) u_control (
       .i_clk            ( i_clk            )
     , .i_rst            ( o_rst_internal   )
@@ -133,11 +125,6 @@ nx_control #(
 nx_mesh #(
       .ROWS             ( ROWS           )
     , .COLUMNS          ( COLUMNS        )
-    , .INPUTS           ( INPUTS         )
-    , .OUTPUTS          ( OUTPUTS        )
-    , .REGISTERS        ( REGISTERS      )
-    , .RAM_ADDR_W       ( RAM_ADDR_W     )
-    , .RAM_DATA_W       ( RAM_DATA_W     )
 ) u_mesh (
       .i_clk            ( i_clk          )
     , .i_rst            ( o_rst_internal )

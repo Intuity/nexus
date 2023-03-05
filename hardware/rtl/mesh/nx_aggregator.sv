@@ -22,7 +22,7 @@ module nx_aggregator
 import NXConstants::*,
        nx_primitives::ROUND_ROBIN;
 #(
-    parameter OUTPUTS = 32
+    parameter OUTPUTS = 8
 ) (
       input  logic               i_clk
     , input  logic               i_rst
@@ -68,8 +68,8 @@ logic [1:0]                    comb_valid, comb_ready;
 // NOTE: Only test the column address, not the row, allowing any signals
 //       travelling down the column to be captured
 assign is_signal = (
-    (i_inbound_data.signal.header.column  == i_node_id.column   ) &&
-    (i_inbound_data.signal.header.command == NODE_COMMAND_SIGNAL) &&
+    (i_inbound_data.signal.header.target.column == i_node_id.column   ) &&
+    (i_inbound_data.signal.header.command       == NODE_COMMAND_SIGNAL) &&
     i_inbound_valid
 );
 
@@ -84,8 +84,8 @@ assign o_outputs = outputs_q;
 generate
 for (genvar idx = 0; idx < OUTPUTS; idx++) begin : gen_outputs
     assign outputs[idx] = (
-        (is_signal && idx[$clog2(OUTPUTS)-1:0] == i_inbound_data.signal.index)
-            ? i_inbound_data.signal.state
+        (is_signal && idx[$clog2(OUTPUTS)-1:0] == i_inbound_data.signal.address[$clog2(OUTPUTS)-1:0])
+            ? i_inbound_data.signal.data[0]
             : outputs_q[idx[$clog2(OUTPUTS)-1:0]]
     );
 end

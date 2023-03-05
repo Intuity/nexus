@@ -21,11 +21,8 @@
 module nx_control
 import NXConstants::*;
 #(
-      parameter ROWS      =  3
-    , parameter COLUMNS   =  3
-    , parameter INPUTS    = 32
-    , parameter OUTPUTS   = 32
-    , parameter REGISTERS = 16
+      parameter ROWS    = 3
+    , parameter COLUMNS = 3
 ) (
       input  logic                         i_clk
     , input  logic                         i_rst
@@ -58,7 +55,7 @@ import NXConstants::*;
     , input  logic [COLUMNS-1:0]           i_mesh_node_idle
     , input  logic                         i_mesh_agg_idle
     , output logic [COLUMNS-1:0]           o_mesh_trigger
-    , input  logic [(COLUMNS*OUTPUTS)-1:0] i_mesh_outputs
+    , input  logic [(COLUMNS*8)-1:0]       i_mesh_outputs
     , output logic [TOP_MEM_COUNT-1:0]     o_mesh_en_memory
     , output logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] o_mesh_rd_data
 );
@@ -67,7 +64,7 @@ import NXConstants::*;
 // Constants
 // =============================================================================
 
-localparam MESH_OUTPUTS     = COLUMNS * OUTPUTS;
+localparam MESH_OUTPUTS     = COLUMNS * 8;
 localparam MAX_OUTPUT_INDEX = (MESH_OUTPUTS + OUT_BITS_PER_MSG - 1) / OUT_BITS_PER_MSG;
 localparam OUTPUT_IDX_WIDTH = 1 + ((MESH_OUTPUTS > OUT_BITS_PER_MSG) ? $clog2(MAX_OUTPUT_INDEX) : 0);
 
@@ -131,7 +128,7 @@ logic emit_output_msg;
 `DECLARE_DQ(TOP_MEM_COUNT, en_mem_wstrb, i_clk, i_rst, 'd0)
 `DECLARE_DQ(TOP_MEM_COUNT, mem_rd_pend,  i_clk, i_rst, 'd0)
 
-logic                     mem_update;
+// logic                     mem_update;
 logic [TOP_MEM_COUNT-1:0] mem_host_access;
 
 logic [TOP_MEM_COUNT-1:0][TOP_MEM_ADDR_WIDTH-1:0] mem_a_addr, mem_b_addr;
@@ -334,9 +331,7 @@ assign resp_params.ver_minor   = HW_VER_MINOR;
 assign resp_params.timer_width = TIMER_WIDTH;
 assign resp_params.rows        = ROWS[$clog2(MAX_ROW_COUNT):0];
 assign resp_params.columns     = COLUMNS[$clog2(MAX_COLUMN_COUNT):0];
-assign resp_params.node_ins    = INPUTS[$clog2(MAX_NODE_INPUTS):0];
-assign resp_params.node_outs   = OUTPUTS[$clog2(MAX_NODE_OUTPUTS):0];
-assign resp_params.node_regs   = REGISTERS[$clog2(MAX_NODE_REGISTERS):0];
+assign resp_params.node_regs  = 'd8;
 assign resp_params._padding_0  = 'd0;
 
 // Populate status response
@@ -402,7 +397,7 @@ assign o_ctrl_out_last  = ctrl_out_last_q;
 // =============================================================================
 
 // Perform mesh based memory operations when leaving ACTIVE
-assign mem_update = (state_q == CTRL_ACTIVE) && (state == CTRL_OUTPUTS);
+// assign mem_update = (state_q == CTRL_ACTIVE) && (state == CTRL_OUTPUTS);
 
 // Drive read responses to the mesh
 assign o_mesh_en_memory = en_memory_q;
@@ -412,24 +407,24 @@ assign o_mesh_rd_data   = mem_a_rd_data;
 generate
 for (genvar idx = 0; idx < TOP_MEM_COUNT; idx++) begin : gen_top_mem
     // Compensate for other memory I/O
-    localparam OFFSET = (
-        idx * (TOP_MEM_ADDR_WIDTH + TOP_MEM_DATA_WIDTH + TOP_MEM_STRB_WIDTH + 2)
-    );
+    // localparam OFFSET = (
+    //     idx * (TOP_MEM_ADDR_WIDTH + TOP_MEM_DATA_WIDTH + TOP_MEM_STRB_WIDTH + 2)
+    // );
 
     // Drive A port from mesh outputs
-    localparam IDX_ADDR    = MESH_OUTPUTS - OFFSET - 1;
-    localparam IDX_DATA    = IDX_ADDR - TOP_MEM_ADDR_WIDTH;
-    localparam IDX_WR_EN   = IDX_DATA - TOP_MEM_DATA_WIDTH;
-    localparam IDX_RD_EN   = IDX_WR_EN - 1;
-    localparam IDX_WR_STRB = IDX_RD_EN - 1;
-    assign mem_a_addr[idx]    = i_mesh_outputs[IDX_ADDR-:TOP_MEM_ADDR_WIDTH];
-    assign mem_a_wr_data[idx] = i_mesh_outputs[IDX_DATA-:TOP_MEM_DATA_WIDTH];
-    assign mem_a_wr[idx]      = i_mesh_outputs[IDX_WR_EN] && en_memory_q[idx] && mem_update;
-    assign mem_a_rd[idx]      = i_mesh_outputs[IDX_RD_EN] && en_memory_q[idx] && mem_update;
-    assign mem_a_wr_strb[idx] = {TOP_MEM_STRB_WIDTH{mem_a_wr[idx]}} & (
+    // localparam IDX_ADDR    = MESH_OUTPUTS - OFFSET - 1;
+    // localparam IDX_DATA    = IDX_ADDR - TOP_MEM_ADDR_WIDTH;
+    // localparam IDX_WR_EN   = IDX_DATA - TOP_MEM_DATA_WIDTH;
+    // localparam IDX_RD_EN   = IDX_WR_EN - 1;
+    // localparam IDX_WR_STRB = IDX_RD_EN - 1;
+    assign mem_a_addr[idx]    = 'd0; // i_mesh_outputs[IDX_ADDR-:TOP_MEM_ADDR_WIDTH];
+    assign mem_a_wr_data[idx] = {8'd0, i_mesh_outputs}; // [IDX_DATA-:TOP_MEM_DATA_WIDTH];
+    assign mem_a_wr[idx]      = 'd0; // i_mesh_outputs[IDX_WR_EN] && en_memory_q[idx] && mem_update;
+    assign mem_a_rd[idx]      = 'd0; // i_mesh_outputs[IDX_RD_EN] && en_memory_q[idx] && mem_update;
+    assign mem_a_wr_strb[idx] = 'd0; /* {TOP_MEM_STRB_WIDTH{mem_a_wr[idx]}} & (
         en_mem_wstrb_q[idx] ? i_mesh_outputs[IDX_WR_STRB-:TOP_MEM_STRB_WIDTH]
                             : {TOP_MEM_STRB_WIDTH{1'b1}}
-    );
+    );*/
 
     // Instance RAM
     nx_ram #(
@@ -438,15 +433,15 @@ for (genvar idx = 0; idx < TOP_MEM_COUNT; idx++) begin : gen_top_mem
         , .DEPTH         ( 1 << TOP_MEM_ADDR_WIDTH        )
         , .REGISTER_A_RD ( 1                              )
         , .REGISTER_B_RD ( 0                              )
-        , .BYTE_WR_EN_A  ( 1                              )
-        , .BYTE_WR_EN_B  ( 1                              )
+        , .BIT_WR_EN_A   ( 1                              )
+        , .BIT_WR_EN_B   ( 1                              )
     ) u_memory (
         // Port A - Design access
           .i_clk_a       ( i_clk                          )
         , .i_rst_a       ( i_rst                          )
         , .i_addr_a      ( mem_a_addr[idx]                )
         , .i_wr_data_a   ( mem_a_wr_data[idx]             )
-        , .i_wr_en_a     ( mem_a_wr_strb[idx]             )
+        , .i_wr_en_a     ( {8{mem_a_wr_strb[idx]}}        )
         , .i_en_a        ( mem_a_wr[idx] || mem_a_rd[idx] )
         , .o_rd_data_a   ( mem_a_rd_data[idx]             )
         // Port B - Backdoor access
@@ -454,7 +449,7 @@ for (genvar idx = 0; idx < TOP_MEM_COUNT; idx++) begin : gen_top_mem
         , .i_rst_b       ( i_rst                          )
         , .i_addr_b      ( mem_b_addr[idx]                )
         , .i_wr_data_b   ( mem_b_wr_data[idx]             )
-        , .i_wr_en_b     ( mem_b_wr_strb[idx]             )
+        , .i_wr_en_b     ( {8{mem_b_wr_strb[idx]}}        )
         , .i_en_b        ( mem_b_wr[idx] || mem_b_rd[idx] )
         , .o_rd_data_b   ( mem_b_rd_data[idx]             )
     );

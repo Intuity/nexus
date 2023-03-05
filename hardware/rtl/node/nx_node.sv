@@ -69,6 +69,9 @@ logic decd_idle, dist_idle, core_idle;
 // Slot
 logic slot;
 
+// Pipelined trigger
+`DECLARE_DQ(1, trigger, i_clk, i_rst, 'd0)
+
 // =============================================================================
 // Instruction RAM
 // =============================================================================
@@ -219,6 +222,7 @@ nx_node_core u_core (
 // =============================================================================
 
 assign o_idle    = &{i_idle, decd_idle, dist_idle, core_idle};
-assign o_trigger = i_trigger;
+assign trigger   = i_trigger;
+assign o_trigger = trigger_q;
 
 endmodule : nx_node
