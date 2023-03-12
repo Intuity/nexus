@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Wed Mar  1 18:38:44 2023
+[*] Sun Mar 12 16:04:50 2023
 [*]
 [dumpfile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/sim.lxt"
-[dumpfile_mtime] "Wed Mar  1 18:38:31 2023"
-[dumpfile_size] 1868702
-[savefile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/nx_node.gtkw"
-[timestart] 0
-[size] 1853 1401
+[dumpfile_mtime] "Sun Mar 12 16:04:11 2023"
+[dumpfile_size] 1576793
+[savefile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/node.gtkw"
+[timestart] 16560690
+[size] 1680 997
 [pos] -1 -1
-*-21.580225 17157000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-12.337322 16581000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_core.
@@ -53,7 +53,7 @@ testbench.u_dut.i_trigger[0]
 testbench.u_dut.o_idle[0]
 @200
 -
-@800200
+@c00200
 -Inbound
 @800022
 testbench.i_ib_north_data[30:0]
@@ -293,11 +293,11 @@ testbench.i_ib_west_data[30:0]
 @28
 testbench.i_ib_west_valid[0]
 testbench.o_ib_west_ready[0]
-@1000200
+@1401200
 -Inbound
 @200
 -
-@800200
+@c00200
 -Outbound
 @800022
 testbench.o_ob_north_data[30:0]
@@ -545,11 +545,11 @@ testbench.i_ob_west_present[0]
 -
 @22
 testbench.outbound_present[3:0]
-@1000200
+@1401200
 -Outbound
 @200
 -
-@800200
+@c00200
 -Decoder
 @22
 testbench.u_dut.u_decoder.arb_data[30:0]
@@ -571,13 +571,13 @@ testbench.u_dut.u_decoder.o_data_addr[9:0]
 @22
 testbench.u_dut.u_decoder.o_data_wr_data[31:0]
 testbench.u_dut.u_decoder.o_data_wr_strb[31:0]
-@1000200
+@1401200
 -Decoder
 @200
 -
 @401200
 -i_node_id[7:0]
-@800200
+@c00200
 -Routing
 @800022
 testbench.u_dut.u_distributor.i_node_id[7:0]
@@ -664,186 +664,25 @@ testbench.u_dut.u_distributor.comb_outbound_dir.lt_row[0]
 -
 @28
 testbench.u_dut.u_distributor.outbound_dir[1:0]
-@1000200
+@1401200
 -Routing
 @200
 -
 @800200
 -Execute
-@29
-testbench.u_dut.u_core.slot_q[0]
-@200
--
-@22
-testbench.u_dut.u_core.pc_fetch_q[9:0]
-@c00022
-testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(0)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(1)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(2)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(3)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(4)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(5)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(6)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(7)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(8)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(9)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(10)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(11)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(12)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(13)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(14)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(15)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(16)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(17)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(18)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(19)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(20)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(21)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(22)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(23)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(24)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(25)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(26)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(27)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(28)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(29)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(30)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(31)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@28
-testbench.u_dut.u_core.inst_valid_q[0]
-testbench.u_dut.u_core.is_memory[0]
-testbench.u_dut.u_core.is_pause[0]
-testbench.u_dut.u_core.is_pick[0]
-testbench.u_dut.u_core.is_shuffle[0]
-testbench.u_dut.u_core.is_truth[0]
-@200
--
-@28
-testbench.u_dut.u_core.is_load[0]
-testbench.u_dut.u_core.is_send[0]
-testbench.u_dut.u_core.is_store[0]
-@200
--
-@800022
-testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@c00028
-#{opcode[2:1]} (0)testbench.u_dut.u_core.i_inst_rd_data[31:0] (1)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(0)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(1)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{M7} (2)testbench.u_dut.u_core.i_inst_rd_data[31:0] (3)testbench.u_dut.u_core.i_inst_rd_data[31:0] (4)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(2)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(3)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(4)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{M6} (5)testbench.u_dut.u_core.i_inst_rd_data[31:0] (6)testbench.u_dut.u_core.i_inst_rd_data[31:0] (7)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(5)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(6)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(7)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{M5} (8)testbench.u_dut.u_core.i_inst_rd_data[31:0] (9)testbench.u_dut.u_core.i_inst_rd_data[31:0] (10)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(8)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(9)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(10)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{src_c} (11)testbench.u_dut.u_core.i_inst_rd_data[31:0] (12)testbench.u_dut.u_core.i_inst_rd_data[31:0] (13)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(11)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(12)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(13)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{target} (14)testbench.u_dut.u_core.i_inst_rd_data[31:0] (15)testbench.u_dut.u_core.i_inst_rd_data[31:0] (16)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(14)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(15)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(16)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{src_b} (17)testbench.u_dut.u_core.i_inst_rd_data[31:0] (18)testbench.u_dut.u_core.i_inst_rd_data[31:0] (19)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(17)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(18)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(19)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{M2} (20)testbench.u_dut.u_core.i_inst_rd_data[31:0] (21)testbench.u_dut.u_core.i_inst_rd_data[31:0] (22)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(20)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(21)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(22)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{M1} (23)testbench.u_dut.u_core.i_inst_rd_data[31:0] (24)testbench.u_dut.u_core.i_inst_rd_data[31:0] (25)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(23)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(24)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(25)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{M0} (26)testbench.u_dut.u_core.i_inst_rd_data[31:0] (27)testbench.u_dut.u_core.i_inst_rd_data[31:0] (28)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(26)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(27)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(28)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@c00024
-#{src_a} (29)testbench.u_dut.u_core.i_inst_rd_data[31:0] (30)testbench.u_dut.u_core.i_inst_rd_data[31:0] (31)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@28
-(29)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(30)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-(31)testbench.u_dut.u_core.i_inst_rd_data[31:0]
-@1401200
--group_end
-@1001200
--group_end
-@200
--
-@c00024
-testbench.u_dut.u_core.pc_execute_q[9:0]
-@28
-(0)testbench.u_dut.u_core.pc_execute_q[9:0]
-(1)testbench.u_dut.u_core.pc_execute_q[9:0]
-(2)testbench.u_dut.u_core.pc_execute_q[9:0]
-(3)testbench.u_dut.u_core.pc_execute_q[9:0]
-(4)testbench.u_dut.u_core.pc_execute_q[9:0]
-(5)testbench.u_dut.u_core.pc_execute_q[9:0]
-(6)testbench.u_dut.u_core.pc_execute_q[9:0]
-(7)testbench.u_dut.u_core.pc_execute_q[9:0]
-(8)testbench.u_dut.u_core.pc_execute_q[9:0]
-(9)testbench.u_dut.u_core.pc_execute_q[9:0]
-@1401200
--group_end
-@200
--
 @28
 testbench.u_dut.u_core.pause_q[0]
+@29
+testbench.u_dut.u_core.pc0_q[0]
+@28
+testbench.u_dut.u_core.slot_q[0]
+testbench.u_dut.u_core.stall[0]
+@22
+testbench.u_dut.u_core.fetch_pc_q[9:0]
 @200
 -
-@800022
-testbench.u_dut.u_core.regfile_q[63:0]
+@800200
+-Registers
 @c00022
 #{R7} (0)testbench.u_dut.u_core.regfile_q[63:0] (1)testbench.u_dut.u_core.regfile_q[63:0] (2)testbench.u_dut.u_core.regfile_q[63:0] (3)testbench.u_dut.u_core.regfile_q[63:0] (4)testbench.u_dut.u_core.regfile_q[63:0] (5)testbench.u_dut.u_core.regfile_q[63:0] (6)testbench.u_dut.u_core.regfile_q[63:0] (7)testbench.u_dut.u_core.regfile_q[63:0]
 @28
@@ -910,7 +749,7 @@ testbench.u_dut.u_core.regfile_q[63:0]
 @1401200
 -group_end
 @c00022
-#{R2} (40)testbench.u_dut.u_core.regfile_q[63:0] (41)testbench.u_dut.u_core.regfile_q[63:0] (42)testbench.u_dut.u_core.regfile_q[63:0] (43)testbench.u_dut.u_core.regfile_q[63:0] (44)testbench.u_dut.u_core.regfile_q[63:0] (45)testbench.u_dut.u_core.regfile_q[63:0] (46)testbench.u_dut.u_core.regfile_q[63:0] (47)testbench.u_dut.u_core.regfile_q[63:0]
++{R2} #{$2} (40)testbench.u_dut.u_core.regfile_q[63:0] (41)testbench.u_dut.u_core.regfile_q[63:0] (42)testbench.u_dut.u_core.regfile_q[63:0] (43)testbench.u_dut.u_core.regfile_q[63:0] (44)testbench.u_dut.u_core.regfile_q[63:0] (45)testbench.u_dut.u_core.regfile_q[63:0] (46)testbench.u_dut.u_core.regfile_q[63:0] (47)testbench.u_dut.u_core.regfile_q[63:0]
 @28
 (40)testbench.u_dut.u_core.regfile_q[63:0]
 (41)testbench.u_dut.u_core.regfile_q[63:0]
@@ -948,35 +787,33 @@ testbench.u_dut.u_core.regfile_q[63:0]
 (63)testbench.u_dut.u_core.regfile_q[63:0]
 @1401200
 -group_end
+@1000200
+-Registers
 @200
 -
+@28
+testbench.u_dut.u_core.dcd_is_load_q[0]
+testbench.u_dut.u_core.dcd_is_pause_q[0]
+testbench.u_dut.u_core.dcd_is_pick_q[0]
+testbench.u_dut.u_core.dcd_is_send_q[0]
+testbench.u_dut.u_core.dcd_is_shuffle_q[0]
+testbench.u_dut.u_core.dcd_is_store_q[0]
+testbench.u_dut.u_core.dcd_is_truth_q[0]
+@200
 -
-@800022
-testbench.u_dut.u_core.trgt_id[7:0]
-@c00024
-#{testbench.u_dut.u_core.trgt_id[7:4]} (0)testbench.u_dut.u_core.trgt_id[7:0] (1)testbench.u_dut.u_core.trgt_id[7:0] (2)testbench.u_dut.u_core.trgt_id[7:0] (3)testbench.u_dut.u_core.trgt_id[7:0]
 @28
-(0)testbench.u_dut.u_core.trgt_id[7:0]
-(1)testbench.u_dut.u_core.trgt_id[7:0]
-(2)testbench.u_dut.u_core.trgt_id[7:0]
-(3)testbench.u_dut.u_core.trgt_id[7:0]
-@1401200
--group_end
-@c00024
-#{testbench.u_dut.u_core.trgt_id[3:0]} (4)testbench.u_dut.u_core.trgt_id[7:0] (5)testbench.u_dut.u_core.trgt_id[7:0] (6)testbench.u_dut.u_core.trgt_id[7:0] (7)testbench.u_dut.u_core.trgt_id[7:0]
-@28
-(4)testbench.u_dut.u_core.trgt_id[7:0]
-(5)testbench.u_dut.u_core.trgt_id[7:0]
-(6)testbench.u_dut.u_core.trgt_id[7:0]
-(7)testbench.u_dut.u_core.trgt_id[7:0]
-@1401200
--group_end
-@1001200
--group_end
+testbench.u_dut.u_core.dcd_fwd_a_q[0]
+testbench.u_dut.u_core.dcd_fwd_b_q[0]
+testbench.u_dut.u_core.dcd_fwd_c_q[0]
+testbench.u_dut.u_core.dcd_ovr_a_q[0]
+testbench.u_dut.u_core.dcd_ovr_b_q[0]
+testbench.u_dut.u_core.dcd_ovr_c_q[0]
+@200
+-
 @22
-testbench.u_dut.u_core.send_msg[30:0]
-@28
-testbench.u_dut.u_core.send_vld[0]
+testbench.u_dut.u_core.exe_val_a[7:0]
+testbench.u_dut.u_core.exe_val_b[7:0]
+testbench.u_dut.u_core.exe_val_c[7:0]
 @200
 -
 @22
@@ -986,12 +823,23 @@ testbench.u_dut.u_core.o_data_rd_en[0]
 @22
 testbench.u_dut.u_core.o_data_wr_data[31:0]
 testbench.u_dut.u_core.o_data_wr_strb[31:0]
-@1001200
--group_end
+@200
+-
+@28
+testbench.u_dut.u_core.exe_cmt_rd_q[0]
+testbench.u_dut.u_core.exe_cmt_result_q[0]
 @22
-testbench.u_dut.u_core.i_data_rd_data[31:0]
+testbench.u_dut.u_core.cmt_value[7:0]
+@28
+testbench.u_dut.u_core.cmt_valid[0]
 @24
-testbench.u_dut.u_core.rd_pend_target_q[2:0]
+testbench.u_dut.u_core.exe_tgt_reg_q[2:0]
+@200
+-
+@22
+testbench.u_dut.u_core.o_send_data[30:0]
+@28
+testbench.u_dut.u_core.o_send_valid[0]
 @1000200
 -Execute
 @200

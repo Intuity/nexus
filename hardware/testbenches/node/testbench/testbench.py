@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from random import randint
 from types import SimpleNamespace
 
@@ -62,7 +63,8 @@ class Testbench(BaseBench):
         self.all_inbound = [self.ib_north, self.ib_east, self.ib_south, self.ib_west]
         self.all_outbound = [self.ob_north, self.ob_east, self.ob_south, self.ob_west]
         # Create model instance
-        # nxmodel.setup_logging(True)
+        if os.environ.get("NXMODEL_LOGGING", "no") == "yes":
+            nxmodel.setup_logging(True)
         self.model          = NXNode(0, 0, False)
         self.model_inbound  = [self.model.get_pipe(direction_t(x)) for x in range(4)]
         self.model_outbound = [NXMessagePipe() for _ in range(4)]

@@ -18,7 +18,6 @@ from cocotb.triggers import ClockCycles, RisingEdge
 
 from drivers.stream.common import StreamTransaction
 from nxconstants import MemorySlot, NodeCommand, NodeHeader, NodeLoad, NodeSignal
-from nxconstants import NodeRaw, MAX_ROW_COUNT, MAX_COLUMN_COUNT, MESSAGE_WIDTH
 from nxisa import Memory, Pause, Pick, Shuffle, Truth
 from nxisa.fields import Target
 
@@ -125,9 +124,9 @@ async def execute(tb):
         while tb.dut.u_dut.u_core.pause_q.value == 0:
             await RisingEdge(tb.clk)
 
-        # Check the PC
-        mdl_pc = tb.model.get_pc()
-        dut_pc = int(tb.dut.u_dut.u_core.pc_fetch_q.value)
+        # Check the next fetch PC
+        mdl_pc = tb.model.get_pc() + 1
+        dut_pc = int(tb.dut.u_dut.u_core.fetch_pc_q.value)
         tb.info(f"PC - Model: 0x{mdl_pc:04X}, DUT: 0x{dut_pc:04X}")
         assert mdl_pc == dut_pc, "PC mismatch between model and DUT"
 
