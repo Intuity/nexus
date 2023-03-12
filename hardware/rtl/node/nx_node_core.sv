@@ -66,44 +66,70 @@ logic stall;
 `DECLARE_DQ(1, pc0,   i_clk, i_rst, 'd1)
 
 // Program counter
-`DECLARE_DQT(pc_t, pc_fetch,   i_clk, i_rst, 'd0)
-`DECLARE_DQT(pc_t, pc_execute, i_clk, i_rst, 'd0)
-`DECLARE_DQ (   1, inst_valid, i_clk, i_rst, 'd0)
+`DECLARE_DQT(pc_t, fetch_pc,    i_clk, i_rst, 'd0)
+`DECLARE_DQ (   1, fetch_valid, i_clk, i_rst, 'd0)
 
-// Decode
-instruction_t instruction;
-logic         is_pause, is_memory, is_load, is_store, is_send, is_truth,
-              is_pick, is_shuffle;
-
-// Registers
+// Register file
 `DECLARE_DQ_ARRAY(REG_WIDTH, REG_COUNT, regfile, i_clk, i_rst, 'd0)
-logic [REG_WIDTH-1:0] r7_result;
-logic [REG_WIDTH-1:0] reg_rd_data;
-logic [REG_WIDTH-1:0] reg_forward [REG_COUNT-1:0];
-logic [REG_WIDTH-1:0] src_a, src_b, src_c;
-logic [REG_WIDTH-1:0] muxsel;
 
-// Memory
-`DECLARE_DQ(        1, rd_pend,        i_clk, i_rst, 'd0)
-`DECLARE_DQ(REG_IDX_W, rd_pend_target, i_clk, i_rst, 'd0)
-`DECLARE_DQ(        2, rd_pend_slot,   i_clk, i_rst, 'd0)
+// === Decode ===
+logic dcd_is_memory;
 
-NXISA::f_address_10_7_t addr_10_7;
-NXISA::f_address_6_0_t  addr_6_0;
-logic [RAM_ADDR_W-1:0]  full_addr;
-logic [           1:0]  full_slot;
+`DECLARE_DQG(1, dcd_is_pause,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(1, dcd_is_truth,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(1, dcd_is_pick,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(1, dcd_is_shuffle, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(1, dcd_is_load,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(1, dcd_is_store,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(1, dcd_is_send,    i_clk, i_rst, 'd0, ~stall)
 
-// Truth
-logic [2:0] truth_select;
-logic       truth_result;
+`DECLARE_DQG(        8, dcd_val_a,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        8, dcd_val_b,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        8, dcd_val_c,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        8, dcd_val_7,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_ovr_a,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(REG_IDX_W, dcd_tgt_reg, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_ovr_b,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_ovr_c,   i_clk, i_rst, 'd0, ~stall)
 
-// Messages
-`DECLARE_DQT(node_message_t, send_msg, i_clk, i_rst, 'd0)
-`DECLARE_DQ (             1, send_vld, i_clk, i_rst, 'd0)
+`DECLARE_DQG(4, dcd_addr_10_7, i_clk, i_rst, 'd0, ~stall)
 
-node_id_t     trgt_id;
-node_header_t header;
-node_signal_t to_send;
+`DECLARE_DQTG(instruction_t, dcd_instr, i_clk, i_rst, 'd0, ~stall)
+
+`DECLARE_DQG(2, dcd_slot, i_clk, i_rst, 'd0, ~stall)
+
+// === Execute ===
+
+logic [7:0] exe_rd_data;
+logic [7:0] exe_val_a, exe_val_b, exe_val_c;
+logic [9:0] exe_full_addr;
+logic [7:0] exe_result_truth, exe_result_shuffle;
+logic [2:0] exe_truth_select;
+logic       exe_truth_output;
+
+node_id_t     exe_msg_tgt;
+node_header_t exe_msg_hdr;
+node_signal_t exe_msg_sig;
+
+`DECLARE_DQG(REG_IDX_W, exe_tgt_reg,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, exe_cmt_rd,     i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, exe_cmt_result, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        2, exe_rd_slot,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        8, exe_result,     i_clk, i_rst, 'd0, ~stall)
+
+`DECLARE_DQT(node_message_t, exe_message, i_clk, i_rst, 'd0)
+`DECLARE_DQ (             1, exe_send,    i_clk, i_rst, 'd0)
+
+// === Commit ===
+
+logic       cmt_valid;
+logic [7:0] cmt_value;
+
+// =============================================================================
+// Expose Idle Flag
+// =============================================================================
+
+assign o_idle = idle_q;
 
 // =============================================================================
 // Slot
@@ -121,204 +147,206 @@ assign o_slot = slot_q;
 assign stall = pause_q || (o_send_valid && !i_send_ready);
 
 // If stalled either hold PC or reset to zero, else always increment
-assign pc_fetch = stall ? (pc0_q ? 'd0 : pc_fetch_q)
-                        : (pc_fetch_q + 'd1);
+assign fetch_pc = stall ? (pc0_q ? 'd0 : fetch_pc_q)
+                        : (fetch_pc_q + 'd1);
 
 // Drive RAM interface
-assign o_inst_addr  = pc_fetch;
+assign o_inst_addr  = fetch_pc;
 assign o_inst_rd_en = !pause;
 
 // Pipeline read signal as instruction valid
-assign inst_valid = o_inst_rd_en;
+assign fetch_valid = o_inst_rd_en;
 
 // =============================================================================
 // Decode
 // =============================================================================
 
-// Pickup PC from fetch
-assign pc_execute = stall ? pc_execute_q : pc_fetch_q;
-
 // Type cast raw data onto the instruction union
-assign instruction = i_inst_rd_data;
+assign dcd_instr = i_inst_rd_data;
 
-// Identify the operation
-assign is_pause   = inst_valid_q && (instruction.memory.op == NXISA::OP_PAUSE );
-assign is_memory  = inst_valid_q && (instruction.memory.op == NXISA::OP_MEMORY);
-assign is_truth   = inst_valid_q && (instruction.memory.op == NXISA::OP_TRUTH );
-assign is_pick    = inst_valid_q && (instruction.memory.op == NXISA::OP_PICK  );
-assign is_shuffle = inst_valid_q && ((instruction.memory.op == NXISA::OP_SHUFFLE    ) ||
-                                     (instruction.memory.op == NXISA::OP_SHUFFLE_ALT));
-assign is_load    = is_memory && (instruction.memory.mode == NXISA::MEM_LOAD );
-assign is_store   = is_memory && (instruction.memory.mode == NXISA::MEM_STORE);
-assign is_send    = is_memory && (instruction.memory.mode == NXISA::MEM_SEND );
+// Operation decode
+assign dcd_is_pause   = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_PAUSE );
+assign dcd_is_memory  = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_MEMORY);
+assign dcd_is_truth   = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_TRUTH );
+assign dcd_is_pick    = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_PICK  );
+assign dcd_is_shuffle = fetch_valid_q && ((dcd_instr.memory.op == NXISA::OP_SHUFFLE    ) ||
+                                          (dcd_instr.memory.op == NXISA::OP_SHUFFLE_ALT));
+assign dcd_is_load    = dcd_is_memory && (dcd_instr.memory.mode == NXISA::MEM_LOAD );
+assign dcd_is_store   = dcd_is_memory && (dcd_instr.memory.mode == NXISA::MEM_STORE);
+assign dcd_is_send    = dcd_is_memory && (dcd_instr.memory.mode == NXISA::MEM_SEND );
 
-// =============================================================================
-// Register Reads
-// =============================================================================
+// Select the right value for each register (with register forwarding)
+assign dcd_val_a = (cmt_valid && exe_tgt_reg_q == dcd_instr.truth.src_a)
+                   ? cmt_value
+                   : regfile_q[dcd_instr.truth.src_a];
+assign dcd_val_b = (cmt_valid && exe_tgt_reg_q == dcd_instr.truth.src_b)
+                   ? cmt_value
+                   : regfile_q[dcd_instr.truth.src_b];
+assign dcd_val_c = (cmt_valid && exe_tgt_reg_q == dcd_instr.truth.src_c)
+                   ? cmt_value
+                   : regfile_q[dcd_instr.truth.src_c];
 
-// Extract the right 8-bit slot from read data
-assign reg_rd_data = (rd_pend_slot_q == 'd3) ? i_data_rd_data[31:24] :
-                     (rd_pend_slot_q == 'd2) ? i_data_rd_data[23:16] :
-                     (rd_pend_slot_q == 'd1) ? i_data_rd_data[15: 8]
-                                             : i_data_rd_data[ 7: 0];
+// Special case for R7 which is only used by the TRUTH instruction
+assign dcd_val_7 = (cmt_valid && exe_tgt_reg_q == 'd7) ? cmt_value : regfile_q[7];
 
-// R7 only acts as a shift register for TRUTH operations, so forwarding impossible
-assign reg_forward[REG_COUNT-1] = regfile_q[REG_COUNT-1];
+// Forward the target register through
+assign dcd_tgt_reg = dcd_instr.memory.tgt;
 
-// R0-R6 require register forwarding
-generate
-for (genvar idx = 0; idx < (REG_COUNT - 1); idx++) begin
-    assign reg_forward[idx] = (
-        (rd_pend_q && (rd_pend_target_q == idx[2:0])) ? reg_rd_data : regfile_q[idx]
-    );
-end
-endgenerate
+// Flag if a pending read means value needs to be overridden
+assign dcd_ovr_a = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_a);
+assign dcd_ovr_b = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_b);
+assign dcd_ovr_c = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_c);
 
-// Pickup the source registers (for MEMORY, TRUTH, PICK, and SHUFFLE)
-assign src_a = reg_forward[instruction.truth.src_a];
-assign src_b = reg_forward[instruction.truth.src_b];
-assign src_c = reg_forward[instruction.truth.src_c];
-
-// Perform single register bit extractions (for PICK and SHUFFLE)
-assign muxsel[0] = src_a[instruction.shuffle.mux_0];
-assign muxsel[1] = src_a[instruction.shuffle.mux_1];
-assign muxsel[2] = src_a[instruction.shuffle.mux_2];
-assign muxsel[3] = src_a[instruction.shuffle.mux_3];
-assign muxsel[4] = src_a[instruction.shuffle.mux_4];
-assign muxsel[5] = src_a[instruction.shuffle.mux_5];
-assign muxsel[6] = src_a[instruction.shuffle.mux_6];
-assign muxsel[7] = src_a[instruction.shuffle.mux_7];
-
-// =============================================================================
-// Register Writes
-// NOTE: Only R0-R6 are directly writeable, R7 is a shift register for TRUTH
-// =============================================================================
-
-always_comb begin : comb_reg_write
-    for (int idx = 0; idx < REG_COUNT; idx++) begin
-        // R7 can only be updated by truth table operations
-        if (idx == 7) begin
-            regfile[idx] = r7_result;
-        // SHUFFLE is the only operation which can directly write to a register
-        end else if (is_shuffle && (instruction.shuffle.tgt == idx[2:0])) begin
-            regfile[idx] = muxsel;
-        // LOAD operations write to registers a cycle later (RAM latency)
-        end else if (rd_pend_q && (rd_pend_target_q == idx[2:0])) begin
-            regfile[idx] = reg_rd_data;
-        // Otherwise hold the current value
-        end else begin
-            regfile[idx] = regfile_q[idx];
-        end
-    end
-end
-
-// =============================================================================
-// Stalling/Pausing
-// =============================================================================
-
-// Activate pause when requested
-assign pause = (pause_q && !i_trigger) || is_pause;
-
-// If required, set the IDLE flag
-assign idle = (idle_q && !i_trigger) || (is_pause && instruction.pause.idle);
-
-// If required, reset PC to zero
-assign pc0 = (pc0_q && !i_trigger) || (is_pause && instruction.pause.pc0);
-
-// Expose idle
-assign o_idle = idle_q;
-
-// =============================================================================
-// Reading/Writing Local Memory
-// =============================================================================
-
-// Calculate the full memory address
+// Determine address [10:7]
 // NOTE: PICK operations offset by 64 rows (shifted by one for the 16-bit slot)
-assign addr_10_7 = is_memory ? instruction.memory.address_10_7 : 'd1;
-assign addr_6_0  = instruction.memory.address_6_0;
-assign full_addr = { addr_10_7, addr_6_0[6:1] };
+assign dcd_addr_10_7 = dcd_is_memory ? dcd_instr.memory.address_10_7 : 'd1;
 
+// Determine the 8-bit slot selector
 always_comb begin : comb_full_slot
-    full_slot[1] = addr_6_0[0];
-    case (instruction.memory.slot)
-        NXISA::SLOT_PRESERVE: full_slot[0] =  slot_q;
-        NXISA::SLOT_INVERSE : full_slot[0] = ~slot_q;
-        NXISA::SLOT_LOWER   : full_slot[0] =     'd0;
-        NXISA::SLOT_UPPER   : full_slot[0] =     'd1;
+    dcd_slot[1] = dcd_instr.memory.address_6_0[0];
+    case (dcd_instr.memory.slot)
+        NXISA::SLOT_PRESERVE: dcd_slot[0] =  slot_q;
+        NXISA::SLOT_INVERSE : dcd_slot[0] = ~slot_q;
+        NXISA::SLOT_LOWER   : dcd_slot[0] =     'd0;
+        NXISA::SLOT_UPPER   : dcd_slot[0] =     'd1;
     endcase
 end
 
-// Drive data interface
-assign o_data_addr    = full_addr;
-assign o_data_wr_data = is_store ? {4{src_a}} : {8{muxsel[3:0]}};
-assign o_data_rd_en   = is_load;
+// =============================================================================
+// Execute
+// =============================================================================
+
+// Extract the right 8-bit slot from read data (one cycle later)
+assign exe_rd_data = (exe_rd_slot_q == 'd3) ? i_data_rd_data[31:24] :
+                     (exe_rd_slot_q == 'd2) ? i_data_rd_data[23:16] :
+                     (exe_rd_slot_q == 'd1) ? i_data_rd_data[15: 8]
+                                            : i_data_rd_data[ 7: 0];
+
+// Override register value with read data if required
+assign exe_val_a = dcd_ovr_a_q ? exe_rd_data : dcd_val_a_q;
+assign exe_val_b = dcd_ovr_b_q ? exe_rd_data : dcd_val_b_q;
+assign exe_val_c = dcd_ovr_c_q ? exe_rd_data : dcd_val_c_q;
+
+// Form the full 10-bit address
+assign exe_full_addr = { dcd_addr_10_7_q, dcd_instr_q.memory.address_6_0[6:1] };
+
+// Pipeline the target register
+assign exe_tgt_reg = dcd_tgt_reg_q;
+
+// Determine what type of commit is required
+assign exe_cmt_rd     = dcd_is_load_q;
+assign exe_cmt_result = dcd_is_truth_q || dcd_is_shuffle_q;
+
+// === PAUSE ===
+// - Activate pause when requested
+assign pause = (pause_q && !i_trigger) || dcd_is_pause_q;
+// - If required, set the IDLE flag
+assign idle = (idle_q && !i_trigger) || (dcd_is_pause_q && dcd_instr_q.pause.idle);
+// - If required, reset PC to zero
+assign pc0 = (pc0_q && !i_trigger) || (dcd_is_pause_q && dcd_instr_q.pause.pc0);
+
+// === LOAD, STORE & PICK ===
+// Remember the slot data is being loaded to
+assign exe_rd_slot = dcd_slot_q;
+
+// Drive the memory interface
+assign o_data_addr    = exe_full_addr;
+assign o_data_wr_data = dcd_is_store_q ? {4{exe_val_a}}
+                                       : {8{exe_result_shuffle[3:0]}};
+assign o_data_rd_en   = dcd_is_load_q;
 
 assign o_data_wr_strb = (
     {
         24'd0, ((
                     {
-                        {4{(is_pick &&  instruction.pick.upper)}},
-                        {4{(is_pick && !instruction.pick.upper)}}
+                        {4{(dcd_is_pick_q &&  dcd_instr_q.pick.upper)}},
+                        {4{(dcd_is_pick_q && !dcd_instr_q.pick.upper)}}
                     } & {
-                        instruction.pick.mask,
-                        instruction.pick.mask
+                        dcd_instr_q.pick.mask,
+                        dcd_instr_q.pick.mask
                     }
                 ) | (
-                    {8{is_store}} & {instruction.memory.send_row,
-                                     instruction.memory.send_col}
+                    {8{dcd_is_store_q}} & {dcd_instr_q.memory.send_row,
+                                           dcd_instr_q.memory.send_col}
                 ))
-    } << {full_slot, 3'd0}
+    } << {dcd_slot_q, 3'd0}
 );
 
-// Track pending read
-assign rd_pend        = is_load;
-assign rd_pend_target = instruction.memory.tgt;
-assign rd_pend_slot   = full_slot;
-
-// =============================================================================
-// Truth Table
-// =============================================================================
-
-// Perform multiple register bit extractions (for TRUTH)
-assign truth_select[0] = src_a[instruction.truth.mux_0];
-assign truth_select[1] = src_b[instruction.truth.mux_1];
-assign truth_select[2] = src_c[instruction.truth.mux_2];
-
-// Calculate result
-always_comb begin : comb_truth
-    logic [6:0] _unused_shifted;
-    {_unused_shifted, truth_result} = (instruction.truth.truth >> truth_select);
-end
-
-// Shift result into register 7
-assign r7_result = is_truth ? { regfile_q[7][6:0], truth_result } : regfile_q[7];
-
-// =============================================================================
-// Send Message
-// =============================================================================
-
+// === SEND ===
 // Form the target ID
-assign trgt_id.row     = instruction.memory.send_row;
-assign trgt_id.column  = instruction.memory.send_col;
+assign exe_msg_tgt.row     = dcd_instr_q.memory.send_row;
+assign exe_msg_tgt.column  = dcd_instr_q.memory.send_col;
 
 // Form the header
-assign header.target     = trgt_id;
-assign header.command    = NODE_COMMAND_SIGNAL;
-assign header._padding_0 = 'd0;
+assign exe_msg_hdr.target     = exe_msg_tgt;
+assign exe_msg_hdr.command    = NODE_COMMAND_SIGNAL;
+assign exe_msg_hdr._padding_0 = 'd0;
 
 // Form the message
-assign to_send.header  = header;
-assign to_send.address = {addr_10_7, addr_6_0};
-assign to_send.slot    = instruction.memory.slot;
-assign to_send.data    = src_a;
+assign exe_msg_sig.header  = exe_msg_hdr;
+assign exe_msg_sig.address = { exe_full_addr, dcd_slot_q[1] };
+assign exe_msg_sig.slot    = dcd_instr_q.memory.slot;
+assign exe_msg_sig.data    = exe_val_a;
 
-assign {send_msg, send_vld} = (
-    (send_vld_q && !i_send_ready) ? {send_msg_q, 1'b1   }
-                                  : {to_send,    is_send}
+assign {exe_message, exe_send} = (
+    (exe_send_q && !i_send_ready) ? {exe_message_q, 1'b1         }
+                                  : {exe_msg_sig,   dcd_is_send_q}
 );
 
 // Drive message interface
-assign o_send_data  = send_msg_q;
-assign o_send_valid = send_vld_q;
+assign o_send_data  = exe_message_q;
+assign o_send_valid = exe_send_q;
+
+// === TRUTH ===
+// - Perform multiple register bit extractions (for TRUTH)
+assign exe_truth_select[0] = exe_val_a[dcd_instr_q.truth.mux_0];
+assign exe_truth_select[1] = exe_val_b[dcd_instr_q.truth.mux_1];
+assign exe_truth_select[2] = exe_val_c[dcd_instr_q.truth.mux_2];
+// - Calculate result
+always_comb begin : comb_truth
+    logic [6:0] _unused_shifted;
+    {_unused_shifted, exe_truth_output} = (dcd_instr_q.truth.truth >> exe_truth_select);
+end
+// - Shift result into register 7
+assign exe_result_truth = { dcd_val_7_q[6:0], exe_truth_output };
+
+// === SHUFFLE ===
+assign exe_result_shuffle[0] = exe_val_a[dcd_instr_q.shuffle.mux_0];
+assign exe_result_shuffle[1] = exe_val_a[dcd_instr_q.shuffle.mux_1];
+assign exe_result_shuffle[2] = exe_val_a[dcd_instr_q.shuffle.mux_2];
+assign exe_result_shuffle[3] = exe_val_a[dcd_instr_q.shuffle.mux_3];
+assign exe_result_shuffle[4] = exe_val_a[dcd_instr_q.shuffle.mux_4];
+assign exe_result_shuffle[5] = exe_val_a[dcd_instr_q.shuffle.mux_5];
+assign exe_result_shuffle[6] = exe_val_a[dcd_instr_q.shuffle.mux_6];
+assign exe_result_shuffle[7] = exe_val_a[dcd_instr_q.shuffle.mux_7];
+
+// Select the right result
+assign exe_result = dcd_is_truth_q   ? exe_result_truth :
+                    dcd_is_shuffle_q ? exe_result_shuffle
+                                     : 'd0;
+
+// =============================================================================
+// Commit
+// =============================================================================
+
+// Determine if a value needs to be written
+assign cmt_valid = exe_cmt_rd_q || exe_cmt_result_q;
+
+// Resolve whether the commit value comes from read data or the execute result
+assign cmt_value = exe_cmt_rd_q ? exe_rd_data : exe_result_q;
+
+// Update register values
+generate
+for (genvar idx = 0; idx < 8; idx++) begin : gen_register_update
+    assign regfile[idx] = (cmt_valid && exe_tgt_reg_q == idx[2:0]) ? cmt_value : regfile_q[idx];
+end
+endgenerate
+
+// =============================================================================
+// Unused
+// =============================================================================
+
+logic _unused;
+assign _unused = &{ 1'b0, dcd_val_7_q[7] };
 
 endmodule : nx_node_core

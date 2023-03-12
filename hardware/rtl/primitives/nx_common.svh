@@ -71,7 +71,47 @@
 //  R: Reset signal driving sequential logic
 //  I: Initial value for the signal to take
 //
-`define DECLARE_DQ(W, X, C, R, I) `DECLARE_DQTG(logic [W-1:0], X, C, R, I, 1'b1)
+`define DECLARE_DQ(W, X, C, R, I) `DECLARE_DQT(logic [W-1:0], X, C, R, I)
+
+// DECLARE_DQTG_ARRAY(T, N, X, C, R, I, G)
+// Declares a combinatorial-sequential logic pair for an array, and sets up the
+// sequential logic portion.
+// Args:
+//  T: Type of the signal
+//  N: Number of elements in the array
+//  X: Name of the signal
+//  C: Clock signal driving sequential logic
+//  R: Reset signal driving sequential logic
+//  I: Initial value for each signal to take
+//  G: Gating condition for adopting the new value
+//
+`define DECLARE_DQTG_ARRAY(T, N, X, C, R, I, G) \
+    T ``X`` [N-1:0], ``X``_q [N-1:0]; \
+    localparam __ARRAY_SIZE_``X`` = N; \
+    always_ff @(posedge C, posedge R) begin : s_``X \
+        int i; \
+        if (R) begin \
+            for (i = 0; i < N; i = (i + 1)) ``X``_q[i] <= (I); \
+        end else if (G) begin \
+            for (i = 0; i < N; i = (i + 1)) ``X``_q[i] <= X[i]; \
+        end \
+    end
+
+// DECLARE_DQG_ARRAY(W, N, X, C, R, I, G)
+// Declares a combinatorial-sequential logic pair for an array, and sets up the
+// sequential logic portion.
+// Args:
+//  W: Width of the signal
+//  N: Number of elements in the array
+//  X: Name of the signal
+//  C: Clock signal driving sequential logic
+//  R: Reset signal driving sequential logic
+//  I: Initial value for each signal to take
+//  G: Gating condition for adopting the new value
+//
+`define DECLARE_DQG_ARRAY(W, N, X, C, R, I, G) \
+    localparam __ARRAY_SIZE_``X`` = N; \
+    `DECLARE_DQTG(logic [N-1:0][W-1:0], X, C, R, I, G)
 
 // DECLARE_DQT_ARRAY(T, N, X, C, R, I)
 // Declares a combinatorial-sequential logic pair for an array, and sets up the
@@ -84,17 +124,7 @@
 //  R: Reset signal driving sequential logic
 //  I: Initial value for each signal to take
 //
-`define DECLARE_DQT_ARRAY(T, N, X, C, R, I) \
-    T ``X`` [N-1:0], ``X``_q [N-1:0]; \
-    localparam __ARRAY_SIZE_``X`` = N; \
-    always_ff @(posedge C, posedge R) begin : s_``X \
-        int i; \
-        if (R) begin \
-            for (i = 0; i < N; i = (i + 1)) ``X``_q[i] <= (I); \
-        end else begin \
-            for (i = 0; i < N; i = (i + 1)) ``X``_q[i] <= X[i]; \
-        end \
-    end
+`define DECLARE_DQT_ARRAY(T, N, X, C, R, I) `DECLARE_DQTG_ARRAY(T, N, X, C, R, I, 1'b1)
 
 // DECLARE_DQ_ARRAY(W, N, X, C, R, I)
 // Declares a combinatorial-sequential logic pair for an array, and sets up the
@@ -107,9 +137,7 @@
 //  R: Reset signal driving sequential logic
 //  I: Initial value for each signal to take
 //
-`define DECLARE_DQ_ARRAY(W, N, X, C, R, I) \
-    localparam __ARRAY_SIZE_``X`` = N; \
-    `DECLARE_DQT(logic [N-1:0][W-1:0], X, C, R, I)
+`define DECLARE_DQ_ARRAY(W, N, X, C, R, I) `DECLARE_DQG_ARRAY(W, N, X, C, R, I, 1'b1)
 
 // INIT_D(X)
 // Copy the sequential value back to the combinatorial value, ready for
