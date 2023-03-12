@@ -438,6 +438,18 @@ bool NXNode::evaluate ( bool trigger )
             }
         }
 
+        // Dump register state
+        PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
+                     << std::dec << (unsigned int)m_id.column << ") "
+              << "R0: 0x" << std::hex << (unsigned int)m_registers[0] << ", "
+              << "R1: 0x" << std::hex << (unsigned int)m_registers[1] << ", "
+              << "R2: 0x" << std::hex << (unsigned int)m_registers[2] << ", "
+              << "R3: 0x" << std::hex << (unsigned int)m_registers[3] << ", "
+              << "R4: 0x" << std::hex << (unsigned int)m_registers[4] << ", "
+              << "R5: 0x" << std::hex << (unsigned int)m_registers[5] << ", "
+              << "R6: 0x" << std::hex << (unsigned int)m_registers[6] << ", "
+              << "R7: 0x" << std::hex << (unsigned int)m_registers[7];
+
         // Increment PC
         m_pc += 1;
     }
@@ -450,7 +462,6 @@ bool NXNode::evaluate ( bool trigger )
                   << ".txt";
         m_data_memory.dump(fname.str(), m_cycle);
     }
-
 
     // Return whether the node is now idle
     return m_idle;
