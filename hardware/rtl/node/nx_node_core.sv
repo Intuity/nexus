@@ -60,7 +60,7 @@ typedef logic [RAM_ADDR_W-1:0] pc_t;
 `DECLARE_DQ(1, slot, i_clk, i_rst, 'd1)
 
 // Stall handling
-logic stall;
+`DECLARE_DQ(1, stall, i_clk, i_rst, 'd1)
 `DECLARE_DQ(1, pause, i_clk, i_rst, 'd1)
 `DECLARE_DQ(1, idle,  i_clk, i_rst, 'd1)
 `DECLARE_DQ(1, pc0,   i_clk, i_rst, 'd1)
@@ -87,10 +87,14 @@ logic dcd_is_memory;
 `DECLARE_DQG(        8, dcd_val_b,   i_clk, i_rst, 'd0, ~stall)
 `DECLARE_DQG(        8, dcd_val_c,   i_clk, i_rst, 'd0, ~stall)
 `DECLARE_DQG(        8, dcd_val_7,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_ovr_a,   i_clk, i_rst, 'd0, ~stall)
 `DECLARE_DQG(REG_IDX_W, dcd_tgt_reg, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_ovr_a,   i_clk, i_rst, 'd0, ~stall)
 `DECLARE_DQG(        1, dcd_ovr_b,   i_clk, i_rst, 'd0, ~stall)
 `DECLARE_DQG(        1, dcd_ovr_c,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_fwd_a,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_fwd_b,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_fwd_c,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, dcd_fwd_7,   i_clk, i_rst, 'd0, ~stall)
 
 `DECLARE_DQG(4, dcd_addr_10_7, i_clk, i_rst, 'd0, ~stall)
 
@@ -101,7 +105,7 @@ logic dcd_is_memory;
 // === Execute ===
 
 logic [7:0] exe_rd_data;
-logic [7:0] exe_val_a, exe_val_b, exe_val_c;
+logic [7:0] exe_val_a, exe_val_b, exe_val_c, exe_val_7;
 logic [9:0] exe_full_addr;
 logic [7:0] exe_result_truth, exe_result_shuffle;
 logic [2:0] exe_truth_select;
@@ -111,14 +115,14 @@ node_id_t     exe_msg_tgt;
 node_header_t exe_msg_hdr;
 node_signal_t exe_msg_sig;
 
-`DECLARE_DQG(REG_IDX_W, exe_tgt_reg,    i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, exe_cmt_rd,     i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, exe_cmt_result, i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        2, exe_rd_slot,    i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        8, exe_result,     i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(REG_IDX_W, exe_tgt_reg,    i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQG(        1, exe_cmt_rd,     i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQG(        1, exe_cmt_result, i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQG(        2, exe_rd_slot,    i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQG(        8, exe_result,     i_clk, i_rst, 'd0, ~(stall || stall_q))
 
-`DECLARE_DQT(node_message_t, exe_message, i_clk, i_rst, 'd0)
-`DECLARE_DQ (             1, exe_send,    i_clk, i_rst, 'd0)
+`DECLARE_DQTG(node_message_t, exe_message, i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQG (             1, exe_send,    i_clk, i_rst, 'd0, ~(stall || stall_q))
 
 // === Commit ===
 
@@ -190,12 +194,21 @@ assign dcd_val_c = (cmt_valid && exe_tgt_reg_q == dcd_instr.truth.src_c)
 assign dcd_val_7 = (cmt_valid && exe_tgt_reg_q == 'd7) ? cmt_value : regfile_q[7];
 
 // Forward the target register through
-assign dcd_tgt_reg = dcd_instr.memory.tgt;
+assign dcd_tgt_reg = dcd_is_truth ? 'd7 : dcd_instr.memory.tgt;
 
-// Flag if a pending read means value needs to be overridden
+// Flag if a pending read means value needs to be overridden by read data
 assign dcd_ovr_a = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_a);
 assign dcd_ovr_b = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_b);
 assign dcd_ovr_c = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_c);
+
+// Flag if a pending read means value needs to be overridden by execute result
+assign dcd_fwd_a = ((dcd_is_shuffle_q && (dcd_instr.truth.src_a == dcd_tgt_reg_q)) ||
+                    (dcd_is_truth_q   && (dcd_instr.truth.src_a == 'd7          )));
+assign dcd_fwd_b = ((dcd_is_shuffle_q && (dcd_instr.truth.src_b == dcd_tgt_reg_q)) ||
+                    (dcd_is_truth_q   && (dcd_instr.truth.src_b == 'd7          )));
+assign dcd_fwd_c = ((dcd_is_shuffle_q && (dcd_instr.truth.src_c == dcd_tgt_reg_q)) ||
+                    (dcd_is_truth_q   && (dcd_instr.truth.src_c == 'd7          )));
+assign dcd_fwd_7 = dcd_is_truth_q;
 
 // Determine address [10:7]
 // NOTE: PICK operations offset by 64 rows (shifted by one for the 16-bit slot)
@@ -223,9 +236,17 @@ assign exe_rd_data = (exe_rd_slot_q == 'd3) ? i_data_rd_data[31:24] :
                                             : i_data_rd_data[ 7: 0];
 
 // Override register value with read data if required
-assign exe_val_a = dcd_ovr_a_q ? exe_rd_data : dcd_val_a_q;
-assign exe_val_b = dcd_ovr_b_q ? exe_rd_data : dcd_val_b_q;
-assign exe_val_c = dcd_ovr_c_q ? exe_rd_data : dcd_val_c_q;
+assign exe_val_a = dcd_ovr_a_q ? exe_rd_data :
+                   dcd_fwd_a_q ? exe_result_q
+                               : dcd_val_a_q;
+assign exe_val_b = dcd_ovr_b_q ? exe_rd_data :
+                   dcd_fwd_b_q ? exe_result_q
+                               : dcd_val_b_q;
+assign exe_val_c = dcd_ovr_c_q ? exe_rd_data :
+                   dcd_fwd_c_q ? exe_result_q
+                               : dcd_val_c_q;
+assign exe_val_7 = dcd_fwd_7_q ? exe_result_q
+                               : dcd_val_7_q;
 
 // Form the full 10-bit address
 assign exe_full_addr = { dcd_addr_10_7_q, dcd_instr_q.memory.address_6_0[6:1] };
@@ -255,7 +276,7 @@ assign o_data_wr_data = dcd_is_store_q ? {4{exe_val_a}}
                                        : {8{exe_result_shuffle[3:0]}};
 assign o_data_rd_en   = dcd_is_load_q;
 
-assign o_data_wr_strb = (
+assign o_data_wr_strb = {32{~(stall || stall_q)}} & (
     {
         24'd0, ((
                     {
@@ -289,8 +310,8 @@ assign exe_msg_sig.slot    = dcd_instr_q.memory.slot;
 assign exe_msg_sig.data    = exe_val_a;
 
 assign {exe_message, exe_send} = (
-    (exe_send_q && !i_send_ready) ? {exe_message_q, 1'b1         }
-                                  : {exe_msg_sig,   dcd_is_send_q}
+    (exe_send_q && !i_send_ready) ? {exe_message_q, 1'b1                                }
+                                  : {exe_msg_sig,   dcd_is_send_q && ~(stall || stall_q)}
 );
 
 // Drive message interface
@@ -308,7 +329,7 @@ always_comb begin : comb_truth
     {_unused_shifted, exe_truth_output} = (dcd_instr_q.truth.truth >> exe_truth_select);
 end
 // - Shift result into register 7
-assign exe_result_truth = { dcd_val_7_q[6:0], exe_truth_output };
+assign exe_result_truth = { exe_val_7[6:0], exe_truth_output };
 
 // === SHUFFLE ===
 assign exe_result_shuffle[0] = exe_val_a[dcd_instr_q.shuffle.mux_0];
