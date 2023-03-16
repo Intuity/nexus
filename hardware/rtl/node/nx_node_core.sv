@@ -75,32 +75,32 @@ typedef logic [RAM_ADDR_W-1:0] pc_t;
 // === Decode ===
 logic dcd_is_memory;
 
-`DECLARE_DQG(1, dcd_is_pause,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(1, dcd_is_truth,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(1, dcd_is_pick,    i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(1, dcd_is_shuffle, i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(1, dcd_is_load,    i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(1, dcd_is_store,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(1, dcd_is_send,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQ(1, dcd_is_pause,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, dcd_is_truth,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, dcd_is_pick,    i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, dcd_is_shuffle, i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, dcd_is_load,    i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, dcd_is_store,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(1, dcd_is_send,    i_clk, i_rst, 'd0)
 
-`DECLARE_DQG(        8, dcd_val_a,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        8, dcd_val_b,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        8, dcd_val_c,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        8, dcd_val_7,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(REG_IDX_W, dcd_tgt_reg, i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_ovr_a,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_ovr_b,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_ovr_c,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_fwd_a,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_fwd_b,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_fwd_c,   i_clk, i_rst, 'd0, ~stall)
-`DECLARE_DQG(        1, dcd_fwd_7,   i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQ(        8, dcd_val_a,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        8, dcd_val_b,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        8, dcd_val_c,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        8, dcd_val_7,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(REG_IDX_W, dcd_tgt_reg, i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_ovr_a,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_ovr_b,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_ovr_c,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_fwd_a,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_fwd_b,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_fwd_c,   i_clk, i_rst, 'd0)
+`DECLARE_DQ(        1, dcd_fwd_7,   i_clk, i_rst, 'd0)
 
-`DECLARE_DQG(4, dcd_addr_10_7, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQ(4, dcd_addr_10_7, i_clk, i_rst, 'd0)
 
-`DECLARE_DQTG(instruction_t, dcd_instr, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQT(instruction_t, dcd_instr, i_clk, i_rst, 'd0)
 
-`DECLARE_DQG(2, dcd_slot, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQ(2, dcd_slot, i_clk, i_rst, 'd0)
 
 // === Execute ===
 
@@ -115,14 +115,14 @@ node_id_t     exe_msg_tgt;
 node_header_t exe_msg_hdr;
 node_signal_t exe_msg_sig;
 
-`DECLARE_DQG(REG_IDX_W, exe_tgt_reg,    i_clk, i_rst, 'd0, ~(stall || stall_q))
-`DECLARE_DQG(        1, exe_cmt_rd,     i_clk, i_rst, 'd0, ~(stall || stall_q))
-`DECLARE_DQG(        1, exe_cmt_result, i_clk, i_rst, 'd0, ~(stall || stall_q))
-`DECLARE_DQG(        2, exe_rd_slot,    i_clk, i_rst, 'd0, ~(stall || stall_q))
-`DECLARE_DQG(        8, exe_result,     i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQG(REG_IDX_W, exe_tgt_reg,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, exe_cmt_rd,     i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        1, exe_cmt_result, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        2, exe_rd_slot,    i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG(        8, exe_result,     i_clk, i_rst, 'd0, ~stall)
 
-`DECLARE_DQTG(node_message_t, exe_message, i_clk, i_rst, 'd0, ~(stall || stall_q))
-`DECLARE_DQG (             1, exe_send,    i_clk, i_rst, 'd0, ~(stall || stall_q))
+`DECLARE_DQTG(node_message_t, exe_message, i_clk, i_rst, 'd0, ~stall)
+`DECLARE_DQG (             1, exe_send,    i_clk, i_rst, 'd0, ~stall)
 
 // === Commit ===
 
@@ -151,15 +151,26 @@ assign o_slot = slot_q;
 assign stall = pause_q || (o_send_valid && !i_send_ready);
 
 // If stalled either hold PC or reset to zero, else always increment
-assign fetch_pc = stall ? (pc0_q ? 'd0 : fetch_pc_q)
-                        : (fetch_pc_q + 'd1);
+always_comb begin : comb_fetch_pc
+    fetch_pc = fetch_pc_q;
+    // If PC0 specified, force
+    if (pc0_q) begin
+        fetch_pc = 'd0;
+    // If entering stall, backup one cycle
+    end else if (!stall_q && stall) begin
+        fetch_pc = fetch_pc_q - 'd1;
+    // Otherwise, if not stalling, increment
+    end else if (!stall_q) begin
+        fetch_pc = fetch_pc_q + 'd1;
+    end
+end
 
 // Drive RAM interface
 assign o_inst_addr  = fetch_pc;
 assign o_inst_rd_en = !pause;
 
 // Pipeline read signal as instruction valid
-assign fetch_valid = o_inst_rd_en;
+assign fetch_valid = o_inst_rd_en && !stall;
 
 // =============================================================================
 // Decode
