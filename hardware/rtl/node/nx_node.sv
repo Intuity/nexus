@@ -72,6 +72,9 @@ logic slot;
 // Pipelined trigger
 `DECLARE_DQ(1, trigger, i_clk, i_rst, 'd0)
 
+// Registered idle signal
+`DECLARE_DQ(1, idle, i_clk, i_rst, 'd0)
+
 // =============================================================================
 // Instruction RAM
 // =============================================================================
@@ -221,7 +224,9 @@ nx_node_core u_core (
 // Idle & Trigger
 // =============================================================================
 
-assign o_idle    = &{i_idle, decd_idle, dist_idle, core_idle};
+assign idle = &{i_idle, decd_idle, dist_idle, core_idle};
+
+assign o_idle    = idle_q;
 assign trigger   = i_trigger;
 assign o_trigger = trigger_q;
 
