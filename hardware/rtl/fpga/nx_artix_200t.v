@@ -50,11 +50,6 @@ wire                       ctrl_out_last, ctrl_out_valid, ctrl_out_ready;
 nexus #(
       .ROWS             ( ROWS           )
     , .COLUMNS          ( COLUMNS        )
-    , .INPUTS           ( 32             )
-    , .OUTPUTS          ( 32             )
-    , .REGISTERS        ( 16             )
-    , .RAM_ADDR_W       ( 10             )
-    , .RAM_DATA_W       ( 32             )
 ) u_nexus (
       .i_clk            ( clk            )
     , .i_rst            ( ~rstn          )
