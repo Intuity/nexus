@@ -73,6 +73,7 @@ typedef logic [RAM_ADDR_W-1:0] pc_t;
 `DECLARE_DQ_ARRAY(REG_WIDTH, REG_COUNT, regfile, i_clk, i_rst, 'd0)
 
 // === Decode ===
+logic dcd_valid;
 logic dcd_is_memory;
 
 `DECLARE_DQ(1, dcd_is_pause,   i_clk, i_rst, 'd0)
@@ -124,6 +125,10 @@ node_signal_t exe_msg_sig;
 `DECLARE_DQTG(node_message_t, exe_message, i_clk, i_rst, 'd0, ~stall)
 `DECLARE_DQG (             1, exe_send,    i_clk, i_rst, 'd0, ~stall)
 
+`DECLARE_DQ(10, exe_mem_addr, i_clk, i_rst, 'd0)
+`DECLARE_DQ( 8, exe_wr_data,  i_clk, i_rst, 'd0)
+`DECLARE_DQ(32, exe_wr_strb,  i_clk, i_rst, 'd0)
+
 // === Commit ===
 
 logic       cmt_valid;
@@ -148,7 +153,9 @@ assign o_slot = slot_q;
 // =============================================================================
 
 // Determine stall condition
-assign stall = pause_q || (o_send_valid && !i_send_ready);
+assign stall = pause_q ||
+               (o_send_valid && !i_send_ready) ||
+               (dcd_is_load_q && (|exe_wr_strb_q));
 
 // If stalled either hold PC or reset to zero, else always increment
 always_comb begin : comb_fetch_pc
@@ -176,16 +183,19 @@ assign fetch_valid = o_inst_rd_en && !stall;
 // Decode
 // =============================================================================
 
+// Take account of the stall
+assign dcd_valid = fetch_valid_q && !stall;
+
 // Type cast raw data onto the instruction union
 assign dcd_instr = i_inst_rd_data;
 
 // Operation decode
-assign dcd_is_pause   = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_PAUSE );
-assign dcd_is_memory  = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_MEMORY);
-assign dcd_is_truth   = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_TRUTH );
-assign dcd_is_pick    = fetch_valid_q && (dcd_instr.memory.op == NXISA::OP_PICK  );
-assign dcd_is_shuffle = fetch_valid_q && ((dcd_instr.memory.op == NXISA::OP_SHUFFLE    ) ||
-                                          (dcd_instr.memory.op == NXISA::OP_SHUFFLE_ALT));
+assign dcd_is_pause   = dcd_valid && (dcd_instr.memory.op == NXISA::OP_PAUSE );
+assign dcd_is_memory  = dcd_valid && (dcd_instr.memory.op == NXISA::OP_MEMORY);
+assign dcd_is_truth   = dcd_valid && (dcd_instr.memory.op == NXISA::OP_TRUTH );
+assign dcd_is_pick    = dcd_valid && (dcd_instr.memory.op == NXISA::OP_PICK  );
+assign dcd_is_shuffle = dcd_valid && ((dcd_instr.memory.op == NXISA::OP_SHUFFLE    ) ||
+                                      (dcd_instr.memory.op == NXISA::OP_SHUFFLE_ALT));
 assign dcd_is_load    = dcd_is_memory && (dcd_instr.memory.mode == NXISA::MEM_LOAD );
 assign dcd_is_store   = dcd_is_memory && (dcd_instr.memory.mode == NXISA::MEM_STORE);
 assign dcd_is_send    = dcd_is_memory && (dcd_instr.memory.mode == NXISA::MEM_SEND );
@@ -281,13 +291,9 @@ assign pc0 = (pc0_q && !i_trigger) || (dcd_is_pause_q && dcd_instr_q.pause.pc0);
 // Remember the slot data is being loaded to
 assign exe_rd_slot = dcd_slot_q;
 
-// Drive the memory interface
-assign o_data_addr    = exe_full_addr;
-assign o_data_wr_data = dcd_is_store_q ? {4{exe_val_a}}
-                                       : {8{exe_result_shuffle[3:0]}};
-assign o_data_rd_en   = dcd_is_load_q;
-
-assign o_data_wr_strb = {32{~(stall || stall_q)}} & (
+assign exe_mem_addr = exe_full_addr;
+assign exe_wr_data  = dcd_is_store_q ? exe_val_a : {2{exe_result_shuffle[3:0]}};
+assign exe_wr_strb  = {32{~(stall || stall_q)}} & (
     {
         24'd0, ((
                     {
@@ -304,10 +310,16 @@ assign o_data_wr_strb = {32{~(stall || stall_q)}} & (
     } << {dcd_slot_q, 3'd0}
 );
 
+// Drive the memory interface
+assign o_data_addr    = (|exe_wr_strb_q) ? exe_mem_addr_q : exe_full_addr;
+assign o_data_rd_en   = dcd_is_load_q && !stall;
+assign o_data_wr_data = {4{exe_wr_data_q}};
+assign o_data_wr_strb = exe_wr_strb_q;
+
 // === SEND ===
 // Form the target ID
-assign exe_msg_tgt.row     = dcd_instr_q.memory.send_row;
-assign exe_msg_tgt.column  = dcd_instr_q.memory.send_col;
+assign exe_msg_tgt.row    = dcd_instr_q.memory.send_row;
+assign exe_msg_tgt.column = dcd_instr_q.memory.send_col;
 
 // Form the header
 assign exe_msg_hdr.target     = exe_msg_tgt;
