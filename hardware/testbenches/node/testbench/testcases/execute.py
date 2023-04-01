@@ -125,8 +125,8 @@ async def execute(tb):
             await RisingEdge(tb.clk)
 
         # Check the next fetch PC
-        mdl_pc = tb.model.get_pc() + 1
-        dut_pc = int(tb.dut.u_dut.u_core.fetch_pc_q.value)
+        mdl_pc = tb.model.get_pc()
+        dut_pc = int(tb.dut.u_dut.u_core.fetch_pc_q.value) - 2
         tb.info(f"PC - Model: 0x{mdl_pc:04X}, DUT: 0x{dut_pc:04X}")
         assert mdl_pc == dut_pc, "PC mismatch between model and DUT"
 

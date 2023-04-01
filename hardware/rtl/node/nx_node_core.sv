@@ -163,9 +163,9 @@ always_comb begin : comb_fetch_pc
     // If PC0 specified, force
     if (pc0_q) begin
         fetch_pc = 'd0;
-    // If entering stall, backup one cycle
+    // If entering stall, backup two cycles
     end else if (!stall_q && stall) begin
-        fetch_pc = fetch_pc_q - 'd1;
+        fetch_pc = fetch_pc_q - 'd2;
     // Otherwise, if not stalling, increment
     end else if (!stall_q) begin
         fetch_pc = fetch_pc_q + 'd1;
@@ -173,8 +173,8 @@ always_comb begin : comb_fetch_pc
 end
 
 // Drive RAM interface
-assign o_inst_addr  = fetch_pc;
-assign o_inst_rd_en = !pause;
+assign o_inst_addr  = fetch_pc_q;
+assign o_inst_rd_en = !stall_q;
 
 // Pipeline read signal as instruction valid
 assign fetch_valid = o_inst_rd_en && !stall;
