@@ -329,7 +329,7 @@ assign exe_msg_hdr._padding_0 = 'd0;
 // Form the message
 assign exe_msg_sig.header  = exe_msg_hdr;
 assign exe_msg_sig.address = { exe_full_addr, dcd_slot_q[1] };
-assign exe_msg_sig.slot    = dcd_instr_q.memory.slot;
+assign exe_msg_sig.slot    = `TYPE_CAST(memory_slot_t, dcd_instr_q.memory.slot);
 assign exe_msg_sig.data    = exe_val_a;
 
 assign {exe_message, exe_send} = (

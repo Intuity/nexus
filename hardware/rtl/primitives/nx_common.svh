@@ -156,4 +156,17 @@
 `define INIT_D_ARRAY(X) \
     for (int _i = 0; _i < __ARRAY_SIZE_``X``; _i = (_i + 1)) X[_i] = ``X``_q[_i]
 
+// TYPE_CAST
+// Type cast from one type to another, accomodating for deficiencies in different
+// EDA tools (for example Icarus Verilog doesn't like typedef casts)
+// Args:
+//  T: Type to cast to
+//  S: Signal to cast
+//
+`ifdef sim_icarus
+    `define TYPE_CAST(T, S) S
+`else
+    `define TYPE_CAST(T, S) ``T``'(S)
+`endif
+
 `endif // __NX_COMMON_SVH__
