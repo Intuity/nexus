@@ -20,6 +20,7 @@ import NXConstants::*;
 #(
       parameter ROWS    = 3
     , parameter COLUMNS = 3
+    , parameter OUTPUTS = 32
 ) (
       input  logic              i_clk
     , input  logic              i_rst
@@ -43,7 +44,7 @@ import NXConstants::*;
 // Constants
 // =============================================================================
 
-localparam MESH_OUTPUTS = COLUMNS * 8;
+localparam MESH_OUTPUTS = COLUMNS * OUTPUTS;
 
 // =============================================================================
 // Internal Signals
@@ -81,6 +82,7 @@ nx_reset u_reset_stretch (
 nx_control #(
       .ROWS             ( ROWS             )
     , .COLUMNS          ( COLUMNS          )
+    , .OUTPUTS          ( OUTPUTS          )
 ) u_control (
       .i_clk            ( i_clk            )
     , .i_rst            ( o_rst_internal   )

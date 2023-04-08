@@ -22,7 +22,7 @@ module nx_aggregator
 import NXConstants::*,
        nx_primitives::ROUND_ROBIN;
 #(
-    parameter OUTPUTS = 8
+      parameter OUTPUTS = 32
 ) (
       input  logic               i_clk
     , input  logic               i_rst
@@ -45,6 +45,9 @@ import NXConstants::*,
     , input  logic               i_outbound_ready
 );
 
+localparam SLOT_W = NXConstants::NODE_MEM_SLOT_WIDTH;
+localparam SLOTS  = OUTPUTS / SLOT_W;
+
 // =============================================================================
 // Signals & State
 // =============================================================================
@@ -52,8 +55,11 @@ import NXConstants::*,
 // Signal message detection
 logic is_signal;
 
+// Slot index
+logic [$clog2(SLOTS)-1:0] slot_idx;
+
 // Output state
-`DECLARE_DQ(OUTPUTS, outputs, i_clk, i_rst, 'd0)
+`DECLARE_DQ_ARRAY(SLOT_W, SLOTS, outputs, i_clk, i_rst, 'd0)
 
 // Stream combiner
 // NOTE: Not using node_message_t is a workaround for Icarus Verilog
@@ -73,21 +79,27 @@ assign is_signal = (
     i_inbound_valid
 );
 
+// Extract slot index
+assign slot_idx = { i_inbound_data.signal.address[$clog2(SLOTS)-2:0],
+                    i_inbound_data.signal.slot[0] };
+
 // =============================================================================
 // Track Output State
 // =============================================================================
 
 // Expose flopped values
-assign o_outputs = outputs_q;
-
-// Update flopped values
 generate
-for (genvar idx = 0; idx < OUTPUTS; idx++) begin : gen_outputs
-    assign outputs[idx] = (
-        (is_signal && idx[$clog2(OUTPUTS)-1:0] == i_inbound_data.signal.address[$clog2(OUTPUTS)-1:0])
-            ? i_inbound_data.signal.data[0]
-            : outputs_q[idx[$clog2(OUTPUTS)-1:0]]
-    );
+for (genvar idx = 0; idx < SLOTS; idx++) begin : gen_expose_outputs
+    assign o_outputs[(idx * SLOT_W) +: SLOT_W] = outputs_q[idx];
+end
+endgenerate
+
+// Capture updated values
+generate
+for (genvar idx = 0; idx < SLOTS; idx++) begin : gen_capture_outputs
+    assign outputs[idx] = (is_signal && (idx[$clog2(SLOTS)-1:0] == slot_idx))
+                          ? i_inbound_data.signal.data
+                          : outputs_q[idx];
 end
 endgenerate
 

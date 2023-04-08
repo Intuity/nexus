@@ -23,6 +23,7 @@ import NXConstants::*;
 #(
       parameter ROWS    = 3
     , parameter COLUMNS = 3
+    , parameter OUTPUTS = 32
 ) (
       input  logic                         i_clk
     , input  logic                         i_rst
@@ -55,7 +56,7 @@ import NXConstants::*;
     , input  logic [COLUMNS-1:0]           i_mesh_node_idle
     , input  logic                         i_mesh_agg_idle
     , output logic [COLUMNS-1:0]           o_mesh_trigger
-    , input  logic [(COLUMNS*8)-1:0]       i_mesh_outputs
+    , input  logic [(COLUMNS*OUTPUTS)-1:0] i_mesh_outputs
     , output logic [TOP_MEM_COUNT-1:0]     o_mesh_en_memory
     , output logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] o_mesh_rd_data
 );
@@ -64,7 +65,7 @@ import NXConstants::*;
 // Constants
 // =============================================================================
 
-localparam MESH_OUTPUTS     = COLUMNS * 8;
+localparam MESH_OUTPUTS     = COLUMNS * OUTPUTS;
 localparam MAX_OUTPUT_INDEX = (MESH_OUTPUTS + OUT_BITS_PER_MSG - 1) / OUT_BITS_PER_MSG;
 localparam OUTPUT_IDX_WIDTH = 1 + ((MESH_OUTPUTS > OUT_BITS_PER_MSG) ? $clog2(MAX_OUTPUT_INDEX) : 0);
 
@@ -128,7 +129,7 @@ logic emit_output_msg;
 `DECLARE_DQ(TOP_MEM_COUNT, en_mem_wstrb, i_clk, i_rst, 'd0)
 `DECLARE_DQ(TOP_MEM_COUNT, mem_rd_pend,  i_clk, i_rst, 'd0)
 
-// logic                     mem_update;
+logic                     mem_update;
 logic [TOP_MEM_COUNT-1:0] mem_host_access;
 
 logic [TOP_MEM_COUNT-1:0][TOP_MEM_ADDR_WIDTH-1:0] mem_a_addr, mem_b_addr;
@@ -397,7 +398,7 @@ assign o_ctrl_out_last  = ctrl_out_last_q;
 // =============================================================================
 
 // Perform mesh based memory operations when leaving ACTIVE
-// assign mem_update = (state_q == CTRL_ACTIVE) && (state == CTRL_OUTPUTS);
+assign mem_update = (state_q == CTRL_ACTIVE) && (state == CTRL_OUTPUTS);
 
 // Drive read responses to the mesh
 assign o_mesh_en_memory = en_memory_q;
@@ -407,24 +408,24 @@ assign o_mesh_rd_data   = mem_a_rd_data;
 generate
 for (genvar idx = 0; idx < TOP_MEM_COUNT; idx++) begin : gen_top_mem
     // Compensate for other memory I/O
-    // localparam OFFSET = (
-    //     idx * (TOP_MEM_ADDR_WIDTH + TOP_MEM_DATA_WIDTH + TOP_MEM_STRB_WIDTH + 2)
-    // );
+    localparam OFFSET = (
+        idx * (TOP_MEM_ADDR_WIDTH + TOP_MEM_DATA_WIDTH + TOP_MEM_STRB_WIDTH + 2)
+    );
 
     // Drive A port from mesh outputs
-    // localparam IDX_ADDR    = MESH_OUTPUTS - OFFSET - 1;
-    // localparam IDX_DATA    = IDX_ADDR - TOP_MEM_ADDR_WIDTH;
-    // localparam IDX_WR_EN   = IDX_DATA - TOP_MEM_DATA_WIDTH;
-    // localparam IDX_RD_EN   = IDX_WR_EN - 1;
-    // localparam IDX_WR_STRB = IDX_RD_EN - 1;
-    assign mem_a_addr[idx]    = 'd0; // i_mesh_outputs[IDX_ADDR-:TOP_MEM_ADDR_WIDTH];
-    assign mem_a_wr_data[idx] = {8'd0, i_mesh_outputs}; // [IDX_DATA-:TOP_MEM_DATA_WIDTH];
-    assign mem_a_wr[idx]      = 'd0; // i_mesh_outputs[IDX_WR_EN] && en_memory_q[idx] && mem_update;
-    assign mem_a_rd[idx]      = 'd0; // i_mesh_outputs[IDX_RD_EN] && en_memory_q[idx] && mem_update;
-    assign mem_a_wr_strb[idx] = 'd0; /* {TOP_MEM_STRB_WIDTH{mem_a_wr[idx]}} & (
+    localparam IDX_ADDR    = MESH_OUTPUTS - OFFSET - 1;
+    localparam IDX_DATA    = IDX_ADDR - TOP_MEM_ADDR_WIDTH;
+    localparam IDX_WR_EN   = IDX_DATA - TOP_MEM_DATA_WIDTH;
+    localparam IDX_RD_EN   = IDX_WR_EN - 1;
+    localparam IDX_WR_STRB = IDX_RD_EN - 1;
+    assign mem_a_addr[idx]    = i_mesh_outputs[IDX_ADDR-:TOP_MEM_ADDR_WIDTH];
+    assign mem_a_wr_data[idx] = i_mesh_outputs[IDX_DATA-:TOP_MEM_DATA_WIDTH];
+    assign mem_a_wr[idx]      = i_mesh_outputs[IDX_WR_EN] && en_memory_q[idx] && mem_update;
+    assign mem_a_rd[idx]      = i_mesh_outputs[IDX_RD_EN] && en_memory_q[idx] && mem_update;
+    assign mem_a_wr_strb[idx] = {TOP_MEM_STRB_WIDTH{mem_a_wr[idx]}} & (
         en_mem_wstrb_q[idx] ? i_mesh_outputs[IDX_WR_STRB-:TOP_MEM_STRB_WIDTH]
                             : {TOP_MEM_STRB_WIDTH{1'b1}}
-    );*/
+    );
 
     // Instance RAM
     nx_ram #(

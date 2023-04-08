@@ -22,6 +22,7 @@ import NXConstants::*;
 #(
       parameter ROWS    = 3
     , parameter COLUMNS = 3
+    , parameter OUTPUTS = 32
 ) (
       input  logic                         i_clk
     , input  logic                         i_rst
@@ -38,7 +39,7 @@ import NXConstants::*;
     , output logic                         o_outbound_valid
     , input  logic                         i_outbound_ready
     // Aggregated outputs
-    , output logic [(COLUMNS*8)-1:0]       o_outputs
+    , output logic [(COLUMNS*OUTPUTS)-1:0] o_outputs
     // Memory inputs
     , input  logic [TOP_MEM_COUNT-1:0]     i_mem_enable
     , input  logic [TOP_MEM_COUNT-1:0][TOP_MEM_DATA_WIDTH-1:0] i_mem_rd_data
@@ -219,7 +220,7 @@ for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_aggregators
 
     // Instance the aggregator
     nx_aggregator #(
-          .OUTPUTS             ( 8                                               )
+          .OUTPUTS             ( OUTPUTS                                         )
     ) u_agg (
           .i_clk               ( i_clk                                           )
         , .i_rst               ( i_rst                                           )
@@ -227,7 +228,7 @@ for (genvar idx_col = 0; idx_col < COLUMNS; idx_col++) begin : gen_aggregators
         , .i_node_id           ( agg_id                                          )
         , .o_idle              ( agg_idle[idx_col]                               )
         // Output signals
-        , .o_outputs           ( o_outputs[idx_col*8+:8]                         )
+        , .o_outputs           ( o_outputs[idx_col*OUTPUTS+:OUTPUTS]             )
         // Inbound interface from mesh
         , .i_inbound_data      ( mesh_ob_data[idx_col][ROWS-1][DIRECTION_SOUTH]  )
         , .i_inbound_valid     ( mesh_ob_valid[idx_col][ROWS-1][DIRECTION_SOUTH] )

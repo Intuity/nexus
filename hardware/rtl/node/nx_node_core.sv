@@ -384,6 +384,6 @@ endgenerate
 // =============================================================================
 
 logic _unused;
-assign _unused = &{ 1'b0, dcd_val_7_q[7] };
+assign _unused = &{ 1'b0, dcd_val_7_q[7], exe_val_7[7] };
 
 endmodule : nx_node_core
