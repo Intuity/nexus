@@ -256,15 +256,14 @@ assign exe_rd_data = (exe_rd_slot_q == 'd3) ? i_data_rd_data[31:24] :
                      (exe_rd_slot_q == 'd1) ? i_data_rd_data[15: 8]
                                             : i_data_rd_data[ 7: 0];
 
-// Override register value with read data if required
+// Override register value with read data or forwarded value if required
+// NOTE: Read data forwarding is only supported for the first register (A)
 assign exe_val_a = dcd_ovr_a_q ? exe_rd_data :
                    dcd_fwd_a_q ? exe_result_q
                                : dcd_val_a_q;
-assign exe_val_b = dcd_ovr_b_q ? exe_rd_data :
-                   dcd_fwd_b_q ? exe_result_q
+assign exe_val_b = dcd_fwd_b_q ? exe_result_q
                                : dcd_val_b_q;
-assign exe_val_c = dcd_ovr_c_q ? exe_rd_data :
-                   dcd_fwd_c_q ? exe_result_q
+assign exe_val_c = dcd_fwd_c_q ? exe_result_q
                                : dcd_val_c_q;
 assign exe_val_7 = dcd_fwd_7_q ? exe_result_q
                                : dcd_val_7_q;
@@ -365,9 +364,7 @@ assign exe_result_shuffle[6] = exe_val_a[dcd_instr_q.shuffle.mux_6];
 assign exe_result_shuffle[7] = exe_val_a[dcd_instr_q.shuffle.mux_7];
 
 // Select the right result
-assign exe_result = dcd_is_truth_q   ? exe_result_truth :
-                    dcd_is_shuffle_q ? exe_result_shuffle
-                                     : 'd0;
+assign exe_result = dcd_is_truth_q ? exe_result_truth : exe_result_shuffle;
 
 // =============================================================================
 // Commit
