@@ -24,7 +24,7 @@ from natsort import natsorted
 from ordered_set import OrderedSet
 
 from nxcompile import nxsignal_type_t, NXGate, NXFlop, NXPort
-from nxisa import Load, Store, Wait, Send, Truth, Shuffle, Instance, Label
+from nxisa import Load, Store, Pause, Send, Truth, Shuffle, Instance, Label
 
 from .memory import Memory
 from .messaging import node_to_node
@@ -355,6 +355,9 @@ class Node:
         # Track register usage
         registers = [Register(index=x) for x in range(7)]
 
+        # Remember the last register loaded (as only SRC_A supports forwarding)
+        last_load_target = 0
+
         # Reserve R7 for outputs of truth tables
         reg_work = Register(index=7)
 
@@ -428,7 +431,7 @@ class Node:
             register.novel = False
 
         def emit_source_setup(op_idx, signal, exclude=None):
-            nonlocal registers, trk_read
+            nonlocal registers, trk_read, last_load_target
             exclude = exclude or []
             # Search for this signal in the registers
             for reg in registers + [reg_work]:
@@ -455,6 +458,8 @@ class Node:
                                comment=f"Loading R{tgt.index} with {', '.join((x.name if x else '-') for x in tgt.elements)}")
                     trk_usage[(row, slot)].append(("read", len(stream)))
                     trk_read[(row, slot)] += 1
+                    # Update the last register which was loaded
+                    last_load_target = tgt.index
                 else:
                     # Not found
                     raise Exception(f"Failed to locate signal '{signal}'")
@@ -484,7 +489,7 @@ class Node:
                             comment=f"Flushing out {', '.join(names)}")
 
         def emit_operation(cone_idx, cone):
-            nonlocal registers
+            nonlocal registers, last_load_target
             # Gather inputs
             srcs = []
             idxs = []
@@ -496,22 +501,34 @@ class Node:
                         idxs.append([getattr(x, "name", None) for x in reg.elements].index(input.name))
                         break
                 else:
-                    breakpoint()
                     raise Exception("Failed to locate input")
                 if isinstance(input, Table) and input in self.references and cone in self.references[input]:
                     self.references[input].remove(cone)
             # Check if working register has reached a flush point (all registers full)
             if None not in reg_work.elements:
                 yield from emit_flush(cone_idx, exclude=srcs)
-            # Extract and pad the lookup table
-            table = 0
+            # Pickup the table and pad with trailing zeroes
+            table = (cone.outputs[:] + (8 * [0]))[:8]
+            # If any source uses the last loaded register, it needs to be moved
+            # to be in slot A as it is the only slot to support data forwarding
             srcs  = [x.index for x in srcs] + ([0] * (3 - len(srcs)))
-            table = sum([(x << i) for i, x in enumerate(cone.outputs)])
-            assert table >= 0 and table <= 0xFF, "Incorrect table value"
+            if srcs[0] != last_load_target and last_load_target in srcs[1:]:
+                slot = srcs.index(last_load_target)
+                # Swapping columns 0 & 1
+                if slot == 1:
+                    swap_map = { 2: 4, 3: 5, 4: 2, 5: 3 }
+                # Swapping columns 0 & 2
+                else:
+                    swap_map = { 1: 4, 3: 6, 4: 1, 6: 3 }
+                # Transform the table to reorder bits according to the map
+                table = [table[swap_map.get(x, x)] for x in range(8)]
+            # Flatten the table
+            flat_table = sum([(x << i) for i, x in enumerate(cone.outputs)])
+            assert flat_table >= 0 and flat_table <= 0xFF, "Incorrect table value"
             # Emit an instruction
             yield Truth(src=srcs,
                         mux=idxs,
-                        table=table,
+                        truth=flat_table,
                         comment=cone.name + " - " +
                                 cone.op.render(include=[cone.op] + cone.inputs) +
                                 " - " + ", ".join([x.name for x in cone.inputs]))
@@ -662,7 +679,7 @@ class Node:
         # Append a branch to wait for the next trigger
         logging.debug("# Inserting loop point")
         stream_add(Label("loop"))
-        stream_add(Wait(pc0=1, idle=1))
+        stream_add(Pause(pc0=1, idle=1))
 
         # Instruction stats
         logging.info("=" * 80)
