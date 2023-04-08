@@ -90,8 +90,6 @@ logic dcd_is_memory;
 `DECLARE_DQ(        8, dcd_val_7,   i_clk, i_rst, 'd0)
 `DECLARE_DQ(REG_IDX_W, dcd_tgt_reg, i_clk, i_rst, 'd0)
 `DECLARE_DQ(        1, dcd_ovr_a,   i_clk, i_rst, 'd0)
-`DECLARE_DQ(        1, dcd_ovr_b,   i_clk, i_rst, 'd0)
-`DECLARE_DQ(        1, dcd_ovr_c,   i_clk, i_rst, 'd0)
 `DECLARE_DQ(        1, dcd_fwd_a,   i_clk, i_rst, 'd0)
 `DECLARE_DQ(        1, dcd_fwd_b,   i_clk, i_rst, 'd0)
 `DECLARE_DQ(        1, dcd_fwd_c,   i_clk, i_rst, 'd0)
@@ -219,8 +217,6 @@ assign dcd_tgt_reg = dcd_is_truth ? 'd7 : dcd_instr.memory.tgt;
 
 // Flag if a pending read means value needs to be overridden by read data
 assign dcd_ovr_a = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_a);
-assign dcd_ovr_b = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_b);
-assign dcd_ovr_c = dcd_is_load_q && (dcd_tgt_reg_q == dcd_instr.truth.src_c);
 
 // Flag if a pending read means value needs to be overridden by execute result
 assign dcd_fwd_a = ((dcd_is_shuffle_q && (dcd_instr.truth.src_a == dcd_tgt_reg_q)) ||

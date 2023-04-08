@@ -27,6 +27,8 @@ from ..testbench import Testbench
 async def execute(tb):
     """ Random instruction sequence execution """
     # Generate and load an instruction sequence
+    last_i_load = None
+    last_target = None
     for instr_idx in range(1024):
         # Only allow PAUSE after the first 250 instructions
         options = [Memory, Pick, Shuffle, Truth]
@@ -52,12 +54,18 @@ async def execute(tb):
             else:
                 fvals[group] = _rand_fval(entry)
         # If this is a SEND operation, don't send to this node
-        while (instr is Memory and
-               fvals["mode"] == "SEND" and
-               fvals["send_row"] == tb.node_id.row and
-               fvals["send_col"] == tb.node_id.column):
+        while ((instr is Memory) and
+               (fvals["mode"] == "SEND") and
+               (fvals["send_row"] == tb.node_id.row) and
+               (fvals["send_col"] == tb.node_id.column)):
             fvals["send_row"] = randint(0, 15)
             fvals["send_col"] = randint(0, 15)
+        # If this is a TRUTH operation following a LOAD, only SRC_A supports forwarding
+        while (last_i_load and
+               (instr is Truth) and
+               ((fvals["src"][1] == last_target) or (fvals["src"][2] == last_target))):
+            fvals["src"][1] = randint(0, 7)
+            fvals["src"][2] = randint(0, 7)
         # The final instruction must be a PAUSE with IDLE set
         if instr_idx == 1023:
             instr = Pause
@@ -74,6 +82,9 @@ async def execute(tb):
                            slot   =(seg_idx & 0x1),
                            data   =(encoded >> (seg_idx * 8)) & 0xFF)
             tb.ib_north.append(StreamTransaction(data=msg.pack()))
+        # Remember the last generated instruction
+        last_i_load = (instr is Memory) and (fvals["mode"] == "LOAD")
+        last_target = fvals.get("tgt", None)
 
     # Generate and load the data memory
     for i_row in range(1024):
