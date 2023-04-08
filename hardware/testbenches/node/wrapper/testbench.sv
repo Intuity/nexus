@@ -62,9 +62,6 @@ import NXConstants::*;
     , input  logic          i_ob_west_present
 );
 
-localparam RAM_ADDR_W = 10;
-localparam RAM_DATA_W = 32;
-
 // =============================================================================
 // Clock Generation
 // =============================================================================
