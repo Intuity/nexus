@@ -48,6 +48,10 @@ namespace NXModel {
         // Public Methods
         // =====================================================================
 
+        /** Reset the state of the pipe (dropping all contents)
+         */
+        void reset (void);
+
         /** Append a message into the pipe
          *
          * @param message the message to append

@@ -18,6 +18,12 @@
 using namespace NXModel;
 using namespace NXConstants;
 
+void NXMessagePipe::reset (void)
+{
+    std::queue<entry_t> empty;
+    std::swap(m_messages, empty);
+}
+
 void NXMessagePipe::enqueue (node_load_t message)
 {
     entry_t entry;

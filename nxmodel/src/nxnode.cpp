@@ -69,6 +69,16 @@ void NXNode::reset (void)
         (              1 << NXISA::PC0_LSB ) |
         (              1 << NXISA::IDLE_LSB)
     ));
+    // Reset all pipes
+    for (int idx_pipe = 0; idx_pipe < 4; idx_pipe++)
+    {
+        if (m_inbound[idx_pipe]  != nullptr) {
+            m_inbound[idx_pipe]->reset();
+        }
+        if (m_outbound[idx_pipe] != nullptr) {
+            m_outbound[idx_pipe]->reset();
+        }
+    }
 }
 
 bool NXNode::is_idle (void)

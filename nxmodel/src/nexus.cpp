@@ -37,6 +37,13 @@ Nexus::Nexus (
     m_mesh->get_node(m_rows-1, 0)->attach(DIRECTION_SOUTH, m_egress);
 }
 
+void Nexus::reset (void)
+{
+    m_mesh->reset();
+    if (m_ingress != NULL) m_ingress->reset();
+    if (m_egress  != NULL) m_egress->reset();
+}
+
 void Nexus::run (uint32_t cycles)
 {
     PLOGI << "[Nexus] Running for " << cycles << " cycles";

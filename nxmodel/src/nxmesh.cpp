@@ -50,6 +50,15 @@ NXMesh::NXMesh (uint32_t rows, uint32_t columns)
     }
 }
 
+void NXMesh::reset (void)
+{
+    for (uint32_t row = 0; row < m_rows; row++) {
+        for (uint32_t column = 0; column < m_columns; column++) {
+            (*m_nodes[row])[column]->reset();
+        }
+    }
+}
+
 std::shared_ptr<NXNode> NXMesh::get_node (NXConstants::node_id_t id)
 {
     return get_node(id.row, id.column);

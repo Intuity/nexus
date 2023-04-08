@@ -18,8 +18,10 @@ from nxmodel import Nexus, NXMesh, NXNode, NXLoader
 
 # Create an instance of the model
 print("# Creating a 3x3 mesh")
-instance = Nexus(3, 3, 32, 32)
+instance = Nexus(3, 3)
 print(f"# Instance reports {instance.get_rows()}x{instance.get_columns()}")
+
+instance.reset()
 
 # Extract the mesh
 print("# Extracting NXMesh from model")

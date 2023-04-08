@@ -49,6 +49,10 @@ namespace NXModel {
         // Public Methods
         // =====================================================================
 
+        /** Reset the state of the mesh and all nodes within it
+         */
+        void reset (void);
+
         /** Retrieve a node from the mesh
          *
          * @param  id   node identifier (carries row & column)

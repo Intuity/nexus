@@ -50,6 +50,10 @@ namespace NXModel {
         // Public Methods
         // =====================================================================
 
+        /** Reset the entire state of Nexus (mesh, nodes, and pipes)
+         */
+        void reset (void);
+
         /** Return the number of rows in the mesh
          *
          * @return integer number of rows

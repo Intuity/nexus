@@ -76,6 +76,7 @@ PYBIND11_MODULE(nxmodel, m) {
     // Expose classes
     py::class_<NXModel::Nexus, std::shared_ptr<NXModel::Nexus>>(m, "Nexus")
         .def(py::init<uint32_t, uint32_t>())
+        .def("reset",               &NXModel::Nexus::reset              )
         .def("get_rows",            &NXModel::Nexus::get_rows           )
         .def("get_columns",         &NXModel::Nexus::get_columns        )
         .def("get_mesh",            &NXModel::Nexus::get_mesh           )
@@ -88,10 +89,11 @@ PYBIND11_MODULE(nxmodel, m) {
 
     py::class_<NXModel::NXMesh, std::shared_ptr<NXModel::NXMesh>>(m, "NXMesh")
         .def(py::init<uint32_t, uint32_t>())
+        .def("reset",    &NXModel::NXMesh::reset  )
         .def("get_node", static_cast<std::shared_ptr<NXModel::NXNode> (NXModel::NXMesh::*)(NXConstants::node_id_t)>(&NXModel::NXMesh::get_node))
         .def("get_node", static_cast<std::shared_ptr<NXModel::NXNode> (NXModel::NXMesh::*)(uint32_t, uint32_t)>(&NXModel::NXMesh::get_node))
-        .def("is_idle",  &NXModel::NXMesh::is_idle )
-        .def("step",     &NXModel::NXMesh::step    );
+        .def("is_idle",  &NXModel::NXMesh::is_idle)
+        .def("step",     &NXModel::NXMesh::step   );
 
     py::class_<NXModel::NXNode, std::shared_ptr<NXModel::NXNode>>(m, "NXNode")
         .def(py::init<uint8_t, uint8_t, bool>())
@@ -110,12 +112,13 @@ PYBIND11_MODULE(nxmodel, m) {
 
     py::class_<NXModel::NXMessagePipe, std::shared_ptr<NXModel::NXMessagePipe>>(m, "NXMessagePipe")
         .def(py::init<>())
-        .def("enqueue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_load_t     )>(&NXModel::NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_signal_t   )>(&NXModel::NXMessagePipe::enqueue))
-        .def("enqueue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_raw_t      )>(&NXModel::NXMessagePipe::enqueue))
-        .def("dequeue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_load_t    &)>(&NXModel::NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_signal_t  &)>(&NXModel::NXMessagePipe::dequeue))
-        .def("dequeue", static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_raw_t     &)>(&NXModel::NXMessagePipe::dequeue))
+        .def("reset",       &NXModel::NXMessagePipe::reset)
+        .def("enqueue",     static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_load_t     )>(&NXModel::NXMessagePipe::enqueue))
+        .def("enqueue",     static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_signal_t   )>(&NXModel::NXMessagePipe::enqueue))
+        .def("enqueue",     static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_raw_t      )>(&NXModel::NXMessagePipe::enqueue))
+        .def("dequeue",     static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_load_t    &)>(&NXModel::NXMessagePipe::dequeue))
+        .def("dequeue",     static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_signal_t  &)>(&NXModel::NXMessagePipe::dequeue))
+        .def("dequeue",     static_cast<void (NXModel::NXMessagePipe::*)(NXConstants::node_raw_t     &)>(&NXModel::NXMessagePipe::dequeue))
         .def("enqueue_raw", &NXModel::NXMessagePipe::enqueue_raw)
         .def("dequeue_raw", &NXModel::NXMessagePipe::dequeue_raw)
         .def("is_idle",     &NXModel::NXMessagePipe::is_idle)
