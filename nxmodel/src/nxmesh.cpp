@@ -34,6 +34,13 @@ NXMesh::NXMesh (uint32_t rows, uint32_t columns)
             ));
         }
     }
+    // Create the aggregators
+    for (uint32_t column = 0; column < m_columns; column++) {
+        m_aggregators.push_back(std::make_shared<NXAggregator>(
+            (node_id_t){ .row    = (uint8_t)m_rows,
+                         .column = (uint8_t)column }
+        ));
+    }
     // Link nodes together
     for (uint32_t row = 0; row < m_rows; row++) {
         for (uint32_t column = 0; column < m_columns; column++) {
@@ -46,6 +53,16 @@ NXMesh::NXMesh (uint32_t rows, uint32_t columns)
                 node->attach(DIRECTION_WEST, (*m_nodes[row])[column-1]->get_pipe(DIRECTION_EAST));
             if (column < (m_columns - 1))
                 node->attach(DIRECTION_EAST, (*m_nodes[row])[column+1]->get_pipe(DIRECTION_WEST));
+        }
+    }
+    // Link aggregators to the nodes
+    for (uint32_t column = 0; column < m_columns; column++) {
+        std::shared_ptr<NXAggregator> aggr = m_aggregators[column];
+        std::shared_ptr<NXNode>       node = (*m_nodes[m_rows-1])[column];
+        node->attach(DIRECTION_SOUTH, aggr->get_pipe_mesh());
+        if (column > 0) {
+            std::shared_ptr<NXAggregator> neighbour = m_aggregators[column - 1];
+            aggr->attach(neighbour->get_pipe_neighbour());
         }
     }
 }

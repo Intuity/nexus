@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sun Mar 12 16:04:50 2023
+[*] Sat Apr  1 17:35:06 2023
 [*]
 [dumpfile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/sim.lxt"
-[dumpfile_mtime] "Sun Mar 12 16:04:11 2023"
-[dumpfile_size] 1576793
+[dumpfile_mtime] "Sat Apr  1 17:34:20 2023"
+[dumpfile_size] 1599645
 [savefile] "/Users/peterbirch/Development/nexus_slang/hardware/testbenches/node/node.gtkw"
-[timestart] 16560690
+[timestart] 16662330
 [size] 1680 997
 [pos] -1 -1
-*-12.337322 16581000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-13.100987 16697000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] testbench.
 [treeopen] testbench.u_dut.
 [treeopen] testbench.u_dut.u_core.
@@ -672,9 +672,7 @@ testbench.u_dut.u_distributor.outbound_dir[1:0]
 -Execute
 @28
 testbench.u_dut.u_core.pause_q[0]
-@29
 testbench.u_dut.u_core.pc0_q[0]
-@28
 testbench.u_dut.u_core.slot_q[0]
 testbench.u_dut.u_core.stall[0]
 @22
@@ -791,13 +789,20 @@ testbench.u_dut.u_core.fetch_pc_q[9:0]
 -Registers
 @200
 -
-@28
+@29
+[color] 7
 testbench.u_dut.u_core.dcd_is_load_q[0]
+[color] 7
 testbench.u_dut.u_core.dcd_is_pause_q[0]
+[color] 7
 testbench.u_dut.u_core.dcd_is_pick_q[0]
+[color] 7
 testbench.u_dut.u_core.dcd_is_send_q[0]
+[color] 7
 testbench.u_dut.u_core.dcd_is_shuffle_q[0]
+[color] 7
 testbench.u_dut.u_core.dcd_is_store_q[0]
+[color] 7
 testbench.u_dut.u_core.dcd_is_truth_q[0]
 @200
 -
@@ -825,6 +830,11 @@ testbench.u_dut.u_core.o_data_wr_data[31:0]
 testbench.u_dut.u_core.o_data_wr_strb[31:0]
 @200
 -
+@22
+testbench.u_dut.u_core.exe_result_shuffle[7:0]
+testbench.u_dut.u_core.exe_result_truth[7:0]
+@200
+-
 @28
 testbench.u_dut.u_core.exe_cmt_rd_q[0]
 testbench.u_dut.u_core.exe_cmt_result_q[0]
@@ -840,6 +850,16 @@ testbench.u_dut.u_core.exe_tgt_reg_q[2:0]
 testbench.u_dut.u_core.o_send_data[30:0]
 @28
 testbench.u_dut.u_core.o_send_valid[0]
+@200
+-
+@22
+testbench.u_dut.u_core.o_inst_addr[9:0]
+@28
+testbench.u_dut.u_core.o_inst_rd_en[0]
+@22
+testbench.u_dut.u_core.i_inst_rd_data[31:0]
+@28
+testbench.u_dut.u_core.fetch_valid_q[0]
 @1000200
 -Execute
 @200

@@ -107,8 +107,8 @@ class ControlRespType:
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED)
 class NodeCommand:
     """ Different message types for nodes in the mesh """
-    LOAD   : Constant("Load data into the node's memory")
-    SIGNAL : Constant("Carries signal state to and from a node")
+    LOAD   : Constant("Load data into the node's memory"       ) = 0
+    SIGNAL : Constant("Carries signal state to and from a node") = 1
 
 @packtype.enum(package=NXConstants, mode=Enum.INDEXED, width=NXConstants.NODE_MEM_SLOT_MODE_WIDTH.value)
 class MemorySlot:
@@ -163,12 +163,30 @@ class NodeSignal:
     data    : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH,
                      desc ="Data to write into memory")
 
+@packtype.struct(package=NXConstants, width=NXConstants.MESSAGE_WIDTH.value, pack=Struct.FROM_MSB)
+class NodeOutput:
+    """
+    Overloads NodeSignal's encoding when talking to an aggregator to carry a
+    masked 8-bit value
+    """
+    header  : NodeHeader(desc="Header carrying row, column, and command")
+    bypass  : Scalar(width=1, desc="Bypass aggregation and send to host")
+    padding : Scalar(width=NXConstants.NODE_MEM_ADDR_WIDTH.value-NXConstants.NODE_MEM_SLOT_WIDTH.value-1,
+                     desc="Padding")
+    mask    : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH.value,
+                     desc="Update only the masked bits in the output")
+    slot    : Scalar(width=MemorySlot._pt_width,
+                     desc="The raw output slot to update")
+    data    : Scalar(width=NXConstants.NODE_MEM_SLOT_WIDTH.value,
+                     desc="Data to write to the output")
+
 @packtype.union(package=NXConstants)
 class NodeMessage:
     """ Union of different node message types """
     raw    : NodeRaw(desc="Raw message encoding")
     load   : NodeLoad(desc="Data load encoding")
     signal : NodeSignal(desc="Signal state encoding")
+    aggout : NodeOutput(desc="Output update encoding")
 
 # ==============================================================================
 # Control Plane Message Formats

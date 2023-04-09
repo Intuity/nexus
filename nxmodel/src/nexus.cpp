@@ -34,7 +34,7 @@ Nexus::Nexus (
     m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns);
     m_ingress = m_mesh->get_node(0, 0)->get_pipe(DIRECTION_NORTH);
     m_egress  = std::make_shared<NXMessagePipe>();
-    m_mesh->get_node(m_rows-1, 0)->attach(DIRECTION_SOUTH, m_egress);
+    m_mesh->get_aggregator(0)->attach(m_egress);
 }
 
 void Nexus::reset (void)

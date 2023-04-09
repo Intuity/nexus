@@ -17,6 +17,7 @@
 #include <memory>
 #include <vector>
 
+#include "nxaggregator.hpp"
 #include "nxnode.hpp"
 #include "nxconstants.hpp"
 
@@ -68,6 +69,13 @@ namespace NXModel {
          */
         std::shared_ptr<NXNode> get_node (uint32_t row, uint32_t column);
 
+        /** Retrieve an aggregator from the mesh
+         *
+         * @param  column   column address of the aggregator
+         * @return          pointer to the NXAggregator instance
+         */
+        std::shared_ptr<NXAggregator> get_aggregator (uint32_t column);
+
         /** Determine if the whole mesh is idle
          *
          * @return True if every node is idle, False otherwise
@@ -92,6 +100,9 @@ namespace NXModel {
 
         // Nodes in mesh
         std::vector<std::vector<std::shared_ptr<NXNode>> *> m_nodes;
+
+        // Aggregators
+        std::vector<std::shared_ptr<NXAggregator>> m_aggregators;
 
     };
 

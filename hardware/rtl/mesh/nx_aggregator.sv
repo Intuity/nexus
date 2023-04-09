@@ -53,10 +53,7 @@ localparam SLOTS  = OUTPUTS / SLOT_W;
 // =============================================================================
 
 // Signal message detection
-logic is_signal;
-
-// Slot index
-logic [$clog2(SLOTS)-1:0] slot_idx;
+logic is_output;
 
 // Output state
 `DECLARE_DQ_ARRAY(SLOT_W, SLOTS, outputs, i_clk, i_rst, 'd0)
@@ -70,18 +67,15 @@ logic [1:0]                    comb_valid, comb_ready;
 // Detect Signal Messages
 // =============================================================================
 
-// Determine if this is an output message
+// Determine if this is an output message (overloaded SIGNAL format)
 // NOTE: Only test the column address, not the row, allowing any signals
 //       travelling down the column to be captured
-assign is_signal = (
-    (i_inbound_data.signal.header.target.column == i_node_id.column   ) &&
-    (i_inbound_data.signal.header.command       == NODE_COMMAND_SIGNAL) &&
+assign is_output = (
+    (i_inbound_data.aggout.header.target.column == i_node_id.column   ) &&
+    (i_inbound_data.aggout.header.command       == NODE_COMMAND_SIGNAL) &&
+    (i_inbound_data.aggout.bypass               == 'd0                ) &&
     i_inbound_valid
 );
-
-// Extract slot index
-assign slot_idx = { i_inbound_data.signal.address[$clog2(SLOTS)-2:0],
-                    i_inbound_data.signal.slot[0] };
 
 // =============================================================================
 // Track Output State
@@ -97,8 +91,9 @@ endgenerate
 // Capture updated values
 generate
 for (genvar idx = 0; idx < SLOTS; idx++) begin : gen_capture_outputs
-    assign outputs[idx] = (is_signal && (idx[$clog2(SLOTS)-1:0] == slot_idx))
-                          ? i_inbound_data.signal.data
+    assign outputs[idx] = (is_output && (idx[$clog2(SLOTS)-1:0] == i_inbound_data.aggout.slot))
+                          ? ((i_inbound_data.aggout.data &  i_inbound_data.aggout.mask) |
+                             (outputs_q[idx]             & ~i_inbound_data.aggout.mask))
                           : outputs_q[idx];
 end
 endgenerate
@@ -109,8 +104,8 @@ endgenerate
 
 // Slot 0 comes from the mesh for non-output messages
 assign comb_data[0]        = i_inbound_data;
-assign comb_valid[0]       = !is_signal && i_inbound_valid;
-assign o_inbound_ready     = is_signal || comb_ready[0];
+assign comb_valid[0]       = !is_output && i_inbound_valid;
+assign o_inbound_ready     = is_output || comb_ready[0];
 
 // Slot 1 comes from the neighbouring aggregator
 assign comb_data[1]        = i_passthrough_data;
