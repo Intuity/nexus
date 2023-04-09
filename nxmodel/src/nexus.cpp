@@ -31,14 +31,18 @@ Nexus::Nexus (
     , m_columns ( columns       )
 {
     // Link the ingress & egress pipes
+    m_control = std::make_shared<NXControl>(m_rows, m_columns);
     m_mesh    = std::make_shared<NXMesh>(m_rows, m_columns);
     m_ingress = m_mesh->get_node(0, 0)->get_pipe(DIRECTION_NORTH);
     m_egress  = std::make_shared<NXMessagePipe>();
     m_mesh->get_aggregator(0)->attach(m_egress);
+    m_control->attach_to_mesh(m_ingress);
+    m_control->attach_from_mesh(m_egress);
 }
 
 void Nexus::reset (void)
 {
+    m_control->reset();
     m_mesh->reset();
     if (m_ingress != NULL) m_ingress->reset();
     if (m_egress  != NULL) m_egress->reset();

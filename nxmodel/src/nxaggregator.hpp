@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <array>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <stdint.h>
 #include <stdbool.h>
-#include <queue>
 
 #include "nxconstants.hpp"
-#include "nxmemory.hpp"
 #include "nxmessagepipe.hpp"
 
 #ifndef __NXAGGREGATOR_HPP__

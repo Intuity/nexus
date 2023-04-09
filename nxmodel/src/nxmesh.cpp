@@ -87,6 +87,12 @@ std::shared_ptr<NXNode> NXMesh::get_node (uint32_t row, uint32_t column)
     return (*m_nodes[row])[column];
 }
 
+std::shared_ptr<NXAggregator> NXMesh::get_aggregator (uint32_t column)
+{
+    assert(column < m_columns);
+    return m_aggregators[column];
+}
+
 bool NXMesh::is_idle (void)
 {
     bool is_idle = true;

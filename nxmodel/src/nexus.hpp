@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <tuple>
 
+#include "nxcontrol.hpp"
 #include "nxmesh.hpp"
 #include "nxmessagepipe.hpp"
 
@@ -117,6 +118,9 @@ namespace NXModel {
         // Sizing
         uint32_t m_rows;
         uint32_t m_columns;
+
+        // Controller
+        std::shared_ptr<NXControl> m_control;
 
         // Mesh
         std::shared_ptr<NXMesh> m_mesh;
