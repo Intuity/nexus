@@ -18,6 +18,7 @@
 #include <stdbool.h>
 
 #include "nxconstants.hpp"
+#include "nxcontrolpipe.hpp"
 #include "nxmessagepipe.hpp"
 
 #ifndef __NXCONTROL_HPP__
@@ -40,6 +41,8 @@ namespace NXModel {
         )   : m_rows    ( rows    )
             , m_columns ( columns )
         {
+            m_to_host   = std::make_shared<NXControlPipe>();
+            m_from_host = std::make_shared<NXControlPipe>();
             reset();
         }
 
@@ -88,7 +91,11 @@ namespace NXModel {
         unsigned int m_rows;
         unsigned int m_columns;
 
-        // Inbound and outbound message pipes
+        // Control pipes to/from host
+        std::shared_ptr<NXControlPipe> m_to_host;
+        std::shared_ptr<NXControlPipe> m_from_host;
+
+        // Message pipes to/from mesh
         std::shared_ptr<NXMessagePipe> m_to_mesh;
         std::shared_ptr<NXMessagePipe> m_from_mesh;
 

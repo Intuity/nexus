@@ -26,12 +26,15 @@ using namespace NXConstants;
 
 void NXControl::reset (void)
 {
+    m_to_host->reset();
+    m_from_host->reset();
     if (m_to_mesh   != nullptr) m_to_mesh->reset();
     if (m_from_mesh != nullptr) m_from_mesh->reset();
 }
 
 bool NXControl::is_idle (void)
 {
+    // Host pipes are excluded here as they are not involved in the execution loop
     return m_to_mesh->is_idle() && m_from_mesh->is_idle();
 }
 
