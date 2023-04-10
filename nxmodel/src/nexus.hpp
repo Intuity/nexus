@@ -22,8 +22,8 @@
 #include <tuple>
 
 #include "nxcontrol.hpp"
+#include "nxcontrolpipe.hpp"
 #include "nxmesh.hpp"
-#include "nxmessagepipe.hpp"
 
 #ifndef __NEXUS_HPP__
 #define __NEXUS_HPP__
@@ -73,23 +73,23 @@ namespace NXModel {
          */
         std::shared_ptr<NXMesh> get_mesh (void) { return m_mesh; }
 
-        /** Return a pointer to the ingress pipe
+        /** Return a pointer to the pipe from the host
          *
-         * @return pointer to instance of NXMessagePipe
+         * @return pointer to instance of NXControlPipe
          */
-        std::shared_ptr<NXMessagePipe> get_ingress (void) { return m_ingress; }
+        std::shared_ptr<NXControlPipe> get_from_host (void) { return m_control->get_from_host(); }
 
-        /** Return a pointer to the egress pipe
+        /** Return a pointer to the pipe towards the host
          *
-         * @return pointer to instance of NXMessagePipe
+         * @return pointer to instance of NXControlPipe
          */
-        std::shared_ptr<NXMessagePipe> get_egress (void) { return m_egress; }
+        std::shared_ptr<NXControlPipe> get_to_host (void) { return m_control->get_to_host(); }
 
         /** Run for a specified number of cycles
          *
          * @param cycles number of cycles to run for
          */
-        void run (uint32_t cycles);
+        void run (uint32_t cycles, bool with_trigger=true);
 
         /** Dump a VCD file
          *

@@ -65,6 +65,7 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                   << std::hex << std::setw(8) << std::setfill('0') << instr;
             // Load in four 8-bit chunks
             for (uint32_t idx = 0; idx < 4; idx++) {
+                // Build the mesh message
                 node_load_t msg;
                 msg.header.target.row    = row;
                 msg.header.target.column = column;
@@ -72,7 +73,13 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
                 msg.address              = (address << 1) + (idx / 2);
                 msg.slot                 = (idx % 2);
                 msg.data                 = (instr >> (8 * idx)) & 0xFF;
-                model->get_ingress()->enqueue(msg);
+                // Build the control message
+                control_request_to_mesh_t req;
+                req.command = CONTROL_REQ_TYPE_TO_MESH;
+                req.message = 0;
+                pack_node_load(msg, (uint8_t *)&req.message);
+                // Queue into the controller
+                model->get_from_host()->enqueue(req);
             }
             // Increment address
             address += 1;
@@ -80,12 +87,8 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
     }
     // Run the mesh until it sinks all of the queued messages
     PLOGD << "[NXLoader] All messages queued, waiting for idle";
-    uint32_t steps = 0;
-    while (!model->get_mesh()->is_idle()) {
-        model->get_mesh()->step(false);
-        steps++;
-    }
-    PLOGD << "[NXLoader] Ran mesh for " << steps << " steps";
+    model->run(1, false);
+    PLOGD << "[NXLoader] Model returned to idle, load complete";
     // Close the file
     fh.close();
 }

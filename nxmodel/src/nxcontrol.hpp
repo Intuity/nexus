@@ -65,6 +65,18 @@ namespace NXModel {
          */
         void attach_from_mesh (std::shared_ptr<NXMessagePipe> pipe) { m_from_mesh = pipe; }
 
+        /** Return a pointer to the pipe from the host
+         *
+         * @return pointer to instance of NXControlPipe
+         */
+        std::shared_ptr<NXControlPipe> get_from_host (void) { return m_from_host; }
+
+        /** Return a pointer to the pipe towards the host
+         *
+         * @return pointer to instance of NXControlPipe
+         */
+        std::shared_ptr<NXControlPipe> get_to_host (void) { return m_to_host; }
+
         /** Resets the state of the controller
          */
         void reset (void);

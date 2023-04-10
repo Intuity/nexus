@@ -48,7 +48,7 @@ void Nexus::reset (void)
     if (m_egress  != NULL) m_egress->reset();
 }
 
-void Nexus::run (uint32_t cycles)
+void Nexus::run (uint32_t cycles, bool with_trigger /* = true */)
 {
     PLOGI << "[Nexus] Running for " << cycles << " cycles";
     // Take timestamp at start of run
@@ -60,7 +60,8 @@ void Nexus::run (uint32_t cycles)
         // Step until mesh and controller become idle
         uint32_t steps = 0;
         do  {
-            m_mesh->step((steps == 0));
+            m_control->step();
+            m_mesh->step(with_trigger && (steps == 0));
             steps++;
         } while (!m_mesh->is_idle() || !m_control->is_idle());
         PLOGD << "[Nexus] Finished cycle " << cycle << " in " << steps << " steps";
