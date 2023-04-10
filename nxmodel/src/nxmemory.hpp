@@ -50,7 +50,7 @@ namespace NXModel {
          * @param data      Data to write
          * @param mask      Mask to modify existing data
          */
-        void write ( uint32_t address, T data, T mask = ((1 << W) - 1) )
+        void write ( uint32_t address, T data, T mask = -1 )
         {
             m_contents[address] = (
                 ((read(address, 0)) & ~mask) |

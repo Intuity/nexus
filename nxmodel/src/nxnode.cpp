@@ -61,14 +61,9 @@ void NXNode::reset (void)
     m_next_pc    = 0;
     m_next_slot  = false;
     for (int i = 0; i < 8; i++) m_registers[i] = 0;
+    // Reset the contents of instruction & data memories
     m_inst_memory.clear();
     m_data_memory.clear();
-    // Insert a wait operation into the bottom of instruction memory
-    m_inst_memory.write(0, (
-        (NXISA::OP_PAUSE << NXISA::OP_LSB  ) |
-        (              1 << NXISA::PC0_LSB ) |
-        (              1 << NXISA::IDLE_LSB)
-    ));
     // Reset all pipes
     for (int idx_pipe = 0; idx_pipe < 4; idx_pipe++)
     {
@@ -79,6 +74,10 @@ void NXNode::reset (void)
             m_outbound[idx_pipe]->reset();
         }
     }
+    // Insert a wait operation into the bottom of instruction memory
+    m_inst_memory.write(0, (NXISA::OP_PAUSE << NXISA::OP_LSB  ) |
+                           (              1 << NXISA::PC0_LSB ) |
+                           (              1 << NXISA::IDLE_LSB));
 }
 
 bool NXNode::is_idle (void)
@@ -103,7 +102,6 @@ void NXNode::step (bool trigger)
     PLOGD << "(" << std::dec << (unsigned int)m_id.row << ", "
                  << std::dec << (unsigned int)m_id.column << ") "
           << "Step " << (trigger ? "with" : "without") << " trigger";
-
 
     // If evaluation caused by a global trigger, adopt next PC & slot
     // NOTE: This is done before 'digest' so that 'm_slot' has the correct
@@ -343,7 +341,8 @@ bool NXNode::evaluate ( bool trigger )
                              << std::dec << (unsigned int)m_id.column << ") "
                       << "@ 0x" << std::hex << m_pc << " "
                       << "Waiting to go to 0x" << std::hex << m_next_pc << " "
-                      << (m_idle ? "with" : "without") << " idle";
+                      << (m_idle ? "with" : "without") << " idle "
+                      << "(0x" << std::hex << (unsigned int)raw << ")";
                 break;
             }
             case NXISA::OP_TRUTH: {

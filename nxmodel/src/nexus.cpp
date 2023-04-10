@@ -38,6 +38,8 @@ Nexus::Nexus (
     m_mesh->get_aggregator(0)->attach(m_egress);
     m_control->attach_to_mesh(m_ingress);
     m_control->attach_from_mesh(m_egress);
+    // Reset all state to initialise
+    reset();
 }
 
 void Nexus::reset (void)
