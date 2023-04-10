@@ -88,6 +88,12 @@ namespace NXModel {
          */
         void step (bool trigger);
 
+        /** Populate an array of all the outputs from the mesh
+         *
+         * @param outputs array to populate with the output state
+         */
+        void get_outputs (uint8_t * outputs);
+
     private:
 
         // =====================================================================

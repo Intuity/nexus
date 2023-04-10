@@ -54,59 +54,19 @@ void Nexus::run (uint32_t cycles)
     // Take timestamp at start of run
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     // Run for the requested number of cycles
+    uint8_t outputs[NXAggregator::SLOTS * m_columns];
     for (uint32_t cycle = 0; cycle < cycles; cycle++) {
         PLOGD << "[Nexus] Starting cycle " << cycle;
-        // Step until idle
+        // Step until mesh and controller become idle
         uint32_t steps = 0;
         do  {
             m_mesh->step((steps == 0));
             steps++;
-        } while (!m_mesh->is_idle());
+        } while (!m_mesh->is_idle() || !m_control->is_idle());
         PLOGD << "[Nexus] Finished cycle " << cycle << " in " << steps << " steps";
-        // Summarise final output state
-        summary_t * summary = new summary_t();
-        // - Base the summary on the previous cycle
-        if (m_output.size() > 0) {
-            summary_t * last = m_output.back();
-            for (typename summary_t::iterator it = last->begin(); it != last->end(); it++) {
-                output_key_t key   = it->first;
-                bool         state = it->second;
-                (*summary)[key] = state;
-            }
-        }
-        // - Digest all queued egress messages
-        while (!m_egress->is_idle()) {
-            node_header_t header = m_egress->next_header();
-            switch (header.command) {
-                // Summarise final signal state
-                case NODE_COMMAND_SIGNAL : {
-                    node_signal_t msg;
-                    m_egress->dequeue(msg);
-                    output_key_t key = { msg.header.target.row,
-                                         msg.header.target.column,
-                                         msg.address };
-                    (*summary)[key] = msg.data;
-                    break;
-                }
-                // Anything else, just drop
-                default : {
-                    m_egress->dequeue_raw();
-                    continue;
-                }
-            }
-        }
-        // - Summarise the output
-        PLOGD << "[Nexus] Cycle " << cycle << " state: ";
-        for (typename summary_t::iterator it = summary->begin(); it != summary->end(); it++) {
-            output_key_t key   = it->first;
-            uint8_t      state = it->second;
-            PLOGD << " - "               << std::get<0>(key)
-                  << ", "                << std::get<1>(key)
-                  << ", "                << std::get<2>(key)
-                  << " = 0x" << std::hex << (unsigned int)state;
-        }
-        // Record state
-        m_output.push_back(summary);
+        // Update the controller's output state
+        m_mesh->get_outputs(outputs);
+        m_control->update_outputs(outputs);
     }
     // Work out delta
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

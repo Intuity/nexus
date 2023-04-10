@@ -115,3 +115,10 @@ void NXMesh::step (bool trigger)
         for (uint32_t column = 0; column < m_columns; column++)
             (*m_nodes[row])[column]->step(trigger);
 }
+
+void NXMesh::get_outputs (uint8_t * outputs)
+{
+    for (unsigned int column = 0; column < m_columns; column++)
+        for (unsigned int slot = 0; slot < NXAggregator::SLOTS; slot++)
+            outputs[(column * NXAggregator::SLOTS) + slot] = get_aggregator(column)->get_output(slot);
+}

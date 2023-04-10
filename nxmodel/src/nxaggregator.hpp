@@ -30,8 +30,8 @@ namespace NXModel {
     class NXAggregator {
     public:
 
-        const unsigned int SLOTS  = 4;
-        const unsigned int SLOT_W = 8;
+        static const unsigned int SLOTS  = 4;
+        static const unsigned int SLOT_W = 8;
 
         // =====================================================================
         // Constructor
@@ -102,6 +102,17 @@ namespace NXModel {
         /** Performs a single step of execution
          */
         void step ();
+
+        /** Get the state of an output slot
+         *
+         * @param slot  The slot index to read
+         * @returns The value held in that slot
+         */
+        uint8_t get_output (unsigned int slot)
+        {
+            assert(slot < SLOTS);
+            return m_outputs[slot];
+        }
 
     private:
 

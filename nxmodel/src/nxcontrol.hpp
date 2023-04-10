@@ -17,8 +17,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "nxaggregator.hpp"
 #include "nxconstants.hpp"
 #include "nxcontrolpipe.hpp"
+#include "nxmesh.hpp"
 #include "nxmessagepipe.hpp"
 
 #ifndef __NXCONTROL_HPP__
@@ -41,8 +43,9 @@ namespace NXModel {
         )   : m_rows    ( rows    )
             , m_columns ( columns )
         {
-            m_to_host   = std::make_shared<NXControlPipe>();
-            m_from_host = std::make_shared<NXControlPipe>();
+            m_to_host     = std::make_shared<NXControlPipe>();
+            m_from_host   = std::make_shared<NXControlPipe>();
+            m_last_output = new uint8_t[columns * NXAggregator::SLOTS];
             reset();
         }
 
@@ -77,6 +80,12 @@ namespace NXModel {
          */
         void step ();
 
+        /** Update output state
+         *
+         * @param outputs   array of output slot states
+         */
+        void update_outputs (uint8_t * outputs);
+
     private:
 
         // =====================================================================
@@ -98,6 +107,9 @@ namespace NXModel {
         // Message pipes to/from mesh
         std::shared_ptr<NXMessagePipe> m_to_mesh;
         std::shared_ptr<NXMessagePipe> m_from_mesh;
+
+        // Track the last output state
+        uint8_t * m_last_output;
 
     };
 }
