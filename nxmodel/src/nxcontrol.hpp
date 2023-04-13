@@ -40,8 +40,16 @@ namespace NXModel {
         NXControl (
               unsigned int rows
             , unsigned int columns
-        )   : m_rows    ( rows    )
-            , m_columns ( columns )
+        )   : m_rows       ( rows    )
+            , m_columns    ( columns )
+            , m_active     ( false   )
+            , m_mesh_idle  ( true    )
+            , m_agg_idle   ( true    )
+            , m_seen_low   ( false   )
+            , m_first_tick ( true    )
+            , m_req_reset  ( false   )
+            , m_cycle      ( 0       )
+            , m_countdown  ( 0       )
         {
             m_to_host     = std::make_shared<NXControlPipe>();
             m_from_host   = std::make_shared<NXControlPipe>();
@@ -98,6 +106,21 @@ namespace NXModel {
          */
         void update_outputs (uint8_t * outputs);
 
+        bool get_active (void) { return m_active; }
+        void set_mesh_idle (bool idle)
+        {
+            m_mesh_idle  = idle;
+            m_seen_low  |= ~idle;
+        }
+        void set_agg_idle (bool idle) { m_agg_idle = idle; }
+        bool get_seen_low (void) { return m_seen_low; }
+        bool get_first_tick (void) { return m_first_tick; }
+        bool get_req_reset (void) { return m_req_reset; }
+        unsigned int get_cycle (void) { return m_cycle; }
+        unsigned int get_countdown (void) { return m_countdown; }
+
+        void cycle_complete (void);
+
     private:
 
         // =====================================================================
@@ -122,6 +145,16 @@ namespace NXModel {
 
         // Track the last output state
         uint8_t * m_last_output;
+
+        // Control state
+        bool         m_active;
+        bool         m_mesh_idle;
+        bool         m_agg_idle;
+        bool         m_seen_low;
+        bool         m_first_tick;
+        bool         m_req_reset;
+        unsigned int m_cycle;
+        unsigned int m_countdown;
 
     };
 }

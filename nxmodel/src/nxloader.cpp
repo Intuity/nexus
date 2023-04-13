@@ -87,7 +87,7 @@ void NXLoader::load(Nexus * model, std::filesystem::path path, bool verbose)
     }
     // Run the mesh until it sinks all of the queued messages
     PLOGD << "[NXLoader] All messages queued, waiting for idle";
-    model->run(1, false);
+    model->step();
     PLOGD << "[NXLoader] Model returned to idle, load complete";
     // Close the file
     fh.close();

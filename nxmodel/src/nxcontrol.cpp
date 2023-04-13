@@ -27,6 +27,14 @@ using namespace NXConstants;
 void NXControl::reset (void)
 {
     memset((void *)m_last_output, 0, (size_t)m_columns);
+    m_active     = false;
+    m_mesh_idle  = true;
+    m_agg_idle   = true;
+    m_seen_low   = false;
+    m_first_tick = true;
+    m_req_reset  = false;
+    m_cycle      = 0;
+    m_countdown  = 0;
     m_to_host->reset();
     m_from_host->reset();
     if (m_to_mesh   != nullptr) m_to_mesh->reset();
@@ -39,6 +47,15 @@ bool NXControl::is_idle (void)
     return m_to_mesh->is_idle() && m_from_mesh->is_idle();
 }
 
+void NXControl::cycle_complete (void) {
+    m_countdown = (m_countdown > 0) ? (m_countdown - 1) : 0;
+    m_cycle     = (m_cycle + 1) % TIMER_WIDTH;
+    m_active    = m_countdown > 0;
+    PLOGD << "[NXControl] At cycle " << m_cycle << " with " << m_countdown
+          << " cycles remaining and in an " << (m_active ? "ACTIVE" : "INACTIVE")
+          << " state";
+}
+
 void NXControl::step (void)
 {
     // Digest all messages from the host
@@ -46,35 +63,39 @@ void NXControl::step (void)
         assert(m_from_host->next_is_request());
         switch (m_from_host->next_request_type()) {
             case CONTROL_REQ_TYPE_READ_PARAMS: {
+                PLOGD << "[NXControl] Servicing read parameters request";
                 m_from_host->dequeue_raw();
                 control_response_parameters_t response;
                 response.format      = CONTROL_RESP_TYPE_PARAMS;
                 response.id          = HW_DEV_ID;
                 response.ver_major   = HW_VER_MAJOR;
                 response.ver_minor   = HW_VER_MINOR;
-                response.timer_width = 0; // TODO
+                response.timer_width = TIMER_WIDTH;
                 response.rows        = m_rows;
                 response.columns     = m_columns;
-                response.node_regs   = 0; // TODO
+                response.node_regs   = 8;
                 m_to_host->enqueue(response);
                 break;
             }
             case CONTROL_REQ_TYPE_READ_STATUS: {
+                PLOGD << "[NXControl] Servicing read status request";
                 m_from_host->dequeue_raw();
                 control_response_status_t response;
                 response.format     = CONTROL_RESP_TYPE_STATUS;
-                response.active     = 0; // TODO
-                response.mesh_idle  = 0; // TODO
-                response.agg_idle   = 0; // TODO
-                response.seen_low   = 0; // TODO
-                response.first_tick = 0; // TODO
-                response.cycle      = 0; // TODO
-                response.countdown  = 0; // TODO
+                response.active     = m_active     ? 1 : 0;
+                response.mesh_idle  = m_mesh_idle  ? 1 : 0;
+                response.agg_idle   = m_agg_idle   ? 1 : 0;
+                response.seen_low   = m_seen_low   ? 1 : 0;
+                response.first_tick = m_first_tick ? 1 : 0;
+                response.cycle      = m_cycle;
+                response.countdown  = m_countdown;
                 m_to_host->enqueue(response);
                 break;
             }
             case CONTROL_REQ_TYPE_SOFT_RESET: {
-                assert(!"Not yet implemented - SOFT_RESET");
+                PLOGD << "[NXControl] Servicing reset request";
+                m_from_host->dequeue_raw();
+                m_req_reset = true;
                 break;
             }
             case CONTROL_REQ_TYPE_CONFIGURE: {
@@ -82,10 +103,17 @@ void NXControl::step (void)
                 break;
             }
             case CONTROL_REQ_TYPE_TRIGGER: {
-                assert(!"Not yet implemented - TRIGGER");
+                control_request_trigger_t request;
+                m_from_host->dequeue(request);
+                m_countdown = request.cycles;
+                m_active    = (request.active != 0);
+                PLOGD << "[NXControl] Servicing trigger request with active state of "
+                      << (m_active ? "ACTIVE" : "INACTIVE")
+                      << " for " << m_countdown << " cycles";
                 break;
             }
             case CONTROL_REQ_TYPE_TO_MESH: {
+                PLOGD << "[NXControl] Servicing message forwarding request";
                 // Pickup request from pipe
                 control_request_to_mesh_t request;
                 m_from_host->dequeue(request);

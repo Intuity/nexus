@@ -50,33 +50,73 @@ void Nexus::reset (void)
     if (m_egress  != NULL) m_egress->reset();
 }
 
-void Nexus::run (uint32_t cycles, bool with_trigger /* = true */)
+void Nexus::run (uint32_t cycles)
 {
     PLOGI << "[Nexus] Running for " << cycles << " cycles";
     // Take timestamp at start of run
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    // Run for the requested number of cycles
-    uint8_t outputs[NXAggregator::SLOTS * m_columns];
-    for (uint32_t cycle = 0; cycle < cycles; cycle++) {
-        PLOGD << "[Nexus] Starting cycle " << cycle;
-        // Step until mesh and controller become idle
-        uint32_t steps = 0;
-        do  {
-            m_control->step();
-            m_mesh->step(with_trigger && (steps == 0));
-            steps++;
-        } while (!m_mesh->is_idle() || !m_control->is_idle());
-        PLOGD << "[Nexus] Finished cycle " << cycle << " in " << steps << " steps";
-        // Update the controller's output state
-        m_mesh->get_outputs(outputs);
-        m_control->update_outputs(outputs);
-    }
+    // Queue a trigger request
+    control_request_trigger_t trigger;
+    trigger.command  = CONTROL_REQ_TYPE_TRIGGER;
+    trigger.col_mask = 0xFFFF;
+    trigger.cycles   = cycles;
+    trigger.active   = 1;
+    m_control->get_from_host()->enqueue(trigger);
+    // Run until exhausted
+    while (step()) /* ... */;
     // Work out delta
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     uint64_t delta_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
     uint64_t rate     = delta_ns / ((uint64_t)cycles);
     uint64_t freq     = (1E9 / rate);
     PLOGI << "[Nexus] Achieved frequency of " << freq << " Hz";
+}
+
+bool Nexus::step (void)
+{
+    // Run controller until ingress is idle
+    while (!m_control->get_from_host()->is_idle()) m_control->step();
+    // Detect reset request
+    if (m_control->get_req_reset()) {
+        reset();
+        return false;
+    }
+    // If the controller isn't active, run until the mesh reaches an idle state
+    // (sinks queued messages)
+    if (!m_control->get_active()) {
+        while (!m_mesh->is_idle()) {
+            m_control->step();
+            m_mesh->step(false);
+        }
+        return false;
+    }
+    // Run a cycle in the mesh
+    PLOGD << "[Nexus] Starting cycle " << m_control->get_cycle();
+    m_control->set_mesh_idle(false);
+    m_control->set_agg_idle(false);
+    unsigned int steps = 0;
+    do {
+        m_mesh->step(steps == 0);
+        m_control->step();
+        steps++;
+    } while (!m_mesh->is_idle());
+    m_control->set_mesh_idle(true);
+    m_control->set_agg_idle(true);
+    // Wait for controller to return to idle
+    while (!m_control->is_idle()) m_control->step();
+    // Update the output state
+    uint8_t outputs[NXAggregator::SLOTS * m_columns];
+    m_mesh->get_outputs(outputs);
+    m_control->update_outputs(outputs);
+    // Debug log
+    PLOGD << "[Nexus] Finished cycle " << m_control->get_cycle()
+          << " in " << steps << " steps";
+    // Mark the end of the cycle
+    m_control->cycle_complete();
+    // Run controller until egress is idle
+    while (!m_control->get_to_host()->is_idle()) m_control->step();
+    // Return whether controller is still active
+    return m_control->get_active();
 }
 
 void Nexus::dump_vcd (const std::string path)

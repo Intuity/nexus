@@ -89,7 +89,13 @@ namespace NXModel {
          *
          * @param cycles number of cycles to run for
          */
-        void run (uint32_t cycles, bool with_trigger=true);
+        void run (uint32_t cycles);
+
+        /** Run for a single simulated cycle
+         *
+         * @returns whether the mesh is active at the end of the cycle
+         */
+        bool step (void);
 
         /** Dump a VCD file
          *
